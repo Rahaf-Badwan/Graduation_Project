@@ -6,3 +6,7 @@ google-generativeai
 google-genai
 faiss-cpu
 numpy
+sentence-transformers
+pypdf
+pytesseract
+pdf2image

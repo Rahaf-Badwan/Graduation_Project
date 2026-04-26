@@ -19,6 +19,15 @@ from db import get_db
 # ضع مفتاح Groq هنا
 os.environ["GROQ_API_KEY"] = "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"
 
+FORMAT_INSTRUCTION = (
+    "\n\nFORMATTING RULES — always follow these:\n"
+    "- Use bullet points (- item) for lists, never long paragraphs.\n"
+    "- Use **bold** to highlight key terms, names, numbers, and conclusions.\n"
+    "- Use relevant emojis naturally (📊 stats, ✅ positives, ⚠️ warnings, 🏆 top results, 📄 files).\n"
+    "- Keep each point short and clear.\n"
+    "- If comparing, use: **Category**: value.\n"
+)
+
 INDEX_DIR = "faiss_index"
 INDEX_FILE = os.path.join(INDEX_DIR, "docs.index")
 META_FILE = os.path.join(INDEX_DIR, "metadata.pkl")
@@ -143,41 +152,49 @@ def _list_all_pdf_files():
 
 
 def _fetch_projects() -> List[Dict[str, Any]]:
-    db = get_db()
-    cursor = db.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT p.project_id, p.title, p.abstract, p.keywords, p.project_type, p.status,
-               p.final_score, p.submission_date,
-               u.full_name AS supervisor_name
-        FROM projects p
-        LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
-        LEFT JOIN users u ON u.user_id = f.user_id
-        ORDER BY p.project_id DESC
-    """)
-    rows = cursor.fetchall()
-    cursor.close()
-    db.close()
-    return rows
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT p.project_id, p.title, p.abstract, p.keywords, p.project_type, p.status,
+                   p.final_score, p.submission_date,
+                   u.full_name AS supervisor_name
+            FROM projects p
+            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+            LEFT JOIN users u ON u.user_id = f.user_id
+            ORDER BY p.project_id DESC
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+        return rows
+    except Exception as e:
+        print(f"[ai_engine] DB error in _fetch_projects: {e}")
+        return []
 
 
 def _fetch_supervisor_stats() -> List[Dict[str, Any]]:
-    db = get_db()
-    cursor = db.cursor(dictionary=True)
-    cursor.execute("""
-        SELECT u.full_name AS supervisor_name,
-               COUNT(DISTINCT p.project_id) AS project_count,
-               ROUND(AVG(p.final_score), 2) AS avg_score
-        FROM faculty f
-        JOIN users u ON u.user_id = f.user_id
-        LEFT JOIN projects p ON p.supervisor_id = f.faculty_id
-        WHERE u.role = 'supervisor'
-        GROUP BY f.faculty_id, u.full_name
-        ORDER BY project_count DESC, u.full_name ASC
-    """)
-    rows = cursor.fetchall()
-    cursor.close()
-    db.close()
-    return rows
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT u.full_name AS supervisor_name,
+                   COUNT(DISTINCT p.project_id) AS project_count,
+                   ROUND(AVG(p.final_score), 2) AS avg_score
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            LEFT JOIN projects p ON p.supervisor_id = f.faculty_id
+            WHERE u.role = 'supervisor'
+            GROUP BY f.faculty_id, u.full_name
+            ORDER BY project_count DESC, u.full_name ASC
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+        return rows
+    except Exception as e:
+        print(f"[ai_engine] DB error in _fetch_supervisor_stats: {e}")
+        return []
 
 
 def _match_project_name(question: str, projects: List[Dict[str, Any]]) -> Dict[str, Any] | None:
@@ -265,7 +282,7 @@ def _build_context(question: str) -> str:
     ]
 
     return (
-        "You are APMS AI assistant for Birzeit University.\n"
+        "You are APMS AI assistant for Birzeit University.\n" + FORMAT_INSTRUCTION +
         "Rules:\n"
         "1. Prefer answering from uploaded PDF files when relevant chunks are found.\n"
         "2. If PDFs do not contain the answer, use APMS database records.\n"
@@ -290,7 +307,7 @@ def ask_apms_ai(question: str) -> str:
     if not _needs_document_search(question):
         return _call_ai(
             "You are APMS AI assistant for Birzeit University — a friendly and helpful assistant.\n"
-            "Answer the following question naturally and helpfully.\n"
+            "Answer the following question naturally and helpfully." + FORMAT_INSTRUCTION + "\n"
             "Do NOT mention PDFs or project databases unless directly asked.\n\n"
             "User: " + question
         )
@@ -310,7 +327,7 @@ def ask_apms_ai(question: str) -> str:
                 "[File: " + str(hit["meta"].get("file")) + " | Chunk: " + str(hit["meta"].get("chunk_id")) + "]\n" + hit["text"]
                 for hit in pdf_hits)
             return _call_ai(
-                "Extract and list all project names mentioned in the following uploaded PDF chunks.\n"
+                "Extract and list all project names mentioned in the following uploaded PDF chunks.\n" + FORMAT_INSTRUCTION +
                 "Return only the project names as a clean bullet list.\n"
                 "Start with: 'Based on uploaded PDFs:'\n\n" + pdf_context)
 
@@ -322,7 +339,7 @@ def ask_apms_ai(question: str) -> str:
             for hit in pdf_hits)
         result = _call_ai(
             "You are APMS AI assistant.\n"
-            "Answer the user's question using the uploaded PDF context.\n"
+            "Answer the user's question using the uploaded PDF context.\n" + FORMAT_INSTRUCTION +
             "If found in PDFs, start with: 'Based on uploaded PDFs:'\n"
             "Otherwise give a general AI answer.\n\n"
             "User question: " + question + "\n\n"

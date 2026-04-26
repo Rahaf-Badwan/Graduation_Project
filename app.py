@@ -381,8 +381,18 @@ def api_ai_ask():
     if not question:
         return jsonify({"error": "Please write a question before sending.", "session_id": session_id}), 400
 
-    answer = ask_apms_ai(question)
-    saved, save_error = _save_ai_exchange(session["user_id"], session_id, question, answer)
+    try:
+        answer = ask_apms_ai(question)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"AI engine error: {exc}", "session_id": session_id}), 500
+
+    try:
+        saved, save_error = _save_ai_exchange(session["user_id"], session_id, question, answer)
+    except Exception as exc:
+        saved, save_error = False, str(exc)
+
     payload = {"answer": answer, "session_id": session_id, "archive_saved": saved}
     if save_error:
         payload["archive_error"] = save_error
