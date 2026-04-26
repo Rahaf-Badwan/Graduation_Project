@@ -1,0 +1,48 @@
+/* Coordinator shell aligned with student shell */
+.sidebar .sb-toggle { display: inline-flex !important; }
+.coordinator-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.coordinator-nav .sb-section {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--color-text-secondary);
+  padding: 14px 14px 6px;
+}
+.sidebar.collapsed .sb-section {
+  display: none;
+}
+.coordinator-nav .sb-item {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+.coordinator-nav .sb-item:visited {
+  color: inherit;
+}
+.content-area {
+  background: var(--color-background-secondary);
+}
+.content-area .page {
+  display: block;
+  padding: 20px;
+  min-height: 100%;
+}
+.content-area .page.page-single {
+  display: block;
+}
+.page > :last-child {
+  margin-bottom: 0;
+}
+@media (max-width: 900px) {
+  .two-col,
+  .form-grid,
+  .stats-row,
+  .three-col,
+  .content-area [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}

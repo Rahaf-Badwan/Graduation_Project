@@ -1,0 +1,41 @@
+{% extends 'head/base.html' %}
+{% block page_title %}Search Projects{% endblock %}
+{% block page_id %}search{% endblock %}
+{% block topbar_title %}Search &amp; Filters{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-search">
+  <div class="card">
+    <div class="card-hd"><span class="card-title">Comprehensive Search Across All Projects</span></div>
+    <div class="search-bar" style="padding:10px 14px">
+      <span class="material-symbols-outlined icon-inline" style="color:var(--color-text-secondary)">search</span>
+      <input placeholder="Search by any criterion — title, student, supervisor, year, grade ..." style="font-size:14px"/>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px"><option>All years</option><option>2025/2026</option><option>2024/2025</option><option>2023/2024</option><option>2022/2023</option></select>
+      <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px"><option>All supervisors</option></select>
+      <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px"><option>All specialties</option></select>
+      <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px"><option>All cases</option><option>Accept</option><option>Rejected</option><option>Under evaluation</option></select>
+      <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px"><option>Sort: Newest</option><option>High Grade</option><option>Oldest</option></select>
+    </div>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">Showing 3 of 314 total projects</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm)">
+        <div style="width:36px;height:36px;background:var(--teal-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--teal)">AP</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Academic Project Lifecycle Management System</div><div style="font-size:11px;color:var(--color-text-secondary)">Rahaf Badwan &middot; Dr. Naima Harbawi &middot; 2025/2026</div></div>
+        <span class="year-tag">2025/2026</span><span class="score-chip sc-b">78.8</span><span class="pill p-review">Under evaluation</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm)">
+        <div style="width:36px;height:36px;background:var(--blue-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--blue)">AI</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">AI-powered disease recognition system</div><div style="font-size:11px;color:var(--color-text-secondary)">Amjad Al-Rimawi &middot; Dr. Mohammed Salem &middot; 2024/2025</div></div>
+        <span class="year-tag">2024/2025</span><span class="score-chip sc-a">92</span><span class="pill p-accepted">Accept</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm)">
+        <div style="width:36px;height:36px;background:var(--green-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--green)">EL</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Adaptive e-learning platform</div><div style="font-size:11px;color:var(--color-text-secondary)">Sara Mousa &middot; Dr. Lina Haddad &middot; 2023/2024</div></div>
+        <span class="year-tag">2023/2024</span><span class="score-chip sc-a">87</span><span class="pill p-accepted">Accept</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,279 @@
+{% extends 'coordinator/base.html' %}
+
+{% block page_title %}Lectures &amp; Deliverables{% endblock %}
+{% block page_id %}lectures{% endblock %}
+{% block topbar_title %}Lectures &amp; Deliverables{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-lectures">
+
+<div class="tab-bar" style="margin-bottom:16px;">
+<button class="tab on" type="button" onclick="showLectureSection('introLectures',this)">Project Introduction</button>
+<button class="tab" type="button" onclick="showLectureSection('gradLectures',this)">Graduation Projects</button>
+</div>
+
+<div id="introLectures">
+
+<div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+<span style="background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">◑ Project Introduction — COMP4200</span>
+<span style="font-size:11px;color:var(--color-text-secondary);">مقدمة المشاريع</span>
+</div>
+
+<div class="card">
+<div class="card-hd">
+<span class="card-title">Coordinator Lectures</span>
+<button class="card-action" type="button">+ Add Lecture</button>
+</div>
+<div class="u-3fa92238">Attendance recorded per lecture — students receive attendance marks.</div>
+
+<div class="lec-card">
+<div class="lec-num u-7dd75b5a">1</div>
+<div class="u-d5e8c5f3">
+<div class="u-d331ec29">Introductory Lecture</div>
+<div class="u-c8be14a8">System overview, requirements, submission steps · Week 1</div>
+<div class="u-dfe4d359">
+<span class="pill p-accepted">Completed</span>
+<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">84 / 98</b></span>
+<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
+</div>
+</div>
+</div>
+
+<div class="lec-card">
+<div class="lec-num u-2fa90a93">2</div>
+<div class="u-d5e8c5f3">
+<div class="u-d331ec29">Formatting & Best Practices</div>
+<div class="u-c8be14a8">Standards, examples from previous projects · Mid-semester</div>
+<div class="u-dfe4d359">
+<span class="pill p-accepted">Completed</span>
+<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">79 / 98</b></span>
+<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
+</div>
+</div>
+</div>
+
+<div class="lec-card u-6e83efb5">
+<div class="lec-num u-7073bc52">3</div>
+<div class="u-d5e8c5f3">
+<div class="u-d331ec29">Turnitin Upload & Similarity</div>
+<div class="u-c8be14a8">Uploading reports, checking similarity, citing sources · Near end</div>
+<div class="u-dfe4d359">
+<span class="pill p-pending">Scheduled</span>
+<input class="field-input u-9d6b4ff1" type="date" />
+<button class="btn btn-primary u-70a7ba83" type="button">Confirm Date</button>
+</div>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-hd">
+<span class="card-title">Deliverables — Project Introduction</span>
+<button class="card-action" type="button">+ Add Deliverable</button>
+</div>
+<div class="u-cebcb327">On-time submission carries marks — monitored by the coordinator</div>
+
+<div class="deliv-row">
+<div class="u-844ebab6">T1</div>
+<div class="u-d5e8c5f3">
+<div class="u-2e61148f">Project Title + Initial Idea</div>
+<div class="u-7d16b22c">Week 3 · Commitment mark: 5 pts</div>
+</div>
+<div class="u-244a7f30">
+<span class="pill p-accepted">Completed</span>
+<div class="u-e19e0a67">89 / 98 submitted</div>
+</div>
+</div>
+
+<div class="deliv-row">
+<div class="u-64d7500e">T2</div>
+<div class="u-d5e8c5f3">
+<div class="u-2e61148f">Chapter One Outline</div>
+<div class="u-7d16b22c">Week 7 · Commitment mark: 10 pts</div>
+</div>
+<div class="u-244a7f30">
+<span class="pill p-review">In Progress</span>
+<div class="u-e19e0a67">61 / 98 submitted</div>
+</div>
+</div>
+
+<div class="deliv-row u-5677897e">
+<div class="u-2d2d4f55">T3</div>
+<div class="u-d5e8c5f3">
+<div class="u-2e61148f">Final Report + Turnitin Upload</div>
+<div class="u-7d16b22c">2 weeks before semester end · 15 pts</div>
+</div>
+<div class="u-244a7f30">
+<span class="pill p-draft">Not Open Yet</span>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-hd"><span class="card-title">Attendance — Project Introduction</span></div>
+<div class="u-77c8140b">
+<table class="reg-table">
+<thead>
+<tr><th>Student</th><th>Lec 1</th><th>Lec 2</th><th>Lec 3</th><th>Total</th></tr>
+</thead>
+<tbody>
+<tr><td>Rahaf Badwan</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
+<tr><td>Salma Al-Khatib</td><td class="u-cfb6c12e">✓</td><td class="u-bc7c441e">✗</td><td class="u-5def8408">—</td><td><b>1/3</b></td></tr>
+<tr><td>Khaled Mansour</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
+<tr><td>Ahmad Al-Arouri</td><td class="u-bc7c441e">✗</td><td class="u-bc7c441e">✗</td><td class="u-5def8408">—</td><td><b class="u-bc7c441e">0/3 ⚑</b></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+</div>
+</div>
+
+<div id="gradLectures" style="display:none;">
+
+<div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+<span style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">✦ Graduation Projects — COMP4201</span>
+<span style="font-size:11px;color:var(--color-text-secondary);">مشاريع التخرج</span>
+</div>
+
+<div class="card">
+<div class="card-hd">
+<span class="card-title">Coordinator Lectures</span>
+<button class="card-action" type="button">+ Add Lecture</button>
+</div>
+<div class="u-3fa92238">Attendance recorded per lecture — students receive attendance marks.</div>
+
+<div class="lec-card">
+<div class="lec-num u-7dd75b5a">1</div>
+<div class="u-d5e8c5f3">
+<div class="u-d331ec29">Graduation Project Guidelines</div>
+<div class="u-c8be14a8">Full project requirements, milestones, committee process · Week 1</div>
+<div class="u-dfe4d359">
+<span class="pill p-accepted">Completed</span>
+<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">72 / 81</b></span>
+<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
+</div>
+</div>
+</div>
+
+<div class="lec-card">
+<div class="lec-num u-2fa90a93">2</div>
+<div class="u-d5e8c5f3">
+<div class="u-d331ec29">Report Writing Standards</div>
+<div class="u-c8be14a8">Structure, chapter breakdown, referencing · Mid-semester</div>
+<div class="u-dfe4d359">
+<span class="pill p-accepted">Completed</span>
+<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">68 / 81</b></span>
+<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
+</div>
+</div>
+</div>
+
+<div class="lec-card u-6e83efb5">
+<div class="lec-num u-7073bc52">3</div>
+<div class="u-d5e8c5f3">
+<div class="u-d331ec29">Discussion Preparation & Presentation</div>
+<div class="u-c8be14a8">How to present to committee, Q&amp;A tips, grading breakdown · Near end</div>
+<div class="u-dfe4d359">
+<span class="pill p-pending">Scheduled</span>
+<input class="field-input u-9d6b4ff1" type="date" />
+<button class="btn btn-primary u-70a7ba83" type="button">Confirm Date</button>
+</div>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-hd">
+<span class="card-title">Deliverables — Graduation Projects</span>
+<button class="card-action" type="button">+ Add Deliverable</button>
+</div>
+<div class="u-cebcb327">On-time submission carries marks — monitored by the coordinator</div>
+
+<div class="deliv-row">
+<div class="u-844ebab6">T1</div>
+<div class="u-d5e8c5f3">
+<div class="u-2e61148f">Project Proposal + Supervisor Approval</div>
+<div class="u-7d16b22c">Week 2 · Commitment mark: 5 pts</div>
+</div>
+<div class="u-244a7f30">
+<span class="pill p-accepted">Completed</span>
+<div class="u-e19e0a67">78 / 81 submitted</div>
+</div>
+</div>
+
+<div class="deliv-row">
+<div class="u-64d7500e">T2</div>
+<div class="u-d5e8c5f3">
+<div class="u-2e61148f">Progress Report (Chapters 1–3)</div>
+<div class="u-7d16b22c">Week 8 · Commitment mark: 10 pts</div>
+</div>
+<div class="u-244a7f30">
+<span class="pill p-review">In Progress</span>
+<div class="u-e19e0a67">55 / 81 submitted</div>
+</div>
+</div>
+
+<div class="deliv-row">
+<div class="u-2d2d4f55">T3</div>
+<div class="u-d5e8c5f3">
+<div class="u-2e61148f">Final Report + Turnitin Upload</div>
+<div class="u-7d16b22c">2 weeks before semester end · 15 pts</div>
+</div>
+<div class="u-244a7f30">
+<span class="pill p-draft">Not Open Yet</span>
+</div>
+</div>
+
+<div class="deliv-row u-5677897e">
+<div class="u-844ebab6">T4</div>
+<div class="u-d5e8c5f3">
+<div class="u-2e61148f">Committee Discussion Scheduling</div>
+<div class="u-7d16b22c">End of semester · Coordinator arranges slots</div>
+</div>
+<div class="u-244a7f30">
+<span class="pill p-draft">Not Open Yet</span>
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-hd"><span class="card-title">Attendance — Graduation Projects</span></div>
+<div class="u-77c8140b">
+<table class="reg-table">
+<thead>
+<tr><th>Group</th><th>Lec 1</th><th>Lec 2</th><th>Lec 3</th><th>Total</th></tr>
+</thead>
+<tbody>
+<tr><td>G01 — Rahaf Badwan &amp; team</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
+<tr><td>G02 — Salma Al-Khatib &amp; team</td><td class="u-cfb6c12e">✓</td><td class="u-bc7c441e">✗</td><td class="u-5def8408">—</td><td><b>1/3</b></td></tr>
+<tr><td>G03 — Khaled Mansour &amp; team</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
+<tr><td>G04 — Maryam Al-Jayousi</td><td class="u-bc7c441e">✗</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>1/3</b></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+
+<script>
+function showLectureSection(id,btn){
+document.getElementById('introLectures').style.display='none';
+document.getElementById('gradLectures').style.display='none';
+
+document.getElementById(id).style.display='block';
+
+document.querySelectorAll('#pg-lectures > .tab-bar .tab').forEach(tab=>{
+tab.classList.remove('on');
+});
+
+btn.classList.add('on');
+}
+</script>
+
+{% endblock %}

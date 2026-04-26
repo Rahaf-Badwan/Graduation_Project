@@ -1,0 +1,73 @@
+{% extends 'head/base.html' %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_id %}profile{% endblock %}
+{% block topbar_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-profile">
+  <div class="profile-header">
+    <div class="profile-avatar-lg">{{ session.avatar_initials }}</div>
+    <div style="flex:1">
+      <div style="font-size:18px;font-weight:600;color:var(--color-text-primary)">{{ session.full_name }}</div>
+      <div style="font-size:13px;color:var(--color-text-secondary);margin-top:2px">Head of Department of Computer Science — Birzeit University</div>
+      <div style="margin-top:6px;display:flex;gap:6px">
+        <span class="pill p-active">Head of Department</span>
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--blue-light);color:var(--blue)">COMP4200</span>
+      </div>
+    </div>
+    <button class="btn btn-outline">Update Profile</button>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Personal Information</span></div>
+      <div class="field-wrap">
+        <div class="field-label">Full Name</div>
+        <input class="field-input" value="{{ session.full_name }}"/>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">University ID</div>
+        <input class="field-input" value="{{ session.university_id }}" readonly style="opacity:0.6"/>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Email</div>
+        <input class="field-input" placeholder="your.email@birzeit.edu"/>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Office Number</div>
+        <input class="field-input" placeholder="e.g. CS-201"/>
+      </div>
+      <div class="btn-row"><button class="btn btn-primary">Save Changes</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Statistics as Head of Department</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="stat"><div class="stat-num" style="color:var(--teal);font-size:18px">312</div><div class="stat-label">Current Semester Projects</div></div>
+        <div class="stat"><div class="stat-num" style="color:var(--blue);font-size:18px">14</div><div class="stat-label">Department Supervisors</div></div>
+        <div class="stat"><div class="stat-num" style="color:var(--green);font-size:18px">95%</div><div class="stat-label">Acceptance Rate</div></div>
+        <div class="stat"><div class="stat-num" style="color:var(--purple);font-size:18px">4</div><div class="stat-label">Years Using APMS</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Change Password</span></div>
+      <form method="POST" action="/head/profile/change-password">
+        <div class="field-wrap">
+          <div class="field-label">Current Password</div>
+          <input class="field-input" type="password" name="current_password" placeholder="••••••••"/>
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">New Password</div>
+          <input class="field-input" type="password" name="new_password" placeholder="••••••••"/>
+        </div>
+        <div class="field-wrap" style="margin-bottom:10px">
+          <div class="field-label">Confirm Password</div>
+          <input class="field-input" type="password" name="confirm_password" placeholder="••••••••"/>
+        </div>
+        <div class="btn-row"><button type="submit" class="btn btn-primary">Update Password</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

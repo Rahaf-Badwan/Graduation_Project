@@ -1,0 +1,57 @@
+<div class="sidebar collapsed" id="sidebar">
+  <div class="sb-top">
+    <button class="sb-toggle" onclick="toggleSidebar()" title="Menu">
+      <span class="material-symbols-outlined icon-inline">menu</span>
+    </button>
+  </div>
+
+  <div class="sb-profile" onclick="window.location.href='/student/profile'" title="My Profile">
+    <div class="sb-avatar">{{ session.avatar_initials }}</div>
+    <div class="sb-name">{{ session.full_name }}</div>
+    <div class="sb-id">{{ session.university_id }}</div>
+    <div class="sb-role">Student</div>
+  </div>
+
+  <div class="sb-nav">
+    <a class="sb-item {% if request.path == '/student/' %}on{% endif %}" data-page="dashboard" href="/student/">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
+      <span class="sb-label">Dashboard</span>
+    </a>
+    <a class="sb-item {% if request.path == '/student/submit' %}on{% endif %}" data-page="submit" href="/student/submit">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">upload_file</span></span>
+      <span class="sb-label">Submit Project</span>
+    </a>
+    <a class="sb-item {% if request.path == '/student/status' %}on{% endif %}" data-page="status" href="/student/status">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">schedule</span></span>
+      <span class="sb-label">Project Status</span>
+    </a>
+    <a class="sb-item {% if request.path == '/student/feedback' %}on{% endif %}" data-page="feedback" href="/student/feedback">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">reviews</span></span>
+      <span class="sb-label">Feedback</span>
+    </a>
+    <a class="sb-item {% if request.path == '/student/challenges' %}on{% endif %}" data-page="challenges" href="/student/challenges">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">flag</span></span>
+      <span class="sb-label">Challenges &amp; Reflections</span>
+    </a>
+    <a class="sb-item {% if request.path == '/student/search' %}on{% endif %}" data-page="search" href="/student/search">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
+      <span class="sb-label">Archived Projects</span>
+    </a>
+    <a class="sb-item {% if request.path == '/student/notifs' %}on{% endif %}" data-page="notifs" href="/student/notifs">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
+      <span class="sb-label">Notifications</span>
+      <span class="sb-badge">3</span>
+    </a>
+    <a class="sb-item {% if request.path == '/student/ai' %}on{% endif %}" data-page="ai" href="/student/ai">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
+      <span class="sb-label">AI Assistant</span>
+    </a>
+  </div>
+
+  <div class="sb-footer">
+    <a class="sb-footer-item" href="/logout" style="text-decoration:none;color:inherit">
+      <span class="material-symbols-outlined icon-inline">logout</span>
+      <span>&nbsp;Sign Out</span>
+    </a>
+  </div>
+</div>

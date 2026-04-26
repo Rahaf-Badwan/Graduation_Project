@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APMS — {% block page_title %}Dashboard{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/head/styles.css') }}" />
+</head>
+
+<body data-page="{% block page_id %}dashboard{% endblock %}">
+  <div class="app-wrapper">
+    <div class="shell">
+
+      {% include 'head/components/sidebar.html' %}
+
+      <div class="main">
+        <div class="topbar">
+          <div class="tb-left">
+            <div class="tb-titles">
+              <div class="tb-title">{% block topbar_title %}Dashboard{% endblock %}</div>
+              <div class="tb-sub">COMP4200 · Semester 2025/2026</div>
+            </div>
+          </div>
+          <div class="tb-right">
+            <div class="tb-profile-btn" onclick="window.location.href='/head/profile'" title="My Profile">
+              {{ session.avatar_initials }}
+            </div>
+            <div class="tb-notif" onclick="window.location.href='/head/notifs'" title="Notifications">
+              <span class="material-symbols-outlined icon-inline">notifications</span>
+              <div class="tb-notif-dot"></div>
+            </div>
+            <div class="tb-logo">APMS</div>
+          </div>
+        </div>
+
+        <div class="content-area">
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      © 2026 <strong>Birzeit University</strong> — Department of Computer Science · All Rights Reserved · APMS v1.0
+    </footer>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/head/app.js') }}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

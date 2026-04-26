@@ -1,0 +1,58 @@
+{% extends 'coordinator/base.html' %}
+
+{% block page_title %}Profile{% endblock %}
+{% block page_id %}profile{% endblock %}
+{% block topbar_title %}Profile{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-profile">
+        <div class="profile-header">
+          <div class="profile-avatar-lg">AS</div>
+          <div class="u-d5e8c5f3">
+            <div class="u-01c72404">Dr. Ahmad Abu Sneineh</div>
+            <div class="u-be9d84ea">Coordinator of COMP4200 · Computer Science Department</div>
+            <div class="u-fa567a25">
+              <span class="pill p-review">Active Coordinator</span>
+              <span class="u-6107fe4d">COMP4200</span>
+            </div>
+          </div>
+          <button class="btn btn-outline" type="button">Edit Profile</button>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-hd"><span class="card-title">Personal Information</span></div>
+            <div class="field-wrap">
+              <div class="field-label">Full Name</div><input class="field-input" value="Dr. Ahmad Abu Sneineh" />
+            </div>
+            <div class="field-wrap">
+              <div class="field-label">Email</div><input class="field-input" value="abuseneina@birzeit.edu" />
+            </div>
+            <div class="field-wrap">
+              <div class="field-label">Office Number</div><input class="field-input" value="Science Building — 214" />
+            </div>
+            <div class="btn-row"><button class="btn btn-primary" type="button">Save Changes</button></div>
+          </div>
+          <div class="card">
+            <div class="card-hd"><span class="card-title">My Statistics as Coordinator</span></div>
+            <div class="u-e1357c22">
+              <div class="stat">
+                <div class="stat-num u-8351a61a">312</div>
+                <div class="stat-label">Projects Overseen</div>
+              </div>
+              <div class="stat">
+                <div class="stat-num u-33340b68">95%</div>
+                <div class="stat-label">Acceptance Rate</div>
+              </div>
+              <div class="stat">
+                <div class="stat-num u-c0077588">18</div>
+                <div class="stat-label">Committees Formed</div>
+              </div>
+              <div class="stat">
+                <div class="stat-num u-a28c35c7">83.4</div>
+                <div class="stat-label">Average Scores</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+{% endblock %}

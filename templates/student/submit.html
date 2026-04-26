@@ -1,0 +1,63 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Submit Project{% endblock %}
+{% block page_id %}submit{% endblock %}
+{% block topbar_title %}Submit Project{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-submit">
+  <div class="card">
+    <div class="card-hd"><span class="card-title">Student Distribution Submission</span></div>
+    <div class="form-grid">
+      <div class="field-wrap">
+        <div class="field-label">Project Title <span>*</span></div>
+        <input class="field-input" id="distTitle" placeholder="Enter project title" />
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Group Name <span>*</span></div>
+        <input class="field-input" id="distGroup" placeholder="Example: G12 or Team Alpha" />
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Preferred Professor 1</div>
+        <select class="field-select" id="pref1">
+          <option value="">Select professor...</option>
+        </select>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Preferred Professor 2</div>
+        <select class="field-select" id="pref2">
+          <option value="">Select professor...</option>
+        </select>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Preferred Professor 3</div>
+        <select class="field-select" id="pref3">
+          <option value="">Select professor...</option>
+        </select>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Keywords</div>
+        <input class="field-input" id="distKeywords" placeholder="AI, web, security..." />
+      </div>
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Abstract</div>
+      <textarea class="field-textarea" id="distAbstract" style="min-height:100px" placeholder="Write a short abstract..."></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><span class="card-title">Team Members</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      <input class="field-input member-id" placeholder="Student ID 1" />
+      <input class="field-input member-id" placeholder="Student ID 2" />
+      <input class="field-input member-id" placeholder="Student ID 3" />
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" type="button" onclick="submitDistributionProject()">Submit to Coordinator</button>
+      <button class="btn btn-outline" type="button" onclick="clearDistributionForm()">Clear</button>
+    </div>
+    <div id="distMsg" style="margin-top:12px;font-size:12px"></div>
+  </div>
+</div>
+{% endblock %}

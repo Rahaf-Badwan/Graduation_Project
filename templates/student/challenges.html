@@ -1,0 +1,115 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Challenges{% endblock %}
+{% block page_id %}challenges{% endblock %}
+{% block topbar_title %}Challenges &amp; Reflections{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-challenges">
+
+            <div class="two-col" style="align-items:start">
+              <div>
+                <div class="card">
+                  <div class="card-hd"><span class="card-title">Add New Challenge or Reflection</span></div>
+                  <div class="field-wrap">
+                    <div class="field-label">Type</div>
+                    <select class="field-select" id="challengeType">
+                      <option value="Technical">Technical Challenge</option>
+                      <option value="Administrative">Administrative / Coordination Challenge</option>
+                      <option value="Reflection">Reflection &amp; Lesson Learned</option>
+                    </select>
+                  </div>
+                  <div class="field-wrap">
+                    <div class="field-label">Title</div>
+                    <input class="field-input" id="challengeTitle"
+                      placeholder="Briefly describe the challenge or reflection..." />
+                  </div>
+                  <div class="field-wrap">
+                    <div class="field-label">Details</div>
+                    <textarea class="field-textarea" id="challengeDetails"
+                      placeholder="Describe the challenge in detail and how you overcame it..."></textarea>
+                  </div>
+                  <div class="field-wrap">
+                    <div class="field-label">Solution / Outcome <span
+                        style="color:var(--color-text-secondary)">(optional)</span></div>
+                    <textarea class="field-textarea" id="challengeSolution"
+                      placeholder="Write the solution, action taken, or lesson learned..."></textarea>
+                  </div>
+                  <div class="btn-row">
+                    <button class="btn btn-primary" id="saveChallengeBtn" type="button">Save</button>
+                    <button class="btn btn-outline" id="cancelChallengeBtn" type="button">Cancel</button>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="card">
+                  <div class="card-hd">
+                    <span class="card-title">Team Challenges & Reflections</span>
+                    <span class="pill p-review" style="font-size:10px">Shared by section team</span>
+                  </div>
+                  <div id="emptyChallenges" class="empty-state">No challenges or reflections added yet.</div>
+                  <div id="challengeList">
+                    <div class="challenge-card" data-type="Technical">
+                      <div
+                        style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+                        <div class="ch-title">API Integration Delay</div>
+                        <span class="pill p-review" style="font-size:10px">Technical</span>
+                      </div>
+                      <div class="challenge-meta">
+                        <span><span class="challenge-author">Rahaf Badwan</span> · Added by team member</span>
+                        <span>Apr 8, 2026</span>
+                      </div>
+                      <div class="ch-text">We had an issue connecting some frontend pages with the project data because
+                        the integration flow between pages was not finalized yet.</div>
+                      <div class="ch-sol">✓ Solution: We agreed on a shared project-based structure and linked the pages
+                        using the same project context.</div>
+                      <div class="challenge-actions">
+                        <button class="btn btn-outline btn-xs" type="button">Update</button>
+                        <button class="btn btn-outline btn-xs" type="button">Delete</button>
+                      </div>
+                    </div>
+
+                    <div class="challenge-card" data-type="Administrative">
+                      <div
+                        style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+                        <div class="ch-title">Dividing Tasks Between Team Members</div>
+                        <span class="pill p-pending" style="font-size:10px">Administrative</span>
+                      </div>
+                      <div class="challenge-meta">
+                        <span><span class="challenge-author">Amneh Abu Musallam</span> · Added by team member</span>
+                        <span>Apr 7, 2026</span>
+                      </div>
+                      <div class="ch-text">At the beginning, task ownership between design, report writing, and UI pages
+                        was not fully clear, which slowed progress for a short period.</div>
+                      <div class="ch-sol">✓ Solution: We split the work by module and reviewed progress together at the
+                        end of each phase.</div>
+                      <div class="challenge-actions">
+                        <button class="btn btn-outline btn-xs" type="button">Update</button>
+                        <button class="btn btn-outline btn-xs" type="button">Delete</button>
+                      </div>
+                    </div>
+
+                    <div class="challenge-card" style="border-left-color:var(--green)" data-type="Reflection">
+                      <div
+                        style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+                        <div class="ch-title">Lesson Learned — Keep the Structure Shared</div>
+                        <span class="pill p-accepted" style="font-size:10px">Reflection</span>
+                      </div>
+                      <div class="challenge-meta">
+                        <span><span class="challenge-author">Taima Abed</span> · Added by team member</span>
+                        <span>Apr 6, 2026</span>
+                      </div>
+                      <div class="ch-text">Using one agreed structure for project pages, naming, and data flow made
+                        collaboration easier and reduced duplicated work.</div>
+                      <div class="challenge-actions">
+                        <button class="btn btn-outline btn-xs" type="button">Update</button>
+                        <button class="btn btn-outline btn-xs" type="button">Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+{% endblock %}

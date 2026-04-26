@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APMS — Sign In</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='login_style.css') }}">
+  <style>
+    .error-msg {
+      background: #fff0f0;
+      border: 1px solid #f5c6c6;
+      color: #c0392b;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 7px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .nav-links li {
+      position: relative;
+    }
+
+    .dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+      min-width: 200px;
+      z-index: 100;
+      padding: 6px 0;
+    }
+
+    .nav-links li:hover .dropdown {
+      display: block;
+    }
+
+    .dropdown a {
+      display: block;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #333;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .dropdown a:hover {
+      background: #f0f0f0;
+      color: #1a3d1f;
+    }
+
+    .dropdown-divider {
+      height: 1px;
+      background: #eee;
+      margin: 4px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page" id="page">
+    <nav>
+      <div class="nav-brand">
+        <div class="nav-brand-icon">AP</div>
+        Academic Project Management System
+      </div>
+      <ul class="nav-links nav-center">
+        <li><a href="https://ritaj.birzeit.edu/academic-calendar" target="_blank">Academic Calendar</a></li>
+        <li><a href="https://ritaj.birzeit.edu" target="_blank">Ritaj</a></li>
+        <li><a href="https://itc.birzeit.edu" target="_blank">ITC</a></li>
+      </ul>
+      <ul class="nav-links nav-right">
+
+        <li><a href="">Archived Projects</a></li>
+
+        <li>
+          <a href="#">General Services <span class="arr">▾</span></a>
+          <div class="dropdown">
+            <a href="https://ritaj.birzeit.edu" target="_blank">Ritaj Student Portal</a>
+            <a href="https://itc.birzeit.edu" target="_blank">ITC Help Desk</a>
+            <a href="https://library.birzeit.edu" target="_blank">Library</a>
+            <div class="dropdown-divider"></div>
+            <a href="mailto:support@birzeit.edu">Email Support</a>
+          </div>
+        </li>
+
+      </ul>
+    </nav>
+
+    <div class="hero" id="hero">
+      <div class="notice">
+        <div class="notice-title">
+          <div class="notice-dot"></div>
+          Important Notice — APMS System
+        </div>
+        <p>
+          The new graduation project lifecycle management system
+          (<span class="hl">APMS</span>) has been launched for Semester 1 of 2025/2026.
+          All students enrolled in COMP4200 are required to register their projects
+          through the system before <span class="dhl">15/2/2026</span>. Submission of
+          project files (report, code, documentation) is exclusively through this portal.
+        </p>
+        <p>
+          Supervisors: Please log in to review and approve your assigned projects.
+          The coordinator can form evaluation committees directly from the control panel.
+        </p>
+    
+        <div class="notice-btns">
+          <button type="button">ⓘ How does the system work?</button>
+          <button type="button">⬆ Project Upload Guide</button>
+          <button type="button">⚙ Roles &amp; Permissions</button>
+        </div>
+      </div>
+
+      <div class="login-card">
+        <div class="card-header">
+          <div class="card-logo">APMS</div>
+          <div class="card-title">Academic Project<br>Management System</div>
+          <div class="card-sub">Department of Computer Science — Birzeit University</div>
+        </div>
+
+        <form method="POST" action="/login">
+          {% if error %}
+          <div class="error-msg">⚠ {{ error }}</div>
+          {% endif %}
+
+          <label for="university_id">University ID</label>
+          <input type="text" id="university_id" name="university_id" placeholder="Enter your University ID"
+            value="{{ request.form.get('university_id', '') }}" autocomplete="username" required />
+
+          <label for="password">Password</label>
+          <div style="position:relative;margin-bottom:12px">
+            <input type="password" id="password" name="password" placeholder="Enter your password"
+              autocomplete="current-password" required style="margin-bottom:0;padding-right:40px;width:100%" />
+            <button type="button" onclick="togglePassword()" id="eye-btn" title="Show / Hide password" style="
+                position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                background:none;border:none;cursor:pointer;padding:4px;
+                color:#888;font-size:16px;line-height:1;
+              ">&#128065;</button>
+          </div>
+
+          <button type="submit" class="btn-signin">Sign In</button>
+        </form>
+
+        <div class="card-links">
+          <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
+          <span class="card-divider">·</span>
+          <a href="#">New Registration</a>
+        </div>
+
+        <div class="card-project">
+          <p>
+            Project: APMS — COMP4200<br>
+            Amna Abu Muslim · Rahaf Badwan · Tima Abd<br>
+            Supervisor: Dr. Naima Harbawi
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      © 2026 <strong>Birzeit University</strong> — Department of Computer Science · All Rights Reserved.
+    </footer>
+  </div>
+  <script>
+    function togglePassword() {
+      const input = document.getElementById('password');
+      const btn = document.getElementById('eye-btn');
+      const isHidden = input.type === 'password';
+      input.type = isHidden ? 'text' : 'password';
+      btn.textContent = isHidden ? '\uD83D\uDE48' : '\uD83D\uDC41';
+    }
+  </script>
+</body>
+
+</html>

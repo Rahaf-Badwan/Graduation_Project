@@ -1,0 +1,211 @@
+{% extends 'coordinator/base.html' %}
+
+{% block page_title %}Faculty Hours{% endblock %}
+{% block page_id %}hours{% endblock %}
+{% block topbar_title %}Faculty Hours{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-hours">
+        <div class="two-col u-d1e999ac">
+          <div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">Project Supervision Hours — Current Semester</span></div>
+              <div class="u-0ffd9126">
+                ℹ Each professor's base teaching load is <b>12 credit hours/semester</b>. Maximum allowed is <b>18 credit hours</b>. Professors who take on <b>Project Introduction sections</b> or <b>Graduation Project supervision</b> receive an additional load, calculated as:<br/><br/>
+                <b>Extra Load = (# of Intro-Project sections) + (# of Graduation Projects supervised) + 1</b><br/><br/>
+                Example: 2 intro sections + 3 graduation projects = 5 → +1 = <b>6 extra credit hours</b>. At end of semester, <b>Ruba</b> applies this +1 addition to each professor's total. Professor <b>specialization</b> (e.g. Cybersecurity) is also considered during assignment. <b>Part-time</b> professors are only assigned tasks after all full-time assignments are finalized.
+              </div>
+              <div class="hours-bar-wrap">
+                <div class="hours-bar-top">
+                  <span class="u-44265a69">Dr. Naemeh Harbawi</span>
+                  <span class="u-cfb6c12e">12 / 18 hrs ✓</span>
+                </div>
+                <div class="hours-bar-bg">
+                  <div class="hours-bar-fill h-ok u-737a8ef1"></div>
+                </div>
+                <div class="u-de9298af">3 projects (3 groups of three) — 6 hours remaining</div>
+              </div>
+              <div class="hours-bar-wrap">
+                <div class="hours-bar-top">
+                  <span class="u-44265a69">Dr. Mahmoud Salem</span>
+                  <span class="u-a9721929">16.5 / 18 hrs ⚑</span>
+                </div>
+                <div class="hours-bar-bg">
+                  <div class="hours-bar-fill h-warn u-056ea173"></div>
+                </div>
+                <div class="u-de9298af">4 projects — only 1.5 hours remaining</div>
+              </div>
+              <div class="hours-bar-wrap">
+                <div class="hours-bar-top">
+                  <span class="u-44265a69">Dr. Lina Haddad</span>
+                  <span class="u-cfb6c12e">9 / 18 hrs ✓</span>
+                </div>
+                <div class="hours-bar-bg">
+                  <div class="hours-bar-fill h-ok u-70e57a51"></div>
+                </div>
+                <div class="u-de9298af">2 projects — 9 hours remaining (suitable for unassigned students)</div>
+              </div>
+              <div class="hours-bar-wrap">
+                <div class="hours-bar-top">
+                  <span class="u-44265a69">Dr. Samer Darwish</span>
+                  <span class="u-cfb6c12e">7.5 / 18 hrs ✓</span>
+                </div>
+                <div class="hours-bar-bg">
+                  <div class="hours-bar-fill h-ok u-34db8b98"></div>
+                </div>
+                <div class="u-de9298af">10.5 hours remaining</div>
+              </div>
+              <div class="hours-bar-wrap">
+                <div class="hours-bar-top">
+                  <span class="u-44265a69">Dr. Ahmad Omar</span>
+                  <span class="u-bc7c441e">19 / 18 hrs ✗</span>
+                </div>
+                <div class="hours-bar-bg">
+                  <div class="hours-bar-fill h-over u-8588e44d"></div>
+                </div>
+                <div class="u-37d8d0c9">⚑ Over the limit — will take less next semester</div>
+              </div>
+              <div class="hours-bar-wrap u-a2d48c76">
+                <div class="hours-bar-top">
+                  <span class="u-44265a69">Dr. Osama Erekat</span>
+                  <span class="u-cfb6c12e">6 / 18 hrs ✓</span>
+                </div>
+                <div class="hours-bar-bg">
+                  <div class="hours-bar-fill h-ok u-204790b9"></div>
+                </div>
+                <div class="u-de9298af">12 hours remaining</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">Edit Professor Teaching Load — Department Chair (Eyad) &amp; Coordinator (Ruba)</span></div>
+              <div class="u-7dcbcef8">
+                ◈ <b>Eyad</b> (Dept. Chair) reviews each professor's total hours and Full-time / Part-time status, then distributes Project Introduction sections and Graduation Project supervision accordingly. <b>Ruba</b> (Coordinator) adds the +1 bonus at end of semester based on each professor's number of intro sections and supervised projects.
+              </div>
+              <div class="field-wrap">
+                <div class="field-label">Select Professor</div>
+                <select class="field-select">
+                  <option>Dr. Naemeh Harbawi</option>
+                  <option>Dr. Mahmoud Salem</option>
+                  <option>Dr. Lina Haddad</option>
+                  <option>Dr. Samer Darwish</option>
+                  <option>Dr. Ahmad Omar</option>
+                </select>
+              </div>
+              <div class="form-grid">
+                <div class="field-wrap">
+                  <div class="field-label">Credit Hours This Semester</div>
+                  <input class="field-input" max="18" min="0" type="number" value="12" />
+                </div>
+                <div class="field-wrap">
+                  <div class="field-label">Employment Type</div>
+                  <select class="field-select">
+                    <option>Full-time</option>
+                    <option>Part-time</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="field-wrap">
+                  <div class="field-label"># Intro-Project Sections</div>
+                  <input class="field-input" min="0" type="number" value="2" />
+                </div>
+                <div class="field-wrap">
+                  <div class="field-label"># Graduation Projects Supervised</div>
+                  <input class="field-input" min="0" type="number" value="3" />
+                </div>
+              </div>
+              <div class="u-0ffd9126" style="margin-bottom:10px">
+                ◎ Calculated extra load: (Intro sections + Graduation projects) + 1 = <b>6 credit hours</b>
+              </div>
+              <div class="field-wrap">
+                <div class="field-label">Assigned Courses (Select)</div>
+                <select class="field-select u-b050adc0" multiple="">
+                  <option selected="">COMP4200 - Project Introduction</option>
+                  <option selected="">COMP4201 - Graduation Projects</option>
+                  <option>COMP3100 - Software Engineering</option>
+                  <option>COMP3200 - Databases</option>
+                </select>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-primary"
+                  data-prompt="The department chair updated Dr. Naemeh Harbawi’s hours in APMS ↗" type="button">Save
+                  Changes ↗</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">Semester Load Summary</span></div>
+              <div class="u-77c8140b">
+                <table class="reg-table">
+                  <thead>
+                    <tr>
+                      <th>Professor</th>
+                      <th>Type</th>
+                      <th>Base Hours</th>
+                      <th>Intro Sections</th>
+                      <th>Projects</th>
+                      <th>Extra Load (+1)</th>
+                      <th>Total / 18</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Dr. Naemeh Harbawi</td>
+                      <td>Full-time</td>
+                      <td>12</td>
+                      <td>1</td>
+                      <td>1</td>
+                      <td>3</td>
+                      <td>15</td>
+                      <td><span class="pill p-accepted">Within Limit</span></td>
+                    </tr>
+                    <tr>
+                      <td>Dr. Mahmoud Salem</td>
+                      <td>Full-time</td>
+                      <td>12</td>
+                      <td>2</td>
+                      <td>2</td>
+                      <td>5</td>
+                      <td>17</td>
+                      <td><span class="pill p-review">Near Limit</span></td>
+                    </tr>
+                    <tr>
+                      <td>Dr. Ahmad Omar</td>
+                      <td>Full-time</td>
+                      <td>12</td>
+                      <td>2</td>
+                      <td>3</td>
+                      <td>6</td>
+                      <td>18</td>
+                      <td><span class="pill p-review">At Max</span></td>
+                    </tr>
+                    <tr>
+                      <td>Dr. Lina Haddad</td>
+                      <td>Full-time</td>
+                      <td>12</td>
+                      <td>0</td>
+                      <td>2</td>
+                      <td>3</td>
+                      <td>15</td>
+                      <td><span class="pill p-accepted">Within Limit</span></td>
+                    </tr>
+                    <tr>
+                      <td>Dr. Samer Darwish</td>
+                      <td>Part-time</td>
+                      <td>9</td>
+                      <td>0</td>
+                      <td>1</td>
+                      <td>2</td>
+                      <td>11</td>
+                      <td><span class="pill p-accepted">Within Limit</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+{% endblock %}

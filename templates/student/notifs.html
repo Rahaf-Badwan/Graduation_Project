@@ -1,0 +1,67 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Notifications{% endblock %}
+{% block page_id %}notifs{% endblock %}
+{% block topbar_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-notifs">
+
+            <div class="card">
+              <div class="card-hd">
+                <span class="card-title">Notifications</span>
+                <button class="card-action">Mark All as Read</button>
+              </div>
+              <div
+                style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
+                Today</div>
+              <div class="notif-item notif-unread" style="border-radius:var(--rm);padding:10px">
+                <div class="notif-icon" style="background:var(--green-light)"><span
+                    class="material-symbols-outlined icon-inline">reviews</span></div>
+                <div class="notif-body">
+                  <div class="notif-title">Your project was reviewed by the supervisor</div>
+                  <div class="notif-meta">Dr. Naema Harbawi reviewed the report and added feedback · 2 hours ago</div>
+                </div>
+                <div class="notif-dot"></div>
+              </div>
+              <div class="notif-item notif-unread" style="border-radius:var(--rm);padding:10px">
+                <div class="notif-icon" style="background:var(--amber-light)"><span
+                    class="material-symbols-outlined icon-inline">flag</span></div>
+                <div class="notif-body">
+                  <div class="notif-title">Reminder: Presentation slides upload required</div>
+                  <div class="notif-meta">Deadline for uploading Presentation.pptx is Feb 15 · 4 hours ago</div>
+                </div>
+                <div class="notif-dot"></div>
+              </div>
+              <div class="notif-item notif-unread" style="border-radius:var(--rm);padding:10px">
+                <div class="notif-icon" style="background:var(--blue-light)"><span
+                    class="material-symbols-outlined icon-inline">schedule</span></div>
+                <div class="notif-body">
+                  <div class="notif-title">Defense meeting scheduled</div>
+                  <div class="notif-meta">APMS project defense: Feb 20, 2026 at 10:00 AM · 5 hours ago</div>
+                </div>
+                <div class="notif-dot"></div>
+              </div>
+              <div
+                style="font-size:12px;color:var(--color-text-secondary);margin:12px 0 10px;padding-top:8px;border-top:1px solid var(--color-border-tertiary)">
+                Last Week</div>
+              <div class="notif-item" style="padding:10px">
+                <div class="notif-icon" style="background:var(--green-light)"><span
+                    class="material-symbols-outlined icon-inline">upload_file</span></div>
+                <div class="notif-body">
+                  <div class="notif-title">Your project files were accepted successfully</div>
+                  <div class="notif-meta">Report and source code uploaded and accepted · Feb 1, 2026</div>
+                </div>
+              </div>
+              <div class="notif-item" style="padding:10px">
+                <div class="notif-icon" style="background:var(--green-light)"><span
+                    class="material-symbols-outlined icon-inline">notifications</span></div>
+                <div class="notif-body">
+                  <div class="notif-title">Your project was registered in the system</div>
+                  <div class="notif-meta">Project No.: 24 · Jan 25, 2026</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+{% endblock %}

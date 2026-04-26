@@ -1,0 +1,150 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Dashboard{% endblock %}
+{% block page_id %}dashboard{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-dashboard">
+
+            <div class="stats-row">
+              <div class="stat">
+                <div class="stat-num" style="color:var(--blue)">Under Review</div>
+                <div class="stat-label">Current Project Status</div>
+              </div>
+              <div class="stat">
+                <div class="stat-num" style="color:var(--green)">78%</div>
+                <div class="stat-label">Completion Rate</div>
+              </div>
+              <div class="stat">
+                <div class="stat-num" style="color:var(--amber)">3</div>
+                <div class="stat-label">New Feedback Items</div>
+              </div>
+              <div class="stat">
+                <div class="stat-num" style="color:var(--coral)">15 Days</div>
+                <div class="stat-label">Until Final Deadline</div>
+              </div>
+            </div>
+            <div class="two-col">
+              <div>
+                <div class="card">
+                  <div class="card-hd"><span class="card-title">My Current Project</span><span
+                      class="pill p-review">Under Review</span></div>
+                  <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px">Academic
+                    Project Lifecycle Management System</div>
+                  <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">Supervisor: Dr. Naema
+                    Harbawi · 2025/2026</div>
+                  <div class="prog-wrap">
+                    <div class="prog-label"><span>Final Report</span><span>85%</span></div>
+                    <div class="prog-bg">
+                      <div class="prog-fill" style="width:85%;background:var(--green)"></div>
+                    </div>
+                  </div>
+                  <div class="prog-wrap">
+                    <div class="prog-label"><span>Source Code</span><span>70%</span></div>
+                    <div class="prog-bg">
+                      <div class="prog-fill" style="width:70%;background:var(--blue)"></div>
+                    </div>
+                  </div>
+                  <div class="prog-wrap">
+                    <div class="prog-label"><span>Presentation Slides</span><span>60%</span></div>
+                    <div class="prog-bg">
+                      <div class="prog-fill" style="width:60%;background:var(--amber)"></div>
+                    </div>
+                  </div>
+                  <div class="btn-row" style="margin-top:10px">
+                    <button class="btn btn-primary" onclick="window.location.href='/student/status'">Status Details</button>
+                    <button class="btn btn-outline" onclick="window.location.href='/student/submit'">Update Files</button>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-hd"><span class="card-title">Upcoming Deadlines</span></div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div
+                      style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--amber-light);border-radius:var(--rm)">
+                      <div style="font-size:11px;font-weight:700;color:var(--amber);min-width:36px;text-align:center">
+                        Feb<br />15</div>
+                      <div style="font-size:12px;color:var(--color-text-primary)">Final Report submission deadline</div>
+                    </div>
+                    <div
+                      style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--blue-light);border-radius:var(--rm)">
+                      <div style="font-size:11px;font-weight:700;color:var(--blue);min-width:36px;text-align:center">
+                        Feb<br />20</div>
+                      <div style="font-size:12px;color:var(--color-text-primary)">Project presentation before the
+                        committee</div>
+                    </div>
+                    <div
+                      style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-light);border-radius:var(--rm)">
+                      <div style="font-size:11px;font-weight:700;color:var(--green);min-width:36px;text-align:center">
+                        Feb<br />28</div>
+                      <div style="font-size:12px;color:var(--color-text-primary)">Final results announcement</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="card">
+                  <div class="card-hd"><span class="card-title">Latest Feedback</span><button class="card-action"
+                      onclick="window.location.href='/student/feedback'">See All</button></div>
+                  <div class="fb-item" style="margin-bottom:0;border:none;padding:0">
+                    <div class="fb-head">
+                      <div class="fb-avatar" style="background:var(--green-light);color:var(--green)">NH</div>
+                      <div>
+                        <div class="fb-name">Dr. Naema Harbawi</div>
+                        <div class="fb-role">Supervisor</div>
+                      </div>
+                      <div class="fb-date">2 days ago</div>
+                    </div>
+                    <div class="fb-text">The report is generally good, but I recommend elaborating more on the system
+                      architecture section and adding detailed ERD diagrams.</div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-hd"><span class="card-title">Team Members</span></div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="fb-avatar"
+                        style="background:var(--green-light);color:var(--green);width:32px;height:32px;font-size:11px">
+                        AM</div>
+                      <div>
+                        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Amna Abu Muslim
+                        </div>
+                        <div style="font-size:11px;color:var(--color-text-secondary)">1220670</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="fb-avatar"
+                        style="background:var(--blue-light);color:var(--blue);width:32px;height:32px;font-size:11px">RB
+                      </div>
+                      <div>
+                        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Rahaf Badwan</div>
+                        <div style="font-size:11px;color:var(--color-text-secondary)">1220654 · You</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="fb-avatar"
+                        style="background:#FBEAF0;color:#993556;width:32px;height:32px;font-size:11px">TA</div>
+                      <div>
+                        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Tima Abd</div>
+                        <div style="font-size:11px;color:var(--color-text-secondary)">1220174</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-hd"><span class="card-title">Quick Alerts</span><button class="card-action"
+                      onclick="window.location.href='/student/notifs'">See All</button></div>
+                  <div
+                    style="font-size:12px;color:var(--color-text-primary);padding:6px 0;border-bottom:1px solid var(--color-border-tertiary)">
+                    ✦ Your project was reviewed by the supervisor</div>
+                  <div
+                    style="font-size:12px;color:var(--color-text-primary);padding:6px 0;border-bottom:1px solid var(--color-border-tertiary)">
+                    ◎ Defense date: Feb 20 at 10:00 AM</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);padding:6px 0">⚑ Please upload source code
+                    before Feb 15</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+{% endblock %}

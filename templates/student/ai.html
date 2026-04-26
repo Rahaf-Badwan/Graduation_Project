@@ -1,0 +1,728 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}AI Assistant{% endblock %}
+{% block page_id %}ai{% endblock %}
+{% block topbar_title %}AI Assistant{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-ai">
+  <div class="ai-fullpage-wrap" id="aiWrap">
+
+    <aside class="ai-archive-panel" id="archivePanel">
+      <div class="archive-head">
+        <div>
+          <div class="archive-title">Chat Archive</div>
+          <div class="archive-sub">Saved for 30 days only</div>
+        </div>
+        <button class="archive-new" type="button" onclick="startNewChat()">+ New</button>
+        <button class="archive-close" type="button" onclick="setArchiveOpen(false)" aria-label="Close archive">✕</button>
+      </div>
+      <div class="archive-list" id="archiveList">
+        <div class="archive-empty">Loading archive...</div>
+      </div>
+    </aside>
+
+    <section class="ai-chat-panel">
+      <div class="chat-head">
+        <button class="archive-toggle" id="archiveToggleBtn" type="button" onclick="toggleArchive()" aria-label="Toggle archive" aria-expanded="true" title="Toggle archive">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+        </button>
+        <div class="chat-dot"></div>
+        <span class="chat-head-title">AI Assistant — APMS AI</span>
+        <span class="chat-status">Connected ● Active</span>
+      </div>
+
+      <div class="chat-body" id="chatBody">
+        <div class="chat-msg chat-bot">
+          Hello {{ session.full_name.split()[0] if session.full_name else 'there' }}! I can provide you with comprehensive reports and analyses on projects, supervisor performance, and comparisons with previous years.
+        </div>
+        <div class="chat-msg chat-bot">
+          Try for example: "Compare AI vs web projects over 3 years" or "Who is the top supervisor this semester?"
+        </div>
+
+        <div class="suggested-wrap" id="suggestedWrap">
+          <div class="suggested-label">Suggested Questions</div>
+          <div class="suggested-grid">
+            <button class="suggested-btn" onclick="sendSuggested('Compare the performance of AI projects vs web development over the last 3 years')">📊 Compare discipline performance</button>
+            <button class="suggested-btn" onclick="sendSuggested('Who is the top-performing supervisor this semester?')">🏆 Top-performing supervisor</button>
+            <button class="suggested-btn" onclick="sendSuggested('What is the trend in project grades over the last five years?')">📈 Grade trend — 5 years</button>
+            <button class="suggested-btn" onclick="sendSuggested('How many projects were rejected this semester and what were the reasons?')">⚠ Analysis of rejected projects</button>
+            <button class="suggested-btn" onclick="sendSuggested('Which students are still without a supervisor?')">👥 Students without supervisors</button>
+            <button class="suggested-btn" onclick="sendSuggested('What projects scored above 90 this semester?')">⭐ Top-scored projects</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input-row">
+        <input class="chat-input" id="chatIn" placeholder="Inquire about department or project statistics..." />
+        <button class="chat-send" id="sendBtn" onclick="askAI()">Send</button>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="archive-backdrop" id="archiveBackdrop" onclick="setArchiveOpen(false)"></div>
+</div>
+
+<style>
+.content-area {
+  overflow-y: auto !important;
+  display: block !important;
+}
+#pg-ai.page.on {
+  display: flex !important;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+}
+.ai-fullpage-wrap {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 14px;
+  flex: 1;
+  min-height: calc(100vh - 165px);
+  align-items: start;
+  transition: grid-template-columns 0.25s ease, gap 0.25s ease;
+}
+.ai-fullpage-wrap.archive-collapsed {
+  grid-template-columns: 0 minmax(0, 1fr);
+  gap: 0;
+}
+.ai-archive-panel,
+.ai-chat-panel {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e0ede9;
+  box-shadow: 0 2px 12px rgba(8,80,65,0.07);
+}
+.ai-archive-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 16px;
+  height: calc(100vh - 165px);
+  max-height: calc(100vh - 165px);
+  transition: opacity 0.22s ease, transform 0.22s ease, width 0.22s ease, border-color 0.22s ease;
+}
+.ai-fullpage-wrap.archive-collapsed .ai-archive-panel {
+  opacity: 0;
+  width: 0;
+  transform: translateX(-18px);
+  border-color: transparent;
+  pointer-events: none;
+}
+.archive-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid #e0ede9;
+  background: #f6faf8;
+}
+.archive-title {
+  color: #085041;
+  font-weight: 800;
+  font-size: 13px;
+}
+.archive-sub {
+  color: #6f8580;
+  font-size: 10.5px;
+  margin-top: 2px;
+}
+.archive-new,
+.archive-close,
+.archive-toggle {
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+}
+.archive-new {
+  margin-left: auto;
+  background: #0F6E56;
+  color: white;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+.archive-close {
+  background: #eaf4f1;
+  color: #0F6E56;
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #eef6f3;
+  color: #085041;
+  border: 1px solid #d4e6df;
+  border-radius: 10px;
+  padding: 0;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.archive-toggle svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+}
+.archive-toggle:hover,
+.archive-close:hover {
+  background: #dff0eb;
+}
+.archive-toggle:hover {
+  border-color: #0F6E56;
+}
+.archive-list {
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.archive-item {
+  border: 1px solid #e6efec;
+  background: #fbfefd;
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.archive-item:hover {
+  border-color: #0F6E56;
+  background: #f0f7f5;
+  transform: translateY(-1px);
+}
+.archive-item.active {
+  border-color: #0F6E56;
+  background: #eaf7f3;
+}
+.archive-item-title {
+  font-size: 12px;
+  color: #153d35;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.archive-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: #6f8580;
+  font-size: 10px;
+}
+.archive-delete {
+  border: none;
+  background: transparent;
+  color: #b64d4d;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.archive-empty,
+.archive-error {
+  color: #6f8580;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+}
+.archive-error { color: #b64d4d; }
+.ai-chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  min-height: 100%;
+  min-width: 0;
+}
+.ai-chat-panel .chat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e0ede9;
+  background: #f6faf8;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+.chat-head-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #085041;
+}
+.chat-status {
+  margin-left: auto;
+  font-size: 10px;
+  color: #0F6E56;
+}
+.ai-chat-panel .chat-body {
+  flex: 1 0 auto;
+  max-height: none !important;
+  overflow-y: visible !important;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ai-chat-panel .chat-input-row {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #e0ede9;
+  background: #f6faf8;
+  flex-shrink: 0;
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+}
+.ai-chat-panel .chat-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #c8ddd7;
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ai-chat-panel .chat-input:focus { border-color: #0F6E56; }
+
+.suggested-wrap { margin-top: 4px; }
+.suggested-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.suggested-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.suggested-btn {
+  background: #f0f7f5;
+  border: 1px solid #c8ddd7;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #085041;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.suggested-btn:hover { background: #dff0eb; border-color: #0F6E56; }
+
+.chat-loading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 16px;
+  background: #f6faf8;
+  border: 1px solid #e0ede9;
+  border-radius: 12px;
+  width: fit-content;
+  max-width: 80px;
+}
+.chat-loading span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0F6E56;
+  animation: bounce 1.2s infinite ease-in-out;
+}
+.chat-loading span:nth-child(2) { animation-delay: 0.2s; }
+.chat-loading span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%            { transform: scale(1);   opacity: 1;   }
+}
+.chat-msg.chat-bot {
+  background: #f6faf8;
+  border: 1px solid #e0ede9;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: #1a1a1a;
+  max-width: 85%;
+}
+.chat-msg.chat-user {
+  align-self: flex-end;
+  background: #0F6E56;
+  color: white;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  max-width: 78%;
+  white-space: pre-wrap;
+}
+.msg-source {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+.msg-source.pdf    { background: #e8f5e9; color: #2e7d32; }
+.msg-source.db     { background: #e3f2fd; color: #1565c0; }
+.msg-source.ai     { background: #f3e5f5; color: #6a1b9a; }
+.msg-source.other  { background: #f0f0f0; color: #555; }
+.bot-list { margin: 6px 0 0 0; padding: 0; list-style: none; }
+.bot-list li {
+  display: flex;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid #eaf1ef;
+  font-size: 13px;
+}
+.bot-list li:last-child { border-bottom: none; }
+.bot-list li::before { content: "•"; color: #0F6E56; font-weight: 700; flex-shrink: 0; }
+.chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.archive-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 34, 28, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 90;
+}
+.chat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #7fb59c;
+  flex-shrink: 0;
+}
+.chat-send {
+  border: none;
+  background: #0F6E56;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  #pg-ai.page.on {
+    position: relative;
+    overflow: hidden;
+  }
+  .ai-fullpage-wrap {
+    grid-template-columns: 1fr;
+    min-height: calc(100vh - 140px);
+  }
+  .ai-archive-panel {
+    position: fixed;
+    top: 76px;
+    left: 12px;
+    bottom: 12px;
+    height: auto;
+    max-height: none;
+    width: min(320px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    z-index: 100;
+    transform: translateX(0);
+  }
+  .ai-fullpage-wrap.archive-collapsed .ai-archive-panel {
+    transform: translateX(-112%);
+    width: min(320px, calc(100vw - 24px));
+    opacity: 1;
+    border-color: #e0ede9;
+  }
+  .archive-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .chat-status { display: none; }
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentSessionId = makeSessionId();
+const ARCHIVE_PREF_KEY = 'apms-ai-archive-open';
+
+function makeSessionId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 12);
+}
+function scrollBottom() {
+  const scroller = document.querySelector('.content-area');
+  requestAnimationFrame(() => {
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+    else window.scrollTo(0, document.documentElement.scrollHeight);
+  });
+}
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+function addMessage(html, kind) {
+  const body = document.getElementById('chatBody');
+  const div  = document.createElement('div');
+  div.className = 'chat-msg ' + (kind === 'user' ? 'chat-user' : 'chat-bot');
+  if (kind === 'user') div.textContent = html;
+  else div.innerHTML = html;
+  body.appendChild(div);
+  scrollBottom();
+  return div;
+}
+function showLoading() {
+  const body = document.getElementById('chatBody');
+  const div  = document.createElement('div');
+  div.id = 'loadingBubble';
+  div.className = 'chat-loading';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  body.appendChild(div);
+  scrollBottom();
+}
+function hideLoading() {
+  const el = document.getElementById('loadingBubble');
+  if (el) el.remove();
+}
+function applyInline(text) {
+  let safe = escapeHtml(text);
+  safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  safe = safe.replace(/`([^`]+)`/g, '<code style="background:#eef;padding:1px 4px;border-radius:3px;font-size:12px">$1</code>');
+  return safe;
+}
+function formatResponse(text) {
+  let sourceHtml = '';
+  let body = String(text || '');
+  if (body.startsWith('Based on uploaded PDFs:')) {
+    sourceHtml = '<span class="msg-source pdf">📄 From uploaded PDFs</span>';
+    body = body.replace('Based on uploaded PDFs:', '').trim();
+  } else if (body.startsWith('Based on APMS data:')) {
+    sourceHtml = '<span class="msg-source db">🗄 From APMS database</span>';
+    body = body.replace('Based on APMS data:', '').trim();
+  } else if (body.startsWith('General AI answer:')) {
+    sourceHtml = '<span class="msg-source ai">🤖 General AI</span>';
+    body = body.replace('General AI answer:', '').trim();
+  }
+  const lines = body.split('\n');
+  let html = '';
+  let inList = false;
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += '<div style="height:6px"></div>';
+      continue;
+    }
+    const isBullet = /^[-•*]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed);
+    if (isBullet) {
+      if (!inList) { html += '<ul class="bot-list">'; inList = true; }
+      const ct = trimmed.replace(/^[-•*\d\.]+\s*/, '');
+      html += '<li>' + applyInline(ct) + '</li>';
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += '<p style="margin:0 0 6px 0">' + applyInline(trimmed) + '</p>';
+    }
+  }
+  if (inList) html += '</ul>';
+  return sourceHtml ? '<div style="margin-bottom:10px">' + sourceHtml + '</div>' + html : html;
+}
+function resetWelcome() {
+  const body = document.getElementById('chatBody');
+  body.innerHTML = `
+    <div class="chat-msg chat-bot">
+      Hello {{ session.full_name.split()[0] if session.full_name else 'there' }}! I can provide you with comprehensive reports and analyses on projects, supervisor performance, and comparisons with previous years.
+    </div>
+    <div class="chat-msg chat-bot">
+      Try for example: "Compare AI vs web projects over 3 years" or "Who is the top supervisor this semester?"
+    </div>
+    <div class="suggested-wrap" id="suggestedWrap">
+      <div class="suggested-label">Suggested Questions</div>
+      <div class="suggested-grid">
+        <button class="suggested-btn" onclick="sendSuggested('Compare the performance of AI projects vs web development over the last 3 years')">📊 Compare discipline performance</button>
+        <button class="suggested-btn" onclick="sendSuggested('Who is the top-performing supervisor this semester?')">🏆 Top-performing supervisor</button>
+        <button class="suggested-btn" onclick="sendSuggested('What is the trend in project grades over the last five years?')">📈 Grade trend — 5 years</button>
+        <button class="suggested-btn" onclick="sendSuggested('How many projects were rejected this semester and what were the reasons?')">⚠ Analysis of rejected projects</button>
+        <button class="suggested-btn" onclick="sendSuggested('Which students are still without a supervisor?')">👥 Students without supervisors</button>
+        <button class="suggested-btn" onclick="sendSuggested('What projects scored above 90 this semester?')">⭐ Top-scored projects</button>
+      </div>
+    </div>`;
+}
+function formatArchiveDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+function syncArchiveUi() {
+  const wrap = document.getElementById('aiWrap');
+  const btn = document.getElementById('archiveToggleBtn');
+  const backdrop = document.getElementById('archiveBackdrop');
+  const isOpen = wrap ? !wrap.classList.contains('archive-collapsed') : true;
+  if (btn) {
+    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    btn.setAttribute('title', isOpen ? 'Hide archive' : 'Show archive');
+  }
+  if (backdrop) backdrop.classList.toggle('show', isOpen && window.innerWidth <= 900);
+}
+function setArchiveOpen(open, remember = true) {
+  const wrap = document.getElementById('aiWrap');
+  if (!wrap) return;
+  wrap.classList.toggle('archive-collapsed', !open);
+  syncArchiveUi();
+  if (remember) localStorage.setItem(ARCHIVE_PREF_KEY, open ? '1' : '0');
+}
+function toggleArchive() {
+  const wrap = document.getElementById('aiWrap');
+  if (!wrap) return;
+  setArchiveOpen(wrap.classList.contains('archive-collapsed'));
+}
+async function loadArchive(activeId = currentSessionId) {
+  const list = document.getElementById('archiveList');
+  try {
+    const res = await fetch('/api/ai/archive');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load archive.');
+    const conversations = data.conversations || [];
+    if (!conversations.length) {
+      list.innerHTML = '<div class="archive-empty">No archived chats yet. Start a conversation and it will appear here.</div>';
+      return;
+    }
+    list.innerHTML = conversations.map(item => `
+      <div class="archive-item ${item.session_id === activeId ? 'active' : ''}" onclick="openArchivedChat('${escapeHtml(item.session_id)}')">
+        <div class="archive-item-title">${escapeHtml(item.title)}</div>
+        <div class="archive-meta">
+          <span>${formatArchiveDate(item.updated_at)} · ${item.days_left} days left</span>
+          <button class="archive-delete" type="button" title="Delete" onclick="deleteArchivedChat(event, '${escapeHtml(item.session_id)}')">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    list.innerHTML = '<div class="archive-error">Archive could not be loaded.</div>';
+  }
+}
+async function openArchivedChat(sessionId) {
+  currentSessionId = sessionId;
+  const body = document.getElementById('chatBody');
+  body.innerHTML = '';
+  showLoading();
+  try {
+    const res = await fetch('/api/ai/archive/' + encodeURIComponent(sessionId));
+    const data = await res.json();
+    hideLoading();
+    if (!res.ok) throw new Error(data.error || 'Failed to open conversation.');
+    if (!data.messages || !data.messages.length) {
+      resetWelcome();
+      return;
+    }
+    for (const msg of data.messages) {
+      if (msg.role === 'user') addMessage(msg.text, 'user');
+      else addMessage(formatResponse(msg.text), 'bot');
+    }
+    await loadArchive(sessionId);
+    if (window.innerWidth <= 900) setArchiveOpen(false);
+  } catch (err) {
+    hideLoading();
+    addMessage('<p style="margin:0;color:#c0392b">Could not open this archived conversation.</p>', 'bot');
+  }
+}
+async function deleteArchivedChat(event, sessionId) {
+  event.stopPropagation();
+  if (!confirm('Delete this archived conversation?')) return;
+  try {
+    await fetch('/api/ai/archive/' + encodeURIComponent(sessionId), { method: 'DELETE' });
+    if (sessionId === currentSessionId) startNewChat(false);
+    await loadArchive(currentSessionId);
+  } catch (err) {
+    alert('Could not delete this conversation.');
+  }
+}
+function startNewChat(refreshArchive = true) {
+  currentSessionId = makeSessionId();
+  resetWelcome();
+  const inp = document.getElementById('chatIn');
+  if (inp) inp.focus();
+  if (refreshArchive) loadArchive(currentSessionId);
+  if (window.innerWidth <= 900) setArchiveOpen(false);
+}
+async function askAI() {
+  const inp = document.getElementById('chatIn');
+  const btn = document.getElementById('sendBtn');
+  if (!inp || !inp.value.trim()) return;
+  const question = inp.value.trim();
+  inp.value = '';
+  const wrap = document.getElementById('suggestedWrap');
+  if (wrap) wrap.remove();
+  addMessage(question, 'user');
+  showLoading();
+  if (btn) btn.disabled = true;
+  if (inp) inp.disabled = true;
+  try {
+    const res  = await fetch('/api/ai/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, session_id: currentSessionId })
+    });
+    const data = await res.json();
+    if (data.session_id) currentSessionId = data.session_id;
+    hideLoading();
+    addMessage(formatResponse(data.answer || data.error || 'No response returned.'), 'bot');
+    loadArchive(currentSessionId);
+  } catch (err) {
+    hideLoading();
+    addMessage('<p style="margin:0;color:#c0392b">Could not connect to the AI service.</p>', 'bot');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (inp) { inp.disabled = false; inp.focus(); }
+  }
+}
+function sendSuggested(question) {
+  const wrap = document.getElementById('suggestedWrap');
+  if (wrap) wrap.remove();
+  const inp = document.getElementById('chatIn');
+  if (inp) inp.value = question;
+  askAI();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('chatIn')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') askAI();
+  });
+  const storedPref = localStorage.getItem(ARCHIVE_PREF_KEY);
+  const defaultOpen = storedPref === null ? window.innerWidth > 900 : storedPref === '1';
+  setArchiveOpen(defaultOpen, false);
+    window.addEventListener('resize', () => {
+    syncArchiveUi();
+      });
+  loadArchive();
+  });
+</script>
+{% endblock %}

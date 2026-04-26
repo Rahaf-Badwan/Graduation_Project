@@ -1,0 +1,85 @@
+{% extends 'head/base.html' %}
+{% block page_title %}Supervisors{% endblock %}
+{% block page_id %}supervisors{% endblock %}
+{% block topbar_title %}Supervisors{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-supervisors">
+  <div class="two-col" style="align-items:start">
+    <div class="card">
+      <div class="card-hd"><span class="card-title">List of Active Supervisors</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm);padding:12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div class="person-avatar" style="background:var(--blue-light);color:var(--blue);width:40px;height:40px;font-size:13px">MS</div>
+            <div style="flex:1"><div class="person-name" style="font-size:14px">Dr. Mohammed Salem</div><div class="person-info">Specialization: AI &middot; 12 years experience</div></div>
+            <span class="pill p-active">Active</span>
+          </div>
+          <div style="display:flex;gap:10px;font-size:12px">
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--blue)">7</div><div style="color:var(--color-text-secondary)">This Semester</div></div>
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--green)">89.4</div><div style="color:var(--color-text-secondary)">Average</div></div>
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--teal)">43</div><div style="color:var(--color-text-secondary)">Total</div></div>
+          </div>
+        </div>
+        <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm);padding:12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div class="person-avatar" style="background:#FBEAF0;color:#993556;width:40px;height:40px;font-size:13px">LH</div>
+            <div style="flex:1"><div class="person-name" style="font-size:14px">Dr. Lina Haddad</div><div class="person-info">Specialization: Web Development &middot; 8 years experience</div></div>
+            <span class="pill p-active">Active</span>
+          </div>
+          <div style="display:flex;gap:10px;font-size:12px">
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--blue)">6</div><div style="color:var(--color-text-secondary)">This Semester</div></div>
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--green)">84.7</div><div style="color:var(--color-text-secondary)">Average</div></div>
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--teal)">31</div><div style="color:var(--color-text-secondary)">Total</div></div>
+          </div>
+        </div>
+        <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm);padding:12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div class="person-avatar" style="background:var(--teal-light);color:var(--teal);width:40px;height:40px;font-size:13px">NH</div>
+            <div style="flex:1"><div class="person-name" style="font-size:14px">Dr. Naima Harbawi</div><div class="person-info">Specialization: Software Engineering &middot; 6 years experience</div></div>
+            <span class="pill p-active">Active</span>
+          </div>
+          <div style="display:flex;gap:10px;font-size:12px">
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--blue)">5</div><div style="color:var(--color-text-secondary)">This Semester</div></div>
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--green)">81.2</div><div style="color:var(--color-text-secondary)">Average</div></div>
+            <div style="flex:1;text-align:center;background:var(--color-background-secondary);padding:6px;border-radius:var(--rm)"><div style="font-weight:700;color:var(--teal)">22</div><div style="color:var(--color-text-secondary)">Total</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Supervisor Statistics Summary</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div class="stat"><div class="stat-num" style="color:var(--teal);font-size:20px">14</div><div class="stat-label">Active Supervisors</div></div>
+          <div class="stat"><div class="stat-num" style="color:var(--blue);font-size:20px">5.6</div><div class="stat-label">Avg Projects/Supervisor</div></div>
+          <div class="stat"><div class="stat-num" style="color:var(--green);font-size:20px">89.4</div><div class="stat-label">Highest Average</div></div>
+          <div class="stat"><div class="stat-num" style="color:var(--amber);font-size:20px">78.3</div><div class="stat-label">Lowest Average</div></div>
+        </div>
+        <div style="padding:10px;background:var(--teal-light);border-radius:var(--rm);font-size:12px;color:var(--teal)">
+          &#10003; Distribution is fair — max load per supervisor: 7 projects (within acceptable limit)
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Add New Supervisor</span></div>
+        <div class="field-wrap"><div class="field-label">Full Name</div><input class="field-input" placeholder="Dr. Full Name..."/></div>
+        <div class="field-wrap"><div class="field-label">University Email</div><input class="field-input" placeholder="user@birzeit.edu"/></div>
+        <div class="field-wrap"><div class="field-label">Main Specialization</div>
+          <select class="field-select">
+            <option>Choose specialization...</option>
+            <option>Artificial Intelligence</option>
+            <option>Web Development</option>
+            <option>Software Engineering</option>
+            <option>Networking &amp; Security</option>
+          </select>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary">Add to System &#x2197;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

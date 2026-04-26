@@ -1,0 +1,78 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Archived Projects{% endblock %}
+{% block page_id %}search{% endblock %}
+{% block topbar_title %}Archived Projects{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-search">
+
+            <div class="card">
+              <div class="search-bar" style="padding:10px 14px">
+                <span style="font-size:14px;color:var(--color-text-secondary)"><span
+                    class="material-symbols-outlined icon-inline">search</span></span>
+                <input placeholder="Search by project title, supervisor, keywords..." />
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
+                <span style="font-size:12px;color:var(--color-text-secondary)">Filter by:</span>
+                <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px">
+                  <option>All Years</option>
+                  <option>2025/2026</option>
+                  <option>2024/2025</option>
+                  <option>2023/2024</option>
+                </select>
+                <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px">
+                  <option>All Types</option>
+                  <option>Artificial Intelligence</option>
+                  <option>Web Application</option>
+                  <option>Mobile</option>
+                </select>
+                <select class="field-select" style="width:auto;padding:5px 10px;font-size:12px">
+                  <option>All Supervisors</option>
+                  <option>Dr. Naema Harbawi</option>
+                  <option>Dr. Mahmoud Salem</option>
+                </select>
+                <!-- Score toggle button -->
+                <button class="toggle-score-btn" id="toggleScoreBtn" onclick="toggleScores()">
+                  <span class="material-symbols-outlined icon-inline" style="font-size:14px">visibility_off</span>
+                  Show Scores
+                </button>
+              </div>
+              <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">Showing 2 of 312 projects
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px" id="project-list">
+
+                <!-- Only Accepted projects shown -->
+                <div
+                  style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--color-border-tertiary);border-radius:var(--rm)">
+                  <div
+                    style="width:36px;height:36px;background:var(--blue-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue)">
+                    AI</div>
+                  <div style="flex:1">
+                    <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">AI-Based Disease
+                      Recognition System</div>
+                    <div style="font-size:11px;color:var(--color-text-secondary)">Dr. Mahmoud Salem · 2024/2025 ·
+                      Artificial Intelligence</div>
+                  </div>
+                  <span class="score-chip sc-a">92</span>
+                </div>
+
+                <div
+                  style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--color-border-tertiary);border-radius:var(--rm)">
+                  <div
+                    style="width:36px;height:36px;background:#EAF3DE;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#3B6D11">
+                    EL</div>
+                  <div style="flex:1">
+                    <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Adaptive E-Learning
+                      Platform</div>
+                    <div style="font-size:11px;color:var(--color-text-secondary)">Dr. Lina Haddad · 2023/2024 · Web
+                      Application</div>
+                  </div>
+                  <span class="score-chip sc-a">87</span>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+{% endblock %}

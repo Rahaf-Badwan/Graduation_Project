@@ -1,0 +1,191 @@
+{% extends 'coordinator/base.html' %}
+
+{% block page_title %}Exam Distribution{% endblock %}
+{% block page_id %}exams{% endblock %}
+{% block topbar_title %}Exam Distribution{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-exams">
+
+<div class="tab-bar" style="margin-bottom:16px;">
+  <button class="tab on" type="button" onclick="showExamSection('examProfessors',this)">Professors Distribution</button>
+  <button class="tab" type="button" onclick="showExamSection('examSummary',this)">Summary & Timetable</button>
+</div>
+
+<div id="examProfessors">
+
+<div>
+<div class="card">
+<div class="card-hd"><span class="card-title">Professors Eligible for Examination — End of Semester</span></div>
+
+<div class="u-343f9d13">
+ℹ Priority is given to the supervisor who has <b>Project Introduction</b> hours because they are paid
+for them. Each professor who taught X introductions examines X groups = <b>2X sessions</b> (Each project
+has two presentations). The fixed-staff professor takes more.
+</div>
+
+<div class="exam-assign-row fixed">
+<div class="u-d5e8c5f3">
+<div class="u-75ff8128">
+<span class="u-2e61148f">Dr. Naemeh Harbawi</span>
+<span class="pill p-fixed u-49f06467">Fixed Staff</span>
+</div>
+<div class="u-7d16b22c">3 project introductions → examines 3 groups → <b>6 exam sessions</b></div>
+</div>
+<div class="u-244a7f30">
+<div class="u-fed8e3e4">6</div>
+<div class="u-76f8b3cc">Session</div>
+</div>
+</div>
+
+<div class="exam-assign-row fixed">
+<div class="u-d5e8c5f3">
+<div class="u-75ff8128">
+<span class="u-2e61148f">Dr. Mahmoud Salem</span>
+<span class="pill p-fixed u-49f06467">Fixed Staff</span>
+</div>
+<div class="u-7d16b22c">4 project introductions → examines 4 groups → <b>8 exam sessions</b></div>
+</div>
+<div class="u-244a7f30">
+<div class="u-fed8e3e4">8</div>
+<div class="u-76f8b3cc">Session</div>
+</div>
+</div>
+
+<div class="exam-assign-row temp">
+<div class="u-d5e8c5f3">
+<div class="u-75ff8128">
+<span class="u-2e61148f">Dr. Lina Haddad</span>
+<span class="pill p-temp u-49f06467">Non-Fixed Staff</span>
+</div>
+<div class="u-7d16b22c">2 project introductions → examines 2 groups → <b>4 exam sessions</b></div>
+</div>
+<div class="u-244a7f30">
+<div class="u-03500f46">4</div>
+<div class="u-76f8b3cc">Session</div>
+</div>
+</div>
+
+<div class="exam-assign-row temp">
+<div class="u-d5e8c5f3">
+<div class="u-75ff8128">
+<span class="u-2e61148f">Dr. Samer Darwish</span>
+<span class="pill p-temp u-49f06467">Non-Fixed Staff</span>
+</div>
+<div class="u-7d16b22c">No project introduction hours this semester — can be assigned to unassigned students</div>
+</div>
+<div class="u-244a7f30">
+<div class="u-f1f603ff">0</div>
+<div class="u-76f8b3cc">Session</div>
+</div>
+</div>
+
+<div class="u-49e72f9b">
+<div class="btn-row">
+<button class="btn btn-primary"
+data-prompt="The coordinator redistributed final examinations among professors based on their hours in APMS ↗"
+type="button">Confirm Distribution ↗</button>
+<button class="btn btn-outline" type="button">Auto Recalculate</button>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+
+<div id="examSummary" style="display:none;">
+
+<div>
+<div class="card">
+<div class="card-hd"><span class="card-title">Exam Distribution Summary</span></div>
+
+<div class="u-8f905a06">
+<div class="stat">
+<div class="stat-num u-c293fd73">28</div>
+<div class="stat-label">Fixed-Staff Professor</div>
+</div>
+
+<div class="stat">
+<div class="stat-num u-a9721929">10</div>
+<div class="stat-label">Non-Fixed Professor</div>
+</div>
+
+<div class="stat">
+<div class="stat-num u-cfb6c12e">62</div>
+<div class="stat-label">Total Exam Sessions</div>
+</div>
+
+<div class="stat">
+<div class="stat-num u-90f01645">31</div>
+<div class="stat-label">Projects Discussed</div>
+</div>
+</div>
+
+<div class="u-9c8abd96">Distribution Status</div>
+
+<div class="prog-wrap">
+<div class="prog-label"><span>Assigned to Professors</span><span class="u-44265a69">74%</span></div>
+<div class="prog-bg">
+<div class="prog-fill u-7c06bad9"></div>
+</div>
+</div>
+
+<div class="prog-wrap">
+<div class="prog-label"><span>Waiting for Assignment</span><span class="u-44265a69">26%</span></div>
+<div class="prog-bg">
+<div class="prog-fill u-34aec660"></div>
+</div>
+</div>
+
+</div>
+
+<div class="card">
+<div class="card-hd"><span class="card-title">Scheduled Examination Timetable</span></div>
+
+<div class="u-e47f6ecd">
+
+<div class="u-19a0032b">
+<div class="u-213dde1e">APMS Project — 20 Feb · 10:00 AM</div>
+<div class="u-ebacd908">Examiner: Dr. Naemeh Harbawi + Dr. Mahmoud Salem</div>
+</div>
+
+<div class="u-2ac773d4">
+<div class="u-475b0685">AI Disease System — 21 Feb · 2:00 PM</div>
+<div class="u-569d1fff">Examiner: Dr. Mahmoud Salem + Dr. Lina Haddad</div>
+</div>
+
+<div class="u-4a542d7b">
+<div class="u-a694d8f3">Learning Platform — 22 Feb · Time TBD</div>
+<div class="u-03d43b2e">Examiner: Dr. Lina Haddad + waiting for a second assignment</div>
+</div>
+
+</div>
+
+<div class="u-271dbd4e">
+⚑ Note: If the supervisor does not have project introduction hours, they may still examine students, but it is not counted toward paid hours.
+</div>
+
+</div>
+</div>
+
+</div>
+
+</div>
+
+<script>
+function showExamSection(id,btn){
+document.getElementById('examProfessors').style.display='none';
+document.getElementById('examSummary').style.display='none';
+
+document.getElementById(id).style.display='block';
+
+document.querySelectorAll('#pg-exams > .tab-bar .tab').forEach(tab=>{
+tab.classList.remove('on');
+});
+
+btn.classList.add('on');
+}
+</script>
+
+{% endblock %}

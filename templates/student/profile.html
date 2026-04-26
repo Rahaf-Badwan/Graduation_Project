@@ -1,0 +1,154 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Profile{% endblock %}
+{% block page_id %}profile{% endblock %}
+{% block topbar_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-profile">
+
+  <div class="profile-header">
+    <div class="profile-avatar-lg">{{ user.avatar_initials if user else '?' }}</div>
+    <div style="flex:1">
+      <div style="font-size:18px;font-weight:600;color:var(--color-text-primary)">
+        {{ user.full_name if user else '—' }}
+      </div>
+      <div style="font-size:13px;color:var(--color-text-secondary);margin-top:2px">
+        {{ user.university_id if user else '—' }} · Student · Department of Computer Science
+      </div>
+      <div style="margin-top:6px;display:flex;gap:6px">
+        <span class="pill p-accepted">Active Student</span>
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;
+                     background:var(--blue-light);color:var(--blue)">COMP4200</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+
+    <!-- ── Personal Information (read-only) ── -->
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Personal Information</span></div>
+
+      <div class="field-wrap">
+        <div class="field-label">Full Name</div>
+        <input class="field-input" readonly
+               style="background:var(--color-background-secondary)"
+               value="{{ user.full_name if user else '' }}" />
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Student ID</div>
+        <input class="field-input" readonly
+               style="background:var(--color-background-secondary)"
+               value="{{ user.university_id if user else '' }}" />
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Email</div>
+        <input class="field-input" readonly
+               style="background:var(--color-background-secondary)"
+               value="{{ user.email if user else '' }}" />
+      </div>
+    </div>
+
+    <div>
+
+      <!-- ── Change Password ── -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Change Password</span></div>
+
+        {% if pwd_error %}
+          <div style="background:#fff0f0;border:1px solid #f5c6c6;color:#c0392b;
+                      font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
+            ⚠ {{ pwd_error }}
+          </div>
+        {% endif %}
+        {% if pwd_success %}
+          <div style="background:#f0fff4;border:1px solid #a8d5b5;color:#1a5c2a;
+                      font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
+            ✅ {{ pwd_success }}
+          </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('student.change_password') }}">
+          <div class="field-wrap">
+            <div class="field-label">Current Password</div>
+            <div style="position:relative">
+              <input class="field-input" type="password" name="current_password"
+                     placeholder="••••••••" style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;font-size:15px;line-height:1">
+                👁
+              </button>
+            </div>
+          </div>
+          <div class="field-wrap">
+            <div class="field-label">New Password</div>
+            <div style="position:relative">
+              <input class="field-input" type="password" name="new_password"
+                     placeholder="At least 8 characters" style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;font-size:15px;line-height:1">
+                👁
+              </button>
+            </div>
+          </div>
+          <div class="field-wrap">
+            <div class="field-label">Confirm Password</div>
+            <div style="position:relative">
+              <input class="field-input" type="password" name="confirm_password"
+                     placeholder="Re-enter new password" style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;font-size:15px;line-height:1">
+                👁
+              </button>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary">Update Password</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── Academic Information (read-only) ── -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Academic Information</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Department</span>
+            <span>Computer Science</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Enrollment Year</span>
+            <span>{{ user.enrollment_year if user and user.enrollment_year else '—' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Supervisor</span>
+            <span>{{ academic.supervisor_name if academic and academic.supervisor_name else 'Not assigned' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0">
+            <span style="color:var(--color-text-secondary)">Project No.</span>
+            <span>{{ academic.project_id if academic else '—' }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+function togglePwd(btn) {
+  const input = btn.previousElementSibling;
+  const hidden = input.type === 'password';
+  input.type = hidden ? 'text' : 'password';
+  btn.textContent = hidden ? '🙈' : '👁';
+}
+</script>
+{% endblock %}

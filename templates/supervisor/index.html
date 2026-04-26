@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>APMS — Supervisor Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}"/>
+  <style>
+    .coming-soon-banner {
+      background: #E6F1FB;
+      border-left: 4px solid #185FA5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #185FA5;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body data-page="dashboard">
+<div class="app-wrapper">
+  <div class="shell">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar collapsed" id="sidebar">
+      <div class="sb-top">
+        <button class="sb-toggle" onclick="toggleSidebar()" title="Menu">
+          <span class="material-symbols-outlined icon-inline">menu</span>
+        </button>
+      </div>
+      <div class="sb-profile">
+        <div class="sb-avatar" style="background:#E6F1FB;color:#185FA5">{{ session.avatar_initials }}</div>
+        <div class="sb-name">{{ session.full_name }}</div>
+        <div class="sb-id">{{ session.university_id }}</div>
+        <div class="sb-role">Supervisor</div>
+      </div>
+      <div class="sb-nav">
+        <a class="sb-item" data-page="dashboard" href="/supervisor/dashboard">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
+          <span class="sb-label">Dashboard</span>
+        </a>
+        <a class="sb-item" data-page="projects" href="/supervisor/projects">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">folder_open</span></span>
+          <span class="sb-label">My Projects</span>
+        </a>
+        <a class="sb-item" data-page="progress" href="/supervisor/progress">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">trending_up</span></span>
+          <span class="sb-label">Track Progress</span>
+        </a>
+        <a class="sb-item" data-page="feedback" href="/supervisor/feedback">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">reviews</span></span>
+          <span class="sb-label">Give Feedback</span>
+        </a>
+        <a class="sb-item" data-page="evaluate" href="/supervisor/evaluate">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">grading</span></span>
+          <span class="sb-label">Evaluate Projects</span>
+        </a>
+        <a class="sb-item" data-page="search" href="/supervisor/search">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
+          <span class="sb-label">Archived Projects</span>
+        </a>
+        <a class="sb-item" data-page="notifs" href="/supervisor/notifs">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
+          <span class="sb-label">Notifications</span>
+        </a>
+        <a class="sb-item" data-page="ai" href="/supervisor/ai">
+          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
+          <span class="sb-label">AI Assistant</span>
+        </a>
+
+      </div>
+      <div class="sb-footer">
+        <a class="sb-footer-item" href="/logout" style="text-decoration:none;color:inherit">
+          <span class="material-symbols-outlined icon-inline">logout</span>
+          <span>&nbsp;Sign Out</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+      <div class="topbar">
+        <div class="tb-left">
+          <div class="tb-titles">
+            <div class="tb-title">Supervisor Dashboard</div>
+            <div class="tb-sub">COMP4200 · Semester 2025/2026</div>
+          </div>
+        </div>
+        <div class="tb-right">
+          <div class="tb-logo">APMS</div>
+        </div>
+      </div>
+
+      <div class="content-area">
+        <div class="page on">
+          <div class="coming-soon-banner">
+            👨‍🏫 This dashboard is under construction — full UI coming soon.
+            Logged in as: {{ session.full_name }} ({{ session.role }})
+          </div>
+
+          <div class="stats-row">
+            <div class="stat">
+              <div class="stat-num" style="color:#185FA5">5</div>
+              <div class="stat-label">Projects Under Supervision</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num" style="color:#185FA5">3</div>
+              <div class="stat-label">On Track</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num" style="color:#185FA5">1</div>
+              <div class="stat-label">Needs Urgent Follow-up</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num" style="color:#185FA5">81.2</div>
+              <div class="stat-label">Average Grade This Semester</div>
+            </div>
+
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <div class="card-hd"><span class="card-title">Quick Actions</span></div>
+            <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">
+              Navigation is available from the sidebar. More features will be added here.
+            </p>
+            <div class="btn-row">
+              <a href="/logout" class="btn btn-outline" style="text-decoration:none">Sign Out</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    © 2026 <strong>Birzeit University</strong> — Department of Computer Science · All Rights Reserved · APMS v1.0
+  </footer>
+</div>
+<script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
+</body>
+</html>

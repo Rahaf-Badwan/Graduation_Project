@@ -1,0 +1,93 @@
+{% extends 'head/base.html' %}
+{% block page_title %}Assign Roles{% endblock %}
+{% block page_id %}assign{% endblock %}
+{% block topbar_title %}Assign Roles{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-assign">
+  <div class="two-col" style="align-items:start">
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Assign Coordinator of Projects</span>
+          <div class="tabs">
+            <button class="tab active" onclick="selectTab('intro', this)">COMP4200</button>
+            <button class="tab" onclick="selectTab('grad', this)">COMP4300</button>
+          </div>
+        </div>
+        <div style="padding:10px;background:var(--teal-light);border-radius:var(--rm);margin-bottom:14px;font-size:12px;color:var(--teal)">
+          Current Coordinator: <strong>Dr. Abu Seneina</strong>
+        </div>
+        <div class="form-grid">
+          <div class="field-wrap">
+            <div class="field-label">This Semester <span class="req">*</span></div>
+            <select class="field-select">
+              <option>Second Semester - 2025/2026</option>
+              <option>First Semester - 2026/2027</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <div class="field-label">New Coordinator <span class="req">*</span></div>
+            <select class="field-select">
+              <option>Choose Coordinator ...</option>
+              <option>Dr. Mohammed Salem</option>
+              <option>Dr. Lina Haddad</option>
+              <option>Dr. Naima Harbawi</option>
+            </select>
+          </div>
+          <div class="field-wrap">
+            <div class="field-label">Course <span class="req">*</span></div>
+            <select class="field-select" id="courseSelect">
+              <option>COMP4200</option>
+              <option>COMP4300</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Notes</div>
+          <textarea class="field-textarea" style="min-height:60px" placeholder="Any instructions or notes for the new coordinator"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary">Confirm New Coordinator &#x2197;</button>
+          <button class="btn btn-outline">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Previous Coordinators</span></div>
+        <div class="assign-card new">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <div class="person-avatar" style="background:var(--teal-light);color:var(--teal);width:36px;height:36px">AS</div>
+            <div style="flex:1">
+              <div class="person-name">Dr. Abu Seneina</div>
+              <div class="person-info">COMP4200 &middot; 2025/2026 &middot; <span class="pill p-active" style="font-size:10px">Current</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="assign-card">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="person-avatar" style="background:var(--blue-light);color:var(--blue);width:36px;height:36px">MS</div>
+            <div style="flex:1">
+              <div class="person-name">Dr. Mohammed Salem</div>
+              <div class="person-info">COMP4200 &middot; 2024/2025</div>
+            </div>
+            <span class="year-tag">2024/2025</span>
+          </div>
+        </div>
+        <div class="assign-card">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="person-avatar" style="background:#FBEAF0;color:#993556;width:36px;height:36px">LH</div>
+            <div style="flex:1">
+              <div class="person-name">Dr. Lina Haddad</div>
+              <div class="person-info">COMP4200 &middot; 2023/2024</div>
+            </div>
+            <span class="year-tag">2023/2024</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,193 @@
+/* ─── Head of Department — ADDITIONAL styles only ────────────────────────
+   All layout, sidebar, topbar, card, btn, field, chat, notif, search-bar,
+   prog, score-chip, profile-header, two-col, three-col, form-grid, stat,
+   pill, page, content-area  →  already in assets/css/style.css
+   This file only adds what is NOT in style.css + head colour overrides.
+──────────────────────────────────────────────────────────────────────── */
+
+/* ── Head colour tokens ─────────────────────────────────────────────── */
+:root {
+  --teal:        #0F6E56;
+  --teal-light:  #E1F5EE;
+  --teal-mid:    #1D9E75;
+  --blue:        #185FA5;
+  --blue-light:  #E6F1FB;
+  --amber:       #BA7517;
+  --amber-light: #FAEEDA;
+  --coral:       #993C1D;
+  --coral-light: #FAECE7;
+  --purple:      #534AB7;
+  --purple-light:#EEEDFE;
+}
+
+/* ── Override sidebar active + role colours → teal for head ─────────── */
+.head-nav .sb-item.on {
+  background: var(--teal-light);
+  color: var(--teal);
+  border-left-color: var(--teal);
+}
+
+.sb-role {
+  background: var(--teal-light) !important;
+  color: var(--teal) !important;
+}
+
+.sb-avatar {
+  background: var(--teal-light) !important;
+  color: var(--teal) !important;
+}
+
+/* ── Topbar head badge ───────────────────────────────────────────────── */
+.tb-hd-badge {
+  font-size: 11px;
+  background: var(--teal-light);
+  color: var(--teal);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Topbar border → teal for head (overrides main green) ───────────── */
+.topbar {
+  border-bottom-color: var(--teal) !important;
+}
+
+/* ── Tab bar (not in main style.css) ────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+  margin-bottom: 14px;
+}
+
+.tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: inherit;
+  transition: color .15s;
+}
+
+.tab.on,
+.tab.active {
+  color: var(--teal);
+  border-bottom-color: var(--teal);
+  font-weight: 500;
+}
+
+/* ── Year tag ────────────────────────────────────────────────────────── */
+.year-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--teal-light);
+  color: var(--teal);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Score chip colours ──────────────────────────────────────────────── */
+.sc-a { background: #EAF3DE; color: #3B6D11; }
+.sc-b { background: var(--blue-light); color: var(--blue); }
+.sc-c { background: var(--amber-light); color: var(--amber); }
+
+/* ── Pill colours ────────────────────────────────────────────────────── */
+.p-active   { background: var(--teal-light);   color: var(--teal); }
+.p-accepted { background: #e8f5ee;             color: #085041; }
+.p-review   { background: var(--blue-light);   color: var(--blue); }
+.p-pending  { background: var(--amber-light);  color: var(--amber); }
+.p-rejected { background: var(--coral-light);  color: var(--coral); }
+.p-coord    { background: var(--purple-light); color: var(--purple); }
+
+/* ── Person row (supervisor list) ────────────────────────────────────── */
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.person-row:last-child { border-bottom: none; }
+
+.person-avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.person-meta  { flex: 1; min-width: 0; }
+.person-name  { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.person-info  { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+
+/* ── Notification dot (red, used inline) ────────────────────────────── */
+.notif-dot-red {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #E24B4A;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* ── Notif icon wrap ─────────────────────────────────────────────────── */
+.notif-icon-wrap {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+/* ── Assign card ─────────────────────────────────────────────────────── */
+.assign-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.assign-card.new { border-left: 3px solid var(--teal); }
+
+/* ── Profile avatar large ────────────────────────────────────────────── */
+.profile-avatar-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--teal-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--teal);
+  flex-shrink: 0;
+}
+
+/* ── Bar rows (supervisor stats chart) ───────────────────────────────── */
+.bar-row        { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.bar-row-label  { font-size: 12px; color: var(--color-text-primary); flex: 1.2; }
+.bar-row-bar    { flex: 2; height: 6px; background: var(--color-background-secondary); border-radius: 3px; overflow: hidden; }
+.bar-row-fill   { height: 100%; border-radius: 3px; }
+.bar-row-val    { font-size: 12px; font-weight: 500; color: var(--color-text-primary); min-width: 28px; text-align: right; }
+
+/* ── Responsive tweaks ───────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .two-col  { grid-template-columns: 1fr !important; }
+  .three-col{ grid-template-columns: 1fr 1fr !important; }
+  .form-grid{ grid-template-columns: 1fr !important; }
+}

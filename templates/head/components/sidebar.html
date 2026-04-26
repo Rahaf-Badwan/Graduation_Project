@@ -1,0 +1,66 @@
+<div class="sidebar collapsed" id="sidebar">
+  <div class="sb-top">
+    <button class="sb-toggle" onclick="toggleSidebar()" title="Menu">
+      <span class="material-symbols-outlined icon-inline">menu</span>
+    </button>
+  </div>
+
+  <div class="sb-profile" onclick="window.location.href='/head/profile'" title="My Profile" style="cursor:pointer">
+    <div class="sb-avatar">{{ session.avatar_initials }}</div>
+    <div class="sb-name">{{ session.full_name }}</div>
+    <div class="sb-id">{{ session.university_id }}</div>
+    <div class="sb-role">Head of Department</div>
+  </div>
+
+  <div class="sb-nav head-nav">
+    <a class="sb-item {% if request.path in ['/head/', '/head/dashboard'] %}on{% endif %}"
+       data-page="dashboard" data-tip="Dashboard" href="/head/">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
+      <span class="sb-label">Dashboard</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/head/assign' %}on{% endif %}"
+       data-page="assign" data-tip="Assign Roles" href="/head/assign">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">manage_accounts</span></span>
+      <span class="sb-label">Assign Roles</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/head/overview' %}on{% endif %}"
+       data-page="overview" data-tip="Department Overview" href="/head/overview">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">analytics</span></span>
+      <span class="sb-label">Department Overview</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/head/supervisors' %}on{% endif %}"
+       data-page="supervisors" data-tip="Supervisors" href="/head/supervisors">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">school</span></span>
+      <span class="sb-label">Supervisors</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/head/search' %}on{% endif %}"
+       data-page="search" data-tip="Search Projects" href="/head/search">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
+      <span class="sb-label">Search Projects</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/head/notifs' %}on{% endif %}"
+       data-page="notifs" data-tip="Notifications" href="/head/notifs">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
+      <span class="sb-label">Notifications</span>
+      <span class="sb-badge">4</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/head/ai' %}on{% endif %}"
+       data-page="ai" data-tip="AI Assistant" href="/head/ai">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
+      <span class="sb-label">AI Assistant</span>
+    </a>
+  </div>
+
+  <div class="sb-footer">
+    <a class="sb-footer-item" href="/logout" style="text-decoration:none;color:inherit">
+      <span class="material-symbols-outlined icon-inline">logout</span>
+      <span>&nbsp;Sign Out</span>
+    </a>
+  </div>
+</div>

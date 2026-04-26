@@ -1,0 +1,190 @@
+{% extends 'coordinator/base.html' %}
+
+{% block page_title %}Review Submitted Projects{% endblock %}
+{% block page_id %}review{% endblock %}
+{% block topbar_title %}Review Submitted Projects{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-review">
+
+<div class="tab-bar" style="margin-bottom:16px;">
+  <button class="tab on" type="button" onclick="showSection('introSection',this)">Project Introduction</button>
+  <button class="tab" type="button" onclick="showSection('gradSection',this)">Graduation Projects</button>
+</div>
+
+<div id="introSection">
+
+<div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+<span style="background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">◑ Project Introduction — COMP4200</span>
+<span style="font-size:11px;color:var(--color-text-secondary);">مقدمة المشاريع</span>
+</div>
+
+<div class="tab-bar" style="margin-bottom:10px;">
+<button class="tab on" type="button">New (4)</button>
+<button class="tab" type="button">In Review (6)</button>
+<button class="tab" type="button">Needs Revision (2)</button>
+<button class="tab" type="button">Completed</button>
+</div>
+
+<div class="eval-proj-card u-540daf2c">
+<div class="u-3670a192">
+<div>
+<div class="u-4b40f770">Academic Project Lifecycle Management System (APMS)</div>
+<div class="u-7d16b22c">Rahaf Badwan, Amneh Abu Muslim, Tima Abd · Dr. Naemeh Harbawi</div>
+</div>
+<span class="pill p-new">New</span>
+</div>
+<div class="u-63e9554f">A web system for managing the graduation project lifecycle from registration to archiving, supporting 300+ projects annually.</div>
+<div class="u-1c86650a">
+<span class="u-9ca6aa56">Web Application</span>
+<span class="u-09646ab3">AI Features</span>
+<span class="u-d5dc922a">COMP4200</span>
+</div>
+<div class="field-wrap">
+<div class="field-label">Reviewer Notes</div>
+<textarea class="field-textarea u-f9368ae0" placeholder="Add your notes here..."></textarea>
+</div>
+<div class="btn-row">
+<button class="btn btn-success" data-prompt="Accepted APMS intro project ↗" type="button">✓ Accept</button>
+<button class="btn btn-danger" type="button">✗ Reject</button>
+<button class="btn btn-outline" type="button">◌ Request Revision</button>
+</div>
+</div>
+
+<div class="eval-proj-card u-540daf2c">
+<div class="u-3670a192">
+<div>
+<div class="u-4b40f770">Electronic Student Records Management System</div>
+<div class="u-7d16b22c">Salma Al-Khatib · Dr. Mahmoud Salem</div>
+</div>
+<span class="pill p-new">New</span>
+</div>
+<div class="u-63e9554f">A digital system for managing student records and grades with multi-role access and academic performance reports.</div>
+<div class="field-wrap">
+<div class="field-label">Reviewer Notes</div>
+<textarea class="field-textarea u-f9368ae0" placeholder="Add your notes here..."></textarea>
+</div>
+<div class="btn-row">
+<button class="btn btn-success" type="button">✓ Accept</button>
+<button class="btn btn-danger" type="button">✗ Reject</button>
+<button class="btn btn-outline" type="button">◌ Request Revision</button>
+</div>
+</div>
+
+<div class="eval-proj-card u-b9c0e746">
+<div class="u-3670a192">
+<div>
+<div class="u-4b40f770">Smart Library Catalog System</div>
+<div class="u-7d16b22c">Nour Haddad · Dr. Lina Haddad</div>
+</div>
+<span class="pill p-pending">Needs Revision</span>
+</div>
+<div class="u-26f31170">⚑ Student needs to add a user authentication module and clarify data privacy handling. Waiting 3 days.</div>
+<div class="btn-row">
+<button class="btn btn-success" type="button">✓ Accept After Update</button>
+<button class="btn btn-danger" type="button">✗ Final Rejection</button>
+<button class="btn btn-outline" type="button">Send Reminder</button>
+</div>
+</div>
+
+</div>
+</div>
+
+<div id="gradSection" style="display:none;">
+
+<div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+<span style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">✦ Graduation Projects — COMP4201</span>
+<span style="font-size:11px;color:var(--color-text-secondary);">مشاريع التخرج</span>
+</div>
+
+<div class="tab-bar" style="margin-bottom:10px;">
+<button class="tab on" type="button">New (3)</button>
+<button class="tab" type="button">In Review (6)</button>
+<button class="tab" type="button">Needs Revision (2)</button>
+<button class="tab" type="button">Completed</button>
+</div>
+
+<div class="eval-proj-card u-540daf2c">
+<div class="u-3670a192">
+<div>
+<div class="u-4b40f770">AI-Based Disease Detection System</div>
+<div class="u-7d16b22c">Amjad Al-Rimawi, Sara Nabulsi · Dr. Mahmoud Salem</div>
+</div>
+<span class="pill p-new">New</span>
+</div>
+<div class="u-63e9554f">Deep learning model for early disease detection from medical imaging, with a clinical dashboard and reporting module.</div>
+<div class="u-1c86650a">
+<span class="u-9ca6aa56">Machine Learning</span>
+<span class="u-09646ab3">Healthcare</span>
+<span class="u-d5dc922a">COMP4201</span>
+</div>
+<div class="field-wrap">
+<div class="field-label">Reviewer Notes</div>
+<textarea class="field-textarea u-f9368ae0" placeholder="Add your notes here..."></textarea>
+</div>
+<div class="btn-row">
+<button class="btn btn-success" data-prompt="Accepted AI Disease project for evaluation ↗" type="button">✓ Accept &amp; Send for Evaluation</button>
+<button class="btn btn-danger" type="button">✗ Reject</button>
+<button class="btn btn-outline" type="button">◌ Request Revision</button>
+</div>
+</div>
+
+<div class="eval-proj-card u-540daf2c">
+<div class="u-3670a192">
+<div>
+<div class="u-4b40f770">Adaptive E-Learning Platform</div>
+<div class="u-7d16b22c">Khaled Mansour, Yazan Al-Hajj, Nadine Rashid · Dr. Lina Haddad</div>
+</div>
+<span class="pill p-new">New</span>
+</div>
+<div class="u-63e9554f">Personalised e-learning platform with adaptive content, quiz engine, and learning analytics dashboard.</div>
+<div class="field-wrap">
+<div class="field-label">Reviewer Notes</div>
+<textarea class="field-textarea u-f9368ae0" placeholder="Add your notes here..."></textarea>
+</div>
+<div class="btn-row">
+<button class="btn btn-success" type="button">✓ Accept &amp; Send for Evaluation</button>
+<button class="btn btn-danger" type="button">✗ Reject</button>
+<button class="btn btn-outline" type="button">◌ Request Revision</button>
+</div>
+</div>
+
+<div class="eval-proj-card u-b9c0e746">
+<div class="u-3670a192">
+<div>
+<div class="u-4b40f770">Mobile Patient Tracking App</div>
+<div class="u-7d16b22c">Ahmad Al-Arouri · Dr. Ahmad Omar</div>
+</div>
+<span class="pill p-pending">Needs Revision</span>
+</div>
+<div class="u-26f31170">⚑ Student asked to add a security &amp; privacy section and clarify patient data protection. Waiting 2 days.</div>
+<div class="btn-row">
+<button class="btn btn-success" type="button">✓ Accept After Update</button>
+<button class="btn btn-danger" type="button">✗ Final Rejection</button>
+<button class="btn btn-outline" type="button">Send Reminder</button>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+
+<script>
+function showSection(id,btn){
+document.getElementById('introSection').style.display='none';
+document.getElementById('gradSection').style.display='none';
+
+document.getElementById(id).style.display='block';
+
+document.querySelectorAll('#pg-review > .tab-bar .tab').forEach(tab=>{
+tab.classList.remove('on');
+});
+
+btn.classList.add('on');
+}
+</script>
+
+{% endblock %}

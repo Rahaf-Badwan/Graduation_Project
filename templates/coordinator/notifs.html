@@ -1,0 +1,38 @@
+{% extends 'coordinator/base.html' %}
+
+{% block page_title %}Notifications{% endblock %}
+{% block page_id %}notifs{% endblock %}
+{% block topbar_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-notifs">
+<div class="card">
+<div class="card-hd"><span class="card-title">Notifications</span><button class="card-action" type="button">Mark All as Read</button></div>
+<div class="u-38744a5b">Today</div>
+<div class="notif-item unread">
+<div class="notif-icon-wrap u-200b39d1">◈</div>
+<div class="u-d5e8c5f3"><div class="notif-title">A new project is waiting for your review</div><div class="notif-meta">Student Records Management System — Salma Al-Khatib · 2 hours ago</div></div>
+<div class="notif-dot-red"></div>
+</div>
+<div class="notif-item unread">
+<div class="notif-icon-wrap u-c58c61d5">✦</div>
+<div class="u-d5e8c5f3"><div class="notif-title">Dr. Mahmoud Salem completed evaluation of 3 projects</div><div class="notif-meta">Average score: 89.3 · 4 hours ago</div></div>
+<div class="notif-dot-red"></div>
+</div>
+<div class="notif-item unread">
+<div class="notif-icon-wrap u-ab1fb024">⚑</div>
+<div class="u-d5e8c5f3"><div class="notif-title">7 projects are waiting for a review decision</div><div class="notif-meta">Some have been waiting over 48 hours · Review is recommended today</div></div>
+<div class="notif-dot-red"></div>
+</div>
+<div class="u-34c2bf8a">Last Week</div>
+<div class="notif-item">
+<div class="notif-icon-wrap u-e394f28c">◎</div>
+<div class="u-d5e8c5f3"><div class="notif-title">The APMS project discussion was scheduled</div><div class="notif-meta">20 Feb 2026 — 10:00 AM · All members were notified</div></div>
+</div>
+<div class="notif-item">
+<div class="notif-icon-wrap u-c58c61d5">✓</div>
+<div class="u-d5e8c5f3"><div class="notif-title">The AI Disease System project was archived</div><div class="notif-meta">Final score: 92/100 · The student was notified</div></div>
+</div>
+</div>
+</div>
+{% endblock %}
