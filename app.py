@@ -12,7 +12,7 @@ from auth import login_required
 from routes.student import student_bp
 from routes.head import head_bp
 from ai_engine import ask_apms_ai
-
+from routes.assign_rols import assign_rols_bp
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
@@ -29,7 +29,7 @@ mail = Mail(app)
 # ─── Register Blueprints ─────────────────────────────────────────────────
 app.register_blueprint(student_bp)
 app.register_blueprint(head_bp)
-
+app.register_blueprint(assign_rols_bp)
 
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def fetch_supervisors():
@@ -911,6 +911,8 @@ def coordinator_page(page):
     if not template:
         return redirect(url_for("coordinator_dashboard"))
     return render_template(template)
+
+
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────
