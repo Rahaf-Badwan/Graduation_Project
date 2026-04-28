@@ -495,18 +495,16 @@ CREATE TABLE supervisor_assignments (
 --  AI assistant chat history per user
 -- ============================================================
 CREATE TABLE ai_conversations (
-    conv_id      INT           PRIMARY KEY AUTO_INCREMENT,
-    user_id      INT           NOT NULL,
-    session_id   VARCHAR(120)  NOT NULL COMMENT 'Client-generated conversation session ID',
+    conv_id      INT          PRIMARY KEY AUTO_INCREMENT,
+    user_id      INT          NOT NULL,
+    session_id   VARCHAR(120) NULL                       COMMENT 'Conversation session ID',
     message_role ENUM(
                    'user',
                    'assistant'
-                 )             NOT NULL,
-    message_text MEDIUMTEXT    NOT NULL,
-    created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    INDEX idx_ai_user_session (user_id, session_id, created_at),
-    INDEX idx_ai_created (created_at)
+                 )            NOT NULL,
+    message_text TEXT         NOT NULL,
+    created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -530,7 +528,7 @@ CREATE INDEX idx_lifecycle_project   ON project_lifecycle(project_id, stage);
 --  VIEWS
 -- ============================================================
 
--- Summary view per project
+-- Summary view per projec
 CREATE OR REPLACE VIEW vw_project_summary AS
 SELECT
     p.project_id,
@@ -1075,3 +1073,54 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     INDEX idx_token   (token),
     INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB;
+
+INSERT INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active)
+VALUES ('2025/2026', 2, 'COMP4300', '2026-03-01', '2026-07-01', TRUE);
+INSERT INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes)
+SELECT 
+  5, -- Dr. Lina
+  semester_id,
+  1,
+  'Coordinator for COMP4300 (limited supervisors)'
+FROM semesters
+WHERE course_code = 'COMP4300'
+ORDER BY semester_id DESC
+LIMIT 1;
+-- Dr. Mahmoud
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status)
+SELECT 
+  'Advanced AI System',
+  'ai',
+  semester_id,
+  4,
+  'submitted'
+FROM semesters
+WHERE course_code='COMP4300'
+ORDER BY semester_id DESC
+LIMIT 1;
+
+-- Dr. Lina
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status)
+SELECT 
+  'Enterprise Web Platform',
+  'web',
+  semester_id,
+  5,
+  'submitted'
+FROM semesters
+WHERE course_code='COMP4300'
+ORDER BY semester_id DESC
+LIMIT 1;
+
+-- Dr. Osama
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status)
+SELECT 
+  'Cyber Security Platform',
+  'security',
+  semester_id,
+  7,
+  'submitted'
+FROM semesters
+WHERE course_code='COMP4300'
+ORDER BY semester_id DESC
+LIMIT 1;
