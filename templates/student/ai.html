@@ -55,9 +55,20 @@
         </div>
       </div>
 
-      <div class="chat-input-row">
-        <input class="chat-input" id="chatIn" placeholder="Inquire about department or project statistics..." />
-        <button class="chat-send" id="sendBtn" onclick="askAI()">Send</button>
+      <div class="chat-composer" id="chatComposer">
+        <!-- Reply preview bar -->
+        <div class="reply-bar" id="replyBar" style="display:none;">
+          <div class="reply-bar-inner">
+            <span class="reply-bar-icon">↩️</span>
+            <span class="reply-bar-text" id="replyBarText"></span>
+          </div>
+          <button class="reply-bar-cancel" onclick="cancelReply()" title="Cancel reply">✕</button>
+        </div>
+
+        <div class="chat-input-row">
+          <input class="chat-input" id="chatIn" dir="auto" placeholder="Inquire about department or project statistics..." />
+          <button class="chat-send" id="sendBtn" onclick="askAI()">Send</button>
+        </div>
       </div>
     </section>
 
@@ -290,17 +301,27 @@
   flex-direction: column;
   gap: 16px;
 }
-.ai-chat-panel .chat-input-row {
-  display: flex;
-  gap: 10px;
-  padding: 16px 20px;
-  border-top: 1px solid #e0ede9;
-  background: #f6faf8;
+.ai-chat-panel .chat-composer {
   flex-shrink: 0;
   margin-top: auto;
   position: sticky;
   bottom: 0;
-  z-index: 30;
+  z-index: 35;
+  background: #f6faf8;
+  border-top: 1px solid #e0ede9;
+  box-shadow: 0 -6px 18px rgba(8,80,65,0.06);
+}
+.ai-chat-panel .chat-input-row {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 0;
+  background: transparent;
+  flex-shrink: 0;
+  margin-top: 0;
+  position: relative;
+  bottom: auto;
+  z-index: 1;
 }
 .ai-chat-panel .chat-input {
   flex: 1;
@@ -465,264 +486,108 @@
   .chat-status { display: none; }
 }
 </style>
+<style>
+/* ── Reply feature ── */
+.reply-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #eaf7f3;
+  border-top: 2px solid #0F6E56;
+  padding: 8px 16px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.reply-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.reply-bar-icon { font-size: 15px; flex-shrink: 0; }
+.reply-bar-text {
+  font-size: 12px;
+  color: #085041;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+  font-style: italic;
+}
+.reply-bar-cancel {
+  background: none;
+  border: none;
+  color: #085041;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.6;
+  padding: 2px 4px;
+}
+.reply-bar-cancel:hover { opacity: 1; }
+
+.chat-composer .reply-bar {
+  border-top: 2px solid #0F6E56;
+  border-bottom: 1px solid #d6ece5;
+}
+
+/* ── Reply button on hover ── */
+.chat-msg-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+.chat-msg-wrap.user-wrap { align-items: flex-end; }
+.chat-msg-wrap.bot-wrap  { align-items: flex-start; }
+
+.reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 20px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #aac4bb;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  align-self: flex-start;
+  margin-top: 1px;
+}
+.reply-btn:hover {
+  background: #eef6f3;
+  color: #085041;
+  border: 1px solid #c8ddd7;
+}
+
+/* ── Quoted reply bubble inside message ── */
+.reply-quote {
+  background: rgba(255,255,255,0.25);
+  border-left: 3px solid rgba(255,255,255,0.6);
+  border-radius: 6px;
+  padding: 5px 10px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  opacity: 0.85;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-msg.chat-bot .reply-quote {
+  border-left-color: #0F6E56;
+  background: #e4f2ee;
+  color: #085041;
+}
+</style>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-let currentSessionId = makeSessionId();
-const ARCHIVE_PREF_KEY = 'apms-ai-archive-open';
-
-function makeSessionId() {
-  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  return 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 12);
-}
-function scrollBottom() {
-  const scroller = document.querySelector('.content-area');
-  requestAnimationFrame(() => {
-    if (scroller) scroller.scrollTop = scroller.scrollHeight;
-    else window.scrollTo(0, document.documentElement.scrollHeight);
-  });
-}
-function escapeHtml(text) {
-  return String(text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-function addMessage(html, kind) {
-  const body = document.getElementById('chatBody');
-  const div  = document.createElement('div');
-  div.className = 'chat-msg ' + (kind === 'user' ? 'chat-user' : 'chat-bot');
-  if (kind === 'user') div.textContent = html;
-  else div.innerHTML = html;
-  body.appendChild(div);
-  scrollBottom();
-  return div;
-}
-function showLoading() {
-  const body = document.getElementById('chatBody');
-  const div  = document.createElement('div');
-  div.id = 'loadingBubble';
-  div.className = 'chat-loading';
-  div.innerHTML = '<span></span><span></span><span></span>';
-  body.appendChild(div);
-  scrollBottom();
-}
-function hideLoading() {
-  const el = document.getElementById('loadingBubble');
-  if (el) el.remove();
-}
-function applyInline(text) {
-  let safe = escapeHtml(text);
-  safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  safe = safe.replace(/`([^`]+)`/g, '<code style="background:#eef;padding:1px 4px;border-radius:3px;font-size:12px">$1</code>');
-  return safe;
-}
-function formatResponse(text) {
-  let sourceHtml = '';
-  let body = String(text || '');
-  if (body.startsWith('Based on uploaded PDFs:')) {
-    sourceHtml = '<span class="msg-source pdf">📄 From uploaded PDFs</span>';
-    body = body.replace('Based on uploaded PDFs:', '').trim();
-  } else if (body.startsWith('Based on APMS data:')) {
-    sourceHtml = '<span class="msg-source db">🗄 From APMS database</span>';
-    body = body.replace('Based on APMS data:', '').trim();
-  } else if (body.startsWith('General AI answer:')) {
-    sourceHtml = '<span class="msg-source ai">🤖 General AI</span>';
-    body = body.replace('General AI answer:', '').trim();
-  }
-  const lines = body.split('\n');
-  let html = '';
-  let inList = false;
-  for (let line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      if (inList) { html += '</ul>'; inList = false; }
-      html += '<div style="height:6px"></div>';
-      continue;
-    }
-    const isBullet = /^[-•*]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed);
-    if (isBullet) {
-      if (!inList) { html += '<ul class="bot-list">'; inList = true; }
-      const ct = trimmed.replace(/^[-•*\d\.]+\s*/, '');
-      html += '<li>' + applyInline(ct) + '</li>';
-    } else {
-      if (inList) { html += '</ul>'; inList = false; }
-      html += '<p style="margin:0 0 6px 0">' + applyInline(trimmed) + '</p>';
-    }
-  }
-  if (inList) html += '</ul>';
-  return sourceHtml ? '<div style="margin-bottom:10px">' + sourceHtml + '</div>' + html : html;
-}
-function resetWelcome() {
-  const body = document.getElementById('chatBody');
-  body.innerHTML = `
-    <div class="chat-msg chat-bot">
-      Hello {{ session.full_name.split()[0] if session.full_name else 'there' }}! I can provide you with comprehensive reports and analyses on projects, supervisor performance, and comparisons with previous years.
-    </div>
-    <div class="chat-msg chat-bot">
-      Try for example: "Compare AI vs web projects over 3 years" or "Who is the top supervisor this semester?"
-    </div>
-    <div class="suggested-wrap" id="suggestedWrap">
-      <div class="suggested-label">Suggested Questions</div>
-      <div class="suggested-grid">
-        <button class="suggested-btn" onclick="sendSuggested('Compare the performance of AI projects vs web development over the last 3 years')">📊 Compare discipline performance</button>
-        <button class="suggested-btn" onclick="sendSuggested('Who is the top-performing supervisor this semester?')">🏆 Top-performing supervisor</button>
-        <button class="suggested-btn" onclick="sendSuggested('What is the trend in project grades over the last five years?')">📈 Grade trend — 5 years</button>
-        <button class="suggested-btn" onclick="sendSuggested('How many projects were rejected this semester and what were the reasons?')">⚠ Analysis of rejected projects</button>
-        <button class="suggested-btn" onclick="sendSuggested('Which students are still without a supervisor?')">👥 Students without supervisors</button>
-        <button class="suggested-btn" onclick="sendSuggested('What projects scored above 90 this semester?')">⭐ Top-scored projects</button>
-      </div>
-    </div>`;
-}
-function formatArchiveDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-function syncArchiveUi() {
-  const wrap = document.getElementById('aiWrap');
-  const btn = document.getElementById('archiveToggleBtn');
-  const backdrop = document.getElementById('archiveBackdrop');
-  const isOpen = wrap ? !wrap.classList.contains('archive-collapsed') : true;
-  if (btn) {
-    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    btn.setAttribute('title', isOpen ? 'Hide archive' : 'Show archive');
-  }
-  if (backdrop) backdrop.classList.toggle('show', isOpen && window.innerWidth <= 900);
-}
-function setArchiveOpen(open, remember = true) {
-  const wrap = document.getElementById('aiWrap');
-  if (!wrap) return;
-  wrap.classList.toggle('archive-collapsed', !open);
-  syncArchiveUi();
-  if (remember) localStorage.setItem(ARCHIVE_PREF_KEY, open ? '1' : '0');
-}
-function toggleArchive() {
-  const wrap = document.getElementById('aiWrap');
-  if (!wrap) return;
-  setArchiveOpen(wrap.classList.contains('archive-collapsed'));
-}
-async function loadArchive(activeId = currentSessionId) {
-  const list = document.getElementById('archiveList');
-  try {
-    const res = await fetch('/api/ai/archive');
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to load archive.');
-    const conversations = data.conversations || [];
-    if (!conversations.length) {
-      list.innerHTML = '<div class="archive-empty">No archived chats yet. Start a conversation and it will appear here.</div>';
-      return;
-    }
-    list.innerHTML = conversations.map(item => `
-      <div class="archive-item ${item.session_id === activeId ? 'active' : ''}" onclick="openArchivedChat('${escapeHtml(item.session_id)}')">
-        <div class="archive-item-title">${escapeHtml(item.title)}</div>
-        <div class="archive-meta">
-          <span>${formatArchiveDate(item.updated_at)} · ${item.days_left} days left</span>
-          <button class="archive-delete" type="button" title="Delete" onclick="deleteArchivedChat(event, '${escapeHtml(item.session_id)}')">Delete</button>
-        </div>
-      </div>
-    `).join('');
-  } catch (err) {
-    list.innerHTML = '<div class="archive-error">Archive could not be loaded.</div>';
-  }
-}
-async function openArchivedChat(sessionId) {
-  currentSessionId = sessionId;
-  const body = document.getElementById('chatBody');
-  body.innerHTML = '';
-  showLoading();
-  try {
-    const res = await fetch('/api/ai/archive/' + encodeURIComponent(sessionId));
-    const data = await res.json();
-    hideLoading();
-    if (!res.ok) throw new Error(data.error || 'Failed to open conversation.');
-    if (!data.messages || !data.messages.length) {
-      resetWelcome();
-      return;
-    }
-    for (const msg of data.messages) {
-      if (msg.role === 'user') addMessage(msg.text, 'user');
-      else addMessage(formatResponse(msg.text), 'bot');
-    }
-    await loadArchive(sessionId);
-    if (window.innerWidth <= 900) setArchiveOpen(false);
-  } catch (err) {
-    hideLoading();
-    addMessage('<p style="margin:0;color:#c0392b">Could not open this archived conversation.</p>', 'bot');
-  }
-}
-async function deleteArchivedChat(event, sessionId) {
-  event.stopPropagation();
-  if (!confirm('Delete this archived conversation?')) return;
-  try {
-    await fetch('/api/ai/archive/' + encodeURIComponent(sessionId), { method: 'DELETE' });
-    if (sessionId === currentSessionId) startNewChat(false);
-    await loadArchive(currentSessionId);
-  } catch (err) {
-    alert('Could not delete this conversation.');
-  }
-}
-function startNewChat(refreshArchive = true) {
-  currentSessionId = makeSessionId();
-  resetWelcome();
-  const inp = document.getElementById('chatIn');
-  if (inp) inp.focus();
-  if (refreshArchive) loadArchive(currentSessionId);
-  if (window.innerWidth <= 900) setArchiveOpen(false);
-}
-async function askAI() {
-  const inp = document.getElementById('chatIn');
-  const btn = document.getElementById('sendBtn');
-  if (!inp || !inp.value.trim()) return;
-  const question = inp.value.trim();
-  inp.value = '';
-  const wrap = document.getElementById('suggestedWrap');
-  if (wrap) wrap.remove();
-  addMessage(question, 'user');
-  showLoading();
-  if (btn) btn.disabled = true;
-  if (inp) inp.disabled = true;
-  try {
-    const res  = await fetch('/api/ai/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, session_id: currentSessionId })
-    });
-    const data = await res.json();
-    if (data.session_id) currentSessionId = data.session_id;
-    hideLoading();
-    addMessage(formatResponse(data.answer || data.error || 'No response returned.'), 'bot');
-    loadArchive(currentSessionId);
-  } catch (err) {
-    hideLoading();
-    addMessage('<p style="margin:0;color:#c0392b">Could not connect to the AI service.</p>', 'bot');
-  } finally {
-    if (btn) btn.disabled = false;
-    if (inp) { inp.disabled = false; inp.focus(); }
-  }
-}
-function sendSuggested(question) {
-  const wrap = document.getElementById('suggestedWrap');
-  if (wrap) wrap.remove();
-  const inp = document.getElementById('chatIn');
-  if (inp) inp.value = question;
-  askAI();
-}
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('chatIn')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') askAI();
-  });
-  const storedPref = localStorage.getItem(ARCHIVE_PREF_KEY);
-  const defaultOpen = storedPref === null ? window.innerWidth > 900 : storedPref === '1';
-  setArchiveOpen(defaultOpen, false);
-    window.addEventListener('resize', () => {
-    syncArchiveUi();
-      });
-  loadArchive();
-  });
+  window.APMS_AI_FIRST_NAME = {{ (session.full_name.split()[0] if session.full_name else 'there')|tojson }};
 </script>
+<script src="{{ url_for('static', filename='assets/js/ai_chat.js') }}"></script>
 {% endblock %}

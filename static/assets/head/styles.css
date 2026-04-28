@@ -185,6 +185,97 @@
 .bar-row-fill   { height: 100%; border-radius: 3px; }
 .bar-row-val    { font-size: 12px; font-weight: 500; color: var(--color-text-primary); min-width: 28px; text-align: right; }
 
+.badge{
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fee2e2;
+  color:#991b1b;
+  font-size: 13px;
+  font-weight: bold;
+
+}
+
+.badge .label{
+  font-size: 8px;
+  font-weight: normal;
+  margin-top: 2px;
+}
+select{
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  outline: none;
+}
+.doctor-card{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f9fafb;
+  border-radius: 12px;
+  transition: 0.2s ease;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+}
+
+.doctor-card:hover{
+  transform: scale(1.01);
+  background: #f3f4f6;
+}
+
+.doctor-info{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.left{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+
+.avatar{
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 13px;
+  background: #d1fae5;
+  color:#065f46;
+}
+
+.left .name{
+  font-weight: 600;
+  font-size: 14px;
+  display: block;
+  line-height: 1.2;
+}
+
+.left .spec{
+  font-size: 12px;
+  color:#6b7280;
+  display: block;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.right{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 45px;
+  height: 42px;
+  border-radius: 50%;
+
+}
 /* ── Responsive tweaks ───────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .two-col  { grid-template-columns: 1fr !important; }

@@ -2,7 +2,8 @@
 --  APMS — Academic Project Management System
 --  Birzeit University · Department of Computer Science
 --  Full MySQL Database Schema + Sample Data
---  Version 1.0 · April 2026
+--  Version 2.0 · April 2026
+--  Merged: APMS.sql + AI_ARCHIVE_MIGRATION.sql
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS apms_db
@@ -36,6 +37,7 @@ DROP TABLE IF EXISTS coordinator_assignments;
 DROP TABLE IF EXISTS students;
 DROP TABLE IF EXISTS faculty;
 DROP TABLE IF EXISTS semesters;
+DROP TABLE IF EXISTS password_reset_tokens;
 DROP TABLE IF EXISTS users;
 
 -- ============================================================
@@ -493,6 +495,9 @@ CREATE TABLE supervisor_assignments (
 -- ============================================================
 --  TABLE 22 — ai_conversations
 --  AI assistant chat history per user
+--  Merged from: APMS.sql + AI_ARCHIVE_MIGRATION.sql
+--  • session_id is NOT NULL (migration applied)
+--  • Includes both indexes from the migration
 -- ============================================================
 CREATE TABLE ai_conversations (
     conv_id      INT           PRIMARY KEY AUTO_INCREMENT,
@@ -507,6 +512,22 @@ CREATE TABLE ai_conversations (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_ai_user_session (user_id, session_id, created_at),
     INDEX idx_ai_created (created_at)
+) ENGINE=InnoDB;
+
+-- ============================================================
+--  TABLE 23 — password_reset_tokens
+--  Temporary tokens for password reset (valid for 1 hour)
+-- ============================================================
+CREATE TABLE password_reset_tokens (
+    token_id    INT           PRIMARY KEY AUTO_INCREMENT,
+    user_id     INT           NOT NULL,
+    token       VARCHAR(100)  NOT NULL UNIQUE,
+    expires_at  DATETIME      NOT NULL,
+    used        BOOLEAN       NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_token   (token),
+    INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -1058,20 +1079,137 @@ END$$
 DELIMITER ;
 
 -- ============================================================
+--  AI CONVERSATIONS CLEANUP
+--  Merged from: AI_ARCHIVE_MIGRATION.sql
+--  Deletes all sessions whose first message is older than 30 days.
+--  Run this block manually whenever a cleanup is needed,
+--  or schedule it via a MySQL Event (requires Event Scheduler ON).
+-- ============================================================
+
+-- One-time cleanup on import (removes sessions older than 30 days)
+SET SQL_SAFE_UPDATES = 0;
+
+DELETE ac
+FROM ai_conversations ac
+JOIN (
+    SELECT session_id
+    FROM (
+        SELECT session_id
+        FROM ai_conversations
+        GROUP BY session_id
+        HAVING MIN(created_at) < (UTC_TIMESTAMP() - INTERVAL 30 DAY)
+    ) expired_sessions
+) expired ON expired.session_id = ac.session_id;
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- Optional: Scheduled Event for automatic monthly cleanup
+-- Uncomment the block below if your MySQL server has the Event Scheduler enabled
+-- (SET GLOBAL event_scheduler = ON;)
+--
+-- DROP EVENT IF EXISTS evt_cleanup_ai_conversations;
+-- DELIMITER $$
+-- CREATE EVENT evt_cleanup_ai_conversations
+--   ON SCHEDULE EVERY 1 DAY
+--   STARTS CURRENT_TIMESTAMP
+--   DO
+--   BEGIN
+--     DELETE ac
+--     FROM ai_conversations ac
+--     JOIN (
+--         SELECT session_id
+--         FROM (
+--             SELECT session_id
+--             FROM ai_conversations
+--             GROUP BY session_id
+--             HAVING MIN(created_at) < (UTC_TIMESTAMP() - INTERVAL 30 DAY)
+--         ) expired_sessions
+--     ) expired ON expired.session_id = ac.session_id;
+--   END$$
+-- DELIMITER ;
+
+-- ============================================================
 --  END OF SCHEMA
+
 -- ============================================================
+--  ASSIGN ROLE — COMP4300 Data
+--  Adds second course (COMP4300) semester, coordinator
+--  assignment, and sample projects for the Assign Roles page.
+--  Merged from: assign_role_migration.sql
+--  Uses NOT EXISTS guards to ensure safe re-run on any DB.
 -- ============================================================
---  TABLE — password_reset_tokens
---  Tokens مؤقتة لإعادة تعيين كلمة المرور (صالحة ساعة واحدة)
+
+-- ── 1. COMP4300 Semester ─────────────────────────────────────────────────
+INSERT IGNORE INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active)
+VALUES ('2025/2026', 2, 'COMP4300', '2026-03-01', '2026-07-01', TRUE);
+
+-- ── 2. Coordinator for COMP4300 (Dr. Lina Haddad, faculty_id=5) ─────────
+--       Assigned by Prof. Raed (user_id=1). Skipped if already assigned.
+INSERT INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes)
+SELECT
+    5,
+    s.semester_id,
+    1,
+    'Coordinator for COMP4300 — 2025/2026 Semester 2'
+FROM semesters s
+WHERE s.course_code    = 'COMP4300'
+  AND s.academic_year  = '2025/2026'
+  AND s.semester_number = 2
+  AND NOT EXISTS (
+      SELECT 1 FROM coordinator_assignments ca
+      WHERE ca.semester_id = s.semester_id
+  )
+LIMIT 1;
+
+-- ── 3. Sample Projects for COMP4300 (doctors overview panel) ─────────────
+
+-- Dr. Mahmoud Salem (faculty_id = 4)
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT
+    'Advanced AI Decision System', 'ai', s.semester_id, 4, 'submitted', CURDATE()
+FROM semesters s
+WHERE s.course_code   = 'COMP4300'
+  AND s.academic_year = '2025/2026'
+  AND NOT EXISTS (
+      SELECT 1 FROM projects p
+      WHERE p.supervisor_id = 4
+        AND p.semester_id   = s.semester_id
+        AND p.title         = 'Advanced AI Decision System'
+  )
+LIMIT 1;
+
+-- Dr. Lina Haddad (faculty_id = 5)
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT
+    'Enterprise Web Platform', 'web', s.semester_id, 5, 'submitted', CURDATE()
+FROM semesters s
+WHERE s.course_code   = 'COMP4300'
+  AND s.academic_year = '2025/2026'
+  AND NOT EXISTS (
+      SELECT 1 FROM projects p
+      WHERE p.supervisor_id = 5
+        AND p.semester_id   = s.semester_id
+        AND p.title         = 'Enterprise Web Platform'
+  )
+LIMIT 1;
+
+-- Dr. Osama Arikat (faculty_id = 7)
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT
+    'Cyber Security Audit Platform', 'security', s.semester_id, 7, 'submitted', CURDATE()
+FROM semesters s
+WHERE s.course_code   = 'COMP4300'
+  AND s.academic_year = '2025/2026'
+  AND NOT EXISTS (
+      SELECT 1 FROM projects p
+      WHERE p.supervisor_id = 7
+        AND p.semester_id   = s.semester_id
+        AND p.title         = 'Cyber Security Audit Platform'
+  )
+LIMIT 1;
+
+SELECT 'APMS_MERGED.sql imported successfully — COMP4300 data applied.' AS status;
+
 -- ============================================================
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    token_id    INT           PRIMARY KEY AUTO_INCREMENT,
-    user_id     INT           NOT NULL,
-    token       VARCHAR(100)  NOT NULL UNIQUE,
-    expires_at  DATETIME      NOT NULL,
-    used        BOOLEAN       NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    INDEX idx_token   (token),
-    INDEX idx_expires (expires_at)
-) ENGINE=InnoDB;
+--  END OF FILE
+-- ============================================================

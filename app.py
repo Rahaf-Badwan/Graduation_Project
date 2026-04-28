@@ -12,7 +12,7 @@ from auth import login_required
 from routes.student import student_bp
 from routes.head import head_bp
 from ai_engine import ask_apms_ai
-
+from routes.assign_rols import assign_rols_bp
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
@@ -29,7 +29,7 @@ mail = Mail(app)
 # ─── Register Blueprints ─────────────────────────────────────────────────
 app.register_blueprint(student_bp)
 app.register_blueprint(head_bp)
-
+app.register_blueprint(assign_rols_bp)
 
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def fetch_supervisors():
@@ -292,6 +292,31 @@ AI_ARCHIVE_DAYS = 30
 _AI_SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}$")
 
 
+def _ensure_ai_archive_table(cursor):
+    """Create the AI archive table/indexes if the SQL migration was not run yet."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ai_conversations (
+            conv_id      INT PRIMARY KEY AUTO_INCREMENT,
+            user_id      INT NOT NULL,
+            session_id   VARCHAR(120) NOT NULL,
+            message_role ENUM('user','assistant') NOT NULL,
+            message_text MEDIUMTEXT NOT NULL,
+            created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+    try:
+        cursor.execute("CREATE INDEX idx_ai_user_session ON ai_conversations(user_id, session_id, created_at)")
+    except Exception:
+        pass
+    try:
+        cursor.execute("CREATE INDEX idx_ai_created ON ai_conversations(created_at)")
+    except Exception:
+        pass
+
+
 def _new_ai_session_id():
     """Create a compact, URL-safe conversation id."""
     return secrets.token_urlsafe(18)
@@ -314,6 +339,7 @@ def _dt_iso(value):
 
 def _purge_expired_ai_conversations(cursor):
     """Delete whole AI chat sessions whose first message is older than 30 days."""
+    _ensure_ai_archive_table(cursor)
     cursor.execute(
         """
         DELETE ac
@@ -461,7 +487,9 @@ def api_ai_archive():
 @app.route("/api/ai/archive/<session_id>", methods=["GET"])
 @login_required()
 def api_ai_archive_detail(session_id):
-    session_id = _normalize_ai_session_id(session_id)
+    if not _AI_SESSION_RE.match((session_id or "").strip()):
+        return jsonify({"error": "Invalid conversation id."}), 400
+    session_id = session_id.strip()
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -499,7 +527,9 @@ def api_ai_archive_detail(session_id):
 @app.route("/api/ai/archive/<session_id>", methods=["DELETE"])
 @login_required()
 def api_ai_archive_delete(session_id):
-    session_id = _normalize_ai_session_id(session_id)
+    if not _AI_SESSION_RE.match((session_id or "").strip()):
+        return jsonify({"error": "Invalid conversation id."}), 400
+    session_id = session_id.strip()
     try:
         db = get_db()
         cursor = db.cursor()
@@ -911,6 +941,8 @@ def coordinator_page(page):
     if not template:
         return redirect(url_for("coordinator_dashboard"))
     return render_template(template)
+
+
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────
