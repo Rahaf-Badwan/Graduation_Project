@@ -23,6 +23,14 @@ META_FILE = os.path.join(INDEX_DIR, "metadata.pkl")
 CHUNK_SIZE = 900
 CHUNK_OVERLAP = 150
 
+def normalize_arabic(text: str) -> str:
+    if not text:
+        return ""
+    text = text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
+    text = text.replace("ى", "ي").replace("ة", "ه")
+    text = text.replace("ؤ", "و").replace("ئ", "ي")
+    return text
+
 
 def read_pdf(path: str) -> str:
     """يقرأ الـ PDF — إذا كان مسحوباً يستخدم OCR تلقائياً"""
@@ -70,7 +78,7 @@ def main():
         print(f"❌ فولدر الملفات غير موجود: {UPLOADS_DIR}")
         return
 
-    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 
     all_chunks = []
     metadata = []
@@ -81,7 +89,7 @@ def main():
     for filename in pdf_files:
         path = os.path.join(UPLOADS_DIR, filename)
         print(f"\n📄 يقرأ: {filename}")
-        text = read_pdf(path)
+        text = normalize_arabic(read_pdf(path))
 
         if not text.strip():
             print(f"  ⏭️  تم تخطي الملف (فاضي): {filename}")

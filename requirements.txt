@@ -11,3 +11,10 @@ pypdf
 pytesseract
 pdf2image
 requests
+google-genai
+faiss-cpu
+numpy
+sentence-transformers
+pypdf
+pytesseract
+pdf2image

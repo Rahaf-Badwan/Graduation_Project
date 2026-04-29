@@ -3,7 +3,7 @@ import mysql.connector
 DB_CONFIG = {
     "host":     "localhost",
     "user":     "root",
-    "password": "root123",
+    "password": "root1234",
     "database": "apms_db",
     "charset":  "utf8mb4",
 }

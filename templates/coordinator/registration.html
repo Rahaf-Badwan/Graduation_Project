@@ -220,6 +220,7 @@ function renderStats(stats) {
   document.getElementById('statGroups').textContent = stats.active_groups || 0;
 }
 
+
 async function addSectionEntry() {
   const sectionName = document.getElementById('sectionName').value.trim();
   const supervisorId = document.getElementById('sectionSupervisor').value;
@@ -228,6 +229,7 @@ async function addSectionEntry() {
     .filter(Number.isFinite);
 
   const msg = document.getElementById('sectionMsg');
+  const addBtn = document.querySelector('button[onclick="addSectionEntry()"]');
 
   if (!sectionName || !supervisorId) {
     msg.textContent = 'Please enter the section name and choose a supervisor.';
@@ -240,6 +242,9 @@ async function addSectionEntry() {
   }
 
   try {
+    addBtn.disabled = true;
+    msg.textContent = 'Saving...';
+
     const res = await fetch('/api/coordinator/add-section', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -251,6 +256,7 @@ async function addSectionEntry() {
     });
 
     const data = await res.json();
+
     if (!res.ok) {
       throw new Error(data.error || 'Failed to add section.');
     }
@@ -258,10 +264,15 @@ async function addSectionEntry() {
     msg.textContent = data.message || 'Section added successfully.';
     document.getElementById('sectionName').value = '';
     document.getElementById('sectionSupervisor').value = '';
-    Array.from(document.getElementById('sectionStudents').options).forEach(opt => { opt.selected = false; });
+    Array.from(document.getElementById('sectionStudents').options).forEach(opt => {
+      opt.selected = false;
+    });
+
     await loadDistributionData();
   } catch (err) {
-    msg.textContent = err.message;
+    msg.textContent = err.message || 'Something went wrong while adding the section.';
+  } finally {
+    addBtn.disabled = false;
   }
 }
 

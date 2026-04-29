@@ -11,8 +11,9 @@ from db import get_db
 from auth import login_required
 from routes.student import student_bp
 from routes.head import head_bp
-from ai_engine import ask_apms_ai
+from ai_engine import ask_apms_ai, search_uploaded_semantic
 from routes.assign_rols import assign_rols_bp
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
@@ -30,6 +31,7 @@ mail = Mail(app)
 app.register_blueprint(student_bp)
 app.register_blueprint(head_bp)
 app.register_blueprint(assign_rols_bp)
+
 
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def fetch_supervisors():
@@ -293,7 +295,6 @@ _AI_SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}$")
 
 
 def _ensure_ai_archive_table(cursor):
-    """Create the AI archive table/indexes if the SQL migration was not run yet."""
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS ai_conversations (
@@ -318,7 +319,6 @@ def _ensure_ai_archive_table(cursor):
 
 
 def _new_ai_session_id():
-    """Create a compact, URL-safe conversation id."""
     return secrets.token_urlsafe(18)
 
 
@@ -338,7 +338,6 @@ def _dt_iso(value):
 
 
 def _purge_expired_ai_conversations(cursor):
-    """Delete whole AI chat sessions whose first message is older than 30 days."""
     _ensure_ai_archive_table(cursor)
     cursor.execute(
         """
@@ -943,6 +942,344 @@ def coordinator_page(page):
     return render_template(template)
 
 
+@app.route("/api/coordinator/faculty-hours-data", methods=["GET"])
+@login_required(role="coordinator")
+def api_faculty_hours_data():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT semester_id, academic_year, semester_number, course_code
+            FROM semesters
+            WHERE is_active = TRUE
+            ORDER BY semester_id DESC
+            LIMIT 1
+        """)
+        semester = cursor.fetchone()
+
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No active semester found."}), 400
+
+        cursor.execute("""
+            SELECT
+                f.faculty_id,
+                u.full_name,
+                COALESCE(fls.base_hours, 12) AS base_hours,
+                COALESCE(fls.max_hours, 18) AS max_hours,
+                COALESCE(fls.employment_type, 'full_time') AS employment_type,
+                COALESCE(fls.intro_sections, 0) AS intro_sections,
+                COALESCE(fls.extra_bonus, 1) AS extra_bonus,
+                COALESCE(fls.assigned_courses, '') AS assigned_courses,
+                COUNT(DISTINCT p.project_id) AS supervised_projects
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            LEFT JOIN faculty_load_settings fls
+                ON fls.faculty_id = f.faculty_id
+               AND fls.semester_id = %s
+            LEFT JOIN projects p
+                ON p.supervisor_id = f.faculty_id
+               AND p.semester_id = %s
+            WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
+            GROUP BY
+                f.faculty_id,
+                u.full_name,
+                fls.base_hours,
+                fls.max_hours,
+                fls.employment_type,
+                fls.intro_sections,
+                fls.extra_bonus,
+                fls.assigned_courses
+            ORDER BY u.full_name
+        """, (semester["semester_id"], semester["semester_id"]))
+
+        faculty_rows = cursor.fetchall()
+
+        result = []
+        for row in faculty_rows:
+            intro_sections = int(row["intro_sections"] or 0)
+            supervised_projects = int(row["supervised_projects"] or 0)
+            extra_bonus = int(row["extra_bonus"] or 0)
+            base_hours = float(row["base_hours"] or 0)
+            max_hours = float(row["max_hours"] or 18)
+
+            extra_load = intro_sections + supervised_projects + extra_bonus
+            total_hours = base_hours + extra_load
+            remaining_hours = max_hours - total_hours
+
+            if total_hours > max_hours:
+                status = "Over Limit"
+            elif total_hours == max_hours:
+                status = "At Max"
+            elif total_hours >= max_hours - 1.5:
+                status = "Near Limit"
+            else:
+                status = "Within Limit"
+
+            result.append({
+                "faculty_id": row["faculty_id"],
+                "full_name": row["full_name"],
+                "base_hours": base_hours,
+                "max_hours": max_hours,
+                "employment_type": row["employment_type"],
+                "intro_sections": intro_sections,
+                "supervised_projects": supervised_projects,
+                "extra_bonus": extra_bonus,
+                "extra_load": extra_load,
+                "total_hours": total_hours,
+                "remaining_hours": remaining_hours,
+                "assigned_courses": row["assigned_courses"],
+                "status": status
+            })
+
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            "semester": semester,
+            "faculty": result
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/coordinator/faculty-hours-save", methods=["POST"])
+@login_required(role="coordinator")
+def api_faculty_hours_save():
+    try:
+        data = request.get_json(silent=True) or {}
+
+        faculty_id = data.get("faculty_id")
+        base_hours = float(data.get("base_hours", 12))
+        max_hours = float(data.get("max_hours", 18))
+        employment_type = data.get("employment_type", "full_time")
+        intro_sections = int(data.get("intro_sections", 0))
+        extra_bonus = int(data.get("extra_bonus", 1))
+        assigned_courses = data.get("assigned_courses", "")
+
+        if not faculty_id:
+            return jsonify({"error": "faculty_id is required."}), 400
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT semester_id
+            FROM semesters
+            WHERE is_active = TRUE
+            ORDER BY semester_id DESC
+            LIMIT 1
+        """)
+        semester = cursor.fetchone()
+
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No active semester found."}), 400
+
+        cursor.execute("""
+            INSERT INTO faculty_load_settings
+                (faculty_id, semester_id, base_hours, max_hours, employment_type, intro_sections, extra_bonus, assigned_courses, updated_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                base_hours = VALUES(base_hours),
+                max_hours = VALUES(max_hours),
+                employment_type = VALUES(employment_type),
+                intro_sections = VALUES(intro_sections),
+                extra_bonus = VALUES(extra_bonus),
+                assigned_courses = VALUES(assigned_courses),
+                updated_by = VALUES(updated_by)
+        """, (
+            faculty_id,
+            semester["semester_id"],
+            base_hours,
+            max_hours,
+            employment_type,
+            intro_sections,
+            extra_bonus,
+            assigned_courses,
+            session.get("user_id")
+        ))
+
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return jsonify({"message": "Faculty load saved successfully."})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/coordinator/search-meta", methods=["GET"])
+@login_required(role="coordinator")
+def api_search_meta():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT DISTINCT s.academic_year
+            FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
+            WHERE s.academic_year IS NOT NULL
+            ORDER BY s.academic_year DESC
+        """)
+        years = [row["academic_year"] for row in cursor.fetchall()]
+
+        cursor.execute("""
+            SELECT DISTINCT u.full_name AS supervisor_name
+            FROM projects p
+            JOIN faculty f ON f.faculty_id = p.supervisor_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE u.full_name IS NOT NULL
+            ORDER BY u.full_name
+        """)
+        supervisors = [row["supervisor_name"] for row in cursor.fetchall()]
+
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            "years": years,
+            "supervisors": supervisors
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/coordinator/search-uploaded-projects", methods=["GET"])
+@login_required(role="coordinator")
+def api_search_uploaded_projects():
+    try:
+        q = (request.args.get("q") or "").strip()
+        year = (request.args.get("year") or "").strip()
+        project_type = (request.args.get("type") or "").strip()
+        supervisor = (request.args.get("supervisor") or "").strip()
+        status = (request.args.get("status") or "").strip()
+        score = (request.args.get("score") or "").strip()
+
+        results = search_uploaded_semantic(
+            query=q,
+            year=year,
+            project_type=project_type,
+            supervisor=supervisor,
+            status=status,
+            score=score,
+            top_k=80
+        )
+
+        return jsonify({
+            "count": len(results),
+            "projects": results
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/coordinator/search-projects", methods=["GET"])
+@login_required(role="coordinator")
+def api_search_projects():
+    try:
+        q = (request.args.get("q") or "").strip()
+        year = (request.args.get("year") or "").strip()
+        project_type = (request.args.get("type") or "").strip()
+        supervisor = (request.args.get("supervisor") or "").strip()
+        status = (request.args.get("status") or "").strip()
+        score = (request.args.get("score") or "").strip()
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        sql = """
+            SELECT
+                p.project_id,
+                p.title,
+                p.project_type,
+                p.status,
+                p.final_score,
+                s.academic_year,
+                u_sup.full_name AS supervisor_name,
+                GROUP_CONCAT(u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', ') AS team_members
+            FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
+            LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+            LEFT JOIN project_members pm ON pm.project_id = p.project_id
+            LEFT JOIN students st ON st.student_id = pm.student_id
+            LEFT JOIN users u_st ON u_st.user_id = st.user_id
+            WHERE 1=1
+        """
+        params = []
+
+        if q:
+            sql += """
+                AND (
+                    p.title LIKE %s
+                    OR u_sup.full_name LIKE %s
+                    OR u_st.full_name LIKE %s
+                )
+            """
+            like_q = f"%{q}%"
+            params.extend([like_q, like_q, like_q])
+
+        if year:
+            sql += " AND s.academic_year = %s"
+            params.append(year)
+
+        if project_type:
+            sql += " AND FIND_IN_SET(%s, p.project_type)"
+            params.append(project_type)
+
+        if supervisor:
+            sql += " AND u_sup.full_name = %s"
+            params.append(supervisor)
+
+        if status:
+            sql += " AND p.status = %s"
+            params.append(status)
+
+        if score == "90_plus":
+            sql += " AND p.final_score >= 90"
+        elif score == "75_89":
+            sql += " AND p.final_score >= 75 AND p.final_score < 90"
+        elif score == "below_75":
+            sql += " AND p.final_score < 75"
+        elif score == "no_score":
+            sql += " AND p.final_score IS NULL"
+
+        sql += """
+            GROUP BY
+                p.project_id,
+                p.title,
+                p.project_type,
+                p.status,
+                p.final_score,
+                s.academic_year,
+                u_sup.full_name
+            ORDER BY p.project_id DESC
+        """
+
+        cursor.execute(sql, tuple(params))
+        projects = cursor.fetchall()
+
+        cursor.close()
+        db.close()
+
+        for project in projects:
+            if isinstance(project.get("project_type"), set):
+                project["project_type"] = ", ".join(sorted(project["project_type"]))
+
+        return jsonify({
+            "count": len(projects),
+            "projects": projects
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ─── Run ─────────────────────────────────────────────────────────────────
