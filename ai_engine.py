@@ -536,7 +536,7 @@ def ask_apms_ai(question: str) -> str:
     + FORMAT_INSTRUCTION +
     "\nDo NOT mention PDFs or project databases unless directly asked.\n\n"
     "User: " + question
-)حغف
+)
 
     if any(x in q for x in ["all files", "all pdfs", "uploaded files", "list all files", "show all files"]):
         files = _list_all_pdf_files()
