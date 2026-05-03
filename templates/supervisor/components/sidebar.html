@@ -1,0 +1,62 @@
+<div class="sidebar collapsed" id="sidebar">
+  <div class="sb-top">
+    <button class="sb-toggle" onclick="toggleSidebar()" title="Menu">
+      <span class="material-symbols-outlined icon-inline">menu</span>
+    </button>
+  </div>
+
+  <div class="sb-profile" onclick="window.location.href='/supervisor/profile'" title="My Profile">
+    <div class="sb-avatar">{{ session.avatar_initials }}</div>
+    <div class="sb-name">{{ session.full_name }}</div>
+    <div class="sb-id">{{ session.university_id }}</div>
+    <div class="sb-role">Supervisor</div>
+  </div>
+
+  <div class="sb-nav supervisor-nav">
+    <a class="sb-item {% if request.path in ['/supervisor/', '/supervisor/dashboard'] %}on{% endif %}"
+      href="/supervisor/">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
+      <span class="sb-label">Dashboard</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/supervisor/mystudents' %}on{% endif %}" href="/supervisor/mystudents">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">group</span></span>
+      <span class="sb-label">Students &amp; Projects</span>
+    </a>
+    <a class="sb-item {% if request.path == '/supervisor/progress' %}on{% endif %}" href="/supervisor/progress">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">timeline</span></span>
+      <span class="sb-label">Progress</span>
+      <span class="sb-badge-sup">2</span>
+    </a>
+    <a class="sb-item {% if request.path == '/supervisor/feedback' %}on{% endif %}" href="/supervisor/feedback">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">rate_review</span></span>
+      <span class="sb-label">Feedback</span>
+      <span class="sb-badge">3</span>
+    </a>
+    <a class="sb-item {% if request.path == '/supervisor/evaluation' %}on{% endif %}" href="/supervisor/evaluation">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">grading</span></span>
+      <span class="sb-label">Evaluation Projects</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/supervisor/search' %}on{% endif %}" href="/supervisor/search">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
+      <span class="sb-label">Search &amp; Filtering</span>
+    </a>
+    <a class="sb-item {% if request.path == '/supervisor/notifs' %}on{% endif %}" href="/supervisor/notifs">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
+      <span class="sb-label">Notifications</span>
+      <span class="sb-badge">4</span>
+    </a>
+    <a class="sb-item {% if request.path == '/supervisor/ai' %}on{% endif %}" href="/supervisor/ai">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
+      <span class="sb-label">AI Assistant</span>
+    </a>
+  </div>
+
+  <div class="sb-footer">
+    <a class="sb-footer-item" href="/logout" style="text-decoration:none;color:inherit">
+      <span class="material-symbols-outlined icon-inline">logout</span>
+      <span>&nbsp;Sign Out</span>
+    </a>
+  </div>
+</div>

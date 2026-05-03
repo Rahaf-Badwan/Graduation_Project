@@ -1,0 +1,303 @@
+/* ─── Supervisor-specific CSS ──────────────────────────────────────────────── */
+/* All shared layout (sidebar, topbar, app-wrapper, etc.) is in assets/css/style.css */
+
+/* ─── Supervisor color tokens ─────────────────────────────────────────────── */
+:root {
+  --sup: #0f4d25;
+  --sup-light: #e8f5ee;
+  --sup-mid: #1a6b3a;
+  --sup-dark: #155a30;
+  --green: #1a6b3a;
+  --green-light: #e8f5ee;
+  --blue: #185FA5;
+  --blue-light: #E6F1FB;
+  --coral: #993C1D;
+  --coral-light: #FAECE7;
+  --purple: #534AB7;
+  --purple-light: #EEEDFE;
+  --amber: #B45309;
+  --amber-light: #FEF3C7;
+  --teal: #0F6E56;
+  --teal-light: #E1F5EE;
+}
+
+/* ─── Sidebar active state for supervisor role ───────────────────────────── */
+.supervisor-nav .sb-item.on {
+  background: var(--sup-light);
+  color: var(--sup);
+  font-weight: 500;
+  border-left-color: var(--sup-mid);
+}
+
+/* ─── Supervisor-colored badges ──────────────────────────────────────────── */
+.sb-badge-sup {
+  margin-left: auto;
+  background: var(--sup-mid);
+  color: #fff;
+  font-size: 9px;
+  border-radius: 20px;
+  padding: 1px 6px;
+  font-weight: 700;
+}
+
+/* ─── Topbar supervisor badge ─────────────────────────────────────────────── */
+.tb-sup-badge {
+  font-size: 11px;
+  background: var(--sup-light);
+  color: var(--sup);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+}
+
+/* ─── APMS logo (supervisor amber) ───────────────────────────────────────── */
+.tb-logo {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--sup-mid);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 5px;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Cards ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.card-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.card-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+.card-action {
+  font-size: 12px;
+  color: var(--sup);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-decoration: none;
+}
+
+/* ─── Stats grid ──────────────────────────────────────────────────────────── */
+.stats-row { display: grid; gap: 10px; margin-bottom: 12px; }
+.stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 14px; }
+.stat-num { font-size: 22px; font-weight: 600; line-height: 1; }
+.stat-label { font-size: 11px; color: var(--color-text-secondary); margin-top: 3px; }
+
+/* ─── Pills ───────────────────────────────────────────────────────────────── */
+.pill { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+.p-sup      { background: var(--sup-light); color: var(--sup); }
+.p-accepted { background: var(--green-light); color: #085041; }
+.p-review   { background: var(--blue-light); color: var(--blue); }
+.p-pending  { background: var(--sup-light); color: var(--sup); }
+.p-rejected { background: var(--coral-light); color: var(--coral); }
+.p-late     { background: var(--coral-light); color: var(--coral); }
+.p-ontrack  { background: var(--green-light); color: #085041; }
+
+/* ─── Two / three column grid ─────────────────────────────────────────────── */
+.two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+/* ─── Form fields ─────────────────────────────────────────────────────────── */
+.field-wrap { margin-bottom: 12px; }
+.field-label { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 5px; }
+.req { color: #E24B4A; margin-right: 2px; }
+.field-input, .field-select, .field-textarea {
+  width: 100%;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  background: var(--color-background-secondary);
+  outline: none;
+  transition: border .15s;
+}
+.field-input:focus, .field-select:focus, .field-textarea:focus {
+  border-color: var(--sup-mid);
+  background: var(--color-background-primary);
+}
+.field-textarea { resize: vertical; min-height: 75px; line-height: 1.6; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  padding: 8px 18px;
+  border-radius: var(--border-radius-md);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  border: 0.5px solid var(--color-border-tertiary);
+  transition: all .15s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-primary  { background: var(--sup-mid); color: #fff; border-color: var(--sup-mid); }
+.btn-primary:hover { background: var(--sup); }
+.btn-success  { background: var(--green); color: #fff; border-color: var(--green); }
+.btn-outline  { background: transparent; color: var(--color-text-primary); }
+.btn-outline:hover { background: var(--color-background-secondary); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ─── Progress bars ───────────────────────────────────────────────────────── */
+.prog-wrap { margin-bottom: 9px; }
+.prog-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.prog-label span:first-child { color: var(--color-text-secondary); }
+.prog-label span:last-child  { font-weight: 500; color: var(--color-text-primary); }
+.prog-bg  { height: 6px; background: var(--color-background-secondary); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; }
+
+/* ─── Score chips ─────────────────────────────────────────────────────────── */
+.score-chip { font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 20px; }
+.sc-a { background: #EAF3DE; color: #3B6D11; }
+.sc-b { background: var(--blue-light); color: var(--blue); }
+.sc-c { background: var(--sup-light); color: var(--sup); }
+
+/* ─── Student cards ───────────────────────────────────────────────────────── */
+.student-card {
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 13px;
+  margin-bottom: 10px;
+  transition: border .15s;
+}
+.student-card:hover  { border-color: var(--sup-mid); }
+.student-card.urgent { border-right: 3px solid var(--coral); }
+.student-card.good   { border-right: 3px solid var(--green); }
+.student-card.normal { border-right: 3px solid var(--sup-mid); }
+.person-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ─── Feedback items ──────────────────────────────────────────────────────── */
+.fb-item { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px 14px; margin-bottom: 10px; }
+.fb-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.fb-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.fb-role { font-size: 10px; color: var(--color-text-secondary); }
+.fb-date { margin-left: auto; font-size: 11px; color: var(--color-text-secondary); }
+.fb-text {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 9px 11px;
+  line-height: 1.7;
+}
+
+/* ─── Timeline ────────────────────────────────────────────────────────────── */
+.timeline { padding: 4px 0; }
+.tl-item { display: flex; gap: 12px; margin-bottom: 14px; position: relative; }
+.tl-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 26px;
+  width: 1px;
+  height: calc(100% - 2px);
+  background: var(--color-border-tertiary);
+}
+.tl-dot { width: 27px; height: 27px; min-width: 27px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; z-index: 1; }
+.tl-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); padding-top: 3px; }
+.tl-meta  { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+.tl-note  { font-size: 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 7px 10px; margin-top: 6px; line-height: 1.6; color: var(--color-text-primary); }
+
+/* ─── Notifications ───────────────────────────────────────────────────────── */
+.notif-item { display: flex; gap: 10px; padding: 10px; border-radius: var(--border-radius-md); margin-bottom: 6px; }
+.notif-item.unread { background: var(--color-background-secondary); }
+.notif-icon-wrap { width: 34px; height: 34px; min-width: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.notif-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.notif-meta  { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+.notif-dot-red { width: 7px; height: 7px; border-radius: 50%; background: #E24B4A; flex-shrink: 0; margin-top: 6px; }
+
+/* ─── Search bar ──────────────────────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  margin-bottom: 12px;
+  background: var(--color-background-secondary);
+}
+.search-bar input {
+  border: none; background: none; flex: 1;
+  font-size: 13px; font-family: inherit;
+  color: var(--color-text-primary); outline: none;
+}
+
+/* ─── Tab bar ─────────────────────────────────────────────────────────────── */
+.tab-bar { display: flex; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 14px; }
+.tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  background: none;
+  font-family: inherit;
+  transition: color .15s;
+}
+.tab.on { color: var(--sup); border-bottom-color: var(--sup-mid); font-weight: 500; }
+
+/* ─── AI Chat ─────────────────────────────────────────────────────────────── */
+.chat-wrap { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; }
+.chat-head { background: var(--sup-light); padding: 10px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.chat-dot  { width: 8px; height: 8px; border-radius: 50%; background: var(--sup-mid); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.chat-body { padding: 14px; min-height: 200px; max-height: 320px; overflow-y: auto; }
+.chat-msg  { padding: 9px 12px; border-radius: 10px; font-size: 12px; line-height: 1.7; margin-bottom: 8px; max-width: 88%; }
+.chat-bot  { background: var(--color-background-secondary); color: var(--color-text-primary); }
+.chat-user { background: var(--sup-mid); color: #fff; margin-left: auto; }
+.chat-input-row { display: flex; gap: 6px; padding: 10px 14px; border-top: 0.5px solid var(--color-border-tertiary); }
+.chat-input {
+  flex: 1;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-md);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  outline: none;
+}
+.chat-send { background: var(--sup-mid); color: #fff; border: none; border-radius: var(--border-radius-md); padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: inherit; }
+
+/* ─── Profile ─────────────────────────────────────────────────────────────── */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--color-background-primary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: 12px;
+}
+.profile-avatar-lg {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--sup-light);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; color: var(--sup);
+}
+
+/* ─── Deadline rows ───────────────────────────────────────────────────────── */
+.deadline-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: var(--border-radius-md); margin-bottom: 7px; font-size: 12px; }

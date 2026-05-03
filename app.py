@@ -982,6 +982,19 @@ def api_export_sections():
 
 
 # ─── Supervisor routes ────────────────────────────────────────────────────
+SUPERVISOR_PAGES = {
+    "dashboard":  "supervisor/index.html",
+    "mystudents": "supervisor/mystudents.html",
+    "progress":   "supervisor/progress.html",
+    "feedback":   "supervisor/feedback.html",
+    "evaluation": "supervisor/evaluation.html",
+    "search":     "supervisor/search.html",
+    "notifs":     "supervisor/notifs.html",
+    "ai":         "supervisor/ai.html",
+    "profile":    "supervisor/profile.html",
+}
+
+
 @app.route("/supervisor/")
 @app.route("/supervisor/dashboard")
 @login_required(role="supervisor")
@@ -989,10 +1002,126 @@ def supervisor_dashboard():
     return render_template("supervisor/index.html")
 
 
-@app.route("/supervisor/<path:subpage>")
+@app.route("/supervisor/<page>")
 @login_required(role="supervisor")
-def supervisor_subpage(subpage):
-    return render_template("supervisor/index.html")
+def supervisor_subpage(page):
+    template = SUPERVISOR_PAGES.get(page)
+    if not template:
+        return redirect(url_for("supervisor_dashboard"))
+    return render_template(template)
+
+
+# ─── Supervisor feedback APIs ─────────────────────────────────────────────
+
+@app.route("/api/supervisor/my-projects", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_my_projects():
+    user_id = session["user_id"]
+    db = get_db(); cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT p.project_id, p.title,
+               GROUP_CONCAT(u2.full_name ORDER BY pm.project_id SEPARATOR ', ') AS members
+        FROM   faculty f
+        JOIN   supervisor_assignments sa ON sa.faculty_id  = f.faculty_id
+        JOIN   projects p               ON p.project_id   = sa.project_id
+        LEFT   JOIN project_members pm  ON pm.project_id  = p.project_id
+        LEFT   JOIN students st         ON st.student_id  = pm.student_id
+        LEFT   JOIN users u2            ON u2.user_id     = st.user_id
+        WHERE  f.user_id = %s
+        GROUP  BY p.project_id, p.title
+        ORDER  BY p.project_id DESC
+    """, (user_id,))
+    projects = cursor.fetchall()
+    cursor.close(); db.close()
+    return jsonify({"projects": projects})
+
+
+@app.route("/api/supervisor/submit-feedback", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_submit_feedback():
+    user_id = session["user_id"]
+    data    = request.get_json(force=True)
+
+    project_id    = data.get("project_id")
+    feedback_type = data.get("feedback_type", "general_performance")
+    feedback_text = (data.get("feedback_text") or "").strip()
+    score         = data.get("score")
+    priority      = data.get("priority", "normal")
+    is_draft      = bool(data.get("is_draft", False))
+    points        = data.get("improvement_points", [])   # list of strings
+
+    if not project_id or not feedback_text:
+        return jsonify({"error": "project_id and feedback_text are required"}), 400
+
+    try:
+        score = float(score) if score not in (None, "", "null") else None
+        if score is not None and not (0 <= score <= 100):
+            return jsonify({"error": "Score must be between 0 and 100"}), 400
+    except (ValueError, TypeError):
+        score = None
+
+    db = get_db(); cursor = db.cursor(dictionary=True)
+
+    # Verify supervisor owns this project
+    cursor.execute("""
+        SELECT sa.sa_id FROM supervisor_assignments sa
+        JOIN   faculty f ON f.faculty_id = sa.faculty_id
+        WHERE  f.user_id = %s AND sa.project_id = %s
+        LIMIT  1
+    """, (user_id, project_id))
+    if not cursor.fetchone():
+        cursor.close(); db.close()
+        return jsonify({"error": "You are not assigned to this project"}), 403
+
+    cursor.execute("""
+        INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, score, priority, is_draft)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (project_id, user_id, feedback_type, feedback_text, score, priority, is_draft))
+    feedback_id = cursor.lastrowid
+
+    for pt in points:
+        pt = str(pt).strip()
+        if pt:
+            cursor.execute(
+                "INSERT INTO feedback_improvement_points (feedback_id, point_text) VALUES (%s, %s)",
+                (feedback_id, pt)
+            )
+
+    db.commit(); cursor.close(); db.close()
+    return jsonify({"success": True, "feedback_id": feedback_id})
+
+
+@app.route("/api/supervisor/my-feedback", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_my_feedback():
+    user_id    = session["user_id"]
+    project_id = request.args.get("project_id")
+    db = get_db(); cursor = db.cursor(dictionary=True)
+
+    sql = """
+        SELECT f.feedback_id, f.project_id, p.title AS project_title,
+               f.feedback_type, f.feedback_text, f.score, f.priority,
+               f.is_draft, f.created_at
+        FROM   feedback f
+        JOIN   projects p ON p.project_id = f.project_id
+        WHERE  f.reviewer_id = %s
+    """
+    params = [user_id]
+    if project_id:
+        sql += " AND f.project_id = %s"
+        params.append(project_id)
+    sql += " ORDER BY f.created_at DESC LIMIT 20"
+
+    cursor.execute(sql, params)
+    rows = cursor.fetchall()
+    for r in rows:
+        r["created_at"] = r["created_at"].strftime("%b %d, %Y") if r["created_at"] else ""
+        if r["score"] is not None:
+            r["score"] = float(r["score"])
+        r["is_draft"] = bool(r["is_draft"])
+
+    cursor.close(); db.close()
+    return jsonify({"feedback": rows})
 
 
 # ─── Coordinator routes ───────────────────────────────────────────────────

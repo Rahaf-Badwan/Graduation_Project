@@ -1,0 +1,76 @@
+{% extends 'supervisor/base.html' %}
+{% block page_title %}Evaluation Projects{% endblock %}
+{% block page_id %}evaluation{% endblock %}
+{% block topbar_title %}Evaluation Projects{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:12px;padding:12px 16px;background:var(--sup-light);border-color:var(--sup-mid)">
+  <div style="font-size:13px;font-weight:500;color:var(--sup)">Your role as a member of evaluation committees</div>
+  <div style="font-size:12px;color:var(--sup-dark);margin-top:3px">In addition to your role as a supervisor, you are a member of a committee evaluating three projects for other supervisors. Please complete your evaluations before February 20th.</div>
+</div>
+
+<div class="two-col" style="align-items:start">
+  <div>
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Projects awaiting evaluation</span></div>
+
+      <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm);padding:14px;margin-bottom:10px;border-right:3px solid var(--coral)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">AI-powered disease recognition system</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">Amjad Al-Rimawi · Supervisor: Dr. Mahmoud Salem</div></div>
+          <span class="pill p-late" style="font-size:10px">Due today</span>
+        </div>
+        <div class="field-wrap"><div class="field-label">Your grade as a committee member <span class="req">*</span></div><input class="field-input" type="number" placeholder="Degree from 100" min="0" max="100"/></div>
+        <div class="field-wrap" style="margin-bottom:8px"><div class="field-label">Comments <span class="req">*</span></div><textarea class="field-textarea" style="min-height:60px" placeholder="Your comments on this project..."></textarea></div>
+        <div class="btn-row">
+          <button class="btn btn-primary">Send the evaluation ↗</button>
+        </div>
+      </div>
+
+      <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm);padding:14px;border-right:3px solid var(--sup-mid)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Adaptive e-learning platform</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">Sarah Moussa · Supervisor: Dr. Lina Haddad</div></div>
+          <span class="pill p-pending" style="font-size:10px">Due Feb 22</span>
+        </div>
+        <div class="field-wrap"><div class="field-label">Your grade as a committee member</div><input class="field-input" type="number" placeholder="Degree from 100" min="0" max="100"/></div>
+        <div class="field-wrap" style="margin-bottom:8px"><div class="field-label">Comments</div><textarea class="field-textarea" style="min-height:60px" placeholder="Your comments on this project..."></textarea></div>
+        <div class="btn-row"><button class="btn btn-primary">Send the evaluation</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Completed reviews</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="padding:10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Digital Library Management System</div>
+            <span class="score-chip sc-a">88</span>
+          </div>
+          <div style="font-size:11px;color:var(--color-text-secondary)">Completed January 28th · Supervisor: Dr. Samer Al-Zein</div>
+        </div>
+        <div style="padding:10px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--rm)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Medical treatment tracking application</div>
+            <span class="score-chip sc-b">76</span>
+          </div>
+          <div style="font-size:11px;color:var(--color-text-secondary)">Completed January 25th · Supervisor: Dr. Osama Erekat</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:8px;background:var(--green-light);border-radius:var(--rm);font-size:12px;color:var(--green)">
+        ✓ I have completed two out of four reviews — two more to go before February 20th.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Average rating as a committee</span></div>
+      <div style="text-align:center;padding:10px 0 14px">
+        <div style="font-size:36px;font-weight:700;color:var(--sup-mid)">82</div>
+        <div style="font-size:12px;color:var(--color-text-secondary)">Average grade as a committee member</div>
+      </div>
+      <div class="prog-wrap"><div class="prog-label"><span>Library system</span><span>88</span></div><div class="prog-bg"><div class="prog-fill" style="width:88%;background:var(--green)"></div></div></div>
+      <div class="prog-wrap" style="margin:0"><div class="prog-label"><span>Treatment application</span><span>76</span></div><div class="prog-bg"><div class="prog-fill" style="width:76%;background:var(--blue)"></div></div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

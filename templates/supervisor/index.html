@@ -1,145 +1,148 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>APMS — Supervisor Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}"/>
-  <style>
-    .coming-soon-banner {
-      background: #E6F1FB;
-      border-left: 4px solid #185FA5;
-      border-radius: 8px;
-      padding: 16px 20px;
-      margin-bottom: 16px;
-      font-size: 13px;
-      color: #185FA5;
-      font-weight: 500;
-    }
-  </style>
-</head>
-<body data-page="dashboard">
-<div class="app-wrapper">
-  <div class="shell">
+{% extends 'supervisor/base.html' %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_id %}dashboard{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
 
-    <!-- SIDEBAR -->
-    <div class="sidebar collapsed" id="sidebar">
-      <div class="sb-top">
-        <button class="sb-toggle" onclick="toggleSidebar()" title="Menu">
-          <span class="material-symbols-outlined icon-inline">menu</span>
-        </button>
-      </div>
-      <div class="sb-profile">
-        <div class="sb-avatar" style="background:#E6F1FB;color:#185FA5">{{ session.avatar_initials }}</div>
-        <div class="sb-name">{{ session.full_name }}</div>
-        <div class="sb-id">{{ session.university_id }}</div>
-        <div class="sb-role">Supervisor</div>
-      </div>
-      <div class="sb-nav">
-        <a class="sb-item" data-page="dashboard" href="/supervisor/dashboard">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
-          <span class="sb-label">Dashboard</span>
-        </a>
-        <a class="sb-item" data-page="projects" href="/supervisor/projects">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">folder_open</span></span>
-          <span class="sb-label">My Projects</span>
-        </a>
-        <a class="sb-item" data-page="progress" href="/supervisor/progress">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">trending_up</span></span>
-          <span class="sb-label">Track Progress</span>
-        </a>
-        <a class="sb-item" data-page="feedback" href="/supervisor/feedback">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">reviews</span></span>
-          <span class="sb-label">Give Feedback</span>
-        </a>
-        <a class="sb-item" data-page="evaluate" href="/supervisor/evaluate">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">grading</span></span>
-          <span class="sb-label">Evaluate Projects</span>
-        </a>
-        <a class="sb-item" data-page="search" href="/supervisor/search">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
-          <span class="sb-label">Archived Projects</span>
-        </a>
-        <a class="sb-item" data-page="notifs" href="/supervisor/notifs">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
-          <span class="sb-label">Notifications</span>
-        </a>
-        <a class="sb-item" data-page="ai" href="/supervisor/ai">
-          <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
-          <span class="sb-label">AI Assistant</span>
-        </a>
+{% block content %}
+<div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+  <div class="stat"><div class="stat-num" style="color:var(--sup-mid)">5</div><div class="stat-label">Projects under my supervision</div></div>
+  <div class="stat"><div class="stat-num" style="color:var(--green)">3</div><div class="stat-label">On the right track</div></div>
+  <div class="stat"><div class="stat-num" style="color:var(--coral)">1</div><div class="stat-label">Urgent follow-up is needed</div></div>
+  <div class="stat"><div class="stat-num" style="color:var(--blue)">81.2</div><div class="stat-label">My average grades this semester</div></div>
+</div>
 
+<div class="two-col">
+  <div>
+    <!-- My projects -->
+    <div class="card">
+      <div class="card-hd"><span class="card-title">My projects — Overview</span><a class="card-action" href="/supervisor/mystudents">Details ←</a></div>
+
+      <div class="student-card good">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div class="person-avatar" style="background:var(--sup-light);color:var(--sup);width:32px;height:32px">رف</div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Taima Abed and her teams</div><div style="font-size:11px;color:var(--color-text-secondary)">Web + AI - APMS</div></div>
+          <span class="pill p-review">Under review</span>
+        </div>
+        <div class="prog-wrap" style="margin:0">
+          <div class="prog-label"><span>Project progress</span><span>78%</span></div>
+          <div class="prog-bg"><div class="prog-fill" style="width:78%;background:var(--sup-mid)"></div></div>
+        </div>
       </div>
-      <div class="sb-footer">
-        <a class="sb-footer-item" href="/logout" style="text-decoration:none;color:inherit">
-          <span class="material-symbols-outlined icon-inline">logout</span>
-          <span>&nbsp;Sign Out</span>
-        </a>
+
+      <div class="student-card normal">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div class="person-avatar" style="background:var(--blue-light);color:var(--blue);width:32px;height:32px">SK</div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Salma Al-Khatib</div><div style="font-size:11px;color:var(--color-text-secondary)">Student Records Management System — Web</div></div>
+          <span class="pill p-pending">Waiting</span>
+        </div>
+        <div class="prog-wrap" style="margin:0">
+          <div class="prog-label"><span>Project progress</span><span>52%</span></div>
+          <div class="prog-bg"><div class="prog-fill" style="width:52%;background:var(--blue)"></div></div>
+        </div>
+      </div>
+
+      <div class="student-card urgent">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div class="person-avatar" style="background:var(--coral-light);color:var(--coral);width:32px;height:32px">KO</div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Kareem Odeh</div><div style="font-size:11px;color:var(--color-text-secondary)">Delivery app — Mobile</div></div>
+          <span class="pill p-late">Late</span>
+        </div>
+        <div class="prog-wrap" style="margin:0">
+          <div class="prog-label"><span>Project progress</span><span>31%</span></div>
+          <div class="prog-bg"><div class="prog-fill" style="width:31%;background:var(--coral)"></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--coral);margin-top:6px;background:var(--coral-light);padding:5px 8px;border-radius:5px">⚑ No files have been uploaded for two weeks — requires immediate attention</div>
       </div>
     </div>
 
-    <!-- MAIN -->
-    <div class="main">
-      <div class="topbar">
-        <div class="tb-left">
-          <div class="tb-titles">
-            <div class="tb-title">Supervisor Dashboard</div>
-            <div class="tb-sub">COMP4200 · Semester 2025/2026</div>
-          </div>
-        </div>
-        <div class="tb-right">
-          <div class="tb-logo">APMS</div>
-        </div>
+    <!-- Upcoming dates -->
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Important dates</span></div>
+      <div class="deadline-row" style="background:var(--coral-light)">
+        <div style="font-size:11px;font-weight:700;color:var(--coral);min-width:36px;text-align:center">8<br>Feb</div>
+        <div style="font-size:12px;color:var(--color-text-primary);flex:1">Deadline for submitting my feedback — Project APMS</div>
+        <span class="pill p-late" style="font-size:10px">Today</span>
       </div>
-
-      <div class="content-area">
-        <div class="page on">
-          <div class="coming-soon-banner">
-            👨‍🏫 This dashboard is under construction — full UI coming soon.
-            Logged in as: {{ session.full_name }} ({{ session.role }})
-          </div>
-
-          <div class="stats-row">
-            <div class="stat">
-              <div class="stat-num" style="color:#185FA5">5</div>
-              <div class="stat-label">Projects Under Supervision</div>
-            </div>
-            <div class="stat">
-              <div class="stat-num" style="color:#185FA5">3</div>
-              <div class="stat-label">On Track</div>
-            </div>
-            <div class="stat">
-              <div class="stat-num" style="color:#185FA5">1</div>
-              <div class="stat-label">Needs Urgent Follow-up</div>
-            </div>
-            <div class="stat">
-              <div class="stat-num" style="color:#185FA5">81.2</div>
-              <div class="stat-label">Average Grade This Semester</div>
-            </div>
-
-          </div>
-
-          <div class="card" style="margin-top:16px">
-            <div class="card-hd"><span class="card-title">Quick Actions</span></div>
-            <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">
-              Navigation is available from the sidebar. More features will be added here.
-            </p>
-            <div class="btn-row">
-              <a href="/logout" class="btn btn-outline" style="text-decoration:none">Sign Out</a>
-            </div>
-          </div>
-        </div>
+      <div class="deadline-row" style="background:var(--sup-light)">
+        <div style="font-size:11px;font-weight:700;color:var(--sup);min-width:36px;text-align:center">15<br>Feb</div>
+        <div style="font-size:12px;color:var(--color-text-primary);flex:1">Deadline for uploading student files</div>
+        <span class="pill p-pending" style="font-size:10px">7 days</span>
+      </div>
+      <div class="deadline-row" style="background:var(--blue-light)">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);min-width:36px;text-align:center">20<br>Feb</div>
+        <div style="font-size:12px;color:var(--color-text-primary);flex:1">Discussion of the APMS project before the committee</div>
+        <span class="pill p-review" style="font-size:10px">12 days</span>
+      </div>
+      <div class="deadline-row" style="background:var(--green-light)">
+        <div style="font-size:11px;font-weight:700;color:var(--green);min-width:36px;text-align:center">28<br>Feb</div>
+        <div style="font-size:12px;color:var(--color-text-primary);flex:1">Announcing the final results</div>
+        <span class="pill p-accepted" style="font-size:10px">20 days</span>
       </div>
     </div>
   </div>
 
-  <footer class="app-footer">
-    © 2026 <strong>Birzeit University</strong> — Department of Computer Science · All Rights Reserved · APMS v1.0
-  </footer>
+  <div>
+    <!-- Statistics -->
+    <div class="card">
+      <div class="card-hd"><span class="card-title">My performance this semester</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div class="stat"><div class="stat-num" style="color:var(--sup-mid);font-size:18px">5</div><div class="stat-label">Projects supervised by me</div></div>
+        <div class="stat"><div class="stat-num" style="color:var(--green);font-size:18px">81.2</div><div class="stat-label">My average grades</div></div>
+        <div class="stat"><div class="stat-num" style="color:var(--blue);font-size:18px">12</div><div class="stat-label">Feedback provided</div></div>
+        <div class="stat"><div class="stat-num" style="color:var(--purple);font-size:18px">22</div><div class="stat-label">My total projects</div></div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-label"><span>Projects in progress</span><span>60%</span></div>
+        <div class="prog-bg"><div class="prog-fill" style="width:60%;background:var(--green)"></div></div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-label"><span>Feedback provided</span><span>80%</span></div>
+        <div class="prog-bg"><div class="prog-fill" style="width:80%;background:var(--sup-mid)"></div></div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-label"><span>Review files</span><span>70%</span></div>
+        <div class="prog-bg"><div class="prog-fill" style="width:70%;background:var(--blue)"></div></div>
+      </div>
+    </div>
+
+    <!-- Pending feedback -->
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Pending feedback</span><a class="card-action" href="/supervisor/feedback">Add ←</a></div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="padding:9px;background:var(--coral-light);border-radius:var(--rm);display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px">⚑</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:500;color:var(--coral)">Taima Abed project - APMS</div>
+            <div style="font-size:11px;color:var(--coral)">Feedback on the final report</div>
+          </div>
+          <a class="btn btn-outline" style="font-size:11px;padding:4px 8px;color:var(--coral);border-color:var(--coral)" href="/supervisor/feedback">Add</a>
+        </div>
+        <div style="padding:9px;background:var(--sup-light);border-radius:var(--rm);display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px">⚑</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:500;color:var(--sup)">Student Records System — Salma Al-Khatib</div>
+            <div style="font-size:11px;color:var(--sup)">Review source code</div>
+          </div>
+          <a class="btn btn-outline" style="font-size:11px;padding:4px 8px;color:var(--sup);border-color:var(--sup-mid)" href="/supervisor/feedback">Add</a>
+        </div>
+        <div style="padding:9px;background:var(--sup-light);border-radius:var(--rm);display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px">⚑</span>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:500;color:var(--sup)">Delivery app — Kareem Returns</div>
+            <div style="font-size:11px;color:var(--sup)">Urgent follow-up on the delay</div>
+          </div>
+          <a class="btn btn-outline" style="font-size:11px;padding:4px 8px;color:var(--sup);border-color:var(--sup-mid)" href="/supervisor/feedback">Add</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Last notification -->
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Last notification</span><a class="card-action" href="/supervisor/notifs">All ←</a></div>
+      <div style="font-size:12px;color:var(--color-text-primary);padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary)">◉ Taima Abed uploaded updated files</div>
+      <div style="font-size:12px;color:var(--color-text-primary);padding:6px 0;border-bottom:0.5px solid var(--color-border-tertiary)">✦ You have been assigned membership in a new evaluation committee.</div>
+      <div style="font-size:12px;color:var(--color-text-primary);padding:6px 0">⚑ Kareem Awda hasn't uploaded any files for two weeks.</div>
+    </div>
+  </div>
 </div>
-<script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
-</body>
-</html>
+{% endblock %}
