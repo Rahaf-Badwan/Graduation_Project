@@ -6,110 +6,263 @@
 
 {% block content %}
 <div class="page on" id="pg-challenges">
+  <div class="two-col" style="align-items:start">
 
-            <div class="two-col" style="align-items:start">
-              <div>
-                <div class="card">
-                  <div class="card-hd"><span class="card-title">Add New Challenge or Reflection</span></div>
-                  <div class="field-wrap">
-                    <div class="field-label">Type</div>
-                    <select class="field-select" id="challengeType">
-                      <option value="Technical">Technical Challenge</option>
-                      <option value="Administrative">Administrative / Coordination Challenge</option>
-                      <option value="Reflection">Reflection &amp; Lesson Learned</option>
-                    </select>
-                  </div>
-                  <div class="field-wrap">
-                    <div class="field-label">Title</div>
-                    <input class="field-input" id="challengeTitle"
-                      placeholder="Briefly describe the challenge or reflection..." />
-                  </div>
-                  <div class="field-wrap">
-                    <div class="field-label">Details</div>
-                    <textarea class="field-textarea" id="challengeDetails"
-                      placeholder="Describe the challenge in detail and how you overcame it..."></textarea>
-                  </div>
-                  <div class="field-wrap">
-                    <div class="field-label">Solution / Outcome <span
-                        style="color:var(--color-text-secondary)">(optional)</span></div>
-                    <textarea class="field-textarea" id="challengeSolution"
-                      placeholder="Write the solution, action taken, or lesson learned..."></textarea>
-                  </div>
-                  <div class="btn-row">
-                    <button class="btn btn-primary" id="saveChallengeBtn" type="button">Save</button>
-                    <button class="btn btn-outline" id="cancelChallengeBtn" type="button">Cancel</button>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div class="card">
-                  <div class="card-hd">
-                    <span class="card-title">Team Challenges & Reflections</span>
-                    <span class="pill p-review" style="font-size:10px">Shared by section team</span>
-                  </div>
-                  <div id="emptyChallenges" class="empty-state">No challenges or reflections added yet.</div>
-                  <div id="challengeList">
-                    <div class="challenge-card" data-type="Technical">
-                      <div
-                        style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-                        <div class="ch-title">API Integration Delay</div>
-                        <span class="pill p-review" style="font-size:10px">Technical</span>
-                      </div>
-                      <div class="challenge-meta">
-                        <span><span class="challenge-author">Rahaf Badwan</span> · Added by team member</span>
-                        <span>Apr 8, 2026</span>
-                      </div>
-                      <div class="ch-text">We had an issue connecting some frontend pages with the project data because
-                        the integration flow between pages was not finalized yet.</div>
-                      <div class="ch-sol">✓ Solution: We agreed on a shared project-based structure and linked the pages
-                        using the same project context.</div>
-                      <div class="challenge-actions">
-                        <button class="btn btn-outline btn-xs" type="button">Update</button>
-                        <button class="btn btn-outline btn-xs" type="button">Delete</button>
-                      </div>
-                    </div>
+    <!-- ── Left: Add / Edit form ─────────────────────────── -->
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title" id="formCardTitle">Add New Challenge or Reflection</span>
+        </div>
 
-                    <div class="challenge-card" data-type="Administrative">
-                      <div
-                        style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-                        <div class="ch-title">Dividing Tasks Between Team Members</div>
-                        <span class="pill p-pending" style="font-size:10px">Administrative</span>
-                      </div>
-                      <div class="challenge-meta">
-                        <span><span class="challenge-author">Amneh Abu Musallam</span> · Added by team member</span>
-                        <span>Apr 7, 2026</span>
-                      </div>
-                      <div class="ch-text">At the beginning, task ownership between design, report writing, and UI pages
-                        was not fully clear, which slowed progress for a short period.</div>
-                      <div class="ch-sol">✓ Solution: We split the work by module and reviewed progress together at the
-                        end of each phase.</div>
-                      <div class="challenge-actions">
-                        <button class="btn btn-outline btn-xs" type="button">Update</button>
-                        <button class="btn btn-outline btn-xs" type="button">Delete</button>
-                      </div>
-                    </div>
+        <input type="hidden" id="editChallengeId" value="">
 
-                    <div class="challenge-card" style="border-left-color:var(--green)" data-type="Reflection">
-                      <div
-                        style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-                        <div class="ch-title">Lesson Learned — Keep the Structure Shared</div>
-                        <span class="pill p-accepted" style="font-size:10px">Reflection</span>
-                      </div>
-                      <div class="challenge-meta">
-                        <span><span class="challenge-author">Taima Abed</span> · Added by team member</span>
-                        <span>Apr 6, 2026</span>
-                      </div>
-                      <div class="ch-text">Using one agreed structure for project pages, naming, and data flow made
-                        collaboration easier and reduced duplicated work.</div>
-                      <div class="challenge-actions">
-                        <button class="btn btn-outline btn-xs" type="button">Update</button>
-                        <button class="btn btn-outline btn-xs" type="button">Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <div class="field-wrap">
+          <div class="field-label">Type</div>
+          <select class="field-select" id="challengeType">
+            <option value="technical">Technical Challenge</option>
+            <option value="administrative">Administrative / Coordination Challenge</option>
+            <option value="reflection">Reflection &amp; Lesson Learned</option>
+          </select>
+        </div>
 
-            </div>
+        <div class="field-wrap">
+          <div class="field-label">Title</div>
+          <input class="field-input" id="challengeTitle"
+            placeholder="Briefly describe the challenge or reflection..." />
+        </div>
+
+        <div class="field-wrap">
+          <div class="field-label">Details</div>
+          <textarea class="field-textarea" id="challengeDetails"
+            placeholder="Describe the challenge in detail and how you overcame it..."></textarea>
+        </div>
+
+        <div class="field-wrap">
+          <div class="field-label">Solution / Outcome
+            <span style="color:var(--color-text-secondary)">(optional)</span>
           </div>
+          <textarea class="field-textarea" id="challengeSolution"
+            placeholder="Write the solution, action taken, or lesson learned..."></textarea>
+        </div>
+
+        <div id="formError"
+          style="display:none;color:var(--red,#e05);font-size:13px;margin-bottom:10px"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="saveChallengeBtn" type="button">Save</button>
+          <button class="btn btn-outline" id="cancelChallengeBtn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right: Team list ───────────────────────────────── -->
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Team Challenges &amp; Reflections</span>
+          <span class="pill p-review" style="font-size:10px">Shared by section team</span>
+        </div>
+        <div id="emptyChallenges" class="empty-state" style="display:none">
+          No challenges or reflections added yet.
+        </div>
+        <div id="loadingChallenges" class="empty-state">Loading…</div>
+        <div id="challengeList"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const TYPE_PILL = {
+    technical:      { label: "Technical",      cls: "p-review"  },
+    administrative: { label: "Administrative", cls: "p-pending" },
+    reflection:     { label: "Reflection",     cls: "p-accepted"},
+  };
+  const TYPE_BORDER = {
+    technical:      "var(--color-primary, #2563eb)",
+    administrative: "var(--orange, #f59e0b)",
+    reflection:     "var(--green, #22c55e)",
+  };
+
+  let challenges = [];
+
+  const listEl     = document.getElementById("challengeList");
+  const emptyEl    = document.getElementById("emptyChallenges");
+  const loadingEl  = document.getElementById("loadingChallenges");
+  const formTitle  = document.getElementById("formCardTitle");
+  const editId     = document.getElementById("editChallengeId");
+  const typeEl     = document.getElementById("challengeType");
+  const titleEl    = document.getElementById("challengeTitle");
+  const detailsEl  = document.getElementById("challengeDetails");
+  const solutionEl = document.getElementById("challengeSolution");
+  const saveBtn    = document.getElementById("saveChallengeBtn");
+  const cancelBtn  = document.getElementById("cancelChallengeBtn");
+  const errEl      = document.getElementById("formError");
+
+  /* ── Render list ──────────────────────────────────────── */
+  function render() {
+    listEl.innerHTML = "";
+    loadingEl.style.display = "none";
+
+    if (!challenges.length) { emptyEl.style.display = ""; return; }
+    emptyEl.style.display = "none";
+
+    challenges.forEach(ch => {
+      const pill   = TYPE_PILL[ch.type]   || { label: ch.type, cls: "p-review" };
+      const border = TYPE_BORDER[ch.type] || "var(--color-primary)";
+
+      const card = document.createElement("div");
+      card.className = "challenge-card";
+      card.dataset.id = ch.challenge_id;
+      card.style.borderLeftColor = border;
+
+      const solHtml = ch.solution_lesson
+        ? `<div class="ch-sol">&#10003; Solution: ${esc(ch.solution_lesson)}</div>` : "";
+
+      const actionsHtml = ch.is_mine ? `
+        <div class="challenge-actions">
+          <button class="btn btn-outline btn-xs ch-edit-btn"
+                  data-id="${ch.challenge_id}" type="button">Update</button>
+          <button class="btn btn-outline btn-xs ch-del-btn"
+                  data-id="${ch.challenge_id}" type="button">Delete</button>
+        </div>` : "";
+
+      const byLabel = ch.is_mine ? "Added by you" : "Added by team member";
+
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+          <div class="ch-title">${esc(ch.title)}</div>
+          <span class="pill ${pill.cls}" style="font-size:10px">${pill.label}</span>
+        </div>
+        <div class="challenge-meta">
+          <span><span class="challenge-author">${esc(ch.full_name)}</span> &middot; ${byLabel}</span>
+          <span>${esc(ch.created_date)}</span>
+        </div>
+        <div class="ch-text">${esc(ch.description)}</div>
+        ${solHtml}
+        ${actionsHtml}
+      `;
+      listEl.appendChild(card);
+    });
+
+    listEl.querySelectorAll(".ch-edit-btn").forEach(b =>
+      b.addEventListener("click", () => startEdit(+b.dataset.id)));
+    listEl.querySelectorAll(".ch-del-btn").forEach(b =>
+      b.addEventListener("click", () => deleteChallenge(+b.dataset.id)));
+  }
+
+  /* ── Load from server ─────────────────────────────────── */
+  async function loadChallenges() {
+    try {
+      const res  = await fetch("/student/api/challenges");
+      const data = await res.json();
+      challenges = data.challenges || [];
+      render();
+    } catch {
+      loadingEl.textContent = "Failed to load.";
+    }
+  }
+
+  /* ── Save ─────────────────────────────────────────────── */
+  saveBtn.addEventListener("click", async () => {
+    hideError();
+    const id      = editId.value;
+    const payload = {
+      type:            typeEl.value,
+      title:           titleEl.value.trim(),
+      description:     detailsEl.value.trim(),
+      solution_lesson: solutionEl.value.trim(),
+    };
+    if (!payload.title)       return showError("Title is required.");
+    if (!payload.description) return showError("Details are required.");
+
+    saveBtn.disabled    = true;
+    saveBtn.textContent = "Saving…";
+    try {
+      let res, data;
+      if (id) {
+        res  = await fetch(`/student/api/challenges/${id}`, {
+          method: "PUT", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(payload),
+        });
+        data = await res.json();
+        if (!res.ok) return showError(data.error || "Update failed.");
+        const idx = challenges.findIndex(c => c.challenge_id === +id);
+        if (idx !== -1) challenges[idx] = data.challenge;
+      } else {
+        res  = await fetch("/student/api/challenges", {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(payload),
+        });
+        data = await res.json();
+        if (!res.ok) return showError(data.error || "Save failed.");
+        challenges.unshift(data.challenge);
+      }
+      resetForm();
+      render();
+    } catch {
+      showError("Network error. Please try again.");
+    } finally {
+      saveBtn.disabled    = false;
+      saveBtn.textContent = editId.value ? "Update" : "Save";
+    }
+  });
+
+  cancelBtn.addEventListener("click", resetForm);
+
+  /* ── Start edit ──────────────────────────────────────── */
+  function startEdit(id) {
+    const ch = challenges.find(c => c.challenge_id === id);
+    if (!ch || !ch.is_mine) return;
+    editId.value          = id;
+    typeEl.value          = ch.type;
+    titleEl.value         = ch.title;
+    detailsEl.value       = ch.description;
+    solutionEl.value      = ch.solution_lesson || "";
+    formTitle.textContent = "Edit Challenge or Reflection";
+    saveBtn.textContent   = "Update";
+    document.querySelector(".two-col > div:first-child")
+            .scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ── Delete ──────────────────────────────────────────── */
+  async function deleteChallenge(id) {
+    if (!confirm("Delete this entry?")) return;
+    try {
+      const res = await fetch(`/student/api/challenges/${id}`, { method: "DELETE" });
+      if (!res.ok) { const d = await res.json(); return alert(d.error || "Failed."); }
+      challenges = challenges.filter(c => c.challenge_id !== id);
+      render();
+    } catch { alert("Network error."); }
+  }
+
+  /* ── Helpers ─────────────────────────────────────────── */
+  function resetForm() {
+    editId.value          = "";
+    typeEl.value          = "technical";
+    titleEl.value         = "";
+    detailsEl.value       = "";
+    solutionEl.value      = "";
+    formTitle.textContent = "Add New Challenge or Reflection";
+    saveBtn.textContent   = "Save";
+    hideError();
+  }
+  function showError(msg) {
+    errEl.textContent   = msg;
+    errEl.style.display = "";
+    saveBtn.disabled    = false;
+    saveBtn.textContent = editId.value ? "Update" : "Save";
+  }
+  function hideError() { errEl.style.display = "none"; }
+  function esc(s) {
+    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")
+                        .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  loadChallenges();
+})();
+</script>
 {% endblock %}

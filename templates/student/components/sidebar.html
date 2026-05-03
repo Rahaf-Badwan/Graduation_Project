@@ -17,6 +17,10 @@
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
       <span class="sb-label">Dashboard</span>
     </a>
+    <a class="sb-item {% if request.path == '/student/registration' %}on{% endif %}" data-page="registration" href="/student/registration">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">app_registration</span></span>
+      <span class="sb-label">Registration</span>
+    </a>
     <a class="sb-item {% if request.path == '/student/submit' %}on{% endif %}" data-page="submit" href="/student/submit">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">upload_file</span></span>
       <span class="sb-label">Submit Project</span>

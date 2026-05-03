@@ -6,58 +6,94 @@
 
 {% block content %}
 <div class="page on" id="pg-submit">
-  <div class="card">
-    <div class="card-hd"><span class="card-title">Student Distribution Submission</span></div>
-    <div class="form-grid">
-      <div class="field-wrap">
-        <div class="field-label">Project Title <span>*</span></div>
-        <input class="field-input" id="distTitle" placeholder="Enter project title" />
-      </div>
-      <div class="field-wrap">
-        <div class="field-label">Group Name <span>*</span></div>
-        <input class="field-input" id="distGroup" placeholder="Example: G12 or Team Alpha" />
-      </div>
-      <div class="field-wrap">
-        <div class="field-label">Preferred Professor 1</div>
-        <select class="field-select" id="pref1">
-          <option value="">Select professor...</option>
-        </select>
-      </div>
-      <div class="field-wrap">
-        <div class="field-label">Preferred Professor 2</div>
-        <select class="field-select" id="pref2">
-          <option value="">Select professor...</option>
-        </select>
-      </div>
-      <div class="field-wrap">
-        <div class="field-label">Preferred Professor 3</div>
-        <select class="field-select" id="pref3">
-          <option value="">Select professor...</option>
-        </select>
-      </div>
-      <div class="field-wrap">
-        <div class="field-label">Keywords</div>
-        <input class="field-input" id="distKeywords" placeholder="AI, web, security..." />
-      </div>
-    </div>
-    <div class="field-wrap">
-      <div class="field-label">Abstract</div>
-      <textarea class="field-textarea" id="distAbstract" style="min-height:100px" placeholder="Write a short abstract..."></textarea>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card-hd"><span class="card-title">Team Members</span></div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-      <input class="field-input member-id" placeholder="Student ID 1" />
-      <input class="field-input member-id" placeholder="Student ID 2" />
-      <input class="field-input member-id" placeholder="Student ID 3" />
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-primary" type="button" onclick="submitDistributionProject()">Submit to Coordinator</button>
-      <button class="btn btn-outline" type="button" onclick="clearDistributionForm()">Clear</button>
-    </div>
-    <div id="distMsg" style="margin-top:12px;font-size:12px"></div>
-  </div>
-</div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">Basic Project Information</span></div>
+              <div class="form-grid">
+                <div class="field-wrap">
+                  <div class="field-label">Project Title <span>*</span></div>
+                  <input class="field-input" value="Academic Project Lifecycle Management System (APMS)" />
+                </div>
+                <div class="field-wrap">
+                  <div class="field-label">Academic Year <span>*</span></div>
+                  <select class="field-select">
+                    <option>2025/2026</option>
+                    <option>2024/2025</option>
+                  </select>
+                </div>
+                <div class="field-wrap">
+                  <div class="field-label">Supervisor <span>*</span></div>
+                  <select class="field-select">
+                    <option>Dr. Naema Harbawi</option>
+                    <option>Dr. Mahmoud Salem</option>
+                  </select>
+                </div>
+                <div class="field-wrap">
+                  <div class="field-label">Project Type <span>*</span></div>
+                  <select class="field-select">
+                    <option>Web Application</option>
+                    <option>Mobile Application</option>
+                    <option>Artificial Intelligence</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-wrap">
+                <div class="field-label">Abstract <span>*</span></div>
+                <textarea class="field-textarea"
+                  style="min-height:90px">Most of the educational institutions have no efficient way to centrally manage the graduation projects, from their submission until archiving...</textarea>
+              </div>
+              <div class="field-wrap">
+                <div class="field-label">Keywords</div>
+                <input class="field-input"
+                  value="Academic Project Management, Evaluation Systems, Web Applications, AI" />
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">Upload Files</span></div>
+              <div class="three-col">
+                <div class="upload-zone">
+                  <div class="upload-icon"><span class="material-symbols-outlined icon-inline">description</span></div>
+                  <div class="upload-text">Final Report</div>
+                  <div class="upload-hint">PDF · Max 50MB</div>
+                  <div style="margin-top:8px;font-size:11px;color:var(--green);font-weight:600">✓ Uploaded</div>
+                </div>
+                <div class="upload-zone">
+                  <div class="upload-icon"><span class="material-symbols-outlined icon-inline">code</span></div>
+                  <div class="upload-text">Source Code</div>
+                  <div class="upload-hint">ZIP / GitHub Link</div>
+                  <div style="margin-top:8px;font-size:11px;color:var(--green);font-weight:600">✓ Uploaded</div>
+                </div>
+                <div class="upload-zone">
+                  <div class="upload-icon"><span class="material-symbols-outlined icon-inline">slideshow</span></div>
+                  <div class="upload-text">Presentation Slides</div>
+                  <div class="upload-hint">PPTX / PDF</div>
+                  <div style="margin-top:8px;font-size:11px;color:var(--amber);font-weight:600">↑ Not uploaded yet</div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-title">Team Members</span></div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="field-input" style="flex:1" value="Amna Abu Muslim" />
+                  <input class="field-input" style="width:100px" value="1220670" />
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="field-input" style="flex:1" value="Rahaf Badwan" />
+                  <input class="field-input" style="width:100px" value="1220654" />
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="field-input" style="flex:1" value="Tima Abd" />
+                  <input class="field-input" style="width:100px" value="1220174" />
+                </div>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-primary"
+                  onclick="sendPrompt('Student Rahaf Badwan submitted the APMS project — what are the next steps after submission? ↗')">Submit
+                  Project for Review ↗</button>
+                <button class="btn btn-outline">Save as Draft</button>
+              </div>
+            </div>
+
+          </div>
 {% endblock %}

@@ -6,6 +6,8 @@ import os
 import csv
 import io
 import re
+from dotenv import load_dotenv
+load_dotenv()
 from flask_mail import Mail, Message
 from db import get_db
 from auth import login_required
@@ -546,6 +548,68 @@ def api_ai_archive_delete(session_id):
 
 
 # ─── Student distribution APIs ───────────────────────────────────────────
+
+@app.route("/api/student/supervisors", methods=["GET"])
+@login_required(role="student")
+def api_student_supervisors():
+    """Return list of supervisors for the registration form."""
+    try:
+        rows = fetch_supervisors()
+        return jsonify({"supervisors": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/student/registration-check", methods=["GET"])
+@login_required(role="student")
+def api_student_registration_check():
+    """Check if the current student is already registered in the active semester."""
+    user_id = session.get("user_id")
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # Get active semester
+        cursor.execute("SELECT semester_id FROM semesters WHERE is_active = TRUE ORDER BY semester_id DESC LIMIT 1")
+        semester = cursor.fetchone()
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"registered": False, "project": None})
+
+        # Check if current student is in any project in this semester
+        cursor.execute("""
+            SELECT p.project_id, p.title, p.status,
+                   pref1.full_name AS preferred_1,
+                   pref2.full_name AS preferred_2,
+                   pref3.full_name AS preferred_3,
+                   GROUP_CONCAT(u2.full_name ORDER BY pm2.is_primary_contact DESC SEPARATOR ', ') AS team_members
+            FROM project_members pm
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN projects p  ON p.project_id  = pm.project_id
+            LEFT JOIN faculty f1  ON f1.faculty_id = p.preferred_supervisor_1
+            LEFT JOIN users pref1 ON pref1.user_id = f1.user_id
+            LEFT JOIN faculty f2  ON f2.faculty_id = p.preferred_supervisor_2
+            LEFT JOIN users pref2 ON pref2.user_id = f2.user_id
+            LEFT JOIN faculty f3  ON f3.faculty_id = p.preferred_supervisor_3
+            LEFT JOIN users pref3 ON pref3.user_id = f3.user_id
+            LEFT JOIN project_members pm2 ON pm2.project_id = p.project_id
+            LEFT JOIN students st2        ON st2.student_id  = pm2.student_id
+            LEFT JOIN users u2            ON u2.user_id      = st2.user_id
+            WHERE st.user_id = %s AND p.semester_id = %s
+            GROUP BY p.project_id, p.title, p.status, preferred_1, preferred_2, preferred_3
+            ORDER BY p.project_id DESC
+            LIMIT 1
+        """, (user_id, semester["semester_id"]))
+        project = cursor.fetchone()
+        cursor.close(); db.close()
+
+        if project:
+            return jsonify({"registered": True, "project": project})
+        return jsonify({"registered": False, "project": None})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/student/distribution-submit", methods=["POST"])
 @login_required(role="student")
 def api_student_distribution_submit():
@@ -574,6 +638,28 @@ def api_student_distribution_submit():
             cursor.close()
             db.close()
             return jsonify({"error": "No active semester is configured."}), 400
+
+        # ── Duplicate check: any member already registered this semester? ──
+        all_uids_to_check = list(member_ids)
+        if user_uid and user_uid not in all_uids_to_check:
+            all_uids_to_check.insert(0, user_uid)
+        for uid in all_uids_to_check:
+            cursor.execute("""
+                SELECT p.project_id, p.title
+                FROM project_members pm
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users u     ON u.user_id      = st.user_id
+                JOIN projects p  ON p.project_id   = pm.project_id
+                WHERE u.university_id = %s AND p.semester_id = %s
+                LIMIT 1
+            """, (uid, semester["semester_id"]))
+            dup = cursor.fetchone()
+            if dup:
+                cursor.close(); db.close()
+                return jsonify({
+                    "already_registered": True,
+                    "error": f"Student {uid} is already registered in this semester (Project: \"{dup['title']}\")."
+                }), 409
 
         pref_ids = [int(x) for x in preferred[:3] if str(x).strip().isdigit()]
         while len(pref_ids) < 3:

@@ -1,6 +1,8 @@
 import os
 import re
 import pickle
+from dotenv import load_dotenv
+load_dotenv()
 from typing import List, Dict, Any
 import time
 

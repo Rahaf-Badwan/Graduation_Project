@@ -32,6 +32,8 @@ DROP TABLE IF EXISTS project_lifecycle;
 DROP TABLE IF EXISTS project_progress;
 DROP TABLE IF EXISTS project_files;
 DROP TABLE IF EXISTS project_members;
+DROP TABLE IF EXISTS section_students;
+DROP TABLE IF EXISTS student_distribution_sections;
 DROP TABLE IF EXISTS projects;
 DROP TABLE IF EXISTS coordinator_assignments;
 DROP TABLE IF EXISTS students;
@@ -158,15 +160,22 @@ CREATE TABLE projects (
                         'rejected',
                         'archived'
                       )               NOT NULL DEFAULT 'draft',
-    submission_date   DATE            NULL,
+    submission_date         DATE            NULL,
+    group_name              VARCHAR(200)    NULL    COMMENT 'Team / group label entered during registration',
+    preferred_supervisor_1  INT             NULL    COMMENT 'First preferred supervisor (faculty_id)',
+    preferred_supervisor_2  INT             NULL    COMMENT 'Second preferred supervisor (faculty_id)',
+    preferred_supervisor_3  INT             NULL    COMMENT 'Third preferred supervisor (faculty_id)',
     coordinator_notes TEXT            NULL,
     rejection_reason  TEXT            NULL,
     final_score       DECIMAL(5,2)    NULL     COMMENT 'Final score out of 100',
     created_at        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
                                                ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (semester_id)   REFERENCES semesters(semester_id),
-    FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL
+    FOREIGN KEY (semester_id)          REFERENCES semesters(semester_id),
+    FOREIGN KEY (supervisor_id)        REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+    FOREIGN KEY (preferred_supervisor_1) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+    FOREIGN KEY (preferred_supervisor_2) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+    FOREIGN KEY (preferred_supervisor_3) REFERENCES faculty(faculty_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -467,6 +476,7 @@ CREATE TABLE challenges_reflections (
                       'administrative',
                       'reflection'
                     )         NOT NULL,
+    title           VARCHAR(255) NOT NULL DEFAULT '',
     description     TEXT      NOT NULL,
     solution_lesson TEXT      NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -531,6 +541,35 @@ CREATE TABLE password_reset_tokens (
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+--  TABLE — student_distribution_sections
+--  Coordinator-created sections (name + assigned supervisor)
+-- ============================================================
+CREATE TABLE student_distribution_sections (
+    section_id    INT          PRIMARY KEY AUTO_INCREMENT,
+    section_name  VARCHAR(200) NOT NULL   COMMENT 'e.g. Section 01',
+    supervisor_id INT          NOT NULL   COMMENT 'Assigned faculty_id',
+    entered_by    INT          NULL       COMMENT 'user_id of coordinator who created this',
+    created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (entered_by)    REFERENCES users(user_id)      ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- ============================================================
+--  TABLE — section_students
+--  Maps students to coordinator-created sections
+-- ============================================================
+CREATE TABLE section_students (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    section_id INT NOT NULL,
+    student_id INT NOT NULL,
+
+    UNIQUE KEY uq_section_student (section_id, student_id),
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id)                      ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 -- ============================================================
 --  INDEXES
