@@ -1,12 +1,12 @@
 /*------Add Student------------------------*/
 
-const API_BASE = '';
-let currentCourse = 'COMP4200';
-let allStudents = [];
+const API_BASE = '/head';
+var currentCourse = 'COMP4200';
+var allStudents = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     loadStudents();
-    setInterval(loasStudents, 30000);
+    setInterval(loadStudents, 30000);
 });
 
 /* --- Tabs ---*/
@@ -49,7 +49,7 @@ function renderStudents(students){
     return;    
   }
   list.innerHTML = students.map(function (s) {
-    var initials = s.avater_initials ||
+    var initials = s.avatar_initials ||
        s.full_name.split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
     return(
       '<div class="student-row" style="'+
@@ -58,7 +58,7 @@ function renderStudents(students){
         'border-bottom:0.5px solid var(--color-border-tertiary);">' +
       
         '<div style="'+ 
-          'width:34px; height:34px; border-raduis:50%; flex-shrink:0;' +
+          'width:34px; height:34px; border-radius:50%; flex-shrink:0;' +
           'background:var(--color-background-info);' + 
           'display: grid; place-items:center;' +
           'font-size:12px font-weight:600; color:var(--color-text-info);">' +
@@ -96,7 +96,7 @@ async function addStudent(){
    hideFeedback();
 
   if(!name || !uid || !email){
-    showFeedback('Please fill in Name, University ID, and Email.', 'wran');
+    showFeedback('Please fill in Name, University ID, and Email.', 'warn');
     return;
   }
 
@@ -108,7 +108,7 @@ async function addStudent(){
     var res = await fetch(API_BASE + '/api/students/add', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringfy({full_name: name, university_id: uid, email: email})
+      body: JSON.stringify({full_name: name, university_id: uid, email: email})
     });
     var data = await res.json();
 
@@ -123,7 +123,7 @@ async function addStudent(){
     showFeedback('Could not reach the server.', 'error');
   }finally{
     addBtn.disabled = false;
-    addBtn.innerHTML = 'Condirm New Student &#x2197;';
+    addBtn.innerHTML = 'Confirm New Student &#x2197;';
   }
 }
 
@@ -142,6 +142,9 @@ function clearForm(){
 /*feedback to head of department to know if the student add or any something happen */
 function showFeedback(msg, type){
   var feedback = document.getElementById('add-feedback');
+
+  feedback.style.display = 'block';
+
   var colors = {
     success: 'var(--color-text-success)',
     error: 'var(--color-text-danger)',
@@ -149,9 +152,9 @@ function showFeedback(msg, type){
   };
 
   var backgrounds = {
-    success: 'var(--color-text-success)',
-    error: 'var(--color-text-danger)',
-    warn: 'var(--color-text-warning)'
+    success: 'var(--color-background-success)',
+    error: 'var(--color-background-danger)',
+    warn: 'var(--color-background-warning)'
   };
 
   var borders = {
@@ -160,7 +163,7 @@ function showFeedback(msg, type){
     warn: 'var(--color-text-warning)'
   };
   feedback.style.cssText = 
-    'display:block; padding:10px 14px; border-raduis:var(--border-raduis-md);' +
+    'display:block; padding:10px 14px; border-radius:var(--border-radius-md);' +
     'font-size:13px; margin-top:12px;' +
     'color:'    + (colors[type] || colors.warn) + ';' +
     'background:' + (backgrounds[type] || backgrounds.warn) + ';' +
