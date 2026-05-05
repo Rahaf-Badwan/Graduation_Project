@@ -10,20 +10,24 @@
     <div>
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Student submissions received</span>
+          <span class="card-title">Student submissions schedule</span>
           <button class="card-action" type="button" onclick="window.location.href='/api/coordinator/export-groups'">Download Excel ↓</button>
         </div>
-        <div class="u-cebcb327">Students can submit their names, group name, and three preferred department members. The coordinator then reviews and distributes the submissions.</div>
+
+        <div class="u-cebcb327">
+          This schedule reads the registered students directly from the database, shows each group with the preferred doctors, and lets you decide the final supervisor for every group.
+        </div>
+
         <div class="u-77c8140b">
           <table class="reg-table">
             <thead>
               <tr>
                 <th>Group</th>
                 <th>Team Members</th>
-                <th>Preferred 1</th>
-                <th>Preferred 2</th>
-                <th>Preferred 3</th>
+                <th>Preferred Doctors</th>
                 <th>Idea Title</th>
+                <th>Final Supervisor</th>
+                <th>Action</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -36,7 +40,14 @@
 
       <div class="card">
         <div class="card-hd"><span class="card-title">Unassigned Students</span></div>
-        <div class="u-e284fbe5">Students without a group can be assigned manually by the coordinator.</div>
+        <div class="u-e284fbe5">
+          Students who do not have a group yet are shown here as checkboxes. Select up to 3 students, choose a supervisor, then create a section for them.
+        </div>
+
+        <div style="font-size:12px;color:#667587;margin-bottom:10px">
+          Selected students: <b id="selectedStudentsCount">0</b> / 3
+        </div>
+
         <div class="u-e47f6ecd" id="unassignedStudentsBox">
           <div>Loading...</div>
         </div>
@@ -44,25 +55,49 @@
     </div>
 
     <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-hd">
+          <span class="card-title">Distribution Window Control</span>
+        </div>
+
+        <div style="font-size:13px;color:#667587;margin-bottom:12px">
+          Open or close the student registration window. The student page should use the same status through the existing student APIs.
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <div id="windowStatusText" style="font-weight:700;font-size:15px">Loading...</div>
+            <div id="windowStatusMeta" style="font-size:12px;color:#667587;margin-top:4px"></div>
+          </div>
+
+          <button id="toggleWindowBtn" class="btn btn-primary" type="button" onclick="toggleDistributionWindow()">
+            Loading...
+          </button>
+        </div>
+
+        <div id="windowMsg" style="margin-top:12px;font-size:12px"></div>
+      </div>
+
       <div class="card">
         <div class="card-hd"><span class="card-title">Distribution Statistics</span></div>
         <div class="u-ce5bc819">
           <div class="stat"><div class="stat-num u-c293fd73" id="statTotal">0</div><div class="stat-label">Total Registered Students</div></div>
-          <div class="stat"><div class="stat-num u-cfb6c12e" id="statAssigned">0</div><div class="stat-label">Submitted / Assigned</div></div>
+          <div class="stat"><div class="stat-num u-cfb6c12e" id="statAssigned">0</div><div class="stat-label">Groups with Supervisor</div></div>
           <div class="stat"><div class="stat-num u-a9721929" id="statWaiting">0</div><div class="stat-label">Waiting for Assignment</div></div>
           <div class="stat"><div class="stat-num u-90f01645" id="statGroups">0</div><div class="stat-label">Active Groups</div></div>
         </div>
-        <div class="u-9c8abd96">Group Formation Rules</div>
+
+        <div class="u-9c8abd96">Distribution Rules</div>
         <div class="u-510af369">
-          ✓ Ideal group: <b>3 students</b><br />
-          ✓ Acceptable: <b>2 students</b><br />
-          ✓ Individual registration: can be assigned later by the coordinator
+          ✓ Registered groups are read from the database<br />
+          ✓ Coordinator decides the final supervisor from all doctors<br />
+          ✓ Unassigned students can be grouped into a section of up to <b>3 students</b>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-hd"><span class="card-title">Sections — Coordinator Data Entry</span></div>
-        <div class="u-cebcb327">Create a section, assign a supervisor, and attach up to 3 students from the unassigned list.</div>
+        <div class="card-hd"><span class="card-title">Create Section for Unassigned Students</span></div>
+        <div class="u-cebcb327">Choose a section name, choose a supervisor, and create a section using the checked students from the left panel.</div>
 
         <div class="form-grid" style="margin-bottom:12px">
           <div class="field-wrap">
@@ -78,17 +113,8 @@
           </div>
         </div>
 
-        <div class="field-wrap" style="margin-bottom:12px">
-          <div class="field-label">Unassigned Students (max 3)</div>
-          <select class="field-select" id="sectionStudents" multiple size="8">
-          </select>
-          <div style="font-size:12px;color:#666;margin-top:6px">
-            Hold Ctrl on Windows or Cmd on Mac to choose up to 3 students.
-          </div>
-        </div>
-
         <div class="btn-row u-92d17336">
-          <button class="btn btn-primary u-9bd93d36" type="button" onclick="addSectionEntry()">+ Add New Section</button>
+          <button class="btn btn-primary u-9bd93d36" type="button" onclick="addSectionEntry()">+ Create Section From Selected Students</button>
           <button class="btn btn-outline u-9bd93d36" type="button" onclick="window.location.href='/api/coordinator/export-sections'">Export Excel</button>
         </div>
 
@@ -103,11 +129,14 @@
 </div>
 
 <script>
+let distributionWindowOpen = false;
+let professorsCache = [];
+let formsCache = [];
+let unassignedCache = [];
+
 async function loadDistributionData() {
   const formsBody = document.getElementById('distributionFormsBody');
   const unassignedBox = document.getElementById('unassignedStudentsBox');
-  const supervisorSelect = document.getElementById('sectionSupervisor');
-  const studentsSelect = document.getElementById('sectionStudents');
   const sectionsList = document.getElementById('sectionsList');
   const sectionMsg = document.getElementById('sectionMsg');
 
@@ -119,59 +148,147 @@ async function loadDistributionData() {
       throw new Error(data.error || 'Failed to load distribution data.');
     }
 
-    renderForms(data.forms || []);
-    renderUnassignedStudents(data.unassigned_students || []);
-    renderSupervisorOptions(data.professors || []);
-    renderSectionStudentOptions(data.unassigned_students || []);
+    professorsCache = data.professors || [];
+    formsCache = data.forms || [];
+    unassignedCache = data.unassigned_students || [];
+
+    renderForms(formsCache, professorsCache);
+    renderUnassignedStudents(unassignedCache);
+    renderSupervisorOptions(professorsCache);
     renderSections(data.sections || []);
     renderStats(data.stats || {});
+    updateSelectedStudentsCount();
     sectionMsg.textContent = '';
   } catch (err) {
     formsBody.innerHTML = `<tr><td colspan="7">${escapeHtml(err.message)}</td></tr>`;
     unassignedBox.innerHTML = `<div>${escapeHtml(err.message)}</div>`;
     sectionsList.innerHTML = `<div>${escapeHtml(err.message)}</div>`;
-    supervisorSelect.innerHTML = '<option value="">Select supervisor...</option>';
-    studentsSelect.innerHTML = '';
+    document.getElementById('sectionSupervisor').innerHTML = '<option value="">Select supervisor...</option>';
     sectionMsg.textContent = err.message;
   }
 }
 
-function renderForms(forms) {
+async function loadDistributionWindow() {
+  const statusText = document.getElementById('windowStatusText');
+  const statusMeta = document.getElementById('windowStatusMeta');
+  const btn = document.getElementById('toggleWindowBtn');
+  const msg = document.getElementById('windowMsg');
+
+  try {
+    const res = await fetch('/api/coordinator/distribution-window');
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to load window status.');
+    }
+
+    distributionWindowOpen = !!data.is_open;
+    statusText.textContent = distributionWindowOpen ? 'Registration is OPEN' : 'Registration is CLOSED';
+
+    const openedAt = data.opened_at ? `Opened at: ${data.opened_at}` : '';
+    const closedAt = data.closed_at ? `Closed at: ${data.closed_at}` : '';
+    statusMeta.textContent = distributionWindowOpen ? openedAt : closedAt;
+
+    btn.textContent = distributionWindowOpen ? 'Close Registration' : 'Open Registration';
+    btn.className = distributionWindowOpen ? 'btn btn-outline' : 'btn btn-primary';
+    msg.textContent = '';
+  } catch (err) {
+    statusText.textContent = 'Failed to load window status';
+    statusMeta.textContent = '';
+    btn.textContent = 'Unavailable';
+    msg.textContent = err.message;
+  }
+}
+
+async function toggleDistributionWindow() {
+  const btn = document.getElementById('toggleWindowBtn');
+  const msg = document.getElementById('windowMsg');
+
+  try {
+    btn.disabled = true;
+    msg.textContent = 'Saving...';
+
+    const res = await fetch('/api/coordinator/distribution-window', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_open: !distributionWindowOpen })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update registration window.');
+
+    msg.textContent = data.message || 'Updated successfully.';
+    await loadDistributionWindow();
+  } catch (err) {
+    msg.textContent = err.message || 'Something went wrong.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderForms(forms, professors) {
   const body = document.getElementById('distributionFormsBody');
   if (!forms.length) {
     body.innerHTML = '<tr><td colspan="7">No submissions yet.</td></tr>';
     return;
   }
 
-  body.innerHTML = forms.map(form => `
-    <tr>
-      <td>${escapeHtml(form.group_name || '-')}</td>
-      <td>${escapeHtml(form.team_members || '-')}</td>
-      <td>${escapeHtml(form.preferred_1 || '-')}</td>
-      <td>${escapeHtml(form.preferred_2 || '-')}</td>
-      <td>${escapeHtml(form.preferred_3 || '-')}</td>
-      <td>${escapeHtml(form.title || '-')}</td>
-      <td>${escapeHtml(form.status || '-')}</td>
-    </tr>
-  `).join('');
+  body.innerHTML = forms.map(form => {
+    const preferredDoctors = [form.preferred_1, form.preferred_2, form.preferred_3].filter(Boolean);
+    const currentSupervisorId = form.supervisor_id || '';
+    const selectId = `groupSupervisor_${form.project_id}`;
+
+    const supervisorOptions = [
+      '<option value="">Select supervisor...</option>',
+      ...professors.map(prof => {
+        const selected = String(prof.faculty_id) === String(currentSupervisorId) ? 'selected' : '';
+        return `<option value="${prof.faculty_id}" ${selected}>${escapeHtml(prof.full_name)}</option>`;
+      })
+    ].join('');
+
+    return `
+      <tr>
+        <td>${escapeHtml(form.group_name || '-') }</td>
+        <td>${escapeHtml(form.team_members || '-') }</td>
+        <td>${preferredDoctors.length ? preferredDoctors.map(escapeHtml).join('<br>') : '-'}</td>
+        <td>${escapeHtml(form.title || '-') }</td>
+        <td>
+          <select class="field-select" id="${selectId}">
+            ${supervisorOptions}
+          </select>
+          <div style="font-size:12px;color:#667587;margin-top:6px">
+            Current: ${escapeHtml(form.assigned_supervisor_name || 'Not assigned')}
+          </div>
+        </td>
+        <td>
+          <button class="btn btn-primary" type="button" onclick="assignGroupSupervisor(${form.project_id})">Save</button>
+        </td>
+        <td>${escapeHtml(form.status || '-') }</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderUnassignedStudents(students) {
   const box = document.getElementById('unassignedStudentsBox');
+
   if (!students.length) {
     box.innerHTML = '<div>No unassigned students.</div>';
+    updateSelectedStudentsCount();
     return;
   }
 
   box.innerHTML = students.map(st => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid #e8e8e8;gap:10px;flex-wrap:wrap;">
-      <div>
+    <label style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #e8e8e8;cursor:pointer;">
+      <input type="checkbox" class="unassigned-student-checkbox" value="${st.student_id}" onchange="handleStudentCheckboxChange(this)" />
+      <div style="flex:1">
         <div><b>${escapeHtml(st.full_name || '-')}</b></div>
         <div style="font-size:12px;color:#666">${escapeHtml(st.university_id || '')}</div>
       </div>
-      <div style="font-size:12px;color:#666">Waiting for group or section</div>
-    </div>
+    </label>
   `).join('');
+
+  updateSelectedStudentsCount();
 }
 
 function renderSupervisorOptions(professors) {
@@ -180,18 +297,7 @@ function renderSupervisorOptions(professors) {
   professors.forEach(prof => {
     const opt = document.createElement('option');
     opt.value = prof.faculty_id;
-    opt.textContent = `${prof.full_name} (${prof.assigned_projects} assigned)`;
-    select.appendChild(opt);
-  });
-}
-
-function renderSectionStudentOptions(students) {
-  const select = document.getElementById('sectionStudents');
-  select.innerHTML = '';
-  students.forEach(st => {
-    const opt = document.createElement('option');
-    opt.value = st.student_id;
-    opt.textContent = `${st.full_name} (${st.university_id})`;
+    opt.textContent = `${prof.full_name} (${prof.assigned_projects} assigned groups)`;
     select.appendChild(opt);
   });
 }
@@ -220,19 +326,71 @@ function renderStats(stats) {
   document.getElementById('statGroups').textContent = stats.active_groups || 0;
 }
 
+function getSelectedStudentIds() {
+  return Array.from(document.querySelectorAll('.unassigned-student-checkbox:checked'))
+    .map(el => parseInt(el.value, 10))
+    .filter(Number.isFinite);
+}
+
+function updateSelectedStudentsCount() {
+  document.getElementById('selectedStudentsCount').textContent = getSelectedStudentIds().length;
+}
+
+function handleStudentCheckboxChange(changedBox) {
+  const checked = Array.from(document.querySelectorAll('.unassigned-student-checkbox:checked'));
+  if (checked.length > 3) {
+    changedBox.checked = false;
+    alert('You can select at most 3 students.');
+  }
+  updateSelectedStudentsCount();
+}
+
+async function assignGroupSupervisor(projectId) {
+  const msg = document.getElementById('sectionMsg');
+  const select = document.getElementById(`groupSupervisor_${projectId}`);
+  const supervisorId = select ? select.value : '';
+
+  if (!supervisorId) {
+    msg.textContent = 'Please choose a supervisor before saving.';
+    return;
+  }
+
+  try {
+    msg.textContent = 'Saving group supervisor...';
+
+    const res = await fetch('/api/coordinator/assign-group-supervisor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: projectId,
+        supervisor_id: supervisorId
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to assign supervisor.');
+
+    msg.textContent = data.message || 'Supervisor assigned successfully.';
+    await loadDistributionData();
+  } catch (err) {
+    msg.textContent = err.message || 'Something went wrong while assigning the supervisor.';
+  }
+}
 
 async function addSectionEntry() {
   const sectionName = document.getElementById('sectionName').value.trim();
   const supervisorId = document.getElementById('sectionSupervisor').value;
-  const selectedStudents = Array.from(document.getElementById('sectionStudents').selectedOptions)
-    .map(opt => parseInt(opt.value, 10))
-    .filter(Number.isFinite);
-
+  const selectedStudents = getSelectedStudentIds();
   const msg = document.getElementById('sectionMsg');
   const addBtn = document.querySelector('button[onclick="addSectionEntry()"]');
 
   if (!sectionName || !supervisorId) {
     msg.textContent = 'Please enter the section name and choose a supervisor.';
+    return;
+  }
+
+  if (!selectedStudents.length) {
+    msg.textContent = 'Please choose at least one unassigned student.';
     return;
   }
 
@@ -256,18 +414,11 @@ async function addSectionEntry() {
     });
 
     const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to add section.');
-    }
+    if (!res.ok) throw new Error(data.error || 'Failed to add section.');
 
     msg.textContent = data.message || 'Section added successfully.';
     document.getElementById('sectionName').value = '';
     document.getElementById('sectionSupervisor').value = '';
-    Array.from(document.getElementById('sectionStudents').options).forEach(opt => {
-      opt.selected = false;
-    });
-
     await loadDistributionData();
   } catch (err) {
     msg.textContent = err.message || 'Something went wrong while adding the section.';
@@ -285,6 +436,9 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-document.addEventListener('DOMContentLoaded', loadDistributionData);
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadDistributionWindow();
+  await loadDistributionData();
+});
 </script>
 {% endblock %}
