@@ -32,8 +32,6 @@ DROP TABLE IF EXISTS project_lifecycle;
 DROP TABLE IF EXISTS project_progress;
 DROP TABLE IF EXISTS project_files;
 DROP TABLE IF EXISTS project_members;
-DROP TABLE IF EXISTS section_students;
-DROP TABLE IF EXISTS student_distribution_sections;
 DROP TABLE IF EXISTS projects;
 DROP TABLE IF EXISTS coordinator_assignments;
 DROP TABLE IF EXISTS students;
@@ -160,22 +158,15 @@ CREATE TABLE projects (
                         'rejected',
                         'archived'
                       )               NOT NULL DEFAULT 'draft',
-    submission_date         DATE            NULL,
-    group_name              VARCHAR(200)    NULL    COMMENT 'Team / group label entered during registration',
-    preferred_supervisor_1  INT             NULL    COMMENT 'First preferred supervisor (faculty_id)',
-    preferred_supervisor_2  INT             NULL    COMMENT 'Second preferred supervisor (faculty_id)',
-    preferred_supervisor_3  INT             NULL    COMMENT 'Third preferred supervisor (faculty_id)',
+    submission_date   DATE            NULL,
     coordinator_notes TEXT            NULL,
     rejection_reason  TEXT            NULL,
     final_score       DECIMAL(5,2)    NULL     COMMENT 'Final score out of 100',
     created_at        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
                                                ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (semester_id)          REFERENCES semesters(semester_id),
-    FOREIGN KEY (supervisor_id)        REFERENCES faculty(faculty_id) ON DELETE SET NULL,
-    FOREIGN KEY (preferred_supervisor_1) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
-    FOREIGN KEY (preferred_supervisor_2) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
-    FOREIGN KEY (preferred_supervisor_3) REFERENCES faculty(faculty_id) ON DELETE SET NULL
+    FOREIGN KEY (semester_id)   REFERENCES semesters(semester_id),
+    FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -476,7 +467,6 @@ CREATE TABLE challenges_reflections (
                       'administrative',
                       'reflection'
                     )         NOT NULL,
-    title           VARCHAR(255) NOT NULL DEFAULT '',
     description     TEXT      NOT NULL,
     solution_lesson TEXT      NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -541,35 +531,6 @@ CREATE TABLE password_reset_tokens (
 ) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;
-
--- ============================================================
---  TABLE — student_distribution_sections
---  Coordinator-created sections (name + assigned supervisor)
--- ============================================================
-CREATE TABLE student_distribution_sections (
-    section_id    INT          PRIMARY KEY AUTO_INCREMENT,
-    section_name  VARCHAR(200) NOT NULL   COMMENT 'e.g. Section 01',
-    supervisor_id INT          NOT NULL   COMMENT 'Assigned faculty_id',
-    entered_by    INT          NULL       COMMENT 'user_id of coordinator who created this',
-    created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
-    FOREIGN KEY (entered_by)    REFERENCES users(user_id)      ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- ============================================================
---  TABLE — section_students
---  Maps students to coordinator-created sections
--- ============================================================
-CREATE TABLE section_students (
-    id         INT PRIMARY KEY AUTO_INCREMENT,
-    section_id INT NOT NULL,
-    student_id INT NOT NULL,
-
-    UNIQUE KEY uq_section_student (section_id, student_id),
-    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
-    FOREIGN KEY (student_id) REFERENCES students(student_id)                      ON DELETE CASCADE
-) ENGINE=InnoDB;
 
 -- ============================================================
 --  INDEXES
@@ -702,6 +663,17 @@ INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_
 ('1220700', 'Khaled Mansour',       '1220700@students.birzeit.edu', '$2b$12$UZ02VkxW0l/XRWRu/T5ireQ5fiRfRdS0IiRzxe5RlfqnSLAe59A9O', 'student', 'KM', TRUE),
 ('1220800', 'Dana Ibrahim',         '1220800@students.birzeit.edu', '$2b$12$km.HzoX0aw6nFjI2m3U8sezhKNDXZh7IBlpH.CEwqZx/ZSEv2DYqy', 'student', 'DI', TRUE),
 ('1220900', 'Mona Nassar',          '1220900@students.birzeit.edu', '$2b$12$m/RTVrKRx.lsECFuFa6yguuR1rRxZO8i0QAxQun/7ojQZjq6M7D3G', 'student', 'MN', TRUE);
+
+
+ALTER TABLE semesters
+ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0;
+
+ALTER TABLE semesters
+ADD COLUMN distribution_opened_at DATETIME NULL;
+
+ALTER TABLE semesters
+ADD COLUMN distribution_closed_at DATETIME NULL;
+
 
 -- Faculty records (user_ids 1–7 match insertion order above)
 INSERT INTO faculty (user_id, specialization, years_experience, title) VALUES
@@ -1252,3 +1224,296 @@ SELECT 'APMS_MERGED.sql imported successfully — COMP4300 data applied.' AS sta
 -- ============================================================
 --  END OF FILE
 -- ============================================================
+
+-- ============================================================
+-- APPENDED MYSQL-COMPATIBLE DISTRIBUTION / FACULTY LOAD / DOCTORS MIGRATION
+-- ============================================================
+
+USE apms_db;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ============================================================
+-- 1) semesters: distribution window columns
+-- ============================================================
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'semesters'
+      AND COLUMN_NAME = 'distribution_open'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0',
+    'SELECT "distribution_open already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'semesters'
+      AND COLUMN_NAME = 'distribution_opened_at'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL',
+    'SELECT "distribution_opened_at already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'semesters'
+      AND COLUMN_NAME = 'distribution_closed_at'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL',
+    'SELECT "distribution_closed_at already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 2) projects: preferred supervisors
+-- ============================================================
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'projects'
+      AND COLUMN_NAME = 'preferred_supervisor_1'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE projects ADD COLUMN preferred_supervisor_1 INT NULL AFTER supervisor_id',
+    'SELECT "preferred_supervisor_1 already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'projects'
+      AND COLUMN_NAME = 'preferred_supervisor_2'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE projects ADD COLUMN preferred_supervisor_2 INT NULL AFTER preferred_supervisor_1',
+    'SELECT "preferred_supervisor_2 already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'projects'
+      AND COLUMN_NAME = 'preferred_supervisor_3'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE projects ADD COLUMN preferred_supervisor_3 INT NULL AFTER preferred_supervisor_2',
+    'SELECT "preferred_supervisor_3 already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @fk_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'projects'
+      AND CONSTRAINT_NAME = 'fk_projects_pref_sup_1'
+);
+SET @sql = IF(
+    @fk_exists = 0,
+    'ALTER TABLE projects ADD CONSTRAINT fk_projects_pref_sup_1 FOREIGN KEY (preferred_supervisor_1) REFERENCES faculty(faculty_id) ON DELETE SET NULL',
+    'SELECT "fk_projects_pref_sup_1 already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @fk_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'projects'
+      AND CONSTRAINT_NAME = 'fk_projects_pref_sup_2'
+);
+SET @sql = IF(
+    @fk_exists = 0,
+    'ALTER TABLE projects ADD CONSTRAINT fk_projects_pref_sup_2 FOREIGN KEY (preferred_supervisor_2) REFERENCES faculty(faculty_id) ON DELETE SET NULL',
+    'SELECT "fk_projects_pref_sup_2 already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @fk_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'projects'
+      AND CONSTRAINT_NAME = 'fk_projects_pref_sup_3'
+);
+SET @sql = IF(
+    @fk_exists = 0,
+    'ALTER TABLE projects ADD CONSTRAINT fk_projects_pref_sup_3 FOREIGN KEY (preferred_supervisor_3) REFERENCES faculty(faculty_id) ON DELETE SET NULL',
+    'SELECT "fk_projects_pref_sup_3 already exists"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- 3) student distribution tables
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS student_distribution_sections (
+    section_id     INT PRIMARY KEY AUTO_INCREMENT,
+    section_name   VARCHAR(100) NOT NULL,
+    supervisor_id  INT NOT NULL,
+    entered_by     INT NULL,
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (entered_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS section_students (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    section_id  INT NOT NULL,
+    student_id  INT NOT NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_section_student (section_id, student_id),
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 4) faculty yearly load settings
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS faculty_load_settings (
+    load_id          INT PRIMARY KEY AUTO_INCREMENT,
+    faculty_id       INT NOT NULL,
+    semester_id      INT NOT NULL,
+    min_hours        DECIMAL(5,2) NOT NULL DEFAULT 12,
+    max_hours        DECIMAL(5,2) NOT NULL DEFAULT 36,
+    employment_type  ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time',
+    intro_students   INT NOT NULL DEFAULT 0,
+    extra_bonus      DECIMAL(5,2) NOT NULL DEFAULT 0,
+    assigned_courses TEXT NULL,
+    updated_by       INT NULL,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id),
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 5) Add CS doctors to users/faculty
+--    Temporary IDs/emails; edit later if needed.
+-- ============================================================
+
+SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
+
+INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+SELECT * FROM (
+    SELECT '2101' AS university_id, 'Dr. Iyad Jaber' AS full_name, 'iyad.jaber.temp@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'IJ' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '2102', 'Dr. Adel Taweel', 'adel.taweel.temp@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
+    UNION ALL SELECT '2103', 'Dr. Mustafa Jarrar', 'mustafa.jarrar.temp@birzeit.edu', @pwd, 'supervisor', 'MJ', TRUE
+    UNION ALL SELECT '2104', 'Dr. Majdi Mafarja', 'majdi.mafarja.temp@birzeit.edu', @pwd, 'supervisor', 'MM', TRUE
+    UNION ALL SELECT '2105', 'Dr. Radi Jarrar', 'radi.jarrar.temp@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
+    UNION ALL SELECT '2106', 'Dr. Mohammad Alkhanafseh', 'mohammad.alkhanafseh.temp@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
+    UNION ALL SELECT '2107', 'Dr. Ahmed Abusnaina', 'ahmed.abusnaina.temp@birzeit.edu', @pwd, 'supervisor', 'AA', TRUE
+    UNION ALL SELECT '2108', 'Dr. Ali Jaber', 'ali.jaber.temp@birzeit.edu', @pwd, 'supervisor', 'AJ', TRUE
+    UNION ALL SELECT '2109', 'Dr. Mohammed Helal', 'mohammed.helal.temp@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
+    UNION ALL SELECT '2110', 'Dr. Tamer Alkhouli', 'tamer.alkhouli.temp@birzeit.edu', @pwd, 'supervisor', 'TA', TRUE
+    UNION ALL SELECT '2111', 'Dr. Mohammed Khalilia', 'mohammed.khalilia.temp@birzeit.edu', @pwd, 'supervisor', 'MK', TRUE
+) AS new_users
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM users u
+    WHERE u.full_name = new_users.full_name
+);
+
+INSERT INTO faculty (user_id, specialization, years_experience, title)
+SELECT
+    u.user_id,
+    CASE u.full_name
+        WHEN 'Dr. Mustafa Jarrar' THEN 'artificial_intelligence'
+        WHEN 'Dr. Majdi Mafarja' THEN 'artificial_intelligence'
+        WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
+        WHEN 'Dr. Adel Taweel' THEN 'software_engineering'
+        WHEN 'Dr. Radi Jarrar' THEN 'software_engineering'
+        WHEN 'Dr. Ahmed Abusnaina' THEN 'software_engineering'
+        WHEN 'Dr. Ali Jaber' THEN 'software_engineering'
+        WHEN 'Dr. Mohammed Helal' THEN 'software_engineering'
+        WHEN 'Dr. Tamer Alkhouli' THEN 'artificial_intelligence'
+        WHEN 'Dr. Mohammed Khalilia' THEN 'artificial_intelligence'
+        ELSE 'other'
+    END AS specialization,
+    8 AS years_experience,
+    'Dr.' AS title
+FROM users u
+LEFT JOIN faculty f ON f.user_id = u.user_id
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Adel Taweel',
+    'Dr. Mustafa Jarrar',
+    'Dr. Majdi Mafarja',
+    'Dr. Radi Jarrar',
+    'Dr. Mohammad Alkhanafseh',
+    'Dr. Ahmed Abusnaina',
+    'Dr. Ali Jaber',
+    'Dr. Mohammed Helal',
+    'Dr. Tamer Alkhouli',
+    'Dr. Mohammed Khalilia'
+)
+AND f.user_id IS NULL;
+
+-- ============================================================
+-- 6) Helpful verification
+-- ============================================================
+
+SELECT 'Migration completed successfully' AS status;
+
+SELECT full_name, role, university_id, email
+FROM users
+WHERE full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Adel Taweel',
+    'Dr. Mustafa Jarrar',
+    'Dr. Majdi Mafarja',
+    'Dr. Radi Jarrar',
+    'Dr. Mohammad Alkhanafseh',
+    'Dr. Ahmed Abusnaina',
+    'Dr. Ali Jaber',
+    'Dr. Mohammed Helal',
+    'Dr. Tamer Alkhouli',
+    'Dr. Mohammed Khalilia'
+)
+ORDER BY full_name;
+
+SET FOREIGN_KEY_CHECKS = 1;
