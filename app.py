@@ -57,6 +57,20 @@ def fetch_supervisors():
     return rows
 
 
+def _get_active_semester(cursor):
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number, course_code,
+               COALESCE(distribution_open, 0) AS distribution_open,
+               distribution_opened_at,
+               distribution_closed_at
+        FROM semesters
+        WHERE is_active = TRUE
+        ORDER BY semester_id DESC
+        LIMIT 1
+    """)
+    return cursor.fetchone()
+
+
 def _csv_response(filename, headers, rows):
     output = io.StringIO()
     writer = csv.writer(output)
@@ -560,6 +574,7 @@ def api_student_supervisors():
         return jsonify({"error": str(e)}), 500
 
 
+
 @app.route("/api/student/registration-check", methods=["GET"])
 @login_required(role="student")
 def api_student_registration_check():
@@ -569,20 +584,23 @@ def api_student_registration_check():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        # Get active semester
-        cursor.execute("SELECT semester_id FROM semesters WHERE is_active = TRUE ORDER BY semester_id DESC LIMIT 1")
-        semester = cursor.fetchone()
+        semester = _get_active_semester(cursor)
         if not semester:
-            cursor.close(); db.close()
-            return jsonify({"registered": False, "project": None})
+            cursor.close()
+            db.close()
+            return jsonify({"registered": False, "project": None, "distribution_open": False})
 
-        # Check if current student is in any project in this semester
         cursor.execute("""
-            SELECT p.project_id, p.title, p.status,
-                   pref1.full_name AS preferred_1,
-                   pref2.full_name AS preferred_2,
-                   pref3.full_name AS preferred_3,
-                   GROUP_CONCAT(u2.full_name ORDER BY pm2.is_primary_contact DESC SEPARATOR ', ') AS team_members
+            SELECT
+                p.project_id,
+                CONCAT('Group ', p.project_id) AS group_name,
+                p.title,
+                p.status,
+                p.submission_date,
+                pref1.full_name AS preferred_1,
+                pref2.full_name AS preferred_2,
+                pref3.full_name AS preferred_3,
+                GROUP_CONCAT(u2.full_name ORDER BY pm2.is_primary_contact DESC SEPARATOR ', ') AS team_members
             FROM project_members pm
             JOIN students st ON st.student_id = pm.student_id
             JOIN projects p  ON p.project_id  = pm.project_id
@@ -596,16 +614,48 @@ def api_student_registration_check():
             LEFT JOIN students st2        ON st2.student_id  = pm2.student_id
             LEFT JOIN users u2            ON u2.user_id      = st2.user_id
             WHERE st.user_id = %s AND p.semester_id = %s
-            GROUP BY p.project_id, p.title, p.status, preferred_1, preferred_2, preferred_3
+            GROUP BY p.project_id, p.title, p.status, p.submission_date, preferred_1, preferred_2, preferred_3
             ORDER BY p.project_id DESC
             LIMIT 1
         """, (user_id, semester["semester_id"]))
         project = cursor.fetchone()
-        cursor.close(); db.close()
+        cursor.close()
+        db.close()
 
         if project:
-            return jsonify({"registered": True, "project": project})
-        return jsonify({"registered": False, "project": None})
+            return jsonify({
+                "registered": True,
+                "project": project,
+                "distribution_open": bool(semester.get("distribution_open"))
+            })
+
+        return jsonify({
+            "registered": False,
+            "project": None,
+            "distribution_open": bool(semester.get("distribution_open"))
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/student/distribution-window-status", methods=["GET"])
+@login_required(role="student")
+def api_student_distribution_window_status():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester(cursor)
+        cursor.close()
+        db.close()
+
+        if not semester:
+            return jsonify({"error": "No active semester found."}), 400
+
+        return jsonify({
+            "is_open": bool(semester.get("distribution_open")),
+            "opened_at": str(semester.get("distribution_opened_at") or ""),
+            "closed_at": str(semester.get("distribution_closed_at") or "")
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -615,12 +665,12 @@ def api_student_registration_check():
 def api_student_distribution_submit():
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
-    group_name = (data.get("group_name") or "").strip()
     abstract = (data.get("abstract") or "").strip()
     keywords = (data.get("keywords") or "").strip()
     preferred = data.get("preferred_supervisors") or []
     member_ids = [str(x).strip() for x in (data.get("member_ids") or []) if str(x).strip()]
     user_uid = session.get("university_id")
+
     if user_uid and user_uid not in member_ids:
         member_ids.insert(0, user_uid)
 
@@ -632,17 +682,22 @@ def api_student_distribution_submit():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT semester_id FROM semesters WHERE is_active = TRUE ORDER BY semester_id DESC LIMIT 1")
-        semester = cursor.fetchone()
+        semester = _get_active_semester(cursor)
+
         if not semester:
             cursor.close()
             db.close()
             return jsonify({"error": "No active semester is configured."}), 400
 
-        # ── Duplicate check: any member already registered this semester? ──
+        if int(semester.get("distribution_open") or 0) != 1:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Student distribution is currently closed."}), 403
+
         all_uids_to_check = list(member_ids)
         if user_uid and user_uid not in all_uids_to_check:
             all_uids_to_check.insert(0, user_uid)
+
         for uid in all_uids_to_check:
             cursor.execute("""
                 SELECT p.project_id, p.title
@@ -655,7 +710,8 @@ def api_student_distribution_submit():
             """, (uid, semester["semester_id"]))
             dup = cursor.fetchone()
             if dup:
-                cursor.close(); db.close()
+                cursor.close()
+                db.close()
                 return jsonify({
                     "already_registered": True,
                     "error": f"Student {uid} is already registered in this semester (Project: \"{dup['title']}\")."
@@ -668,13 +724,12 @@ def api_student_distribution_submit():
         cursor.execute(
             """
             INSERT INTO projects
-            (title, group_name, abstract, keywords, project_type, semester_id, status, submission_date,
+            (title, abstract, keywords, project_type, semester_id, status, submission_date,
              preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
-            VALUES (%s, %s, %s, %s, 'software_engineering', %s, 'submitted', CURDATE(), %s, %s, %s)
+            VALUES (%s, %s, %s, 'software_engineering', %s, 'submitted', CURDATE(), %s, %s, %s)
             """,
             (
                 title,
-                group_name or None,
                 abstract or None,
                 keywords or None,
                 semester["semester_id"],
@@ -710,6 +765,7 @@ def api_student_distribution_submit():
         return jsonify({"error": str(e)}), 500
 
 
+
 @app.route("/api/coordinator/distribution-data", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_distribution_data():
@@ -719,10 +775,16 @@ def api_coordinator_distribution_data():
 
         cursor.execute(
             """
-            SELECT p.project_id, p.title, p.group_name, p.status,
+            SELECT
+                   p.project_id,
+                   CONCAT('Group ', p.project_id) AS group_name,
+                   p.title,
+                   p.status,
+                   p.supervisor_id,
                    pref1.full_name AS preferred_1,
                    pref2.full_name AS preferred_2,
                    pref3.full_name AS preferred_3,
+                   u_sup.full_name AS final_supervisor,
                    GROUP_CONCAT(u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', ') AS team_members
             FROM projects p
             LEFT JOIN faculty f1 ON f1.faculty_id = p.preferred_supervisor_1
@@ -731,10 +793,20 @@ def api_coordinator_distribution_data():
             LEFT JOIN users pref2 ON pref2.user_id = f2.user_id
             LEFT JOIN faculty f3 ON f3.faculty_id = p.preferred_supervisor_3
             LEFT JOIN users pref3 ON pref3.user_id = f3.user_id
+            LEFT JOIN faculty fsup ON fsup.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = fsup.user_id
             LEFT JOIN project_members pm ON pm.project_id = p.project_id
             LEFT JOIN students st ON st.student_id = pm.student_id
             LEFT JOIN users u ON u.user_id = st.user_id
-            GROUP BY p.project_id, p.title, p.group_name, p.status, preferred_1, preferred_2, preferred_3
+            GROUP BY
+                p.project_id,
+                p.title,
+                p.status,
+                p.supervisor_id,
+                pref1.full_name,
+                pref2.full_name,
+                pref3.full_name,
+                u_sup.full_name
             ORDER BY p.project_id DESC
             """
         )
@@ -746,7 +818,9 @@ def api_coordinator_distribution_data():
             FROM students st
             JOIN users u ON u.user_id = st.user_id
             LEFT JOIN project_members pm ON pm.student_id = st.student_id
+            LEFT JOIN section_students ss ON ss.student_id = st.student_id
             WHERE pm.member_id IS NULL
+              AND ss.id IS NULL
             ORDER BY u.full_name
             """
         )
@@ -775,11 +849,7 @@ def api_coordinator_distribution_data():
         cursor.close()
         db.close()
 
-        assigned_forms = sum(
-            1
-            for item in forms
-            if item.get("status") in {"accepted", "under_review", "submitted", "committee_evaluation"}
-        )
+        assigned_forms = sum(1 for item in forms if item.get("final_supervisor"))
         stats = {
             "total_registered_students": len(unassigned) + sum(
                 len((f.get("team_members") or "").split(", "))
@@ -790,17 +860,42 @@ def api_coordinator_distribution_data():
             "waiting": len(unassigned),
             "active_groups": len(forms),
         }
-        return jsonify(
-            {
-                "forms": forms,
-                "unassigned_students": unassigned,
-                "sections": sections,
-                "stats": stats,
-                "professors": fetch_supervisors(),
-            }
-        )
+
+        return jsonify({
+            "forms": forms,
+            "unassigned_students": unassigned,
+            "sections": sections,
+            "stats": stats,
+            "professors": fetch_supervisors(),
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/coordinator/assign-group-supervisor", methods=["POST"])
+@login_required(role="coordinator")
+def api_assign_group_supervisor():
+    data = request.get_json(silent=True) or {}
+    project_id = data.get("project_id")
+    supervisor_id = data.get("supervisor_id")
+
+    if not project_id or not supervisor_id:
+        return jsonify({"error": "project_id and supervisor_id are required."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "UPDATE projects SET supervisor_id = %s WHERE project_id = %s",
+            (supervisor_id, project_id),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Supervisor assigned successfully."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/api/coordinator/assign-student", methods=["POST"])
@@ -809,31 +904,36 @@ def api_assign_student():
     data = request.get_json(silent=True) or {}
     student_id = data.get("student_id")
     faculty_id = data.get("faculty_id")
+
     if not student_id or not faculty_id:
         return jsonify({"error": "student_id and faculty_id are required."}), 400
+
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT semester_id FROM semesters WHERE is_active = TRUE ORDER BY semester_id DESC LIMIT 1")
-        semester = cursor.fetchone()
+        semester = _get_active_semester(cursor)
         cursor.execute(
             "SELECT u.full_name FROM students st JOIN users u ON u.user_id = st.user_id WHERE st.student_id = %s",
             (student_id,),
         )
         student = cursor.fetchone()
+
         if not semester or not student:
             cursor.close()
             db.close()
             return jsonify({"error": "Student or active semester not found."}), 404
+
         cursor.execute(
-            "INSERT INTO projects (title, group_name, project_type, semester_id, supervisor_id, status, submission_date) VALUES (%s, %s, 'software_engineering', %s, %s, 'under_review', CURDATE())",
-            (f"Individual Project - {student['full_name']}", student["full_name"], semester["semester_id"], faculty_id),
+            "INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date) VALUES (%s, 'software_engineering', %s, %s, 'under_review', CURDATE())",
+            (f"Individual Project - {student['full_name']}", semester["semester_id"], faculty_id),
         )
         project_id = cursor.lastrowid
+
         cursor.execute(
             "INSERT INTO project_members (project_id, student_id, is_primary_contact) VALUES (%s, %s, TRUE)",
             (project_id, student_id),
         )
+
         db.commit()
         cursor.close()
         db.close()
@@ -904,6 +1004,7 @@ def api_add_section():
         return jsonify({"error": str(e)}), 500
 
 
+
 @app.route("/api/coordinator/export-groups", methods=["GET"])
 @login_required(role="coordinator")
 def api_export_groups():
@@ -911,11 +1012,14 @@ def api_export_groups():
     cursor = db.cursor(dictionary=True)
     cursor.execute(
         """
-        SELECT p.group_name, p.title,
+        SELECT
+               CONCAT('Group ', p.project_id) AS group_name,
+               p.title,
                GROUP_CONCAT(u.full_name ORDER BY u.full_name SEPARATOR ', ') AS team_members,
                COALESCE(pref1.full_name, '') AS preferred_1,
                COALESCE(pref2.full_name, '') AS preferred_2,
                COALESCE(pref3.full_name, '') AS preferred_3,
+               COALESCE(u_sup.full_name, '') AS final_supervisor,
                p.status
         FROM projects p
         LEFT JOIN project_members pm ON pm.project_id = p.project_id
@@ -927,7 +1031,9 @@ def api_export_groups():
         LEFT JOIN users pref2 ON pref2.user_id = f2.user_id
         LEFT JOIN faculty f3 ON f3.faculty_id = p.preferred_supervisor_3
         LEFT JOIN users pref3 ON pref3.user_id = f3.user_id
-        GROUP BY p.project_id, p.group_name, p.title, preferred_1, preferred_2, preferred_3, p.status
+        LEFT JOIN faculty fsup ON fsup.faculty_id = p.supervisor_id
+        LEFT JOIN users u_sup ON u_sup.user_id = fsup.user_id
+        GROUP BY p.project_id, p.title, pref1.full_name, pref2.full_name, pref3.full_name, u_sup.full_name, p.status
         ORDER BY p.project_id DESC
         """
     )
@@ -936,7 +1042,7 @@ def api_export_groups():
     db.close()
     return _csv_response(
         "student_groups.csv",
-        ["Group", "Idea Title", "Team Members", "Preferred 1", "Preferred 2", "Preferred 3", "Status"],
+        ["Group", "Idea Title", "Team Members", "Preferred 1", "Preferred 2", "Preferred 3", "Final Supervisor", "Status"],
         [
             [
                 r["group_name"],
@@ -945,6 +1051,7 @@ def api_export_groups():
                 r["preferred_1"],
                 r["preferred_2"],
                 r["preferred_3"],
+                r["final_supervisor"],
                 r["status"],
             ]
             for r in rows
@@ -979,6 +1086,79 @@ def api_export_sections():
         ["Section", "Supervisor", "Students", "Created At"],
         [[r["section_name"], r["supervisor_name"], r["assigned_students"] or "", r["created_at"]] for r in rows],
     )
+
+
+@app.route("/api/coordinator/distribution-window", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_distribution_window():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester(cursor)
+        cursor.close()
+        db.close()
+
+        if not semester:
+            return jsonify({"error": "No active semester found."}), 400
+
+        return jsonify({
+            "semester_id": semester["semester_id"],
+            "academic_year": semester["academic_year"],
+            "semester_number": semester["semester_number"],
+            "is_open": bool(semester.get("distribution_open")),
+            "opened_at": str(semester.get("distribution_opened_at") or ""),
+            "closed_at": str(semester.get("distribution_closed_at") or "")
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/coordinator/distribution-window", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_distribution_window_update():
+    data = request.get_json(silent=True) or {}
+    is_open = 1 if bool(data.get("is_open")) else 0
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester(cursor)
+
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No active semester found."}), 400
+
+        if is_open:
+            cursor.execute(
+                """
+                UPDATE semesters
+                SET distribution_open = 1,
+                    distribution_opened_at = NOW(),
+                    distribution_closed_at = NULL
+                WHERE semester_id = %s
+                """,
+                (semester["semester_id"],),
+            )
+            message = "Registration window opened successfully."
+        else:
+            cursor.execute(
+                """
+                UPDATE semesters
+                SET distribution_open = 0,
+                    distribution_closed_at = NOW()
+                WHERE semester_id = %s
+                """,
+                (semester["semester_id"],),
+            )
+            message = "Registration window closed successfully."
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": message})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ─── Supervisor routes ────────────────────────────────────────────────────
@@ -1157,6 +1337,7 @@ def coordinator_page(page):
     return render_template(template)
 
 
+
 @app.route("/api/coordinator/faculty-hours-data", methods=["GET"])
 @login_required(role="coordinator")
 def api_faculty_hours_data():
@@ -1165,38 +1346,45 @@ def api_faculty_hours_data():
         cursor = db.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT semester_id, academic_year, semester_number, course_code
+            SELECT academic_year
             FROM semesters
             WHERE is_active = TRUE
             ORDER BY semester_id DESC
             LIMIT 1
         """)
-        semester = cursor.fetchone()
+        active_semester = cursor.fetchone()
 
-        if not semester:
+        if not active_semester:
             cursor.close()
             db.close()
             return jsonify({"error": "No active semester found."}), 400
+
+        academic_year = active_semester["academic_year"]
 
         cursor.execute("""
             SELECT
                 f.faculty_id,
                 u.full_name,
                 COALESCE(fls.base_hours, 12) AS base_hours,
-                COALESCE(fls.max_hours, 18) AS max_hours,
+                COALESCE(fls.max_hours, 36) AS max_hours,
                 COALESCE(fls.employment_type, 'full_time') AS employment_type,
-                COALESCE(fls.intro_sections, 0) AS intro_sections,
-                COALESCE(fls.extra_bonus, 1) AS extra_bonus,
+                COALESCE(fls.extra_bonus, 0) AS extra_bonus,
                 COALESCE(fls.assigned_courses, '') AS assigned_courses,
-                COUNT(DISTINCT p.project_id) AS supervised_projects
+                COUNT(DISTINCT pm.student_id) AS supervised_students
             FROM faculty f
             JOIN users u ON u.user_id = f.user_id
+            LEFT JOIN semesters s
+                ON s.academic_year = %s
             LEFT JOIN faculty_load_settings fls
                 ON fls.faculty_id = f.faculty_id
-               AND fls.semester_id = %s
+               AND fls.semester_id = s.semester_id
             LEFT JOIN projects p
                 ON p.supervisor_id = f.faculty_id
-               AND p.semester_id = %s
+            LEFT JOIN semesters ps
+                ON ps.semester_id = p.semester_id
+               AND ps.academic_year = %s
+            LEFT JOIN project_members pm
+                ON pm.project_id = p.project_id
             WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
             GROUP BY
                 f.faculty_id,
@@ -1204,56 +1392,55 @@ def api_faculty_hours_data():
                 fls.base_hours,
                 fls.max_hours,
                 fls.employment_type,
-                fls.intro_sections,
                 fls.extra_bonus,
                 fls.assigned_courses
             ORDER BY u.full_name
-        """, (semester["semester_id"], semester["semester_id"]))
+        """, (academic_year, academic_year))
 
         faculty_rows = cursor.fetchall()
 
         result = []
         for row in faculty_rows:
-            intro_sections = int(row["intro_sections"] or 0)
-            supervised_projects = int(row["supervised_projects"] or 0)
-            extra_bonus = int(row["extra_bonus"] or 0)
-            base_hours = float(row["base_hours"] or 0)
-            max_hours = float(row["max_hours"] or 18)
+            base_hours = float(row["base_hours"] or 12)
+            max_hours = 36.0
+            min_hours = 12.0
+            extra_bonus = float(row["extra_bonus"] or 0)
+            supervised_students = int(row["supervised_students"] or 0)
 
-            extra_load = intro_sections + supervised_projects + extra_bonus
-            total_hours = base_hours + extra_load
+            student_load_hours = supervised_students * 0.5
+            total_hours = base_hours + student_load_hours + extra_bonus
             remaining_hours = max_hours - total_hours
 
             if total_hours > max_hours:
                 status = "Over Limit"
-            elif total_hours == max_hours:
-                status = "At Max"
-            elif total_hours >= max_hours - 1.5:
+            elif total_hours >= max_hours - 1:
                 status = "Near Limit"
+            elif total_hours < min_hours:
+                status = "Below Minimum"
             else:
                 status = "Within Limit"
 
             result.append({
-                "faculty_id": row["faculty_id"],
-                "full_name": row["full_name"],
-                "base_hours": base_hours,
-                "max_hours": max_hours,
-                "employment_type": row["employment_type"],
-                "intro_sections": intro_sections,
-                "supervised_projects": supervised_projects,
-                "extra_bonus": extra_bonus,
-                "extra_load": extra_load,
-                "total_hours": total_hours,
-                "remaining_hours": remaining_hours,
-                "assigned_courses": row["assigned_courses"],
-                "status": status
-            })
+    "faculty_id": row["faculty_id"],
+    "full_name": row["full_name"],
+    "base_hours": base_hours,
+    "min_hours": 12.0,
+    "max_hours": 36.0,
+    "employment_type": row["employment_type"],
+    "extra_bonus": extra_bonus,
+    "supervised_students": supervised_students,
+    "student_load_hours": student_load_hours,
+    "total_hours": total_hours,
+    "remaining_hours": remaining_hours,
+    "assigned_courses": row["assigned_courses"],
+    "status": status
+})
 
         cursor.close()
         db.close()
 
         return jsonify({
-            "semester": semester,
+            "academic_year": academic_year,
             "faculty": result
         })
 
@@ -1269,10 +1456,8 @@ def api_faculty_hours_save():
 
         faculty_id = data.get("faculty_id")
         base_hours = float(data.get("base_hours", 12))
-        max_hours = float(data.get("max_hours", 18))
         employment_type = data.get("employment_type", "full_time")
-        intro_sections = int(data.get("intro_sections", 0))
-        extra_bonus = int(data.get("extra_bonus", 1))
+        extra_bonus = float(data.get("extra_bonus", 0))
         assigned_courses = data.get("assigned_courses", "")
 
         if not faculty_id:
@@ -1297,13 +1482,12 @@ def api_faculty_hours_save():
 
         cursor.execute("""
             INSERT INTO faculty_load_settings
-                (faculty_id, semester_id, base_hours, max_hours, employment_type, intro_sections, extra_bonus, assigned_courses, updated_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (faculty_id, semester_id, base_hours, max_hours, employment_type, extra_bonus, assigned_courses, updated_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 base_hours = VALUES(base_hours),
                 max_hours = VALUES(max_hours),
                 employment_type = VALUES(employment_type),
-                intro_sections = VALUES(intro_sections),
                 extra_bonus = VALUES(extra_bonus),
                 assigned_courses = VALUES(assigned_courses),
                 updated_by = VALUES(updated_by)
@@ -1311,9 +1495,8 @@ def api_faculty_hours_save():
             faculty_id,
             semester["semester_id"],
             base_hours,
-            max_hours,
+            36,
             employment_type,
-            intro_sections,
             extra_bonus,
             assigned_courses,
             session.get("user_id")
@@ -1323,7 +1506,7 @@ def api_faculty_hours_save():
         cursor.close()
         db.close()
 
-        return jsonify({"message": "Faculty load saved successfully."})
+        return jsonify({"message": "Faculty yearly load saved successfully."})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
