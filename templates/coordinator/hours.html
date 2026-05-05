@@ -36,7 +36,7 @@
         </div>
 
         <div class="u-7dcbcef8">
-          ◈ Set the professor base hours, employment type, yearly bonus, and assigned courses. Max hours are fixed at 36 for the academic year.
+          ◈ Set the professor base hours, employment type, yearly bonus, assigned courses, and yearly values from here.
         </div>
 
         <div class="field-wrap">
@@ -48,13 +48,13 @@
 
         <div class="form-grid">
           <div class="field-wrap">
-            <div class="field-label">Base Hours (minimum 12)</div>
-            <input class="field-input" id="baseHours" type="number" min="12" max="36" step="0.5" value="12" />
+            <div class="field-label">Base Hours</div>
+            <input class="field-input" id="baseHours" type="number" min="0" max="100" step="0.5" value="12" oninput="updateYearLoadPreview()" />
           </div>
 
           <div class="field-wrap">
-            <div class="field-label">Max Hours (fixed)</div>
-            <input class="field-input" id="maxHours" type="number" value="36" disabled />
+            <div class="field-label">Max Hours</div>
+            <input class="field-input" id="maxHours" type="number" min="0" max="100" step="0.5" value="36" oninput="updateYearLoadPreview()" />
           </div>
         </div>
 
@@ -76,30 +76,39 @@
         <div class="form-grid">
           <div class="field-wrap">
             <div class="field-label">Supervised Groups</div>
-            <input class="field-input" id="supervisedGroups" type="number" min="0" value="0" disabled />
+            <input class="field-input" id="supervisedGroups" type="number" min="0" value="0" oninput="updateYearLoadPreview()" />
           </div>
 
           <div class="field-wrap">
             <div class="field-label">Supervised Students</div>
-            <input class="field-input" id="supervisedStudents" type="number" min="0" value="0" disabled />
+            <input class="field-input" id="supervisedStudents" type="number" min="0" value="0" oninput="syncStudentLoadFromStudents()" />
           </div>
         </div>
 
         <div class="form-grid">
           <div class="field-wrap">
             <div class="field-label">Student Load Hours (0.5 each)</div>
-            <input class="field-input" id="studentLoadHours" type="number" min="0" step="0.5" value="0" disabled />
+            <input class="field-input" id="studentLoadHours" type="number" min="0" step="0.5" value="0" oninput="updateYearLoadPreview()" />
           </div>
 
           <div class="field-wrap">
             <div class="field-label">Estimated Total Yearly Load</div>
-            <input class="field-input" id="totalYearHoursPreview" type="number" min="0" step="0.5" value="12" disabled />
+            <input class="field-input" id="totalYearHoursPreview" type="number" min="0" step="0.5" value="12" oninput="updateYearLoadPreviewFromTotal()" />
           </div>
         </div>
 
         <div class="field-wrap">
           <div class="field-label">Assigned Courses</div>
-          <textarea class="field-input" id="assignedCourses" rows="4" placeholder="Example: COMP4200 - Project Introduction, COMP4201 - Graduation Projects"></textarea>
+          <div id="assignedCoursesBox" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#f8fafc;border:1px solid #dce3ea;border-radius:12px;padding:14px;">
+            <label><input type="checkbox" class="courseCheck" value="COMP4200 - Project Introduction"> COMP4200 - Project Introduction</label>
+            <label><input type="checkbox" class="courseCheck" value="COMP4201 - Graduation Projects"> COMP4300 - Graduation Projects</label>
+            <label><input type="checkbox" class="courseCheck" value="COMP331 - Web Development"> COMP331 - Web Development</label>
+            <label><input type="checkbox" class="courseCheck" value="COMP433 - Software Engineering"> COMP433 - Software Engineering</label>
+            <label><input type="checkbox" class="courseCheck" value="COMP438 - Artificial Intelligence"> COMP438 - Artificial Intelligence</label>
+            <label><input type="checkbox" class="courseCheck" value="COMP336 - Database Systems"> COMP336 - Database Systems</label>
+            <label><input type="checkbox" class="courseCheck" value="COMP434 - Requirements Engineering"> COMP434 - Requirements Engineering</label>
+            <label><input type="checkbox" class="courseCheck" value="COMP439 - Information Security"> COMP439 - Information Security</label>
+          </div>
         </div>
 
         <div class="btn-row">
@@ -125,7 +134,7 @@
                 <th>Student Load</th>
                 <th>Groups</th>
                 <th>Bonus</th>
-                <th>Total / 36</th>
+                <th>Total / Max</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -142,31 +151,40 @@
 <script>
 let facultyData = [];
 
-function num(value, fallback = 0) {
-  const n = Number(value);
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function num(v, fallback = 0) {
+  const n = parseFloat(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
 function normalizeRow(row) {
   const baseHours = num(row.base_hours, 12);
+  const maxHours = num(row.max_hours, 36);
   const extraBonus = num(row.extra_bonus, 0);
-  const supervisedStudents = num(row.supervised_students, 0);
-  const supervisedGroups = num(row.supervised_groups ?? row.supervised_projects, 0);
+  const supervisedGroups = parseInt(row.supervised_groups ?? 0, 10) || 0;
+  const supervisedStudents = parseInt(row.supervised_students ?? 0, 10) || 0;
   const studentLoadHours = num(row.student_load_hours, supervisedStudents * 0.5);
   const totalYearHours = num(row.total_year_hours ?? row.total_hours, baseHours + studentLoadHours + extraBonus);
-  const remainingHours = num(row.remaining_hours, 36 - totalYearHours);
 
   return {
     ...row,
     base_hours: baseHours,
+    max_hours: maxHours,
     extra_bonus: extraBonus,
-    supervised_students: supervisedStudents,
     supervised_groups: supervisedGroups,
+    supervised_students: supervisedStudents,
     student_load_hours: studentLoadHours,
     total_year_hours: totalYearHours,
-    remaining_hours: remainingHours,
-    employment_type: row.employment_type || 'full_time',
     assigned_courses: row.assigned_courses || '',
+    employment_type: row.employment_type || 'full_time',
     status: row.status || 'Within Limit'
   };
 }
@@ -204,24 +222,24 @@ function renderFacultyBars(rows) {
     return;
   }
 
-  box.innerHTML = rows.map(originalRow => {
-    const row = normalizeRow(originalRow);
-    const percent = Math.min((row.total_year_hours / 36) * 100, 100);
+  box.innerHTML = rows.map(raw => {
+    const row = normalizeRow(raw);
+    const percent = Math.min((row.total_year_hours / Math.max(row.max_hours, 1)) * 100, 100);
     let fillClass = 'h-ok';
-    if (row.total_year_hours > 36) fillClass = 'h-over';
-    else if (row.total_year_hours >= 32) fillClass = 'h-warn';
+    if (row.total_year_hours > row.max_hours) fillClass = 'h-over';
+    else if (row.total_year_hours >= row.max_hours - 4) fillClass = 'h-warn';
 
     return `
       <div class="hours-bar-wrap">
         <div class="hours-bar-top">
           <span class="u-44265a69">${escapeHtml(row.full_name)}</span>
-          <span class="u-cfb6c12e">${row.total_year_hours.toFixed(1)} / 36 hrs</span>
+          <span class="u-cfb6c12e">${row.total_year_hours.toFixed(1)} / ${row.max_hours.toFixed(1)} hrs</span>
         </div>
         <div class="hours-bar-bg">
           <div class="hours-bar-fill ${fillClass}" style="width:${percent}%"></div>
         </div>
         <div class="u-de9298af">
-          ${row.supervised_students} students × 0.5 = ${row.student_load_hours.toFixed(1)} hrs — ${row.remaining_hours.toFixed(1)} hours remaining
+          ${row.supervised_students} students × 0.5 = ${row.student_load_hours.toFixed(1)} hrs
         </div>
       </div>
     `;
@@ -236,18 +254,18 @@ function renderSummaryTable(rows) {
     return;
   }
 
-  body.innerHTML = rows.map(originalRow => {
-    const row = normalizeRow(originalRow);
+  body.innerHTML = rows.map(raw => {
+    const row = normalizeRow(raw);
     return `
       <tr>
         <td>${escapeHtml(row.full_name)}</td>
         <td>${row.employment_type === 'full_time' ? 'Full-time' : 'Part-time'}</td>
-        <td>${row.base_hours}</td>
+        <td>${row.base_hours.toFixed(1)}</td>
         <td>${row.supervised_students}</td>
         <td>${row.student_load_hours.toFixed(1)}</td>
         <td>${row.supervised_groups}</td>
-        <td>${row.extra_bonus}</td>
-        <td>${row.total_year_hours.toFixed(1)} / 36</td>
+        <td>${row.extra_bonus.toFixed(1)}</td>
+        <td>${row.total_year_hours.toFixed(1)} / ${row.max_hours.toFixed(1)}</td>
         <td>${escapeHtml(row.status)}</td>
       </tr>
     `;
@@ -258,13 +276,30 @@ function renderProfessorSelect(rows) {
   const select = document.getElementById('professorSelect');
   select.innerHTML = '<option value="">Select professor...</option>';
 
-  rows.forEach(originalRow => {
-    const row = normalizeRow(originalRow);
+  rows.forEach(raw => {
+    const row = normalizeRow(raw);
     const opt = document.createElement('option');
     opt.value = row.faculty_id;
     opt.textContent = row.full_name;
     select.appendChild(opt);
   });
+}
+
+function setCourseChecks(coursesText) {
+  const selected = (coursesText || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  document.querySelectorAll('.courseCheck').forEach(chk => {
+    chk.checked = selected.includes(chk.value);
+  });
+}
+
+function getCheckedCourses() {
+  return Array.from(document.querySelectorAll('.courseCheck:checked'))
+    .map(chk => chk.value)
+    .join(', ');
 }
 
 function fillProfessorData() {
@@ -274,14 +309,19 @@ function fillProfessorData() {
   if (!row.faculty_id) return;
 
   document.getElementById('baseHours').value = row.base_hours;
-  document.getElementById('maxHours').value = 36;
+  document.getElementById('maxHours').value = row.max_hours;
   document.getElementById('employmentType').value = row.employment_type;
   document.getElementById('supervisedGroups').value = row.supervised_groups;
   document.getElementById('supervisedStudents').value = row.supervised_students;
   document.getElementById('studentLoadHours').value = row.student_load_hours.toFixed(1);
   document.getElementById('extraBonus').value = row.extra_bonus;
-  document.getElementById('assignedCourses').value = row.assigned_courses || '';
+  document.getElementById('totalYearHoursPreview').value = row.total_year_hours.toFixed(1);
+  setCourseChecks(row.assigned_courses);
+}
 
+function syncStudentLoadFromStudents() {
+  const students = parseInt(document.getElementById('supervisedStudents').value || '0', 10) || 0;
+  document.getElementById('studentLoadHours').value = (students * 0.5).toFixed(1);
   updateYearLoadPreview();
 }
 
@@ -290,6 +330,11 @@ function updateYearLoadPreview() {
   const studentLoad = num(document.getElementById('studentLoadHours').value, 0);
   const bonus = num(document.getElementById('extraBonus').value, 0);
   document.getElementById('totalYearHoursPreview').value = (base + studentLoad + bonus).toFixed(1);
+}
+
+function updateYearLoadPreviewFromTotal() {
+  const total = num(document.getElementById('totalYearHoursPreview').value, 12);
+  document.getElementById('totalYearHoursPreview').value = total.toFixed(1);
 }
 
 async function saveFacultyLoad() {
@@ -308,9 +353,14 @@ async function saveFacultyLoad() {
       body: JSON.stringify({
         faculty_id: facultyId,
         base_hours: document.getElementById('baseHours').value,
+        max_hours: document.getElementById('maxHours').value,
         employment_type: document.getElementById('employmentType').value,
         extra_bonus: document.getElementById('extraBonus').value,
-        assigned_courses: document.getElementById('assignedCourses').value
+        supervised_groups: document.getElementById('supervisedGroups').value,
+        supervised_students: document.getElementById('supervisedStudents').value,
+        student_load_hours: document.getElementById('studentLoadHours').value,
+        total_year_hours: document.getElementById('totalYearHoursPreview').value,
+        assigned_courses: getCheckedCourses()
       })
     });
 
@@ -329,18 +379,16 @@ async function saveFacultyLoad() {
   }
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
   await loadFacultyHoursData();
   updateYearLoadPreview();
+
+  document.querySelectorAll('.courseCheck').forEach(chk => {
+    chk.addEventListener('change', () => {
+      const msg = document.getElementById('hoursMsg');
+      if (msg) msg.textContent = '';
+    });
+  });
 });
 </script>
 {% endblock %}
