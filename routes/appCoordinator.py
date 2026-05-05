@@ -52,7 +52,8 @@ def _get_active_semester(cursor):
     cursor.execute(
         """
         SELECT semester_id, academic_year, semester_number,
-               distribution_open, distribution_opened_at, distribution_closed_at
+               COALESCE(distribution_open, 0) AS distribution_open,
+               distribution_opened_at, distribution_closed_at
         FROM semesters
         WHERE is_active = TRUE
         ORDER BY semester_id DESC
@@ -157,7 +158,8 @@ def api_coordinator_distribution_window_update():
                 """
                 UPDATE semesters
                 SET distribution_open = 1,
-                    distribution_opened_at = NOW()
+                    distribution_opened_at = NOW(),
+                    distribution_closed_at = NULL
                 WHERE semester_id = %s
                 """,
                 (semester["semester_id"],),
@@ -209,7 +211,10 @@ def api_coordinator_distribution_data():
                    pref2.full_name AS preferred_2,
                    pref3.full_name AS preferred_3,
                    u_sup.full_name AS final_supervisor,
-                   GROUP_CONCAT(u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', ') AS team_members
+                   COALESCE(
+                       GROUP_CONCAT(DISTINCT u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
+                       ''
+                   ) AS team_members
             FROM projects p
             LEFT JOIN faculty f1 ON f1.faculty_id = p.preferred_supervisor_1
             LEFT JOIN users pref1 ON pref1.user_id = f1.user_id
@@ -268,7 +273,7 @@ def api_coordinator_distribution_data():
                    s.entered_by,
                    s.created_at,
                    u.full_name AS supervisor_name,
-                   GROUP_CONCAT(us.full_name ORDER BY us.full_name SEPARATOR ', ') AS assigned_students
+                   COALESCE(GROUP_CONCAT(us.full_name ORDER BY us.full_name SEPARATOR ', '), '') AS assigned_students
             FROM student_distribution_sections s
             JOIN faculty f ON f.faculty_id = s.supervisor_id
             JOIN users u ON u.user_id = f.user_id
@@ -344,6 +349,9 @@ def api_add_section():
     if not section_name or not supervisor_id:
         return jsonify({"error": "section_name and supervisor_id are required."}), 400
 
+    if len(student_ids) == 0:
+        return jsonify({"error": "Please choose at least 1 student."}), 400
+
     if len(student_ids) > 3:
         return jsonify({"error": "A section can contain at most 3 students."}), 400
 
@@ -357,36 +365,33 @@ def api_add_section():
             db.close()
             return jsonify({"error": "No active semester found."}), 400
 
-        if student_ids:
-            placeholders = ",".join(["%s"] * len(student_ids))
-            params = [semester["semester_id"], *student_ids]
+        placeholders = ",".join(["%s"] * len(student_ids))
+        query = f"""
+            SELECT st.student_id, u.full_name
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE st.student_id IN ({placeholders})
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM project_members pm
+                  JOIN projects p ON p.project_id = pm.project_id
+                  WHERE pm.student_id = st.student_id
+                    AND p.semester_id = %s
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM section_students ss
+                  WHERE ss.student_id = st.student_id
+              )
+        """
+        params = tuple(student_ids) + (semester["semester_id"],)
+        cursor.execute(query, params)
+        students = cursor.fetchall()
 
-            cursor.execute(
-                f"""
-                SELECT st.student_id
-                FROM students st
-                WHERE st.student_id IN ({placeholders})
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM project_members pm
-                      JOIN projects p ON p.project_id = pm.project_id
-                      WHERE pm.student_id = st.student_id
-                        AND p.semester_id = %s
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM section_students ss
-                      WHERE ss.student_id = st.student_id
-                  )
-                """,
-                tuple(student_ids) if len(student_ids) == 0 else tuple(student_ids),
-            )
-            valid_students = {row["student_id"] for row in cursor.fetchall()}
-
-            if len(valid_students) != len(student_ids):
-                cursor.close()
-                db.close()
-                return jsonify({"error": "One or more selected students are already assigned to a project or section."}), 400
+        if len(students) != len(student_ids):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "One or more selected students are already assigned."}), 400
 
         cursor.execute(
             """
@@ -399,17 +404,24 @@ def api_add_section():
 
         for sid in student_ids:
             cursor.execute(
-                "INSERT INTO section_students (section_id, student_id) VALUES (%s, %s)",
+                """
+                INSERT INTO section_students (section_id, student_id)
+                VALUES (%s, %s)
+                """,
                 (section_id, sid),
             )
 
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": "Section added successfully.", "section_id": section_id})
+
+        return jsonify({
+            "message": "Section created successfully.",
+            "section_id": section_id
+        })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @coordinator_bp.route("/api/coordinator/export-groups", methods=["GET"])
 @login_required(role="coordinator")
@@ -428,7 +440,7 @@ def api_export_groups():
         SELECT
                CONCAT('Group ', p.project_id) AS group_name,
                p.title,
-               GROUP_CONCAT(u.full_name ORDER BY u.full_name SEPARATOR ', ') AS team_members,
+               COALESCE(GROUP_CONCAT(DISTINCT u.full_name ORDER BY u.full_name SEPARATOR ', '), '') AS team_members,
                COALESCE(pref1.full_name, '') AS preferred_1,
                COALESCE(pref2.full_name, '') AS preferred_2,
                COALESCE(pref3.full_name, '') AS preferred_3,
@@ -483,7 +495,7 @@ def api_export_sections():
     cursor.execute(
         """
         SELECT s.section_name, u.full_name AS supervisor_name, s.created_at,
-               GROUP_CONCAT(us.full_name ORDER BY us.full_name SEPARATOR ', ') AS assigned_students
+               COALESCE(GROUP_CONCAT(us.full_name ORDER BY us.full_name SEPARATOR ', '), '') AS assigned_students
         FROM student_distribution_sections s
         JOIN faculty f ON f.faculty_id = s.supervisor_id
         JOIN users u ON u.user_id = f.user_id
@@ -501,7 +513,7 @@ def api_export_sections():
     return _csv_response(
         "sections.csv",
         ["Section", "Supervisor", "Students", "Created At"],
-        [[r["section_name"], r["supervisor_name"], r["assigned_students"] or "", r["created_at"]] for r in rows],
+        [[r["section_name"], r["supervisor_name"], r["assigned_students"], r["created_at"]] for r in rows],
     )
 
 
