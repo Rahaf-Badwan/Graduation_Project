@@ -1471,7 +1471,7 @@ SELECT
         WHEN 'Dr. Mohammed Helal' THEN 'software_engineering'
         WHEN 'Dr. Tamer Alkhouli' THEN 'artificial_intelligence'
         WHEN 'Dr. Mohammed Khalilia' THEN 'artificial_intelligence'
-        ELSE 'other'
+        ELSE 'software_engineering'
     END AS specialization,
     8 AS years_experience,
     'Dr.' AS title
@@ -1516,3 +1516,153 @@ WHERE full_name IN (
 ORDER BY full_name;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+--  ADDITIONAL BZU CS FACULTY / ACADEMIC STAFF MIGRATION
+--  Safe re-run: uses NOT EXISTS guards and updates existing rows.
+--  No faculty specialization is stored as 'other'.
+-- ============================================================
+
+USE apms_db;
+
+SET FOREIGN_KEY_CHECKS = 0;
+SET NAMES utf8mb4;
+
+-- Reuse an existing bcrypt hash as temporary password.
+-- Change passwords later from the application/admin panel.
+SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
+
+-- ============================================================
+-- 1) Add missing users
+--    university_id/emails are temporary placeholders.
+-- ============================================================
+INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+SELECT * FROM (
+    SELECT '2112' AS university_id, 'Dr. Ruba Awadallah' AS full_name, 'ruba.awadallah.temp@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'RA' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '2113', 'Dr. Samer Zein', 'samer.zein.temp@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
+    UNION ALL SELECT '2114', 'Dr. Abualseoud Hanani', 'abualseoud.hanani.temp@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
+    UNION ALL SELECT '2115', 'Dr. Ahmad Alsadeh', 'ahmad.alsadeh.temp@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '2116', 'Dr. Mamoun Nawahdah', 'mamoun.nawahdah.temp@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '2117', 'Dr. Ola Surakhi', 'ola.surakhi.temp@birzeit.edu', @pwd, 'supervisor', 'OS', TRUE
+    UNION ALL SELECT '2118', 'Murad Njoum', 'murad.njoum.temp@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '2119', 'Nael Qaraeen', 'nael.qaraeen.temp@birzeit.edu', @pwd, 'supervisor', 'NQ', TRUE
+) AS new_users
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM users u
+    WHERE u.full_name = new_users.full_name
+       OR u.university_id = new_users.university_id
+       OR u.email = new_users.email
+);
+
+-- ============================================================
+-- 2) Add faculty rows with CS specializations only
+--    Allowed enum values in your schema:
+--    software_engineering, artificial_intelligence, web_development,
+--    mobile, security_networks, databases, other
+--    We intentionally do NOT use 'other'.
+-- ============================================================
+INSERT INTO faculty (user_id, specialization, years_experience, title)
+SELECT
+    u.user_id,
+    CASE u.full_name
+        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'             -- General CS mapped to web/app systems
+        WHEN 'Dr. Samer Zein' THEN 'software_engineering'            -- General CS / department leadership
+        WHEN 'Dr. Abualseoud Hanani' THEN 'artificial_intelligence'  -- Speech and language technology
+        WHEN 'Dr. Ahmad Alsadeh' THEN 'security_networks'            -- Network Security and IPv6
+        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'                     -- Interactive and mobile computing
+        WHEN 'Dr. Ola Surakhi' THEN 'artificial_intelligence'        -- Biometrics and Genetic Algorithms
+        WHEN 'Murad Njoum' THEN 'databases'                          -- CS instructor mapped to databases
+        WHEN 'Nael Qaraeen' THEN 'software_engineering'              -- CS lecturer mapped to software engineering
+        ELSE 'software_engineering'
+    END AS specialization,
+    8 AS years_experience,
+    CASE u.full_name
+        WHEN 'Dr. Samer Zein' THEN 'Assoc. Prof.'
+        WHEN 'Dr. Abualseoud Hanani' THEN 'Assoc. Prof.'
+        WHEN 'Murad Njoum' THEN 'Instructor'
+        WHEN 'Nael Qaraeen' THEN 'Lecturer'
+        ELSE 'Dr.'
+    END AS title
+FROM users u
+LEFT JOIN faculty f ON f.user_id = u.user_id
+WHERE u.full_name IN (
+    'Dr. Ruba Awadallah',
+    'Dr. Samer Zein',
+    'Dr. Abualseoud Hanani',
+    'Dr. Ahmad Alsadeh',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Ola Surakhi',
+    'Murad Njoum',
+    'Nael Qaraeen'
+)
+AND f.user_id IS NULL;
+
+-- ============================================================
+-- 3) If an older migration already inserted them as 'other', fix it.
+--    This also removes 'other' from previously added CS doctors.
+-- ============================================================
+UPDATE faculty f
+JOIN users u ON u.user_id = f.user_id
+SET
+    f.specialization = CASE u.full_name
+        WHEN 'Dr. Iyad Jaber' THEN 'software_engineering'
+        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'
+        WHEN 'Dr. Samer Zein' THEN 'software_engineering'
+        WHEN 'Dr. Abualseoud Hanani' THEN 'artificial_intelligence'
+        WHEN 'Dr. Ahmad Alsadeh' THEN 'security_networks'
+        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'
+        WHEN 'Dr. Ola Surakhi' THEN 'artificial_intelligence'
+        WHEN 'Murad Njoum' THEN 'databases'
+        WHEN 'Nael Qaraeen' THEN 'software_engineering'
+        ELSE f.specialization
+    END,
+    f.title = CASE u.full_name
+        WHEN 'Dr. Samer Zein' THEN 'Assoc. Prof.'
+        WHEN 'Dr. Abualseoud Hanani' THEN 'Assoc. Prof.'
+        WHEN 'Murad Njoum' THEN 'Instructor'
+        WHEN 'Nael Qaraeen' THEN 'Lecturer'
+        ELSE f.title
+    END
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Ruba Awadallah',
+    'Dr. Samer Zein',
+    'Dr. Abualseoud Hanani',
+    'Dr. Ahmad Alsadeh',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Ola Surakhi',
+    'Murad Njoum',
+    'Nael Qaraeen'
+);
+
+-- ============================================================
+-- 4) Verification
+-- ============================================================
+SELECT
+    u.full_name,
+    u.university_id,
+    u.email,
+    u.role,
+    f.title,
+    f.specialization
+FROM users u
+JOIN faculty f ON f.user_id = u.user_id
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Ruba Awadallah',
+    'Dr. Samer Zein',
+    'Dr. Abualseoud Hanani',
+    'Dr. Ahmad Alsadeh',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Ola Surakhi',
+    'Murad Njoum',
+    'Nael Qaraeen'
+)
+ORDER BY u.full_name;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+--  END OF ADDITIONAL FACULTY MIGRATION
+-- ============================================================
