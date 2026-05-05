@@ -4,12 +4,12 @@ from flask import Blueprint, jsonify, request
 from db import get_db
 
 assign_rols_bp = Blueprint("assign_rols_bp", __name__)
-conn = get_db()
-cursor = conn.cursor(dictionary=True)
+
 #get the course info
 @assign_rols_bp.route("/api/course/<course_code>")
 def get_course(course_code):
-    
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
     #get semesters
     cursor.execute("""
                   SELECT semester_id, academic_year, semester_number
@@ -58,9 +58,11 @@ def get_course(course_code):
 #assign & update coordinator
 @assign_rols_bp.route("/api/assign-coordinator", methods=["POST"])
 def assign_coordinator():
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
     faculty_id = request.form["faculty_id"]
     semester_id = request.form["semester_id"]
-    assigned_by = request.form.get["assigned_by", 1]
+    assigned_by = request.form.get("assigned_by", 1)
 
     #check if already exists
     cursor.execute("""
@@ -89,6 +91,6 @@ def assign_coordinator():
                    (faculty_id, semester_id, assigned_by)
                    VALUES (%s, %s, %s)
                    """, (faculty_id, semester_id, assigned_by))
-        
-    conn.commit()
+    cursor.close()
+    conn.close()
     return jsonify({"success": True})
