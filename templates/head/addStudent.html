@@ -1,0 +1,62 @@
+{% extends 'head/base.html' %}
+
+{% block page_title %}Add Student{% endblock %}
+{% block page_id %}add-student{% endblock %}
+{% block topbar_title %}Add Student{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-add-student">
+
+  <div class="two-col" style="align-items:start">
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Add Student</span>
+          
+        </div>
+        
+        <div class="field-wrap">
+          <div class="field-label">Full Name</div>
+              <input id="fullName" class="field-input" type="text" placeholder="Student full name">
+        </div>
+
+        <div class="field-wrap">
+            <div class="field-label">University ID</div>
+                <input id="universityId" class="field-input" type="text" placeholder="xxxxxxx">
+            </div>
+
+        <div class="field-wrap">
+            <div class="field-label">Email</div>
+                <input id="email" class="field-input" type="email" placeholder="student@students.birzeit.edu">
+            </div>
+
+        <div class="field-wrap">
+          <div class="field-label">Notes</div>
+          <textarea class="field-textarea" style="min-height:60px" placeholder="Any instructions or notes for the new student"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="addStudent()">Confirm New Student &#x2197;</button>
+          <button class="btn btn-outline" onclick="clearForm()">Cancel</button>
+        </div>
+        <div id="add-feedback" style="display:none; margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Activate Students</span>
+          <div class="tabs">
+            <button class="tab active" onclick="selectTab('COMP4200', this)">COMP4200</button>
+            <button class="tab" onclick="selectTab('COMP4300', this)">COMP4300</button>
+          </div>
+        </div>
+        <div id="studentList">
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/static/assets/head/add_student.js"></script>
+{% endblock %}

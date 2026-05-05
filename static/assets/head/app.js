@@ -1,6 +1,7 @@
 // ─── Head of Department — page-specific JS ────────────────────────────────
 // toggleSidebar / applySidebarState / bindSidebarHover / askAI / setQ
 // are all provided by the shared assets/js/app.js — do NOT redeclare here.
+/*---------Assign rols ---------------*/
 let currentCourse = "COMP4200";
 let currentAssignedAt="null";
 
@@ -131,3 +132,4 @@ function updateCoordinatorUI(coordinator){
   coordinator ? coordinator.full_name : "None";
 
 }
+

@@ -1219,7 +1219,6 @@ WHERE s.course_code   = 'COMP4300'
   )
 LIMIT 1;
 
-SELECT 'APMS_MERGED.sql imported successfully — COMP4300 data applied.' AS status;
 
 -- ============================================================
 --  END OF FILE

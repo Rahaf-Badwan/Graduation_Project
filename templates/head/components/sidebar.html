@@ -55,6 +55,12 @@
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
       <span class="sb-label">AI Assistant</span>
     </a>
+
+    <a class="sb-item {% if request.path == '/head/addStudent' %}on{% endif %}"
+       data-page="addStudent" data-tip="Add Student" href="/head/addStudent">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">person_add</span></span>
+      <span class="sb-label">Add Student</span>
+    </a>
   </div>
 
   <div class="sb-footer">
