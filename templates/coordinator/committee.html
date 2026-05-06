@@ -6,117 +6,105 @@
 
 {% block content %}
 <div class="page page-single on" id="pg-committee">
-<div class="two-col u-d1e999ac">
-<div>
-<div class="card">
-<div class="card-hd"><span class="card-title">Create New Evaluation Committee</span></div>
-<div class="u-0ffd9126" style="margin-bottom:12px">
-  ◈ Committees are formed based on <b>group numbers</b> and professor <b>seniority (years of service)</b>. The <b>Facilitator</b> is selected based on the most years of service — their role is <b>administrative</b>: the coordinator contacts the Facilitator, who then contacts all committee members. If a professor is assigned to <b>2 groups</b>, they must read <b>2 reports</b>. Note: a professor who participates in the <b>Discussion</b> panel does <b>NOT</b> read the report.
-</div>
-<div class="field-wrap">
-<div class="field-label">Project to be Evaluated <span class="req">*</span></div>
-<select class="field-select">
-<option>Academic Project Lifecycle Management System</option>
-<option>AI-Based Disease Detection System</option>
-<option>Adaptive E-Learning Platform</option>
-</select>
-</div>
-<div class="form-grid">
-<div class="field-wrap">
-<div class="field-label">Discussion Date <span class="req">*</span></div>
-<input class="field-input" type="date" value="2026-02-20"/>
-</div>
-<div class="field-wrap">
-<div class="field-label">Discussion Time <span class="req">*</span></div>
-<input class="field-input" type="time" value="10:00"/>
-</div>
-</div>
-<div class="field-wrap">
-<div class="field-label">Room</div>
-<input class="field-input" value="Room 201 — Faculty of Engineering"/>
-</div>
-<div class="u-35833a48">
-<div class="field-label u-88e55a61">Select Committee Members (5 members) — Facilitator selected by seniority</div>
-<div class="u-e47f6ecd">
-<div class="member-row">
-<input checked="" class="u-9999998c" type="checkbox"/>
-<div class="member-avatar u-2fa90a93">NH</div>
-<div class="u-d5e8c5f3"><div class="u-2e61148f">Dr. Naemeh Harbawi</div><div class="u-7d16b22c">Supervisor — Software Engineering · 14 yrs service</div></div>
-<span class="pill p-review u-49f06467">Supervisor</span>
-</div>
-<div class="member-row">
-<input checked="" class="u-9999998c" type="checkbox"/>
-<div class="member-avatar" style="background:#2d6a4f;color:#fff">OE</div>
-<div class="u-d5e8c5f3"><div class="u-2e61148f">Dr. Osama Erekat</div><div class="u-7d16b22c">Mobile &amp; Security · 18 yrs service — Reads 1 report</div></div>
-<span class="pill p-accepted u-49f06467" style="background:var(--c-green,#2d6a4f);color:#fff">Facilitator ★</span>
-</div>
-<div class="member-row">
-<input checked="" class="u-9999998c" type="checkbox"/>
-<div class="member-avatar u-7dd75b5a">MS</div>
-<div class="u-d5e8c5f3"><div class="u-2e61148f">Dr. Mahmoud Salem</div><div class="u-7d16b22c">Artificial Intelligence · 10 yrs — Discussion only (no report)</div></div>
-<span class="pill p-accepted u-49f06467">Member</span>
-</div>
-<div class="member-row">
-<input checked="" class="u-9999998c" type="checkbox"/>
-<div class="member-avatar u-fc4a5ad9">LH</div>
-<div class="u-d5e8c5f3"><div class="u-2e61148f">Dr. Lina Haddad</div><div class="u-7d16b22c">Web Development · 8 yrs — Reads 1 report</div></div>
-<span class="pill p-accepted u-49f06467">Member</span>
-</div>
-<div class="member-row u-5677897e">
-<input checked="" class="u-9999998c" type="checkbox"/>
-<div class="member-avatar u-01ebd179">SD</div>
-<div class="u-d5e8c5f3"><div class="u-2e61148f">Dr. Samer Darwish</div><div class="u-7d16b22c">Databases · 6 yrs — Discussion only (no report)</div></div>
-<span class="pill p-accepted u-49f06467">Member</span>
-</div>
-</div>
-</div>
-<div class="u-0e6ae46f">
-  ✓ Facilitator (Dr. Osama Erekat) selected by highest seniority. Communication flow: <b>Coordinator → Facilitator → Committee Members</b>. Professors in 2 groups read 2 reports; discussion-only members read no report.
-</div>
-<div class="btn-row u-78f6f2c9">
-<button class="btn btn-primary" data-prompt="The coordinator created the APMS project evaluation committee and sent notifications to members and students ↗" type="button">Confirm Committee Creation ↗</button>
-<button class="btn btn-outline" type="button">Reset</button>
-</div>
-</div>
-</div>
-<div>
-<div class="card">
-<div class="card-hd"><span class="card-title">Current Committees</span></div>
-<div class="u-a10c5e0d">
-<div class="u-2b587ae7">
-<div class="u-11730a65">
-<div class="u-2e61148f">AI Disease Project Committee</div>
-<span class="pill p-accepted u-49f06467">Completed</span>
-</div>
-<div class="u-7d16b22c">21 Feb · 5 members</div>
-<div class="u-99556c5c">Result: 92/100</div>
-</div>
-<div class="u-2b587ae7">
-<div class="u-11730a65">
-<div class="u-2e61148f">Learning Platform Committee</div>
-<span class="pill p-review u-49f06467">Ongoing</span>
-</div>
-<div class="u-7d16b22c">22 Feb · 4 members</div>
-</div>
-<div class="u-2b587ae7">
-<div class="u-11730a65">
-<div class="u-2e61148f">APMS Project Committee</div>
-<span class="pill p-pending u-49f06467">Scheduled</span>
-</div>
-<div class="u-7d16b22c">20 Feb · 5 members · 10:00 AM</div>
-</div>
-</div>
-</div>
-<div class="card">
-<div class="card-hd"><span class="card-title">Committee Statistics</span></div>
-<div class="u-e1357c22">
-<div class="stat"><div class="stat-num u-8351a61a">18</div><div class="stat-label">Committees Formed</div></div>
-<div class="stat"><div class="stat-num u-33340b68">83.4</div><div class="stat-label">Average Scores</div></div>
-<div class="stat"><div class="stat-num u-a28c35c7">5</div><div class="stat-label">Ongoing Now</div></div>
-<div class="stat"><div class="stat-num u-c0077588">3</div><div class="stat-label">Scheduled</div></div>
-</div>
-</div>
-</div>
-</div>
+  <div class="two-col u-d1e999ac">
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Auto Committee Generator</span>
+        </div>
+
+        <div class="u-0ffd9126" style="margin-bottom:12px">
+          ◈ The system automatically picks <b>eligible projects</b>, distributes them <b>randomly</b> across committees,
+          assigns <b>4 doctors with different majors</b> to each committee, chooses a <b>room</b>, and creates
+          discussion slots of <b>30 minutes</b> with a <b>10 minute break</b>.
+        </div>
+
+        <div class="form-grid">
+          <div class="field-wrap">
+            <div class="field-label">Discussion Date <span class="req">*</span></div>
+            <input class="field-input" id="committeeDate" type="date" />
+          </div>
+
+          <div class="field-wrap">
+            <div class="field-label">Start Time <span class="req">*</span></div>
+            <input class="field-input" id="committeeStartTime" type="time" value="09:00" />
+          </div>
+        </div>
+
+        <div class="field-wrap" style="margin-top:12px">
+          <div class="field-label">Projects Per Committee <span class="req">*</span></div>
+          <input class="field-input" id="projectsPerCommittee" type="number" min="1" value="2" />
+        </div>
+
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn btn-primary" type="button" onclick="generateCommittees()">Generate Committees
+            Randomly</button>
+          <button class="btn btn-outline" type="button" onclick="resetAndRedistributeCommittees()">
+            Reset & Redistribute Committees
+          </button>
+
+        </div>
+
+        <div id="committeeMsg" style="margin-top:12px;font-size:13px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Eligible Projects</span></div>
+        <div class="u-e47f6ecd" id="eligibleProjectsBox">
+          <div>Loading...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Generated Committees</span></div>
+        <div id="committeePlansBox">
+          <div>Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Current Committees</span></div>
+        <div class="u-a10c5e0d" id="currentCommitteesBox">
+          <div>Loading...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Committee Statistics</span></div>
+        <div class="u-e1357c22">
+          <div class="stat">
+            <div class="stat-num u-8351a61a" id="statCommitteesFormed">0</div>
+            <div class="stat-label">Committees Formed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num u-33340b68" id="statAverageScores">0</div>
+            <div class="stat-label">Average Scores</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num u-a28c35c7" id="statOngoing">0</div>
+            <div class="stat-label">Ongoing Now</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num u-c0077588" id="statScheduled">0</div>
+            <div class="stat-label">Scheduled</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Rules</span></div>
+        <div class="u-510af369">
+          ✓ Each committee has <b>4 doctors</b><br />
+          ✓ Each doctor in the same committee has a <b>different major</b><br />
+          ✓ Projects are selected and distributed <b>randomly</b><br />
+          ✓ The coordinator chooses the <b>responsible doctor</b> for each committee<br />
+          ✓ Each committee gets a <b>room</b><br />
+          ✓ Each project discussion is <b>30 minutes</b> + <b>10 minute break</b>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
