@@ -2,6 +2,7 @@
 // toggleSidebar / applySidebarState / bindSidebarHover / askAI / setQ
 // are all provided by the shared assets/js/app.js — do NOT redeclare here.
 /*---------Assign rols ---------------*/
+const API_BASE = '/head';
 let currentCourse = "COMP4200";
 let currentAssignedAt="null";
 
@@ -20,7 +21,7 @@ function selectTab(courseCode, el) {
 
 
 function loadCourse(courseCode){
-    fetch(`/api/course/${courseCode}`)
+    fetch(API_BASE + `/api/course/${courseCode}`)
         .then(res => res.json())
         .then(data => {
           //coordinator
@@ -110,7 +111,7 @@ function loadCourse(courseCode){
 function assignCoordinator(facultyId){
   let semesterId = document.getElementById("semesterSelect").value;
 
-  fetch("/api/assign-coordinator", {
+  fetch(API_BASE + '/api/assign-coordinator', {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"

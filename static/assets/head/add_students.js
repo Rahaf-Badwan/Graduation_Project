@@ -142,33 +142,43 @@ function clearForm(){
 /*feedback to head of department to know if the student add or any something happen */
 function showFeedback(msg, type){
   var feedback = document.getElementById('add-feedback');
+  if(!feedback) return;
 
   feedback.style.display = 'block';
 
-  var colors = {
-    success: 'var(--color-text-success)',
-    error: 'var(--color-text-danger)',
-    warn: 'var(--color-text-warning)'
+  var styles = {
+   success: {
+    color: 'var(--color-text-success)',
+    background: 'var(--color-background-success)',
+    border: 'var(--color-border-success)'
+   },
+   error: {
+    color: 'var(--color-text-danger)',
+    background: 'var(--color-background-danger)',
+    border: 'var(--color-border-danger)'
+   },
+   warn: {
+    color: 'var(--color-text-warning)',
+    background: 'var(--color-background-warning)',
+    border: 'var(--color-border-warning)'
+   }
+
   };
 
-  var backgrounds = {
-    success: 'var(--color-background-success)',
-    error: 'var(--color-background-danger)',
-    warn: 'var(--color-background-warning)'
-  };
-
-  var borders = {
-    success: 'var(--color-text-success)',
-    error: 'var(--color-text-danger)',
-    warn: 'var(--color-text-warning)'
-  };
-  feedback.style.cssText = 
-    'display:block; padding:10px 14px; border-radius:var(--border-radius-md);' +
-    'font-size:13px; margin-top:12px;' +
-    'color:'    + (colors[type] || colors.warn) + ';' +
-    'background:' + (backgrounds[type] || backgrounds.warn) + ';' +
-    'border:0.5px solid ' +(borders[type] || borders.warn) + ';' ;
+  var s = styles[type] || styles.warn;
+  feedback.removeAttribute('style');
+  feedback.style.display = 'block';
+  feedback.style.padding = '10px 14px';
+  feedback.style.borderRadius = 'var(--border-radius-md, 8px)';
+  feedback.style.fontSize = '13px';
+  feedback.style.marginTop = '12px';
+  feedback.style.color = s.color;
+  feedback.style.background = s.background;
+  feedback.style.border = '0.5px soild ' + s.border;
   feedback.textContent = msg;
+
+  clearTimeout(feedback._timer);
+  feedback._timer = setTimeout(hideFeedback, 5000);
 }
 
 

@@ -1,7 +1,4 @@
 # routes add_student.py 
-
-
-
 from flask import Blueprint, request, jsonify, current_app
 from db import get_db
 from auth import login_required
