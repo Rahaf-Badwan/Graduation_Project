@@ -200,6 +200,8 @@ CREATE TABLE project_files (
                   )               NOT NULL,
     file_name     VARCHAR(255)    NOT NULL,
     file_path     VARCHAR(600)    NULL,
+    file_data     LONGBLOB        NULL                    COMMENT 'Binary file content stored in DB',
+    file_mime     VARCHAR(100)    NULL                    COMMENT 'MIME type of the uploaded file',
     file_size_mb  DECIMAL(7,2)    NULL,
     upload_status ENUM(
                     'not_uploaded',
@@ -209,6 +211,7 @@ CREATE TABLE project_files (
     uploaded_by   INT             NULL                    COMMENT 'student user_id',
     uploaded_at   TIMESTAMP       NULL,
     version       TINYINT         NOT NULL DEFAULT 1,
+    UNIQUE KEY uq_project_file_type (project_id, file_type),
     FOREIGN KEY (project_id)  REFERENCES projects(project_id)  ON DELETE CASCADE,
     FOREIGN KEY (uploaded_by) REFERENCES users(user_id)        ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -468,6 +471,7 @@ CREATE TABLE challenges_reflections (
                       'administrative',
                       'reflection'
                     )         NOT NULL,
+    title           VARCHAR(255) NOT NULL COMMENT 'Short title for the challenge or reflection',
     description     TEXT      NOT NULL,
     solution_lesson TEXT      NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -494,7 +498,18 @@ CREATE TABLE supervisor_assignments (
 ) ENGINE=InnoDB;
 
 -- ============================================================
---  TABLE 22 — ai_conversations
+--  TABLE 22 — student_groups
+--  Groups students into teams for duplicate-submission checks
+-- ============================================================
+CREATE TABLE IF NOT EXISTS student_groups (
+    group_id    INT NOT NULL  COMMENT 'Shared group identifier for teammates',
+    student_id  INT NOT NULL,
+    PRIMARY KEY (group_id, student_id),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Maps students to their project groups for duplicate-submission checks';
+
+-- ============================================================
+--  TABLE 23 — ai_conversations
 --  AI assistant chat history per user
 --  Merged from: APMS.sql + AI_ARCHIVE_MIGRATION.sql
 --  • session_id is NOT NULL (migration applied)
@@ -934,19 +949,22 @@ INSERT INTO notifications (recipient_id, sender_id, notification_type, title, me
 (2, NULL, 'deadline_reminder',  '7 projects awaiting your decision',       '7 projects are pending coordinator review — some exceeded 48 hours.',       NULL, TRUE);
 
 -- Student Challenges & Reflections (all linked to APMS project, submitted by Rahaf, user 8)
-INSERT INTO challenges_reflections (project_id, student_id, type, description, solution_lesson) VALUES
+INSERT INTO challenges_reflections (project_id, student_id, type, title, description, solution_lesson) VALUES
 (
   1, 8, 'technical',
+  'NLP-MySQL Integration Performance',
   'We struggled to efficiently integrate the NLP model with the MySQL database without degrading system performance under a large number of concurrent project queries.',
   'We implemented query caching for frequent lookups and decoupled the AI service as an independent microservice to isolate performance bottlenecks.'
 ),
 (
   1, 8, 'administrative',
+  'Supervisor Distribution Coordination',
   'Based on our meeting with Dr. Abu Sneina, fairly distributing supervisors across projects every semester is one of the biggest coordination challenges handled manually each term.',
   'We designed an automatic distribution algorithm that considers each supervisor''s specialization and enforces a balanced workload across all faculty members.'
 ),
 (
   1, 8, 'reflection',
+  'Importance of Early Documentation',
   'We learned that thorough documentation from the very beginning saves a significant amount of time later, especially when drawing UML diagrams and defining system requirements.',
   'Early and continuous documentation from the analysis phase is the key to a successful project delivery.'
 );
@@ -2014,11 +2032,11 @@ ORDER BY u.university_id;
 
 
 CREATE TABLE IF NOT EXISTS discussion_rooms (
-    room_id INT PRIMARY KEY AUTO_INCREMENT,
-    room_name VARCHAR(120) NOT NULL UNIQUE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    room_id    INT          PRIMARY KEY AUTO_INCREMENT,
+    room_name  VARCHAR(120) NOT NULL UNIQUE,
+    sort_order INT          NOT NULL DEFAULT 1,
+    is_active  BOOLEAN      NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- ============================================================
 -- Committee Plans (one committee can discuss multiple projects)
 -- ============================================================

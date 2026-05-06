@@ -7,93 +7,407 @@
 {% block content %}
 <div class="page on" id="pg-submit">
 
-            <div class="card">
-              <div class="card-hd"><span class="card-title">Basic Project Information</span></div>
-              <div class="form-grid">
-                <div class="field-wrap">
-                  <div class="field-label">Project Title <span>*</span></div>
-                  <input class="field-input" value="Academic Project Lifecycle Management System (APMS)" />
-                </div>
-                <div class="field-wrap">
-                  <div class="field-label">Academic Year <span>*</span></div>
-                  <select class="field-select">
-                    <option>2025/2026</option>
-                    <option>2024/2025</option>
-                  </select>
-                </div>
-                <div class="field-wrap">
-                  <div class="field-label">Supervisor <span>*</span></div>
-                  <select class="field-select">
-                    <option>Dr. Naema Harbawi</option>
-                    <option>Dr. Mahmoud Salem</option>
-                  </select>
-                </div>
-                <div class="field-wrap">
-                  <div class="field-label">Project Type <span>*</span></div>
-                  <select class="field-select">
-                    <option>Web Application</option>
-                    <option>Mobile Application</option>
-                    <option>Artificial Intelligence</option>
-                  </select>
-                </div>
-              </div>
-              <div class="field-wrap">
-                <div class="field-label">Abstract <span>*</span></div>
-                <textarea class="field-textarea"
-                  style="min-height:90px">Most of the educational institutions have no efficient way to centrally manage the graduation projects, from their submission until archiving...</textarea>
-              </div>
-              <div class="field-wrap">
-                <div class="field-label">Keywords</div>
-                <input class="field-input"
-                  value="Academic Project Management, Evaluation Systems, Web Applications, AI" />
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-hd"><span class="card-title">Upload Files</span></div>
-              <div class="three-col">
-                <div class="upload-zone">
-                  <div class="upload-icon"><span class="material-symbols-outlined icon-inline">description</span></div>
-                  <div class="upload-text">Final Report</div>
-                  <div class="upload-hint">PDF · Max 50MB</div>
-                  <div style="margin-top:8px;font-size:11px;color:var(--green);font-weight:600">✓ Uploaded</div>
-                </div>
-                <div class="upload-zone">
-                  <div class="upload-icon"><span class="material-symbols-outlined icon-inline">code</span></div>
-                  <div class="upload-text">Source Code</div>
-                  <div class="upload-hint">ZIP / GitHub Link</div>
-                  <div style="margin-top:8px;font-size:11px;color:var(--green);font-weight:600">✓ Uploaded</div>
-                </div>
-                <div class="upload-zone">
-                  <div class="upload-icon"><span class="material-symbols-outlined icon-inline">slideshow</span></div>
-                  <div class="upload-text">Presentation Slides</div>
-                  <div class="upload-hint">PPTX / PDF</div>
-                  <div style="margin-top:8px;font-size:11px;color:var(--amber);font-weight:600">↑ Not uploaded yet</div>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-hd"><span class="card-title">Team Members</span></div>
-              <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="field-input" style="flex:1" value="Amna Abu Muslim" />
-                  <input class="field-input" style="width:100px" value="1220670" />
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="field-input" style="flex:1" value="Rahaf Badwan" />
-                  <input class="field-input" style="width:100px" value="1220654" />
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <input class="field-input" style="flex:1" value="Tima Abd" />
-                  <input class="field-input" style="width:100px" value="1220174" />
-                </div>
-              </div>
-              <div class="btn-row">
-                <button class="btn btn-primary"
-                  onclick="sendPrompt('Student Rahaf Badwan submitted the APMS project — what are the next steps after submission? ↗')">Submit
-                  Project for Review ↗</button>
-                <button class="btn btn-outline">Save as Draft</button>
-              </div>
-            </div>
+  {% if already_submitted_by %}
+  <!-- ── Already Submitted Banner ── -->
+  <div style="
+      display:flex; align-items:center; gap:14px;
+      background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+      border:1.5px solid #86efac; border-radius:14px;
+      padding:18px 24px; margin-bottom:8px;
+      box-shadow:0 2px 12px rgba(34,197,94,.10);
+  ">
+    <span class="material-symbols-outlined" style="font-size:36px;color:#16a34a;flex-shrink:0">
+      task_alt
+    </span>
+    <div>
+      <div style="font-size:15px;font-weight:700;color:#15803d;margin-bottom:3px">
+        Project Already Submitted
+      </div>
+      <div style="font-size:13px;color:#166534;line-height:1.5">
+        {% if is_my_submission %}
+        You submitted this project on behalf of your team.
+        You can still update your submission below.
+        {% else %}
+        <strong>{{ already_submitted_by }}</strong> has submitted this project on behalf of your team.
+        You can view the details below, but only the submitter can make changes.
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
-          </div>
+  <!-- ── Basic Info ── -->
+  <div class="card">
+    <div class="card-hd"><span class="card-title">Basic Project Information</span></div>
+    <div class="form-grid">
+
+      <!-- Title: editable -->
+      <div class="field-wrap">
+        <div class="field-label">Project Title <span>*</span></div>
+        <input class="field-input" id="proj-title" placeholder="Enter your project title" value="{{ proj_title }}" />
+      </div>
+
+      <!-- Academic Year: read-only from DB -->
+      <div class="field-wrap">
+        <div class="field-label">Academic Year</div>
+        <input class="field-input" value="{{ academic_year if academic_year else 'Not assigned yet' }}" readonly
+          style="background:var(--surface-2, #f5f5f5); color:var(--text-secondary, #666); cursor:not-allowed;" />
+      </div>
+
+      <!-- Supervisor: read-only from DB -->
+      <div class="field-wrap">
+        <div class="field-label">Supervisor</div>
+        <input class="field-input" value="{{ supervisor_name if supervisor_name else 'No supervisor assigned yet' }}"
+          readonly
+          style="background:var(--surface-2, #f5f5f5); color:var(--text-secondary, #666); cursor:not-allowed;" />
+      </div>
+
+      <!-- Project Type: editable -->
+      <div class="field-wrap">
+        <div class="field-label">Project Type <span>*</span></div>
+        <select class="field-select" id="proj-type">
+          <option value="">-- Select type --</option>
+          <option value="web" {{ 'selected' if proj_type=='web' }}>Web Application</option>
+          <option value="mobile" {{ 'selected' if proj_type=='mobile' }}>Mobile Application</option>
+          <option value="ai" {{ 'selected' if proj_type=='ai' }}>Artificial Intelligence</option>
+          <option value="software_engineering" {{ 'selected' if proj_type=='software_engineering' }}>Software
+            Engineering</option>
+          <option value="security" {{ 'selected' if proj_type=='security' }}>Security</option>
+          <option value="databases" {{ 'selected' if proj_type=='databases' }}>Databases</option>
+          <option value="other" {{ 'selected' if proj_type=='other' }}>Other</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-wrap">
+      <div class="field-label">Abstract <span>*</span></div>
+      <textarea class="field-textarea" id="proj-abstract" style="min-height:90px"
+        placeholder="Brief description of your project...">{{ proj_abstract }}</textarea>
+    </div>
+
+    <div class="field-wrap">
+      <div class="field-label">Keywords</div>
+      <input class="field-input" id="proj-keywords" placeholder="e.g. Web Application, AI, Management System"
+        value="{{ proj_keywords }}" />
+    </div>
+  </div>
+
+  <!-- ── File Upload ── -->
+  <div class="card">
+    <div class="card-hd"><span class="card-title">Upload Files</span></div>
+    <div class="three-col">
+
+      <!-- Final Report -->
+      <div class="upload-zone" id="zone-report" onclick="document.getElementById('file-report').click()"
+        style="cursor:pointer">
+        <input type="file" id="file-report" accept=".pdf" style="display:none"
+          onchange="handleFileSelect(this, 'zone-report', 'status-report')">
+        <div class="upload-icon">
+          <span class="material-symbols-outlined icon-inline">description</span>
+        </div>
+        <div class="upload-text">Final Report</div>
+        <div class="upload-hint">PDF · Max 50MB</div>
+        <div id="status-report" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
+          ↑ Click to upload
+        </div>
+      </div>
+
+      <!-- Source Code -->
+      <div class="upload-zone" id="zone-code" onclick="document.getElementById('file-code').click()"
+        style="cursor:pointer">
+        <input type="file" id="file-code" accept=".zip,.rar" style="display:none"
+          onchange="handleFileSelect(this, 'zone-code', 'status-code')">
+        <div class="upload-icon">
+          <span class="material-symbols-outlined icon-inline">code</span>
+        </div>
+        <div class="upload-text">Source Code</div>
+        <div class="upload-hint">ZIP / RAR</div>
+        <div id="status-code" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
+          ↑ Click to upload
+        </div>
+      </div>
+
+      <!-- Presentation -->
+      <div class="upload-zone" id="zone-slides" onclick="document.getElementById('file-slides').click()"
+        style="cursor:pointer">
+        <input type="file" id="file-slides" accept=".pptx,.pdf" style="display:none"
+          onchange="handleFileSelect(this, 'zone-slides', 'status-slides')">
+        <div class="upload-icon">
+          <span class="material-symbols-outlined icon-inline">slideshow</span>
+        </div>
+        <div class="upload-text">Presentation Slides</div>
+        <div class="upload-hint">PPTX / PDF</div>
+        <div id="status-slides" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
+          ↑ Click to upload
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Team Members: read-only from DB ── -->
+  <div class="card">
+    <div class="card-hd"><span class="card-title">Team Members</span></div>
+
+    {% if team_members %}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      {% for member in team_members %}
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="field-input" style="flex:1;background:var(--surface-2,#f5f5f5);cursor:not-allowed;"
+          value="{{ member.full_name }}" readonly />
+        <input class="field-input" style="width:120px;background:var(--surface-2,#f5f5f5);cursor:not-allowed;"
+          value="{{ member.university_id }}" readonly />
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px">
+      No team members found. Please contact your coordinator.
+    </p>
+    {% endif %}
+
+    <div class="btn-row">
+      {% if already_submitted_by and not is_my_submission %}
+      <!-- زميل: مش قادر يعمل إشي -->
+      <button class="btn btn-primary" disabled style="
+            background:linear-gradient(135deg,#86efac,#4ade80);
+            border:none; cursor:not-allowed; opacity:.85;
+            display:flex; align-items:center; gap:8px;
+        ">
+        <span class="material-symbols-outlined" style="font-size:18px">task_alt</span>
+        Already Submitted
+      </button>
+      {% elif already_submitted_by and is_my_submission %}
+      <!-- رهف: سلّمت وتقدر تعدّل أو تحذف -->
+      <button class="btn btn-primary" onclick="handleSubmit()" data-my-submission="1"
+        style="display:flex; align-items:center; gap:8px;">
+        <span class="material-symbols-outlined" style="font-size:18px">edit</span>
+        Update Submission
+      </button>
+      <button class="btn btn-outline" onclick="saveDraft()">Save as Draft</button>
+      <button class="btn btn-outline" onclick="clearSubmission()"
+        style="border-color:#ef4444;color:#ef4444;display:flex;align-items:center;gap:6px;">
+        <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+        Clear Submission
+      </button>
+      {% else %}
+      <!-- ما في سبميت بعد -->
+      <button class="btn btn-primary" onclick="handleSubmit()">
+        Submit Project for Review ↗
+      </button>
+      <button class="btn btn-outline" onclick="saveDraft()">Save as Draft</button>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── توست للإشعارات ────────────────────────────────────────────
+  function showToast(msg, isError) {
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = [
+      'position:fixed', 'bottom:24px', 'right:24px', 'z-index:9999',
+      'padding:12px 20px', 'border-radius:8px', 'font-size:13px',
+      'font-weight:600', 'color:#fff', 'box-shadow:0 4px 16px rgba(0,0,0,.18)',
+      'background:' + (isError ? '#ef4444' : '#22c55e'),
+      'transition:opacity .4s'
+    ].join(';');
+    document.body.appendChild(t);
+    setTimeout(function () { t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 400); }, 3500);
+  }
+
+  // ── تحميل الملفات المرفوعة مسبقاً عند فتح الصفحة ─────────────
+  var FILE_ZONE_MAP = {
+    'final_report': { zone: 'zone-report', status: 'status-report' },
+    'source_code': { zone: 'zone-code', status: 'status-code' },
+    'presentation': { zone: 'zone-slides', status: 'status-slides' }
+  };
+
+  function loadExistingFiles() {
+    fetch('/student/api/submit-info')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.files || !d.files.length) return;
+        d.files.forEach(function (f) {
+          var map = FILE_ZONE_MAP[f.file_type];
+          if (!map) return;
+          var statusEl = document.getElementById(map.status);
+          var zoneEl = document.getElementById(map.zone);
+          if (statusEl && f.upload_status === 'uploaded') {
+            statusEl.textContent = '✓ ' + f.file_name + (f.file_size_mb ? ' (' + f.file_size_mb + ' MB)' : '');
+            statusEl.style.color = 'var(--green, #22c55e)';
+            if (zoneEl) zoneEl.style.borderColor = 'var(--green, #22c55e)';
+          }
+        });
+      })
+      .catch(function () { });
+  }
+  document.addEventListener('DOMContentLoaded', loadExistingFiles);
+
+  // ── File select feedback ───────────────────────────────────────
+  function handleFileSelect(input, zoneId, statusId) {
+    var status = document.getElementById(statusId);
+    var zone = document.getElementById(zoneId);
+    if (input.files && input.files[0]) {
+      var f = input.files[0];
+      var mb = (f.size / 1024 / 1024).toFixed(1);
+      status.textContent = '✓ ' + f.name + ' (' + mb + ' MB)';
+      status.style.color = 'var(--green, #22c55e)';
+      zone.style.borderColor = 'var(--green, #22c55e)';
+    }
+  }
+
+  // ── رفع ملف واحد إلى الـ API ──────────────────────────────────
+  function uploadFile(fileInput, fileType) {
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) return Promise.resolve(null);
+    var fd = new FormData();
+    fd.append('file_type', fileType);
+    fd.append('file', fileInput.files[0]);
+    return fetch('/student/api/upload-file', { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) throw new Error(d.error);
+        return d;
+      });
+  }
+
+  // ── Submit / Update Project ────────────────────────────────────
+  function handleSubmit() {
+    var title = document.getElementById('proj-title').value.trim();
+    var projType = document.getElementById('proj-type').value;
+    var abstract = document.getElementById('proj-abstract').value.trim();
+    var keywords = document.getElementById('proj-keywords').value.trim();
+
+    if (!title) {
+      showToast('Please enter the project title.', true);
+      document.getElementById('proj-title').focus();
+      return;
+    }
+    if (!projType) {
+      showToast('Please select the project type.', true);
+      document.getElementById('proj-type').focus();
+      return;
+    }
+    if (!abstract) {
+      showToast('Please enter the abstract.', true);
+      document.getElementById('proj-abstract').focus();
+      return;
+    }
+
+    // تحقق من الـ Final Report (مطلوب)
+    var reportFile = document.getElementById('file-report');
+    var reportStatus = document.getElementById('status-report');
+    var hasExistingReport = reportStatus.textContent.startsWith('✓');
+    var hasNewReport = reportFile.files && reportFile.files[0];
+    if (!hasExistingReport && !hasNewReport) {
+      showToast('Please upload the Final Report (required).', true);
+      document.getElementById('zone-report').style.borderColor = '#ef4444';
+      return;
+    }
+
+    var btn = document.querySelector('.btn-primary');
+    var originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    // 1) حفظ بيانات المشروع
+    fetch('/student/api/submit-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) throw new Error(d.error);
+        // 2) رفع الملفات الجديدة إن وجدت
+        return Promise.all([
+          uploadFile(document.getElementById('file-report'), 'final_report'),
+          uploadFile(document.getElementById('file-code'), 'source_code'),
+          uploadFile(document.getElementById('file-slides'), 'presentation')
+        ]);
+      })
+      .then(function () {
+        var isUpdate = document.querySelector('[data-my-submission]') !== null;
+        showToast(isUpdate ? 'Submission updated successfully! ✓' : 'Project submitted successfully! ✓', false);
+        // نعيد تفعيل الزر بعد ثانيتين عشان يقدر يعمل update مرة ثانية
+        setTimeout(function () {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }, 2000);
+      })
+      .catch(function (err) {
+        showToast(err.message || 'Submission failed.', true);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      });
+  }
+
+  // ── Clear Submission ─────────────────────────────────────────
+  function clearSubmission() {
+    if (!confirm('Are you sure you want to clear your submission?\nThis will delete all uploaded files and cannot be undone.')) return;
+
+    var btn = document.querySelector('[onclick="clearSubmission()"]');
+    btn.disabled = true;
+    btn.textContent = 'Clearing…';
+
+    fetch('/student/api/clear-submission', { method: 'POST' })
+      .then(function (r) {
+        var contentType = r.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          return r.text().then(function (t) {
+            throw new Error('Server error: ' + r.status + ' — ' + t.substring(0, 100));
+          });
+        }
+        return r.json();
+      })
+      .then(function (d) {
+        if (d.error) throw new Error(d.error);
+        showToast('Submission cleared successfully.', false);
+        setTimeout(function () { window.location.reload(); }, 1500);
+      })
+      .catch(function (err) {
+        showToast(err.message || 'Failed to clear submission.', true);
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px">delete</span> Clear Submission';
+      });
+  }
+
+  // ── Save Draft ────────────────────────────────────────────────
+  function saveDraft() {
+    var title = document.getElementById('proj-title').value.trim();
+    var abstract = document.getElementById('proj-abstract').value.trim();
+    var keywords = document.getElementById('proj-keywords').value.trim();
+    var projType = document.getElementById('proj-type').value;
+
+    if (!title) {
+      showToast('Enter a title before saving a draft.', true);
+      document.getElementById('proj-title').focus();
+      return;
+    }
+
+    var btn = document.querySelector('.btn-outline');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    fetch('/student/api/submit-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType || 'software_engineering', status: 'draft' })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) throw new Error(d.error);
+        showToast('Draft saved successfully.', false);
+        btn.disabled = false;
+        btn.textContent = 'Save as Draft';
+      })
+      .catch(function (err) {
+        showToast(err.message || 'Failed to save draft.', true);
+        btn.disabled = false;
+        btn.textContent = 'Save as Draft';
+      });
+  }
+</script>
 {% endblock %}
