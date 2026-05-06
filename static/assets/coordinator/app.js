@@ -4,6 +4,7 @@ let distributionWindowOpen = false;
 let professorsCache = [];
 let formsCache = [];
 let unassignedCache = [];
+let committeeDashboardCache = null;
 
 function normalizeText(t) {
   return (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -124,6 +125,10 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function committeeEscapeHtml(value) {
+  return escapeHtml(value);
+}
+
 function statusBadge(status) {
   const value = (status || '').toLowerCase();
   if (value === 'accepted' || value === 'under_review' || value === 'committee_evaluation') return '<span class="pill p-accepted">Assigned ✓</span>';
@@ -131,6 +136,17 @@ function statusBadge(status) {
   return `<span class="pill p-pending">${escapeHtml(status || 'Pending')}</span>`;
 }
 
+function committeeStatusBadge(status) {
+  const s = normalizeText(status);
+  if (s === 'completed') return '<span class="pill p-accepted">Completed</span>';
+  if (s === 'ongoing' || s === 'in_progress') return '<span class="pill p-review">Ongoing</span>';
+  if (s === 'scheduled') return '<span class="pill p-pending">Scheduled</span>';
+  return `<span class="pill p-pending">${committeeEscapeHtml(status || 'Unknown')}</span>`;
+}
+
+/* =========================
+   REGISTRATION / DISTRIBUTION
+========================= */
 function updateSelectedStudentsCount() {
   const el = document.getElementById('selectedStudentsCount');
   if (!el) return;
@@ -365,12 +381,21 @@ async function assignGroupSupervisor(projectId) {
   const supervisorId = select ? select.value : '';
 
   if (!supervisorId) {
-    if (msg) msg.textContent = 'Please choose a supervisor before saving.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '600';
+      msg.textContent = 'Please choose a supervisor before saving.';
+    }
+    alert('Please choose a supervisor before saving.');
     return;
   }
 
   try {
-    if (msg) msg.textContent = 'Saving group supervisor...';
+    if (msg) {
+      msg.style.color = '#444';
+      msg.style.fontWeight = '600';
+      msg.textContent = 'Saving group supervisor...';
+    }
 
     const res = await fetch('/api/coordinator/assign-group-supervisor', {
       method: 'POST',
@@ -382,12 +407,25 @@ async function assignGroupSupervisor(projectId) {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to assign supervisor.');
 
-    if (msg) msg.textContent = data.message || 'Supervisor assigned successfully.';
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to assign supervisor.');
+    }
+
+    if (msg) {
+      msg.style.color = 'green';
+      msg.style.fontWeight = '600';
+      msg.textContent = data.message || 'Supervisor assigned successfully.';
+    }
+
     await loadDistributionData();
   } catch (err) {
-    if (msg) msg.textContent = err.message || 'Something went wrong while assigning the supervisor.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '700';
+      msg.textContent = err.message || 'Something went wrong while assigning the supervisor.';
+    }
+    alert(err.message || 'Something went wrong while assigning the supervisor.');
   }
 }
 
@@ -399,23 +437,42 @@ async function addSectionEntry() {
   const addBtn = document.querySelector('button[onclick="addSectionEntry()"]');
 
   if (!sectionName || !supervisorId) {
-    if (msg) msg.textContent = 'Please enter the section name and choose a supervisor.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '600';
+      msg.textContent = 'Please enter the section name and choose a supervisor.';
+    }
+    alert('Please enter the section name and choose a supervisor.');
     return;
   }
 
   if (!selectedStudents.length) {
-    if (msg) msg.textContent = 'Please choose at least one unassigned student.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '600';
+      msg.textContent = 'Please choose at least one unassigned student.';
+    }
+    alert('Please choose at least one unassigned student.');
     return;
   }
 
   if (selectedStudents.length > 3) {
-    if (msg) msg.textContent = 'You can choose at most 3 students.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '600';
+      msg.textContent = 'You can choose at most 3 students.';
+    }
+    alert('You can choose at most 3 students.');
     return;
   }
 
   try {
     if (addBtn) addBtn.disabled = true;
-    if (msg) msg.textContent = 'Saving...';
+    if (msg) {
+      msg.style.color = '#444';
+      msg.style.fontWeight = '600';
+      msg.textContent = 'Saving...';
+    }
 
     const res = await fetch('/api/coordinator/add-section', {
       method: 'POST',
@@ -428,16 +485,30 @@ async function addSectionEntry() {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to add section.');
 
-    if (msg) msg.textContent = data.message || 'Section added successfully.';
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to add section.');
+    }
+
+    if (msg) {
+      msg.style.color = 'green';
+      msg.style.fontWeight = '600';
+      msg.textContent = data.message || 'Section added successfully.';
+    }
+
     const sectionNameInput = document.getElementById('sectionName');
     const sectionSupervisor = document.getElementById('sectionSupervisor');
     if (sectionNameInput) sectionNameInput.value = '';
     if (sectionSupervisor) sectionSupervisor.value = '';
+
     await loadDistributionData();
   } catch (err) {
-    if (msg) msg.textContent = err.message || 'Something went wrong while adding the section.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '700';
+      msg.textContent = err.message || 'Something went wrong while adding the section.';
+    }
+    alert(err.message || 'Something went wrong while adding the section.');
   } finally {
     if (addBtn) addBtn.disabled = false;
   }
@@ -449,10 +520,322 @@ function initRegistrationPage() {
   loadDistributionData();
 }
 
+/* =========================
+   COMMITTEE SCHEDULER
+========================= */
+function setCommitteeMessage(text, isError = false) {
+  const msg = document.getElementById('committeeMsg');
+  if (!msg) return;
+  msg.style.color = isError ? '#c62828' : '#1b5e20';
+  msg.style.fontWeight = '600';
+  msg.textContent = text || '';
+}
+
+function renderEligibleProjects(projects) {
+  const box = document.getElementById('eligibleProjectsBox');
+  if (!box) return;
+
+  if (!projects || !projects.length) {
+    box.innerHTML = '<div>No eligible projects waiting for committee discussion.</div>';
+    return;
+  }
+
+  box.innerHTML = projects.map(project => `
+    <div class="u-e83423b7" style="display:block">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div class="u-2e61148f">${committeeEscapeHtml(project.title || '—')}</div>
+          <div class="u-7d16b22c">${committeeEscapeHtml(project.team_members || 'No team members')}</div>
+        </div>
+        <span class="pill p-review">${committeeEscapeHtml(project.status || 'submitted')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderCommitteeStats(stats) {
+  const formed = document.getElementById('statCommitteesFormed');
+  const avg = document.getElementById('statAverageScores');
+  const ongoing = document.getElementById('statOngoing');
+  const scheduled = document.getElementById('statScheduled');
+
+  if (formed) formed.textContent = stats?.formed ?? 0;
+  if (avg) avg.textContent = stats?.average_score ?? 0;
+  if (ongoing) ongoing.textContent = stats?.ongoing ?? 0;
+  if (scheduled) scheduled.textContent = stats?.scheduled ?? 0;
+}
+
+function renderCurrentCommittees(committees) {
+  const box = document.getElementById('currentCommitteesBox');
+  if (!box) return;
+
+  if (!committees || !committees.length) {
+    box.innerHTML = '<div>No committees created yet.</div>';
+    return;
+  }
+
+  box.innerHTML = committees.map(item => `
+    <div class="u-2b587ae7">
+      <div class="u-11730a65">
+        <div class="u-2e61148f">${committeeEscapeHtml(item.committee_name || 'Committee')}</div>
+        ${committeeStatusBadge(item.status)}
+      </div>
+      <div class="u-7d16b22c">
+        ${committeeEscapeHtml(item.discussion_date || '—')}
+        ${item.start_time ? '· ' + committeeEscapeHtml(item.start_time) : ''}
+        ${item.room_name ? '· ' + committeeEscapeHtml(item.room_name) : ''}
+      </div>
+      <div class="u-99556c5c">
+        ${committeeEscapeHtml(item.projects_count || 0)} project(s)
+        ${item.responsible_name ? ' · Responsible: ' + committeeEscapeHtml(item.responsible_name) : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderCommitteePlans(plans) {
+  const box = document.getElementById('committeePlansBox');
+  if (!box) return;
+
+  if (!plans || !plans.length) {
+    box.innerHTML = '<div>No generated committees yet.</div>';
+    return;
+  }
+
+  box.innerHTML = plans.map(plan => {
+    const responsibleOptions = [
+      '<option value="">Choose responsible doctor...</option>',
+      ...plan.members.map(member => {
+        const selected = String(member.faculty_id) === String(plan.responsible_faculty_id || '') ? 'selected' : '';
+        return `<option value="${member.faculty_id}" ${selected}>${committeeEscapeHtml(member.full_name)} — ${committeeEscapeHtml(member.specialization)}</option>`;
+      })
+    ].join('');
+
+    const membersHtml = plan.members.map(member => `
+      <div class="member-row" style="margin-bottom:8px">
+        <div class="member-avatar">${committeeEscapeHtml((member.full_name || '').split(' ').map(x => x[0]).slice(0, 2).join('') || '--')}</div>
+        <div style="flex:1">
+          <div class="u-2e61148f">${committeeEscapeHtml(member.full_name)}</div>
+          <div class="u-7d16b22c">${committeeEscapeHtml(member.specialization)} · ${committeeEscapeHtml(member.years_experience)} yrs</div>
+        </div>
+        <span class="pill ${member.role === 'responsible' ? 'p-accepted' : 'p-review'}">
+          ${member.role === 'responsible' ? 'Responsible' : 'Member'}
+        </span>
+      </div>
+    `).join('');
+
+    const projectsHtml = (plan.projects || []).map(project => `
+      <tr>
+        <td>${committeeEscapeHtml(project.slot_order)}</td>
+        <td>${committeeEscapeHtml(project.slot_start)} - ${committeeEscapeHtml(project.slot_end)}</td>
+        <td>${committeeEscapeHtml(project.title)}</td>
+        <td>${committeeEscapeHtml(project.team_members || '—')}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="card" style="margin-bottom:14px;border:1px solid #e3e8ef">
+        <div class="card-hd">
+          <span class="card-title">${committeeEscapeHtml(plan.committee_name)}</span>
+          ${committeeStatusBadge(plan.status)}
+        </div>
+
+        <div style="font-size:13px;color:#667587;margin-bottom:10px">
+          <b>Date:</b> ${committeeEscapeHtml(plan.discussion_date)} |
+          <b>Time:</b> ${committeeEscapeHtml(plan.start_time)} - ${committeeEscapeHtml(plan.end_time)} |
+          <b>Room:</b> ${committeeEscapeHtml(plan.room_name)}
+        </div>
+
+        <div style="margin-bottom:12px">
+          <div class="field-label">Responsible Doctor</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <select class="field-select" id="responsible_${plan.plan_id}" style="flex:1;min-width:260px">
+              ${responsibleOptions}
+            </select>
+            <button class="btn btn-primary" type="button" onclick="saveResponsibleDoctor(${plan.plan_id})">Save Responsible</button>
+          </div>
+        </div>
+
+        <div class="field-label" style="margin-bottom:8px">Committee Members</div>
+        <div class="u-e47f6ecd" style="margin-bottom:12px">
+          ${membersHtml}
+        </div>
+
+        <div class="field-label" style="margin-bottom:8px">Projects In This Committee</div>
+        <div class="u-77c8140b">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Slot</th>
+                <th>Project</th>
+                <th>Team Members</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${projectsHtml || '<tr><td colspan="4">No projects assigned.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadCommitteeDashboard() {
+  if (!document.getElementById('pg-committee')) return;
+
+  try {
+    const res = await fetch('/api/coordinator/committee-dashboard');
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to load committee dashboard.');
+    }
+
+    committeeDashboardCache = data;
+    renderEligibleProjects(data.eligible_projects || []);
+    renderCommitteePlans(data.plans || []);
+    renderCurrentCommittees(data.current_committees || []);
+    renderCommitteeStats(data.stats || {});
+
+    const dateInput = document.getElementById('committeeDate');
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().slice(0, 10);
+    }
+  } catch (err) {
+    setCommitteeMessage(err.message || 'Failed to load committee dashboard.', true);
+    const eligible = document.getElementById('eligibleProjectsBox');
+    const plans = document.getElementById('committeePlansBox');
+    const current = document.getElementById('currentCommitteesBox');
+    if (eligible) eligible.innerHTML = `<div>${committeeEscapeHtml(err.message)}</div>`;
+    if (plans) plans.innerHTML = `<div>${committeeEscapeHtml(err.message)}</div>`;
+    if (current) current.innerHTML = `<div>${committeeEscapeHtml(err.message)}</div>`;
+  }
+}
+
+async function generateCommittees() {
+  const discussionDate = document.getElementById('committeeDate')?.value;
+  const startTime = document.getElementById('committeeStartTime')?.value;
+  const projectsPerCommittee = document.getElementById('projectsPerCommittee')?.value;
+
+  if (!discussionDate || !startTime || !projectsPerCommittee) {
+    setCommitteeMessage('Please fill discussion date, start time, and projects per committee.', true);
+    alert('Please fill discussion date, start time, and projects per committee.');
+    return;
+  }
+
+  try {
+    setCommitteeMessage('Generating committees...', false);
+
+    const res = await fetch('/api/coordinator/committee-generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        discussion_date: discussionDate,
+        start_time: startTime,
+        projects_per_committee: parseInt(projectsPerCommittee, 10)
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to generate committees.');
+    }
+
+    setCommitteeMessage(data.message || 'Committees generated successfully.');
+    renderCommitteePlans(data.plans || []);
+    await loadCommitteeDashboard();
+  } catch (err) {
+    setCommitteeMessage(err.message || 'Failed to generate committees.', true);
+    alert(err.message || 'Failed to generate committees.');
+  }
+}
+
+async function saveResponsibleDoctor(planId) {
+  const select = document.getElementById(`responsible_${planId}`);
+  const facultyId = select ? select.value : '';
+
+  if (!facultyId) {
+    setCommitteeMessage('Please choose the responsible doctor first.', true);
+    alert('Please choose the responsible doctor first.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/coordinator/committee/${planId}/responsible`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ faculty_id: facultyId })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to save the responsible doctor.');
+    }
+
+    setCommitteeMessage(data.message || 'Responsible doctor saved successfully.');
+    renderCommitteePlans(data.plans || []);
+    await loadCommitteeDashboard();
+  } catch (err) {
+    setCommitteeMessage(err.message || 'Failed to save the responsible doctor.', true);
+    alert(err.message || 'Failed to save the responsible doctor.');
+  }
+}
+
+function initCommitteePage() {
+  if (!document.getElementById('pg-committee')) return;
+  loadCommitteeDashboard();
+}
+
+async function resetAndRedistributeCommittees() {
+  const discussionDate = document.getElementById('committeeDate')?.value;
+  const startTime = document.getElementById('committeeStartTime')?.value;
+  const projectsPerCommittee = document.getElementById('projectsPerCommittee')?.value;
+
+  if (!discussionDate || !startTime || !projectsPerCommittee) {
+    setCommitteeMessage('Please fill discussion date, start time, and projects per committee.', true);
+    alert('Please fill discussion date, start time, and projects per committee.');
+    return;
+  }
+
+  const confirmed = confirm('This will delete the current scheduled committees and redistribute the projects again. Continue?');
+  if (!confirmed) return;
+
+  try {
+    setCommitteeMessage('Resetting and redistributing committees...', false);
+
+    const res = await fetch('/api/coordinator/committee-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        discussion_date: discussionDate,
+        start_time: startTime,
+        projects_per_committee: parseInt(projectsPerCommittee, 10)
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to reset and redistribute committees.');
+    }
+
+    setCommitteeMessage(data.message || 'Committees were reset and redistributed successfully.');
+    renderCommitteePlans(data.plans || []);
+    await loadCommitteeDashboard();
+  } catch (err) {
+    setCommitteeMessage(err.message || 'Failed to reset and redistribute committees.', true);
+    alert(err.message || 'Failed to reset and redistribute committees.');
+  }
+}
 document.addEventListener('DOMContentLoaded', () => {
   applySidebarState();
   bindSidebarHover();
   bindTabs();
   bindAI();
   initRegistrationPage();
+  initCommitteePage();
 });
