@@ -1517,3 +1517,1542 @@ WHERE full_name IN (
 ORDER BY full_name;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+--  ADDITIONAL BZU CS FACULTY / ACADEMIC STAFF MIGRATION
+--  Safe re-run: uses NOT EXISTS guards and updates existing rows.
+--  No faculty specialization is stored as 'other'.
+-- ============================================================
+
+USE apms_db;
+
+SET FOREIGN_KEY_CHECKS = 0;
+SET NAMES utf8mb4;
+
+-- Reuse an existing bcrypt hash as temporary password.
+-- Change passwords later from the application/admin panel.
+SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
+
+-- ============================================================
+-- 1) Add missing users
+--    university_id/emails are temporary placeholders.
+-- ============================================================
+INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+SELECT * FROM (
+    SELECT '2112' AS university_id, 'Dr. Ruba Awadallah' AS full_name, 'ruba.awadallah.temp@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'RA' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '2113', 'Dr. Samer Zein', 'samer.zein.temp@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
+    UNION ALL SELECT '2114', 'Dr. Abualseoud Hanani', 'abualseoud.hanani.temp@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
+    UNION ALL SELECT '2115', 'Dr. Ahmad Alsadeh', 'ahmad.alsadeh.temp@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '2116', 'Dr. Mamoun Nawahdah', 'mamoun.nawahdah.temp@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '2117', 'Dr. Ola Surakhi', 'ola.surakhi.temp@birzeit.edu', @pwd, 'supervisor', 'OS', TRUE
+    UNION ALL SELECT '2118', 'Murad Njoum', 'murad.njoum.temp@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '2119', 'Nael Qaraeen', 'nael.qaraeen.temp@birzeit.edu', @pwd, 'supervisor', 'NQ', TRUE
+) AS new_users
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM users u
+    WHERE u.full_name = new_users.full_name
+       OR u.university_id = new_users.university_id
+       OR u.email = new_users.email
+);
+
+-- ============================================================
+-- 2) Add faculty rows with CS specializations only
+--    Allowed enum values in your schema:
+--    software_engineering, artificial_intelligence, web_development,
+--    mobile, security_networks, databases, other
+--    We intentionally do NOT use 'other'.
+-- ============================================================
+INSERT INTO faculty (user_id, specialization, years_experience, title)
+SELECT
+    u.user_id,
+    CASE u.full_name
+        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'             -- General CS mapped to web/app systems
+        WHEN 'Dr. Samer Zein' THEN 'software_engineering'            -- General CS / department leadership
+        WHEN 'Dr. Abualseoud Hanani' THEN 'artificial_intelligence'  -- Speech and language technology
+        WHEN 'Dr. Ahmad Alsadeh' THEN 'security_networks'            -- Network Security and IPv6
+        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'                     -- Interactive and mobile computing
+        WHEN 'Dr. Ola Surakhi' THEN 'artificial_intelligence'        -- Biometrics and Genetic Algorithms
+        WHEN 'Murad Njoum' THEN 'databases'                          -- CS instructor mapped to databases
+        WHEN 'Nael Qaraeen' THEN 'software_engineering'              -- CS lecturer mapped to software engineering
+        ELSE 'software_engineering'
+    END AS specialization,
+    8 AS years_experience,
+    CASE u.full_name
+        WHEN 'Dr. Samer Zein' THEN 'Assoc. Prof.'
+        WHEN 'Dr. Abualseoud Hanani' THEN 'Assoc. Prof.'
+        WHEN 'Murad Njoum' THEN 'Instructor'
+        WHEN 'Nael Qaraeen' THEN 'Lecturer'
+        ELSE 'Dr.'
+    END AS title
+FROM users u
+LEFT JOIN faculty f ON f.user_id = u.user_id
+WHERE u.full_name IN (
+    'Dr. Ruba Awadallah',
+    'Dr. Samer Zein',
+    'Dr. Abualseoud Hanani',
+    'Dr. Ahmad Alsadeh',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Ola Surakhi',
+    'Murad Njoum',
+    'Nael Qaraeen'
+)
+AND f.user_id IS NULL;
+
+-- ============================================================
+-- 3) If an older migration already inserted them as 'other', fix it.
+--    This also removes 'other' from previously added CS doctors.
+-- ============================================================
+UPDATE faculty f
+JOIN users u ON u.user_id = f.user_id
+SET
+    f.specialization = CASE u.full_name
+        WHEN 'Dr. Iyad Jaber' THEN 'software_engineering'
+        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'
+        WHEN 'Dr. Samer Zein' THEN 'software_engineering'
+        WHEN 'Dr. Abualseoud Hanani' THEN 'artificial_intelligence'
+        WHEN 'Dr. Ahmad Alsadeh' THEN 'security_networks'
+        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'
+        WHEN 'Dr. Ola Surakhi' THEN 'artificial_intelligence'
+        WHEN 'Murad Njoum' THEN 'databases'
+        WHEN 'Nael Qaraeen' THEN 'software_engineering'
+        ELSE f.specialization
+    END,
+    f.title = CASE u.full_name
+        WHEN 'Dr. Samer Zein' THEN 'Assoc. Prof.'
+        WHEN 'Dr. Abualseoud Hanani' THEN 'Assoc. Prof.'
+        WHEN 'Murad Njoum' THEN 'Instructor'
+        WHEN 'Nael Qaraeen' THEN 'Lecturer'
+        ELSE f.title
+    END
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Ruba Awadallah',
+    'Dr. Samer Zein',
+    'Dr. Abualseoud Hanani',
+    'Dr. Ahmad Alsadeh',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Ola Surakhi',
+    'Murad Njoum',
+    'Nael Qaraeen'
+);
+
+-- ============================================================
+-- 4) Verification
+-- ============================================================
+SELECT
+    u.full_name,
+    u.university_id,
+    u.email,
+    u.role,
+    f.title,
+    f.specialization
+FROM users u
+JOIN faculty f ON f.user_id = u.user_id
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Ruba Awadallah',
+    'Dr. Samer Zein',
+    'Dr. Abualseoud Hanani',
+    'Dr. Ahmad Alsadeh',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Ola Surakhi',
+    'Murad Njoum',
+    'Nael Qaraeen'
+)
+ORDER BY u.full_name;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+--  END OF ADDITIONAL FACULTY MIGRATION
+
+-- ============================================================
+--  MIGRATION: student_course_results
+--  Purpose: Shared table storing each student's result in COMP4200
+--           Used by the coordinator (write) and head (read + promote)
+--  Version 1.0 · May 2026
+-- ============================================================
+
+-- ============================================================
+-- 1) Base Table: student_course_results
+-- ============================================================
+CREATE TABLE IF NOT EXISTS student_course_results (
+
+    result_id               INT           PRIMARY KEY AUTO_INCREMENT,
+    student_id              INT           NOT NULL
+                                          COMMENT 'Foreign key from students table',
+    semester_id             INT           NOT NULL
+                                          COMMENT 'The semester in which the student is evaluated (COMP4200)',
+
+    status                  ENUM('pending','passed','failed')
+                                          NOT NULL DEFAULT 'pending',
+
+    updated_by              INT           NULL
+                                          COMMENT 'user_id of the coordinator',
+    notes                   TEXT          NULL,
+
+    promoted_to_semester_id INT           NULL
+                                          COMMENT 'semester_id for COMP4300 after passing',
+    promoted_by             INT           NULL
+                                          COMMENT 'user_id of the head who promoted the student',
+    promoted_at             TIMESTAMP     NULL
+                                          COMMENT 'Actual promotion timestamp',
+
+    created_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                          ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uq_student_semester (student_id, semester_id),
+
+    FOREIGN KEY (student_id)
+        REFERENCES students(student_id)   ON DELETE CASCADE,
+    FOREIGN KEY (semester_id)
+        REFERENCES semesters(semester_id) ON DELETE RESTRICT,
+    FOREIGN KEY (updated_by)
+        REFERENCES users(user_id)         ON DELETE SET NULL,
+    FOREIGN KEY (promoted_to_semester_id)
+        REFERENCES semesters(semester_id) ON DELETE SET NULL,
+    FOREIGN KEY (promoted_by)
+        REFERENCES users(user_id)         ON DELETE SET NULL
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Student results in COMP4200 — shared between coordinator and head';
+
+-- ============================================================
+-- 2) Indexes
+-- ============================================================
+CREATE INDEX idx_scr_semester
+    ON student_course_results(semester_id, status);
+
+CREATE INDEX idx_scr_passed_not_promoted
+    ON student_course_results(status, promoted_at);
+
+-- ============================================================
+-- 3) View for Coordinator: All students + their results
+-- ============================================================
+CREATE OR REPLACE VIEW vw_coordinator_student_results AS
+SELECT
+    scr.result_id,
+    st.student_id,
+    u.user_id,
+    u.full_name          AS student_name,
+    u.university_id,
+    u.email,
+    s_comp.academic_year,
+    s_comp.course_code   AS comp_course,
+    scr.semester_id,
+    scr.status,
+    scr.notes,
+    scr.updated_at       AS result_updated_at,
+    u_coord.full_name    AS updated_by_name,
+    CASE
+        WHEN scr.promoted_at IS NOT NULL THEN 'Promoted'
+        WHEN scr.status = 'passed'       THEN 'Passed - Not Promoted Yet'
+        ELSE NULL
+    END                  AS promotion_status
+FROM students st
+JOIN users u                   ON u.user_id    = st.user_id
+LEFT JOIN student_course_results scr
+    ON scr.student_id          = st.student_id
+LEFT JOIN semesters s_comp     ON s_comp.semester_id = scr.semester_id
+LEFT JOIN users u_coord        ON u_coord.user_id    = scr.updated_by
+ORDER BY u.full_name;
+
+-- ============================================================
+-- 4) View for Head: Passed students eligible for promotion
+-- ============================================================
+CREATE OR REPLACE VIEW vw_head_pending_promotion AS
+SELECT
+    scr.result_id,
+    u.full_name          AS student_name,
+    u.university_id,
+    u.email,
+    s_comp.academic_year,
+    s_comp.course_code   AS from_course,
+    s_next.course_code   AS to_course,
+    s_next.semester_id   AS comp4300_semester_id,
+    scr.status,
+    scr.notes
+FROM student_course_results scr
+JOIN students st               ON st.student_id  = scr.student_id
+JOIN users    u                ON u.user_id      = st.user_id
+JOIN semesters s_comp          ON s_comp.semester_id = scr.semester_id
+LEFT JOIN semesters s_next
+    ON s_next.academic_year    = s_comp.academic_year
+   AND s_next.course_code      = 'COMP4300'
+WHERE scr.status               = 'passed'
+  AND scr.promoted_at          IS NULL
+ORDER BY u.full_name;
+
+-- ============================================================
+-- 5) Stored Procedure: Coordinator records a student's result
+-- ============================================================
+DROP PROCEDURE IF EXISTS sp_coordinator_set_result;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_coordinator_set_result (
+    IN  p_student_id     INT,
+    IN  p_semester_id    INT,
+    IN  p_status         ENUM('pending','passed','failed'),
+    IN  p_coordinator_id INT,
+    IN  p_notes          TEXT
+)
+BEGIN
+    INSERT INTO student_course_results
+        (student_id, semester_id, status, updated_by, notes)
+    VALUES
+        (p_student_id, p_semester_id, p_status, p_coordinator_id, p_notes)
+    ON DUPLICATE KEY UPDATE
+        status     = p_status,
+        updated_by = p_coordinator_id,
+        notes      = p_notes;
+
+    INSERT INTO notifications
+        (recipient_id, sender_id, notification_type, title, message)
+    SELECT
+        u.user_id,
+        p_coordinator_id,
+        'status_changed',
+        CASE p_status
+            WHEN 'passed' THEN 'Congratulations! You have passed COMP4200'
+            WHEN 'failed' THEN 'COMP4200 Result'
+            ELSE 'COMP4200 Result Update'
+        END,
+        CASE p_status
+            WHEN 'passed' THEN 'You have successfully passed COMP4200 and will be moving to COMP4300 soon.'
+            WHEN 'failed' THEN CONCAT('COMP4200 Result: Failed. ', IFNULL(p_notes, ''))
+            ELSE 'Your result in COMP4200 has been updated.'
+        END
+    FROM students st
+    JOIN users u ON u.user_id = st.user_id
+    WHERE st.student_id = p_student_id;
+
+    SELECT 'Result saved successfully' AS result;
+END$$
+
+DELIMITER ;
+
+-- ============================================================
+-- 6) Stored Procedure: Head promotes a passed student to COMP4300
+-- ============================================================
+DROP PROCEDURE IF EXISTS sp_head_promote_student;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_head_promote_student (
+    IN  p_result_id             INT,
+    IN  p_head_user_id          INT,
+    IN  p_comp4300_semester_id  INT
+)
+BEGIN
+    DECLARE v_student_id INT;
+    DECLARE v_status     VARCHAR(20);
+
+    SELECT student_id, status
+    INTO   v_student_id, v_status
+    FROM   student_course_results
+    WHERE  result_id = p_result_id;
+
+    IF v_status != 'passed' THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Cannot promote a student who has not passed';
+    END IF;
+
+    UPDATE student_course_results
+    SET
+        promoted_to_semester_id = p_comp4300_semester_id,
+        promoted_by             = p_head_user_id,
+        promoted_at             = NOW()
+    WHERE result_id = p_result_id;
+
+    INSERT INTO notifications
+        (recipient_id, sender_id, notification_type, title, message)
+    SELECT
+        u.user_id,
+        p_head_user_id,
+        'status_changed',
+        'You have officially been moved to COMP4300',
+        'Congratulations! You have been successfully promoted to COMP4300 for the upcoming semester.'
+    FROM students st
+    JOIN users u ON u.user_id = st.user_id
+    WHERE st.student_id = v_student_id;
+
+    SELECT 'Student promoted successfully' AS result;
+END$$
+
+DELIMITER ;
+
+-- ============================================================
+-- 7) Seed Data: pending for all students in the active semester
+-- ============================================================
+INSERT INTO student_course_results (student_id, semester_id, status)
+SELECT
+    st.student_id,
+    s.semester_id,
+    'pending'
+FROM students st
+CROSS JOIN semesters s
+WHERE s.is_active   = TRUE
+  AND s.course_code = 'COMP4200'
+ON DUPLICATE KEY UPDATE result_id = result_id;
+
+SELECT st.student_id, u.full_name
+FROM students st
+JOIN users u ON u.user_id = st.user_id
+ORDER BY st.student_id;
+
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact) VALUES
+(10, 9, TRUE),
+(10, 10, FALSE),
+
+(11, 4, TRUE),
+(11, 5, FALSE),
+
+(12, 6, TRUE),
+(12, 7, FALSE);
+
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact) VALUES
+(12, 6, TRUE),
+(12, 7, FALSE),
+(12, 8, FALSE);
+
+
+SELECT
+    p.project_id,
+    p.title,
+    u1.full_name AS preferred_1,
+    u2.full_name AS preferred_2,
+    u3.full_name AS preferred_3
+FROM projects p
+LEFT JOIN faculty f1 ON f1.faculty_id = p.preferred_supervisor_1
+LEFT JOIN users u1 ON u1.user_id = f1.user_id
+LEFT JOIN faculty f2 ON f2.faculty_id = p.preferred_supervisor_2
+LEFT JOIN users u2 ON u2.user_id = f2.user_id
+LEFT JOIN faculty f3 ON f3.faculty_id = p.preferred_supervisor_3
+LEFT JOIN users u3 ON u3.user_id = f3.user_id
+WHERE p.project_id IN (10, 11, 12);
+-- ============================================================
+--  END OF MIGRATION: student_course_results
+-- ============================================================
+
+-- ============================================================
+--  ADD 24 MORE STUDENTS
+--  Safe re-run: skips existing university_id/user_id values
+-- ============================================================
+
+USE apms_db;
+
+SET NAMES utf8mb4;
+
+-- Temporary student password hash
+SET @student_pwd := '$2b$12$eJmEAFs2Cci7.foj61N6tOthlgHqqs0XccNvIRuzvkK70jQixoWb.';
+
+INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+SELECT *
+FROM (
+    SELECT '1221001' AS university_id, 'Yousef Hamdan'      AS full_name, '1221001@students.birzeit.edu' AS email, @student_pwd AS password_hash, 'student' AS role, 'YH' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '1221002', 'Layan Daraghmeh',         '1221002@students.birzeit.edu', @student_pwd, 'student', 'LD', TRUE
+    UNION ALL SELECT '1221003', 'Noor Sawafta',            '1221003@students.birzeit.edu', @student_pwd, 'student', 'NS', TRUE
+    UNION ALL SELECT '1221004', 'Alaa Zakarneh',           '1221004@students.birzeit.edu', @student_pwd, 'student', 'AZ', TRUE
+    UNION ALL SELECT '1221005', 'Raneem Jaradat',          '1221005@students.birzeit.edu', @student_pwd, 'student', 'RJ', TRUE
+    UNION ALL SELECT '1221006', 'Malak Khoury',            '1221006@students.birzeit.edu', @student_pwd, 'student', 'MK', TRUE
+    UNION ALL SELECT '1221007', 'Hana Qasem',              '1221007@students.birzeit.edu', @student_pwd, 'student', 'HQ', TRUE
+    UNION ALL SELECT '1221008', 'Basil Jaber',             '1221008@students.birzeit.edu', @student_pwd, 'student', 'BJ', TRUE
+    UNION ALL SELECT '1221009', 'Jana Taqatqa',            '1221009@students.birzeit.edu', @student_pwd, 'student', 'JT', TRUE
+    UNION ALL SELECT '1221010', 'Omar Khatib',             '1221010@students.birzeit.edu', @student_pwd, 'student', 'OK', TRUE
+    UNION ALL SELECT '1221011', 'Reem Hammad',             '1221011@students.birzeit.edu', @student_pwd, 'student', 'RH', TRUE
+    UNION ALL SELECT '1221012', 'Yazan Abu Ayyash',        '1221012@students.birzeit.edu', @student_pwd, 'student', 'YA', TRUE
+    UNION ALL SELECT '1221013', 'Farah Odeh',              '1221013@students.birzeit.edu', @student_pwd, 'student', 'FO', TRUE
+    UNION ALL SELECT '1221014', 'Lina Barghouti',          '1221014@students.birzeit.edu', @student_pwd, 'student', 'LB', TRUE
+    UNION ALL SELECT '1221015', 'Mariam Salameh',          '1221015@students.birzeit.edu', @student_pwd, 'student', 'MS', TRUE
+    UNION ALL SELECT '1221016', 'Ali Shraim',              '1221016@students.birzeit.edu', @student_pwd, 'student', 'AS', TRUE
+    UNION ALL SELECT '1221017', 'Sama Dweikat',            '1221017@students.birzeit.edu', @student_pwd, 'student', 'SD', TRUE
+    UNION ALL SELECT '1221018', 'Husam Azzam',             '1221018@students.birzeit.edu', @student_pwd, 'student', 'HA', TRUE
+    UNION ALL SELECT '1221019', 'Aseel Masri',             '1221019@students.birzeit.edu', @student_pwd, 'student', 'AM', TRUE
+    UNION ALL SELECT '1221020', 'Rama Hamayel',            '1221020@students.birzeit.edu', @student_pwd, 'student', 'RH', TRUE
+    UNION ALL SELECT '1221021', 'Mahmoud Shtayyeh',        '1221021@students.birzeit.edu', @student_pwd, 'student', 'MS', TRUE
+    UNION ALL SELECT '1221022', 'Celine Nasser',           '1221022@students.birzeit.edu', @student_pwd, 'student', 'CN', TRUE
+    UNION ALL SELECT '1221023', 'Adam Zaid',               '1221023@students.birzeit.edu', @student_pwd, 'student', 'AZ', TRUE
+    UNION ALL SELECT '1221024', 'Shahd Abu Eisheh',        '1221024@students.birzeit.edu', @student_pwd, 'student', 'SA', TRUE
+) AS new_students
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM users u
+    WHERE u.university_id = new_students.university_id
+);
+
+INSERT INTO students (user_id, enrollment_year)
+SELECT u.user_id, 2022
+FROM users u
+WHERE u.university_id IN (
+    '1221001','1221002','1221003','1221004','1221005','1221006',
+    '1221007','1221008','1221009','1221010','1221011','1221012',
+    '1221013','1221014','1221015','1221016','1221017','1221018',
+    '1221019','1221020','1221021','1221022','1221023','1221024'
+)
+AND u.role = 'student'
+AND NOT EXISTS (
+    SELECT 1
+    FROM students s
+    WHERE s.user_id = u.user_id
+);
+
+-- Verification
+SELECT u.user_id, u.university_id, u.full_name, u.email, s.student_id, s.enrollment_year
+FROM users u
+LEFT JOIN students s ON s.user_id = u.user_id
+WHERE u.university_id IN (
+    '1221001','1221002','1221003','1221004','1221005','1221006',
+    '1221007','1221008','1221009','1221010','1221011','1221012',
+    '1221013','1221014','1221015','1221016','1221017','1221018',
+    '1221019','1221020','1221021','1221022','1221023','1221024'
+)
+ORDER BY u.university_id;
+
+
+CREATE TABLE IF NOT EXISTS discussion_rooms (
+    room_id INT PRIMARY KEY AUTO_INCREMENT,
+    room_name VARCHAR(120) NOT NULL UNIQUE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Committee Plans (one committee can discuss multiple projects)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS committee_plans (
+    plan_id INT PRIMARY KEY AUTO_INCREMENT,
+    committee_name VARCHAR(150) NOT NULL,
+    academic_year VARCHAR(20) NOT NULL,
+    discussion_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    room_id INT NOT NULL,
+    responsible_faculty_id INT NULL,
+    status ENUM('draft','scheduled','completed','cancelled') NOT NULL DEFAULT 'draft',
+    created_by INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES discussion_rooms(room_id),
+    FOREIGN KEY (responsible_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Committee Members (4 doctors, different majors)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS committee_plan_members (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    role ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    UNIQUE KEY uq_committee_plan_member (plan_id, faculty_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Projects assigned to each committee with time slots
+-- Discussion per project = 30 min
+-- Break after each project = 10 min
+-- ============================================================
+CREATE TABLE IF NOT EXISTS committee_plan_projects (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id INT NOT NULL,
+    project_id INT NOT NULL,
+    slot_order INT NOT NULL,
+    slot_start TIME NOT NULL,
+    slot_end TIME NOT NULL,
+    UNIQUE KEY uq_committee_plan_project (plan_id, project_id),
+    UNIQUE KEY uq_unique_project_committee (project_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Seed rooms
+-- ============================================================
+INSERT IGNORE INTO discussion_rooms (room_name, is_active) VALUES
+('Room 201 — Faculty of Engineering', TRUE),
+('Room 202 — Faculty of Engineering', TRUE),
+('Room 203 — Faculty of Engineering', TRUE),
+('Room 204 — Faculty of Engineering', TRUE);
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+-- Verification
+-- ============================================================
+SELECT room_id, room_name, is_active FROM discussion_rooms ORDER BY room_name;
+SHOW TABLES LIKE 'committee_plans';
+SHOW TABLES LIKE 'committee_plan_members';
+SHOW TABLES LIKE 'committee_plan_projects';
+
+
+
+CREATE TABLE IF NOT EXISTS discussion_rooms (
+    room_id      INT PRIMARY KEY AUTO_INCREMENT,
+    room_name    VARCHAR(150) NOT NULL UNIQUE,
+    sort_order   INT NOT NULL DEFAULT 1,
+    is_active    TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plans (
+    plan_id                 INT PRIMARY KEY AUTO_INCREMENT,
+    committee_name          VARCHAR(200) NOT NULL,
+    discussion_date         DATE NOT NULL,
+    start_time              TIME NOT NULL,
+    end_time                TIME NOT NULL,
+    room_id                 INT NOT NULL,
+    status                  ENUM('scheduled','ongoing','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+    created_by              INT NOT NULL,
+    responsible_faculty_id  INT NULL,
+    final_average           DECIMAL(5,2) NULL,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES discussion_rooms(room_id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (responsible_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plan_members (
+    cpm_id       INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id      INT NOT NULL,
+    faculty_id   INT NOT NULL,
+    role         ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    UNIQUE KEY uq_plan_faculty (plan_id, faculty_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plan_projects (
+    cpp_id       INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id      INT NOT NULL,
+    project_id   INT NOT NULL,
+    slot_order   INT NOT NULL,
+    slot_start   TIME NOT NULL,
+    slot_end     TIME NOT NULL,
+    UNIQUE KEY uq_plan_project (plan_id, project_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 2) Default rooms
+-- ============================================================
+
+INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+SELECT * FROM (
+    SELECT 'Room 201 — Engineering Building' AS room_name, 1 AS sort_order, 1 AS is_active
+    UNION ALL SELECT 'Room 202 — Engineering Building', 2, 1
+    UNION ALL SELECT 'Room 203 — Engineering Building', 3, 1
+    UNION ALL SELECT 'Room 204 — Engineering Building', 4, 1
+    UNION ALL SELECT 'Lab 1 — Computer Science', 5, 1
+    UNION ALL SELECT 'Lab 2 — Computer Science', 6, 1
+    UNION ALL SELECT 'Hall A — New Building', 7, 1
+    UNION ALL SELECT 'Hall B — New Building', 8, 1
+) AS rooms
+WHERE NOT EXISTS (
+    SELECT 1 FROM discussion_rooms dr WHERE dr.room_name = rooms.room_name
+);
+
+-- ============================================================
+-- 3) Add at least 8 more projects to the latest active semester
+-- ============================================================
+
+SET @target_semester_id := (
+    SELECT semester_id
+    FROM semesters
+    WHERE is_active = TRUE
+    ORDER BY semester_id DESC
+    LIMIT 1
+);
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Smart Clinic Management Platform', 'web', @target_semester_id, 5, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Smart Clinic Management Platform'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'AI Resume Screening System', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'AI Resume Screening System'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Secure Campus Access Control', 'security', @target_semester_id, 7, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Secure Campus Access Control'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Mobile Pharmacy Assistant', 'mobile', @target_semester_id, 5, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Mobile Pharmacy Assistant'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Intelligent Library Recommender', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Intelligent Library Recommender'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Cloud Attendance Tracker', 'web', @target_semester_id, 3, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Cloud Attendance Tracker'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Database Performance Analyzer', 'databases', @target_semester_id, 6, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Database Performance Analyzer'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Smart Graduation Project Marketplace', 'web', @target_semester_id, 3, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Smart Graduation Project Marketplace'
+  );
+
+-- ============================================================
+-- 4) Optional team members for the new 8 projects
+--    Safe re-run. Uses the extra students you added before.
+-- ============================================================
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221001'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Clinic Management Platform'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221002'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Clinic Management Platform'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221003'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'AI Resume Screening System'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221004'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'AI Resume Screening System'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221005'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Secure Campus Access Control'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221006'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Secure Campus Access Control'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221007'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Mobile Pharmacy Assistant'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221008'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Mobile Pharmacy Assistant'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221009'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Intelligent Library Recommender'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221010'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Intelligent Library Recommender'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221011'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Cloud Attendance Tracker'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221012'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Cloud Attendance Tracker'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221013'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Database Performance Analyzer'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221014'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Database Performance Analyzer'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221015'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Graduation Project Marketplace'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221016'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Graduation Project Marketplace'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+-- ============================================================
+-- 5) Verification
+-- ============================================================
+
+SELECT p.project_id, p.title, p.status, p.project_type
+FROM projects p
+WHERE p.semester_id = @target_semester_id
+  AND p.title IN (
+      'Smart Clinic Management Platform',
+      'AI Resume Screening System',
+      'Secure Campus Access Control',
+      'Mobile Pharmacy Assistant',
+      'Intelligent Library Recommender',
+      'Cloud Attendance Tracker',
+      'Database Performance Analyzer',
+      'Smart Graduation Project Marketplace'
+  )
+ORDER BY p.project_id;
+
+-- ============================================================
+--  RANDOM COMMITTEE DISTRIBUTION APPENDIX
+-- ============================================================
+
+USE apms_db;
+
+SET NAMES utf8mb4;
+
+-- ============================================================
+-- 1) Tables needed for multi-project committee scheduling
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS discussion_rooms (
+    room_id      INT PRIMARY KEY AUTO_INCREMENT,
+    room_name    VARCHAR(150) NOT NULL UNIQUE,
+    sort_order   INT NOT NULL DEFAULT 1,
+    is_active    TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plans (
+    plan_id                 INT PRIMARY KEY AUTO_INCREMENT,
+    committee_name          VARCHAR(200) NOT NULL,
+    discussion_date         DATE NOT NULL,
+    start_time              TIME NOT NULL,
+    end_time                TIME NOT NULL,
+    room_id                 INT NOT NULL,
+    status                  ENUM('scheduled','ongoing','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+    created_by              INT NOT NULL,
+    responsible_faculty_id  INT NULL,
+    final_average           DECIMAL(5,2) NULL,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES discussion_rooms(room_id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (responsible_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plan_members (
+    cpm_id       INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id      INT NOT NULL,
+    faculty_id   INT NOT NULL,
+    role         ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    UNIQUE KEY uq_plan_faculty (plan_id, faculty_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plan_projects (
+    cpp_id       INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id      INT NOT NULL,
+    project_id   INT NOT NULL,
+    slot_order   INT NOT NULL,
+    slot_start   TIME NOT NULL,
+    slot_end     TIME NOT NULL,
+    UNIQUE KEY uq_plan_project (plan_id, project_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 2) Default rooms
+-- ============================================================
+
+INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+SELECT * FROM (
+    SELECT 'Room 201 — Engineering Building' AS room_name, 1 AS sort_order, 1 AS is_active
+    UNION ALL SELECT 'Room 202 — Engineering Building', 2, 1
+    UNION ALL SELECT 'Room 203 — Engineering Building', 3, 1
+    UNION ALL SELECT 'Room 204 — Engineering Building', 4, 1
+    UNION ALL SELECT 'Lab 1 — Computer Science', 5, 1
+    UNION ALL SELECT 'Lab 2 — Computer Science', 6, 1
+    UNION ALL SELECT 'Hall A — New Building', 7, 1
+    UNION ALL SELECT 'Hall B — New Building', 8, 1
+) AS rooms
+WHERE NOT EXISTS (
+    SELECT 1 FROM discussion_rooms dr WHERE dr.room_name = rooms.room_name
+);
+
+-- ============================================================
+-- 3) Add at least 8 more projects to the latest active semester
+-- ============================================================
+
+SET @target_semester_id := (
+    SELECT semester_id
+    FROM semesters
+    WHERE is_active = TRUE
+    ORDER BY semester_id DESC
+    LIMIT 1
+);
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Smart Clinic Management Platform', 'web', @target_semester_id, 5, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Smart Clinic Management Platform'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'AI Resume Screening System', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'AI Resume Screening System'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Secure Campus Access Control', 'security', @target_semester_id, 7, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Secure Campus Access Control'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Mobile Pharmacy Assistant', 'mobile', @target_semester_id, 5, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Mobile Pharmacy Assistant'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Intelligent Library Recommender', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Intelligent Library Recommender'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Cloud Attendance Tracker', 'web', @target_semester_id, 3, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Cloud Attendance Tracker'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Database Performance Analyzer', 'databases', @target_semester_id, 6, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Database Performance Analyzer'
+  );
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT 'Smart Graduation Project Marketplace', 'web', @target_semester_id, 3, 'submitted', CURDATE()
+WHERE @target_semester_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM projects
+      WHERE semester_id = @target_semester_id
+        AND title = 'Smart Graduation Project Marketplace'
+  );
+
+-- ============================================================
+-- 4) Optional team members for the new 8 projects
+--    Safe re-run. Uses the extra students you added before.
+-- ============================================================
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221001'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Clinic Management Platform'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221002'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Clinic Management Platform'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221003'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'AI Resume Screening System'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221004'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'AI Resume Screening System'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221005'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Secure Campus Access Control'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221006'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Secure Campus Access Control'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221007'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Mobile Pharmacy Assistant'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221008'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Mobile Pharmacy Assistant'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221009'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Intelligent Library Recommender'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221010'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Intelligent Library Recommender'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221011'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Cloud Attendance Tracker'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221012'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Cloud Attendance Tracker'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221013'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Database Performance Analyzer'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221014'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Database Performance Analyzer'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 1
+FROM projects p
+JOIN users u ON u.university_id = '1221015'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Graduation Project Marketplace'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+INSERT INTO project_members (project_id, student_id, is_primary_contact)
+SELECT p.project_id, s.student_id, 0
+FROM projects p
+JOIN users u ON u.university_id = '1221016'
+JOIN students s ON s.user_id = u.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.title = 'Smart Graduation Project Marketplace'
+  AND NOT EXISTS (
+      SELECT 1 FROM project_members pm
+      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
+  );
+
+-- ============================================================
+-- 5) Verification
+-- ============================================================
+
+SELECT p.project_id, p.title, p.status, p.project_type
+FROM projects p
+WHERE p.semester_id = @target_semester_id
+  AND p.title IN (
+      'Smart Clinic Management Platform',
+      'AI Resume Screening System',
+      'Secure Campus Access Control',
+      'Mobile Pharmacy Assistant',
+      'Intelligent Library Recommender',
+      'Cloud Attendance Tracker',
+      'Database Performance Analyzer',
+      'Smart Graduation Project Marketplace'
+  )
+ORDER BY p.project_id;
+
+-- ============================================================
+--  COMMITTEE RANDOM DISTRIBUTION REPAIR APPENDIX
+--  Safe fixes for older databases / partial runs
+-- ============================================================
+
+USE apms_db;
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ============================================================
+-- A) discussion_rooms safe repair
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS discussion_rooms (
+    room_id      INT PRIMARY KEY AUTO_INCREMENT,
+    room_name    VARCHAR(150) NOT NULL UNIQUE,
+    sort_order   INT NOT NULL DEFAULT 1,
+    is_active    TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'discussion_rooms'
+      AND COLUMN_NAME = 'sort_order'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE discussion_rooms ADD COLUMN sort_order INT NOT NULL DEFAULT 1',
+    'SELECT "discussion_rooms.sort_order already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'discussion_rooms'
+      AND COLUMN_NAME = 'is_active'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE discussion_rooms ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1',
+    'SELECT "discussion_rooms.is_active already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- B) committee_plans safe repair
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS committee_plans (
+    plan_id                 INT PRIMARY KEY AUTO_INCREMENT,
+    committee_name          VARCHAR(200) NOT NULL,
+    discussion_date         DATE NOT NULL,
+    start_time              TIME NOT NULL,
+    end_time                TIME NOT NULL,
+    room_id                 INT NOT NULL,
+    status                  ENUM('scheduled','ongoing','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+    created_by              INT NOT NULL,
+    responsible_faculty_id  INT NULL,
+    final_average           DECIMAL(5,2) NULL,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES discussion_rooms(room_id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE RESTRICT,
+    FOREIGN KEY (responsible_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plans'
+      AND COLUMN_NAME = 'end_time'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE committee_plans ADD COLUMN end_time TIME NOT NULL DEFAULT ''09:30:00'' AFTER start_time',
+    'SELECT "committee_plans.end_time already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plans'
+      AND COLUMN_NAME = 'room_id'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE committee_plans ADD COLUMN room_id INT NULL AFTER end_time',
+    'SELECT "committee_plans.room_id already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plans'
+      AND COLUMN_NAME = 'status'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE committee_plans ADD COLUMN status ENUM(''scheduled'',''ongoing'',''completed'',''cancelled'') NOT NULL DEFAULT ''scheduled'' AFTER room_id',
+    'SELECT "committee_plans.status already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plans'
+      AND COLUMN_NAME = 'created_by'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE committee_plans ADD COLUMN created_by INT NULL AFTER status',
+    'SELECT "committee_plans.created_by already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plans'
+      AND COLUMN_NAME = 'responsible_faculty_id'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE committee_plans ADD COLUMN responsible_faculty_id INT NULL AFTER created_by',
+    'SELECT "committee_plans.responsible_faculty_id already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plans'
+      AND COLUMN_NAME = 'final_average'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE committee_plans ADD COLUMN final_average DECIMAL(5,2) NULL AFTER responsible_faculty_id',
+    'SELECT "committee_plans.final_average already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plans'
+      AND COLUMN_NAME = 'created_at'
+);
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE committee_plans ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER final_average',
+    'SELECT "committee_plans.created_at already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================================
+-- C) committee_plan_members safe repair
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS committee_plan_members (
+    cpm_id       INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id      INT NOT NULL,
+    faculty_id   INT NOT NULL,
+    role         ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    UNIQUE KEY uq_plan_faculty (plan_id, faculty_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- D) committee_plan_projects safe repair
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS committee_plan_projects (
+    cpp_id       INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id      INT NOT NULL,
+    project_id   INT NOT NULL,
+    slot_order   INT NOT NULL,
+    slot_start   TIME NOT NULL,
+    slot_end     TIME NOT NULL,
+    UNIQUE KEY uq_plan_project (plan_id, project_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- E) Default rooms safe insert
+-- ============================================================
+
+INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+SELECT * FROM (
+    SELECT 'Room 201 — Engineering Building' AS room_name, 1 AS sort_order, 1 AS is_active
+    UNION ALL SELECT 'Room 202 — Engineering Building', 2, 1
+    UNION ALL SELECT 'Room 203 — Engineering Building', 3, 1
+    UNION ALL SELECT 'Room 204 — Engineering Building', 4, 1
+    UNION ALL SELECT 'Lab 1 — Computer Science', 5, 1
+    UNION ALL SELECT 'Lab 2 — Computer Science', 6, 1
+    UNION ALL SELECT 'Hall A — New Building', 7, 1
+    UNION ALL SELECT 'Hall B — New Building', 8, 1
+) AS rooms
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM discussion_rooms dr
+    WHERE dr.room_name = rooms.room_name
+);
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+--  END OF REPAIR APPENDIX
+-- ============================================================
