@@ -515,7 +515,7 @@ def api_submit_info():
         if project:
             cursor.execute(
                 """
-                SELECT file_type, file_name, upload_status, uploaded_at
+                SELECT file_id, file_type, file_name, upload_status, uploaded_at, file_size_mb
                 FROM   project_files
                 WHERE  project_id = %s
                 ORDER  BY uploaded_at DESC
