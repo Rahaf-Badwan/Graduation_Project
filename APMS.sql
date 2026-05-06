@@ -20,6 +20,7 @@ DROP TABLE IF EXISTS ai_conversations;
 DROP TABLE IF EXISTS challenges_reflections;
 DROP TABLE IF EXISTS supervisor_assignments;
 DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS student_course_results;
 DROP TABLE IF EXISTS deadlines;
 DROP TABLE IF EXISTS supervisor_notes;
 DROP TABLE IF EXISTS final_decisions;
@@ -1665,3 +1666,238 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
 --  END OF ADDITIONAL FACULTY MIGRATION
+
+-- ============================================================
+--  MIGRATION: student_course_results
+--  Purpose: Shared table storing each student's result in COMP4200
+--           Used by the coordinator (write) and head (read + promote)
+--  Version 1.0 · May 2026
+-- ============================================================
+
+-- ============================================================
+-- 1) Base Table: student_course_results
+-- ============================================================
+CREATE TABLE IF NOT EXISTS student_course_results (
+
+    result_id               INT           PRIMARY KEY AUTO_INCREMENT,
+    student_id              INT           NOT NULL
+                                          COMMENT 'Foreign key from students table',
+    semester_id             INT           NOT NULL
+                                          COMMENT 'The semester in which the student is evaluated (COMP4200)',
+
+    status                  ENUM('pending','passed','failed')
+                                          NOT NULL DEFAULT 'pending',
+
+    updated_by              INT           NULL
+                                          COMMENT 'user_id of the coordinator',
+    notes                   TEXT          NULL,
+
+    promoted_to_semester_id INT           NULL
+                                          COMMENT 'semester_id for COMP4300 after passing',
+    promoted_by             INT           NULL
+                                          COMMENT 'user_id of the head who promoted the student',
+    promoted_at             TIMESTAMP     NULL
+                                          COMMENT 'Actual promotion timestamp',
+
+    created_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                          ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uq_student_semester (student_id, semester_id),
+
+    FOREIGN KEY (student_id)
+        REFERENCES students(student_id)   ON DELETE CASCADE,
+    FOREIGN KEY (semester_id)
+        REFERENCES semesters(semester_id) ON DELETE RESTRICT,
+    FOREIGN KEY (updated_by)
+        REFERENCES users(user_id)         ON DELETE SET NULL,
+    FOREIGN KEY (promoted_to_semester_id)
+        REFERENCES semesters(semester_id) ON DELETE SET NULL,
+    FOREIGN KEY (promoted_by)
+        REFERENCES users(user_id)         ON DELETE SET NULL
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Student results in COMP4200 — shared between coordinator and head';
+
+-- ============================================================
+-- 2) Indexes
+-- ============================================================
+CREATE INDEX idx_scr_semester
+    ON student_course_results(semester_id, status);
+
+CREATE INDEX idx_scr_passed_not_promoted
+    ON student_course_results(status, promoted_at);
+
+-- ============================================================
+-- 3) View for Coordinator: All students + their results
+-- ============================================================
+CREATE OR REPLACE VIEW vw_coordinator_student_results AS
+SELECT
+    scr.result_id,
+    st.student_id,
+    u.user_id,
+    u.full_name          AS student_name,
+    u.university_id,
+    u.email,
+    s_comp.academic_year,
+    s_comp.course_code   AS comp_course,
+    scr.semester_id,
+    scr.status,
+    scr.notes,
+    scr.updated_at       AS result_updated_at,
+    u_coord.full_name    AS updated_by_name,
+    CASE
+        WHEN scr.promoted_at IS NOT NULL THEN 'Promoted'
+        WHEN scr.status = 'passed'       THEN 'Passed - Not Promoted Yet'
+        ELSE NULL
+    END                  AS promotion_status
+FROM students st
+JOIN users u                   ON u.user_id    = st.user_id
+LEFT JOIN student_course_results scr
+    ON scr.student_id          = st.student_id
+LEFT JOIN semesters s_comp     ON s_comp.semester_id = scr.semester_id
+LEFT JOIN users u_coord        ON u_coord.user_id    = scr.updated_by
+ORDER BY u.full_name;
+
+-- ============================================================
+-- 4) View for Head: Passed students eligible for promotion
+-- ============================================================
+CREATE OR REPLACE VIEW vw_head_pending_promotion AS
+SELECT
+    scr.result_id,
+    u.full_name          AS student_name,
+    u.university_id,
+    u.email,
+    s_comp.academic_year,
+    s_comp.course_code   AS from_course,
+    s_next.course_code   AS to_course,
+    s_next.semester_id   AS comp4300_semester_id,
+    scr.status,
+    scr.notes
+FROM student_course_results scr
+JOIN students st               ON st.student_id  = scr.student_id
+JOIN users    u                ON u.user_id      = st.user_id
+JOIN semesters s_comp          ON s_comp.semester_id = scr.semester_id
+LEFT JOIN semesters s_next
+    ON s_next.academic_year    = s_comp.academic_year
+   AND s_next.course_code      = 'COMP4300'
+WHERE scr.status               = 'passed'
+  AND scr.promoted_at          IS NULL
+ORDER BY u.full_name;
+
+-- ============================================================
+-- 5) Stored Procedure: Coordinator records a student's result
+-- ============================================================
+DROP PROCEDURE IF EXISTS sp_coordinator_set_result;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_coordinator_set_result (
+    IN  p_student_id     INT,
+    IN  p_semester_id    INT,
+    IN  p_status         ENUM('pending','passed','failed'),
+    IN  p_coordinator_id INT,
+    IN  p_notes          TEXT
+)
+BEGIN
+    INSERT INTO student_course_results
+        (student_id, semester_id, status, updated_by, notes)
+    VALUES
+        (p_student_id, p_semester_id, p_status, p_coordinator_id, p_notes)
+    ON DUPLICATE KEY UPDATE
+        status     = p_status,
+        updated_by = p_coordinator_id,
+        notes      = p_notes;
+
+    INSERT INTO notifications
+        (recipient_id, sender_id, notification_type, title, message)
+    SELECT
+        u.user_id,
+        p_coordinator_id,
+        'status_changed',
+        CASE p_status
+            WHEN 'passed' THEN 'Congratulations! You have passed COMP4200'
+            WHEN 'failed' THEN 'COMP4200 Result'
+            ELSE 'COMP4200 Result Update'
+        END,
+        CASE p_status
+            WHEN 'passed' THEN 'You have successfully passed COMP4200 and will be moving to COMP4300 soon.'
+            WHEN 'failed' THEN CONCAT('COMP4200 Result: Failed. ', IFNULL(p_notes, ''))
+            ELSE 'Your result in COMP4200 has been updated.'
+        END
+    FROM students st
+    JOIN users u ON u.user_id = st.user_id
+    WHERE st.student_id = p_student_id;
+
+    SELECT 'Result saved successfully' AS result;
+END$$
+
+DELIMITER ;
+
+-- ============================================================
+-- 6) Stored Procedure: Head promotes a passed student to COMP4300
+-- ============================================================
+DROP PROCEDURE IF EXISTS sp_head_promote_student;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_head_promote_student (
+    IN  p_result_id             INT,
+    IN  p_head_user_id          INT,
+    IN  p_comp4300_semester_id  INT
+)
+BEGIN
+    DECLARE v_student_id INT;
+    DECLARE v_status     VARCHAR(20);
+
+    SELECT student_id, status
+    INTO   v_student_id, v_status
+    FROM   student_course_results
+    WHERE  result_id = p_result_id;
+
+    IF v_status != 'passed' THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Cannot promote a student who has not passed';
+    END IF;
+
+    UPDATE student_course_results
+    SET
+        promoted_to_semester_id = p_comp4300_semester_id,
+        promoted_by             = p_head_user_id,
+        promoted_at             = NOW()
+    WHERE result_id = p_result_id;
+
+    INSERT INTO notifications
+        (recipient_id, sender_id, notification_type, title, message)
+    SELECT
+        u.user_id,
+        p_head_user_id,
+        'status_changed',
+        'You have officially been moved to COMP4300',
+        'Congratulations! You have been successfully promoted to COMP4300 for the upcoming semester.'
+    FROM students st
+    JOIN users u ON u.user_id = st.user_id
+    WHERE st.student_id = v_student_id;
+
+    SELECT 'Student promoted successfully' AS result;
+END$$
+
+DELIMITER ;
+
+-- ============================================================
+-- 7) Seed Data: pending for all students in the active semester
+-- ============================================================
+INSERT INTO student_course_results (student_id, semester_id, status)
+SELECT
+    st.student_id,
+    s.semester_id,
+    'pending'
+FROM students st
+CROSS JOIN semesters s
+WHERE s.is_active   = TRUE
+  AND s.course_code = 'COMP4200'
+ON DUPLICATE KEY UPDATE result_id = result_id;
+
+-- ============================================================
+--  END OF MIGRATION: student_course_results
+-- ============================================================
