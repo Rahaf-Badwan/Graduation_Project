@@ -3,6 +3,7 @@ import bcrypt
 import secrets
 import datetime
 import os
+from datetime import datetime
 import csv
 import io
 import re
@@ -58,13 +59,35 @@ def fetch_supervisors():
     return rows
 
 
+def _db_column_exists(cursor, table_name, column_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+        """,
+        (table_name, column_name),
+    )
+    row = cursor.fetchone() or {}
+    return int(row.get("cnt") or 0) > 0
+
+
 def _get_active_semester(cursor):
-    cursor.execute("""
-        SELECT semester_id, academic_year, semester_number, course_code,
-               COALESCE(distribution_open, 0) AS distribution_open,
-               distribution_opened_at,
-               distribution_closed_at,
-               distribution_deadline
+    has_open = _db_column_exists(cursor, "semesters", "distribution_open")
+    has_opened = _db_column_exists(cursor, "semesters", "distribution_opened_at")
+    has_closed = _db_column_exists(cursor, "semesters", "distribution_closed_at")
+    has_close_at = _db_column_exists(cursor, "semesters", "distribution_close_at")
+
+    fields = ["semester_id", "academic_year", "semester_number", "course_code"]
+    fields.append("COALESCE(distribution_open, 0) AS distribution_open" if has_open else "0 AS distribution_open")
+    fields.append("distribution_opened_at" if has_opened else "NULL AS distribution_opened_at")
+    fields.append("distribution_closed_at" if has_closed else "NULL AS distribution_closed_at")
+    fields.append("distribution_close_at" if has_close_at else "NULL AS distribution_close_at")
+
+    cursor.execute(f"""
+        SELECT {', '.join(fields)}
         FROM semesters
         WHERE is_active = TRUE
         ORDER BY semester_id DESC
@@ -73,16 +96,16 @@ def _get_active_semester(cursor):
     return cursor.fetchone()
 
 
-
-
-def _is_distribution_open(semester):
-    """Registration is visible/open only if opened and the close date has not passed."""
-    if not semester or int(semester.get("distribution_open") or 0) != 1:
+def _distribution_is_open(semester):
+    if not semester:
         return False
-    deadline = semester.get("distribution_deadline")
-    if deadline and datetime.datetime.now() > deadline:
+    if not bool(semester.get("distribution_open") or 0):
+        return False
+    close_at = semester.get("distribution_close_at")
+    if close_at and datetime.now() >= close_at:
         return False
     return True
+
 
 def _csv_response(filename, headers, rows):
     output = io.StringIO()
@@ -638,15 +661,13 @@ def api_student_registration_check():
             return jsonify({
                 "registered": True,
                 "project": project,
-                "distribution_open": _is_distribution_open(semester),
-                "deadline": str(semester.get("distribution_deadline") or "")
+                "distribution_open": _distribution_is_open(semester)
             })
 
         return jsonify({
             "registered": False,
             "project": None,
-            "distribution_open": _is_distribution_open(semester),
-            "deadline": str(semester.get("distribution_deadline") or "")
+            "distribution_open": _distribution_is_open(semester)
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -666,10 +687,10 @@ def api_student_distribution_window_status():
             return jsonify({"error": "No active semester found."}), 400
 
         return jsonify({
-            "is_open": _is_distribution_open(semester),
+            "is_open": _distribution_is_open(semester),
             "opened_at": str(semester.get("distribution_opened_at") or ""),
             "closed_at": str(semester.get("distribution_closed_at") or ""),
-            "deadline": str(semester.get("distribution_deadline") or "")
+            "close_at": str(semester.get("distribution_close_at") or "")
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -704,7 +725,7 @@ def api_student_distribution_submit():
             db.close()
             return jsonify({"error": "No active semester is configured."}), 400
 
-        if not _is_distribution_open(semester):
+        if not _distribution_is_open(semester):
             cursor.close()
             db.close()
             return jsonify({"error": "Student distribution is currently closed."}), 403

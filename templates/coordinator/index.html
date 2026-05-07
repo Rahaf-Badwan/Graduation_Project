@@ -6,206 +6,53 @@
 
 {% block content %}
 <div class="page page-single on" id="pg-dashboard">
-        <div class="stats-row u-0e216688">
-          <div class="stat">
-            <div class="stat-num u-c293fd73">312</div>
-            <div class="stat-label">Total Projects</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num u-90f01645">7</div>
-            <div class="stat-label">Awaiting Review</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num u-a9721929">23</div>
-            <div class="stat-label">Under Evaluation</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num u-cfb6c12e">268</div>
-            <div class="stat-label">Accepted & Archived</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num u-bc7c441e">14</div>
-            <div class="stat-label">Rejected</div>
-          </div>
+  <div class="stats-row u-0e216688">
+    <div class="stat"><div class="stat-num u-c293fd73" id="dashTotalProjects">0</div><div class="stat-label">Total Projects</div></div>
+    <div class="stat"><div class="stat-num u-90f01645" id="dashAwaitingReview">0</div><div class="stat-label">Awaiting Review</div></div>
+    <div class="stat"><div class="stat-num u-a9721929" id="dashUnderEvaluation">0</div><div class="stat-label">Under Evaluation</div></div>
+    <div class="stat"><div class="stat-num u-cfb6c12e" id="dashAccepted">0</div><div class="stat-label">Accepted / Archived</div></div>
+    <div class="stat"><div class="stat-num u-bc7c441e" id="dashRejected">0</div><div class="stat-label">Rejected</div></div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Projects Waiting for Your Decision</span>
+          <button class="card-action" data-go="review" type="button">Review All ←</button>
         </div>
+        <div id="dashLatestProjects"><div>Loading...</div></div>
+      </div>
 
-        <div class="two-col">
-          <div>
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">Projects Waiting for Your Decision</span>
-                <button class="card-action" data-go="review" type="button">Review All ←</button>
-              </div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Coordinator Workflow Progress</span></div>
+        <div id="dashWorkflowProgress"><div>Loading...</div></div>
+      </div>
+    </div>
 
-              <div class="review-card new-proj">
-                <div class="u-e8f8c28c">
-                  <div class="u-2e61148f">Student Records Management System</div>
-                  <span class="pill p-new">New</span>
-                </div>
-                <div class="u-6aa10742">Salma Al-Khatib · Dr. Mahmoud Salem · Submitted 2 hours ago</div>
-                <div class="btn-row">
-                  <button class="btn btn-success u-d59a4528"
-                    data-prompt="The coordinator approved the Student Records Management System project in APMS ↗"
-                    type="button">✓ Accept</button>
-                  <button class="btn btn-danger u-d59a4528" type="button">✗ Reject</button>
-                  <button class="btn btn-outline u-d59a4528" data-go="review" type="button">Detailed Review</button>
-                </div>
-              </div>
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Project Distribution by Status</span></div>
+        <div id="dashStatusDistribution" class="u-a10c5e0d"><div>Loading...</div></div>
+      </div>
 
-              <div class="review-card new-proj">
-                <div class="u-e8f8c28c">
-                  <div class="u-2e61148f">Smart Delivery App</div>
-                  <span class="pill p-new">New</span>
-                </div>
-                <div class="u-6aa10742">Karim Odeh · Dr. Lina Haddad · Submitted 5 hours ago</div>
-                <div class="btn-row">
-                  <button class="btn btn-success u-d59a4528" type="button">✓ Accept</button>
-                  <button class="btn btn-danger u-d59a4528" type="button">✗ Reject</button>
-                  <button class="btn btn-outline u-d59a4528" data-go="review" type="button">Detailed Review</button>
-                </div>
-              </div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Projects by Type</span></div>
+        <div id="dashTypeDistribution" class="u-a10c5e0d"><div>Loading...</div></div>
+      </div>
 
-              <div class="review-card pending">
-                <div class="u-e8f8c28c">
-                  <div class="u-2e61148f">Academic Project Lifecycle Management System</div>
-                  <span class="pill p-review">In Review</span>
-                </div>
-                <div class="u-6aa10742">Rahaf Badwan and others · Dr. Naemeh Harbawi · 3 days ago</div>
-                <div class="btn-row">
-                  <button class="btn btn-success u-d59a4528" type="button">✓ Accept</button>
-                  <button class="btn btn-outline u-d59a4528" type="button">Request Revision</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">Semester Progress</span>
-              </div>
-              <div class="prog-wrap">
-                <div class="prog-label">
-                  <span>Submitted Projects</span>
-                  <span class="u-44265a69">91%</span>
-                </div>
-                <div class="prog-bg">
-                  <div class="prog-fill u-927ea9a3"></div>
-                </div>
-              </div>
-              <div class="prog-wrap">
-                <div class="prog-label">
-                  <span>Initial Review</span>
-                  <span class="u-44265a69">77%</span>
-                </div>
-                <div class="prog-bg">
-                  <div class="prog-fill u-5e11a8ab"></div>
-                </div>
-              </div>
-              <div class="prog-wrap">
-                <div class="prog-label">
-                  <span>Committee Formation</span>
-                  <span class="u-44265a69">64%</span>
-                </div>
-                <div class="prog-bg">
-                  <div class="prog-fill u-ddc9dbad"></div>
-                </div>
-              </div>
-              <div class="prog-wrap">
-                <div class="prog-label">
-                  <span>Final Evaluation</span>
-                  <span class="u-44265a69">41%</span>
-                </div>
-                <div class="prog-bg">
-                  <div class="prog-fill u-6ad0f1ea"></div>
-                </div>
-              </div>
-              <div class="prog-wrap">
-                <div class="prog-label">
-                  <span>Archiving</span>
-                  <span class="u-44265a69">29%</span>
-                </div>
-                <div class="prog-bg">
-                  <div class="prog-fill u-f92bcd9d"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">Project Distribution by Status</span>
-              </div>
-              <div class="u-a10c5e0d">
-                <div class="u-4ca7474c">
-                  <div class="u-e62a6be1"></div>
-                  <span class="u-4d41011b">Accepted & Archived</span>
-                  <div class="u-f2ddd5a1">
-                    <div class="u-d26338e7"></div>
-                  </div>
-                  <span class="u-d0321fbe">268</span>
-                </div>
-                <div class="u-4ca7474c">
-                  <div class="u-abd30dfd"></div>
-                  <span class="u-4d41011b">Under Evaluation</span>
-                  <div class="u-f2ddd5a1">
-                    <div class="u-f9566361"></div>
-                  </div>
-                  <span class="u-d0321fbe">23</span>
-                </div>
-                <div class="u-4ca7474c">
-                  <div class="u-dd6cef9f"></div>
-                  <span class="u-4d41011b">Awaiting Review</span>
-                  <div class="u-f2ddd5a1">
-                    <div class="u-93eb44c1"></div>
-                  </div>
-                  <span class="u-d0321fbe">7</span>
-                </div>
-                <div class="u-4ca7474c">
-                  <div class="u-d00e3c80"></div>
-                  <span class="u-4d41011b">Rejected</span>
-                  <div class="u-f2ddd5a1">
-                    <div class="u-d3278ec4"></div>
-                  </div>
-                  <span class="u-d0321fbe">14</span>
-                </div>
-              </div>
-              <div class="u-ba5b4bbb">
-                <span class="u-b467ef32">Acceptance Rate This Semester</span>
-                <span class="u-a3914567">95%</span>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">Upcoming Committees</span>
-                <button class="card-action" data-go="committee" type="button">Manage Committees ←</button>
-              </div>
-              <div class="u-a10c5e0d">
-                <div class="u-5a4d4483">
-                  <div class="u-213dde1e">APMS Project Committee</div>
-                  <div class="u-ebacd908">20 Feb · 5 members · 10:00 AM</div>
-                </div>
-                <div class="u-d0bbda29">
-                  <div class="u-475b0685">AI System Project Committee</div>
-                  <div class="u-569d1fff">21 Feb · 5 members · 2:00 PM</div>
-                </div>
-                <div class="u-5771b4a7">
-                  <div class="u-a694d8f3">E-Learning Platform Committee</div>
-                  <div class="u-03d43b2e">22 Feb · 4 members · Time TBD</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">Latest Notifications</span>
-                <button class="card-action" data-go="notifs" type="button">All ←</button>
-              </div>
-              <div class="u-2e54dd8c">◉ New project submitted: Student Records Management System</div>
-              <div class="u-2e54dd8c">✦ Dr. Mahmoud Salem completed evaluation of 3 projects</div>
-              <div class="u-1966a018">⚑ Reminder: 7 projects are waiting for a review decision</div>
-            </div>
-          </div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Semester Control</span></div>
+        <div class="u-510af369">
+          Student registration window: <b id="dashDistributionStatus">Loading...</b><br>
+          Scheduled committees: <b id="dashCommitteesCount">0</b>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn btn-primary" type="button" data-go="registration">Student Distribution</button>
+          <button class="btn btn-outline" type="button" data-go="committee">Committees</button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

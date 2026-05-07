@@ -3,7 +3,12 @@ from functools import wraps
 
 
 def _wants_json_response():
-    return request.path.startswith("/api/") or "application/json" in (request.headers.get("Accept") or "")
+    """API routes must return JSON, not an HTML login page.
+    This prevents dashboard fetch() from crashing with:
+    Unexpected token '<', "<!doctype ..." is not valid JSON
+    """
+    accept = request.headers.get("Accept") or ""
+    return request.path.startswith("/api/") or "application/json" in accept
 
 
 def login_required(role=None):

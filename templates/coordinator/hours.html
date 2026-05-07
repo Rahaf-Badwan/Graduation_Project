@@ -10,19 +10,17 @@
     <div>
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Graduation Project Supervision Hours</span>
+          <span class="card-title">Graduation Project Hours Wanted</span>
         </div>
 
         <div class="u-0ffd9126">
-          ℹ This screen now reads only the number of <b>graduation project supervision hours</b>
-          each doctor wants to take.
+          This page only manages the number of <b>graduation project supervision hours</b> each doctor wants to take.
+          It does not calculate all university teaching hours.
           <br><br>
-          <b>Used graduation hours = supervised students × 0.5 hour</b>
-          <br>
-          <b>Remaining hours = wanted graduation hours − used graduation hours</b>
+          <b>Used hours = number of supervised graduation students × 0.5</b>
         </div>
 
-        <div id="facultyHoursBars">
+        <div id="facultyHoursBars" style="margin-top:14px">
           <div>Loading...</div>
         </div>
       </div>
@@ -31,87 +29,51 @@
     <div>
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Set Doctor Graduation Project Hours</span>
-        </div>
-
-        <div class="u-7dcbcef8">
-          ◈ Choose a doctor and enter only the number of graduation-project hours they want to take.
-        </div>
-
-        <div class="field-wrap">
-          <div class="field-label">Select Professor</div>
-          <select class="field-select" id="professorSelect" onchange="fillProfessorData()">
-            <option value="">Select professor...</option>
-          </select>
+          <span class="card-title">Edit Doctor Project Hours</span>
         </div>
 
         <div class="form-grid">
           <div class="field-wrap">
-            <div class="field-label">Employment Type</div>
-            <select class="field-select" id="employmentType">
-              <option value="full_time">Full-time</option>
-              <option value="part_time">Part-time</option>
+            <div class="field-label">Doctor</div>
+            <select class="field-select" id="professorSelect" onchange="fillFacultyHourForm()">
+              <option value="">Select doctor...</option>
             </select>
           </div>
 
           <div class="field-wrap">
             <div class="field-label">Graduation Project Hours Wanted</div>
-            <input class="field-input" id="graduationProjectHours" type="number" min="0" max="100" step="0.5" value="0" oninput="updatePreview()" />
+            <input class="field-input" id="graduationProjectHours" type="number" min="0" step="0.5" placeholder="Example: 3" />
           </div>
         </div>
 
-        <div class="form-grid">
-          <div class="field-wrap">
-            <div class="field-label">Current Supervised Students</div>
-            <input class="field-input" id="supervisedStudents" type="number" min="0" value="0" readonly />
-          </div>
-
-          <div class="field-wrap">
-            <div class="field-label">Used Graduation Hours</div>
-            <input class="field-input" id="usedGraduationHours" type="number" min="0" step="0.5" value="0" readonly />
-          </div>
+        <div class="u-510af369" style="margin-top:12px">
+          Example: if a doctor wants <b>3 hours</b>, then the doctor can supervise about <b>6 students</b> because each student counts as <b>0.5 hour</b>.
         </div>
 
-        <div class="form-grid">
-          <div class="field-wrap">
-            <div class="field-label">Current Supervised Groups</div>
-            <input class="field-input" id="supervisedGroups" type="number" min="0" value="0" readonly />
-          </div>
-
-          <div class="field-wrap">
-            <div class="field-label">Remaining Graduation Hours</div>
-            <input class="field-input" id="remainingGraduationHours" type="number" step="0.5" value="0" readonly />
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-primary" type="button" onclick="saveFacultyLoad()">Save Changes</button>
+        <div class="btn-row u-92d17336">
+          <button class="btn btn-primary u-9bd93d36" type="button" onclick="saveFacultyHours()">Save Hours</button>
+          <button class="btn btn-outline u-9bd93d36" type="button" onclick="loadFacultyHoursData()">Refresh</button>
         </div>
 
         <div id="hoursMsg" style="margin-top:12px;font-size:12px"></div>
       </div>
 
       <div class="card">
-        <div class="card-hd">
-          <span class="card-title">Graduation Hours Summary</span>
-        </div>
-
+        <div class="card-hd"><span class="card-title">Summary</span></div>
         <div class="u-77c8140b">
           <table class="reg-table">
             <thead>
               <tr>
-                <th>Professor</th>
-                <th>Type</th>
+                <th>Doctor</th>
                 <th>Wanted Hours</th>
                 <th>Students</th>
                 <th>Used Hours</th>
-                <th>Groups</th>
                 <th>Remaining</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody id="hoursSummaryBody">
-              <tr><td colspan="8">Loading...</td></tr>
+              <tr><td colspan="6">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -123,7 +85,7 @@
 <script>
 let facultyData = [];
 
-function escapeHtml(value) {
+function hEscape(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -132,83 +94,62 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-function num(v, fallback = 0) {
-  const n = parseFloat(v);
+function hNum(value, fallback = 0) {
+  const n = parseFloat(value);
   return Number.isFinite(n) ? n : fallback;
 }
 
-function normalizeRow(row) {
-  const wantedHours = num(row.graduation_project_hours ?? row.wanted_graduation_hours, 0);
-  const supervisedGroups = parseInt(row.supervised_groups ?? 0, 10) || 0;
-  const supervisedStudents = parseInt(row.supervised_students ?? 0, 10) || 0;
-  const usedHours = num(row.used_graduation_hours ?? row.student_load_hours, supervisedStudents * 0.5);
-  const remainingHours = num(row.remaining_hours, wantedHours - usedHours);
-
-  return {
-    ...row,
-    graduation_project_hours: wantedHours,
-    supervised_groups: supervisedGroups,
-    supervised_students: supervisedStudents,
-    used_graduation_hours: usedHours,
-    remaining_hours: remainingHours,
-    employment_type: row.employment_type || 'full_time',
-    status: row.status || 'No Capacity Set'
-  };
+function normalizeFacultyHour(row) {
+  const wanted = hNum(row.graduation_project_hours ?? row.wanted_hours, 0);
+  const students = parseInt(row.project_students ?? 0, 10) || 0;
+  const used = hNum(row.used_hours, students * 0.5);
+  const remaining = hNum(row.remaining_hours, wanted - used);
+  return { ...row, wanted_hours: wanted, project_students: students, used_hours: used, remaining_hours: remaining };
 }
 
 async function loadFacultyHoursData() {
   const barsBox = document.getElementById('facultyHoursBars');
   const summaryBody = document.getElementById('hoursSummaryBody');
   const professorSelect = document.getElementById('professorSelect');
+  const msg = document.getElementById('hoursMsg');
 
   try {
     const res = await fetch('/api/coordinator/faculty-hours-data');
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load faculty hours.');
 
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to load faculty hours.');
-    }
-
-    facultyData = (data.faculty || []).map(normalizeRow);
+    facultyData = (data.faculty || []).map(normalizeFacultyHour);
     renderFacultyBars(facultyData);
     renderSummaryTable(facultyData);
     renderProfessorSelect(facultyData);
-
+    if (msg) msg.textContent = '';
   } catch (err) {
-    barsBox.innerHTML = `<div>${escapeHtml(err.message)}</div>`;
-    summaryBody.innerHTML = `<tr><td colspan="8">${escapeHtml(err.message)}</td></tr>`;
-    professorSelect.innerHTML = '<option value="">Select professor...</option>';
+    barsBox.innerHTML = `<div>${hEscape(err.message)}</div>`;
+    summaryBody.innerHTML = `<tr><td colspan="6">${hEscape(err.message)}</td></tr>`;
+    professorSelect.innerHTML = '<option value="">Select doctor...</option>';
   }
 }
 
 function renderFacultyBars(rows) {
   const box = document.getElementById('facultyHoursBars');
-
   if (!rows.length) {
-    box.innerHTML = '<div>No faculty graduation-hours data found.</div>';
+    box.innerHTML = '<div>No faculty data found.</div>';
     return;
   }
 
-  box.innerHTML = rows.map(raw => {
-    const row = normalizeRow(raw);
-    const wanted = Math.max(row.graduation_project_hours, 0);
-    const percent = wanted > 0 ? Math.min((row.used_graduation_hours / wanted) * 100, 100) : 0;
-    let fillClass = 'h-ok';
-    if (row.remaining_hours < 0) fillClass = 'h-over';
-    else if (row.remaining_hours <= 1 && wanted > 0) fillClass = 'h-warn';
-
+  box.innerHTML = rows.map(row => {
+    const percent = row.wanted_hours > 0 ? Math.min((row.used_hours / row.wanted_hours) * 100, 100) : 0;
+    const fillColor = row.remaining_hours < 0 ? '#dc2626' : row.remaining_hours < 0.5 ? '#f59e0b' : '#0f6e56';
     return `
-      <div class="hours-bar-wrap">
-        <div class="hours-bar-top">
-          <span class="u-44265a69">${escapeHtml(row.full_name)}</span>
-          <span class="u-cfb6c12e">${row.used_graduation_hours.toFixed(1)} / ${row.graduation_project_hours.toFixed(1)} hrs</span>
+      <div class="hours-bar-wrap" style="margin-bottom:14px">
+        <div class="hours-bar-top" style="display:flex;justify-content:space-between;gap:12px">
+          <span class="u-44265a69">${hEscape(row.full_name)}</span>
+          <span class="u-cfb6c12e">${row.used_hours.toFixed(1)} / ${row.wanted_hours.toFixed(1)} hrs</span>
         </div>
-        <div class="hours-bar-bg">
-          <div class="hours-bar-fill ${fillClass}" style="width:${percent}%"></div>
+        <div class="hours-bar-bg" style="height:9px;background:#edf2f7;border-radius:999px;overflow:hidden;margin:8px 0">
+          <div style="height:100%;width:${percent}%;background:${fillColor};border-radius:999px"></div>
         </div>
-        <div class="u-de9298af">
-          ${row.supervised_students} students × 0.5 = ${row.used_graduation_hours.toFixed(1)} hrs · Remaining: ${row.remaining_hours.toFixed(1)} hrs
-        </div>
+        <div class="u-de9298af">${row.project_students} students × 0.5 = ${row.used_hours.toFixed(1)} used hours</div>
       </div>
     `;
   }).join('');
@@ -216,24 +157,21 @@ function renderFacultyBars(rows) {
 
 function renderSummaryTable(rows) {
   const body = document.getElementById('hoursSummaryBody');
-
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="8">No summary data found.</td></tr>';
+    body.innerHTML = '<tr><td colspan="6">No data found.</td></tr>';
     return;
   }
 
-  body.innerHTML = rows.map(raw => {
-    const row = normalizeRow(raw);
+  body.innerHTML = rows.map(row => {
+    const status = row.status || (row.wanted_hours <= 0 ? 'Not Set' : row.remaining_hours < 0 ? 'Over Wanted Hours' : row.remaining_hours < 0.5 ? 'Full' : 'Available');
     return `
       <tr>
-        <td>${escapeHtml(row.full_name)}</td>
-        <td>${row.employment_type === 'full_time' ? 'Full-time' : 'Part-time'}</td>
-        <td>${row.graduation_project_hours.toFixed(1)}</td>
-        <td>${row.supervised_students}</td>
-        <td>${row.used_graduation_hours.toFixed(1)}</td>
-        <td>${row.supervised_groups}</td>
+        <td>${hEscape(row.full_name)}</td>
+        <td>${row.wanted_hours.toFixed(1)}</td>
+        <td>${row.project_students}</td>
+        <td>${row.used_hours.toFixed(1)}</td>
         <td>${row.remaining_hours.toFixed(1)}</td>
-        <td>${escapeHtml(row.status)}</td>
+        <td><span class="pill ${row.remaining_hours < 0 ? 'p-pending' : 'p-accepted'}">${hEscape(status)}</span></td>
       </tr>
     `;
   }).join('');
@@ -241,74 +179,51 @@ function renderSummaryTable(rows) {
 
 function renderProfessorSelect(rows) {
   const select = document.getElementById('professorSelect');
-  select.innerHTML = '<option value="">Select professor...</option>';
-
-  rows.forEach(raw => {
-    const row = normalizeRow(raw);
-    const opt = document.createElement('option');
-    opt.value = row.faculty_id;
-    opt.textContent = row.full_name;
-    select.appendChild(opt);
-  });
+  const current = select.value;
+  select.innerHTML = '<option value="">Select doctor...</option>' + rows.map(row => `
+    <option value="${row.faculty_id}">${hEscape(row.full_name)}</option>
+  `).join('');
+  if (current) select.value = current;
 }
 
-function fillProfessorData() {
-  const id = document.getElementById('professorSelect').value;
-  const row = normalizeRow(facultyData.find(x => String(x.faculty_id) === String(id)) || {});
-
-  if (!row.faculty_id) return;
-
-  document.getElementById('employmentType').value = row.employment_type;
-  document.getElementById('graduationProjectHours').value = row.graduation_project_hours;
-  document.getElementById('supervisedGroups').value = row.supervised_groups;
-  document.getElementById('supervisedStudents').value = row.supervised_students;
-  document.getElementById('usedGraduationHours').value = row.used_graduation_hours.toFixed(1);
-  document.getElementById('remainingGraduationHours').value = row.remaining_hours.toFixed(1);
-}
-
-function updatePreview() {
-  const wanted = num(document.getElementById('graduationProjectHours').value, 0);
-  const used = num(document.getElementById('usedGraduationHours').value, 0);
-  document.getElementById('remainingGraduationHours').value = (wanted - used).toFixed(1);
-}
-
-async function saveFacultyLoad() {
+function fillFacultyHourForm() {
   const facultyId = document.getElementById('professorSelect').value;
+  const row = facultyData.find(x => String(x.faculty_id) === String(facultyId));
+  document.getElementById('graduationProjectHours').value = row ? row.wanted_hours : '';
+}
+
+async function saveFacultyHours() {
+  const facultyId = document.getElementById('professorSelect').value;
+  const hours = document.getElementById('graduationProjectHours').value;
   const msg = document.getElementById('hoursMsg');
 
   if (!facultyId) {
-    msg.textContent = 'Please select a professor first.';
+    msg.style.color = '#c62828';
+    msg.textContent = 'Please choose a doctor.';
     return;
   }
 
   try {
+    msg.style.color = '#444';
+    msg.textContent = 'Saving...';
     const res = await fetch('/api/coordinator/faculty-hours-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        faculty_id: facultyId,
-        employment_type: document.getElementById('employmentType').value,
-        graduation_project_hours: document.getElementById('graduationProjectHours').value
-      })
+      body: JSON.stringify({ faculty_id: facultyId, graduation_project_hours: hours })
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to save graduation project hours.');
-    }
-
+    if (!res.ok) throw new Error(data.error || 'Failed to save hours.');
+    msg.style.color = 'green';
     msg.textContent = data.message || 'Saved successfully.';
     await loadFacultyHoursData();
-    fillProfessorData();
-
+    document.getElementById('professorSelect').value = facultyId;
+    fillFacultyHourForm();
   } catch (err) {
+    msg.style.color = '#c62828';
     msg.textContent = err.message;
   }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadFacultyHoursData();
-});
+document.addEventListener('DOMContentLoaded', loadFacultyHoursData);
 </script>
 {% endblock %}
