@@ -75,27 +75,28 @@ def _get_anchor_semester_for_year(cursor, academic_year):
 
 
 def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id=None):
+    """
+    Graduation-project-hours logic:
+    - The coordinator enters ONLY how many graduation project supervision hours
+      the doctor wants to take.
+    - Used hours are calculated from the supervised students: students × 0.5.
+    - Remaining hours = wanted graduation hours - used graduation hours.
+    """
     if anchor_semester_id is None:
         anchor = _get_anchor_semester_for_year(cursor, academic_year)
         anchor_semester_id = anchor["semester_id"] if anchor else None
 
     settings = {
-        "base_hours": 12.0,
-        "max_hours": 36.0,
+        "graduation_project_hours": 0.0,
         "employment_type": "full_time",
-        "extra_bonus": 0.0,
-        "assigned_courses": "",
     }
 
     if anchor_semester_id:
         cursor.execute(
             """
             SELECT
-                COALESCE(base_hours, 12) AS base_hours,
-                COALESCE(max_hours, 36) AS max_hours,
-                COALESCE(employment_type, 'full_time') AS employment_type,
-                COALESCE(extra_bonus, 0) AS extra_bonus,
-                COALESCE(assigned_courses, '') AS assigned_courses
+                COALESCE(graduation_project_hours, 0) AS graduation_project_hours,
+                COALESCE(employment_type, 'full_time') AS employment_type
             FROM faculty_load_settings
             WHERE faculty_id = %s AND semester_id = %s
             LIMIT 1
@@ -141,39 +142,35 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
 
     total_groups = project_groups + section_groups
     total_students = project_students + section_students
-    student_load_hours = total_students * 0.5
 
-    base_hours = float(settings["base_hours"] or 12)
-    max_hours = float(settings["max_hours"] or 36)
-    extra_bonus = float(settings["extra_bonus"] or 0)
-    total_year_hours = base_hours + student_load_hours + extra_bonus
-    remaining_hours = max_hours - total_year_hours
+    graduation_project_hours = float(settings.get("graduation_project_hours") or 0)
+    used_graduation_hours = total_students * 0.5
+    remaining_hours = graduation_project_hours - used_graduation_hours
 
-    if total_year_hours > max_hours:
-        status = "Over Limit"
-    elif total_year_hours >= max_hours - 0.5:
-        status = "At Limit"
-    elif total_year_hours >= max_hours - 4:
-        status = "Near Limit"
-    elif total_year_hours < 12:
-        status = "Below Minimum"
+    if graduation_project_hours <= 0:
+        status = "No Capacity Set"
+    elif remaining_hours < 0:
+        status = "Over Requested Hours"
+    elif remaining_hours == 0:
+        status = "Full"
+    elif remaining_hours <= 1:
+        status = "Almost Full"
     else:
-        status = "Within Limit"
+        status = "Available"
 
     return {
-        "base_hours": base_hours,
-        "max_hours": max_hours,
-        "employment_type": settings["employment_type"],
-        "extra_bonus": extra_bonus,
-        "assigned_courses": settings["assigned_courses"],
+        "graduation_project_hours": graduation_project_hours,
+        "wanted_graduation_hours": graduation_project_hours,
+        "employment_type": settings.get("employment_type") or "full_time",
         "project_groups": project_groups,
         "project_students": project_students,
         "section_groups": section_groups,
         "section_students": section_students,
         "supervised_groups": total_groups,
         "supervised_students": total_students,
-        "student_load_hours": student_load_hours,
-        "total_year_hours": total_year_hours,
+        "used_graduation_hours": used_graduation_hours,
+        "student_load_hours": used_graduation_hours,
+        "total_year_hours": used_graduation_hours,
         "remaining_hours": remaining_hours,
         "status": status,
         "can_take_one_student": remaining_hours >= 0.5,
@@ -205,30 +202,29 @@ def fetch_supervisors():
     result = []
     for row in rows:
         snapshot = _faculty_load_snapshot(cursor, row["faculty_id"], academic_year, anchor_semester_id) if academic_year else {
-            "base_hours": 12.0,
-            "max_hours": 36.0,
+            "graduation_project_hours": 0.0,
+            "wanted_graduation_hours": 0.0,
             "employment_type": "full_time",
-            "extra_bonus": 0.0,
-            "assigned_courses": "",
             "project_groups": 0,
             "project_students": 0,
             "section_groups": 0,
             "section_students": 0,
             "supervised_groups": 0,
             "supervised_students": 0,
+            "used_graduation_hours": 0.0,
             "student_load_hours": 0.0,
-            "total_year_hours": 12.0,
-            "remaining_hours": 24.0,
-            "status": "Within Limit",
-            "can_take_one_student": True,
+            "total_year_hours": 0.0,
+            "remaining_hours": 0.0,
+            "status": "No Capacity Set",
+            "can_take_one_student": False,
         }
 
         result.append({
             "faculty_id": row["faculty_id"],
             "full_name": row["full_name"],
             "assigned_projects": snapshot["supervised_groups"],
-            "current_hours": snapshot["total_year_hours"],
-            "max_hours": snapshot["max_hours"],
+            "current_hours": snapshot["used_graduation_hours"],
+            "max_hours": snapshot["graduation_project_hours"],
             "remaining_hours": snapshot["remaining_hours"],
             "status": snapshot["status"],
             "can_take_one_student": snapshot["can_take_one_student"],
@@ -801,21 +797,18 @@ def api_faculty_hours_data():
             result.append({
                 "faculty_id": row["faculty_id"],
                 "full_name": row["full_name"],
-                "base_hours": snapshot["base_hours"],
-                "min_hours": 12.0,
-                "max_hours": snapshot["max_hours"],
                 "employment_type": snapshot["employment_type"],
-                "extra_bonus": snapshot["extra_bonus"],
+                "graduation_project_hours": snapshot["graduation_project_hours"],
+                "wanted_graduation_hours": snapshot["wanted_graduation_hours"],
                 "project_groups": snapshot["project_groups"],
                 "project_students": snapshot["project_students"],
                 "section_groups": snapshot["section_groups"],
                 "section_students": snapshot["section_students"],
                 "supervised_groups": snapshot["supervised_groups"],
                 "supervised_students": snapshot["supervised_students"],
+                "used_graduation_hours": snapshot["used_graduation_hours"],
                 "student_load_hours": snapshot["student_load_hours"],
-                "total_year_hours": snapshot["total_year_hours"],
                 "remaining_hours": snapshot["remaining_hours"],
-                "assigned_courses": snapshot["assigned_courses"],
                 "status": snapshot["status"],
             })
 
@@ -838,14 +831,14 @@ def api_faculty_hours_save():
         data = request.get_json(silent=True) or {}
 
         faculty_id = data.get("faculty_id")
-        base_hours = float(data.get("base_hours", 12))
-        max_hours = float(data.get("max_hours", 36))
+        graduation_project_hours = float(data.get("graduation_project_hours", 0) or 0)
         employment_type = data.get("employment_type", "full_time")
-        extra_bonus = float(data.get("extra_bonus", 0))
-        assigned_courses = data.get("assigned_courses", "")
 
         if not faculty_id:
             return jsonify({"error": "faculty_id is required."}), 400
+
+        if graduation_project_hours < 0:
+            return jsonify({"error": "Graduation project hours cannot be negative."}), 400
 
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -865,24 +858,18 @@ def api_faculty_hours_save():
         cursor.execute(
             """
             INSERT INTO faculty_load_settings
-                (faculty_id, semester_id, base_hours, max_hours, employment_type, extra_bonus, assigned_courses, updated_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (faculty_id, semester_id, graduation_project_hours, employment_type, updated_by)
+            VALUES (%s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
-                base_hours = VALUES(base_hours),
-                max_hours = VALUES(max_hours),
+                graduation_project_hours = VALUES(graduation_project_hours),
                 employment_type = VALUES(employment_type),
-                extra_bonus = VALUES(extra_bonus),
-                assigned_courses = VALUES(assigned_courses),
                 updated_by = VALUES(updated_by)
             """,
             (
                 faculty_id,
                 anchor_semester["semester_id"],
-                base_hours,
-                max_hours,
+                graduation_project_hours,
                 employment_type,
-                extra_bonus,
-                assigned_courses,
                 session.get("user_id"),
             ),
         )
@@ -891,7 +878,7 @@ def api_faculty_hours_save():
         cursor.close()
         db.close()
 
-        return jsonify({"message": "Faculty yearly load updated successfully."})
+        return jsonify({"message": "Graduation project hours updated successfully."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

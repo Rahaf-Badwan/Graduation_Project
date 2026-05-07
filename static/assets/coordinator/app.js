@@ -173,6 +173,7 @@ async function loadDistributionWindow() {
   const statusMeta = document.getElementById('windowStatusMeta');
   const btn = document.getElementById('toggleWindowBtn');
   const msg = document.getElementById('windowMsg');
+  const deadlineInput = document.getElementById('windowDeadline');
   if (!statusText || !statusMeta || !btn) return;
 
   try {
@@ -185,7 +186,12 @@ async function loadDistributionWindow() {
 
     const openedAt = data.opened_at ? `Opened at: ${data.opened_at}` : '';
     const closedAt = data.closed_at ? `Closed at: ${data.closed_at}` : '';
-    statusMeta.textContent = distributionWindowOpen ? openedAt : closedAt;
+    const deadline = data.deadline ? `Close date: ${data.deadline}` : '';
+    statusMeta.textContent = distributionWindowOpen ? [openedAt, deadline].filter(Boolean).join(' · ') : closedAt;
+
+    if (deadlineInput && data.deadline) {
+      deadlineInput.value = data.deadline.slice(0, 16).replace(' ', 'T');
+    }
 
     btn.textContent = distributionWindowOpen ? 'Close Registration' : 'Open Registration';
     btn.className = distributionWindowOpen ? 'btn btn-outline' : 'btn btn-primary';
@@ -201,16 +207,25 @@ async function loadDistributionWindow() {
 async function toggleDistributionWindow() {
   const btn = document.getElementById('toggleWindowBtn');
   const msg = document.getElementById('windowMsg');
+  const deadlineInput = document.getElementById('windowDeadline');
   if (!btn) return;
 
   try {
     btn.disabled = true;
     if (msg) msg.textContent = 'Saving...';
 
+    const willOpen = !distributionWindowOpen;
+    if (willOpen && deadlineInput && !deadlineInput.value) {
+      throw new Error('Please choose an automatic close date first.');
+    }
+
     const res = await fetch('/api/coordinator/distribution-window', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_open: !distributionWindowOpen })
+      body: JSON.stringify({
+        is_open: willOpen,
+        deadline: deadlineInput ? deadlineInput.value : ''
+      })
     });
 
     const data = await res.json();

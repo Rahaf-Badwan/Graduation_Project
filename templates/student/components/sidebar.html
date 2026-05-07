@@ -17,7 +17,7 @@
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
       <span class="sb-label">Dashboard</span>
     </a>
-    <a class="sb-item {% if request.path == '/student/registration' %}on{% endif %}" data-page="registration" href="/student/registration">
+    <a id="studentRegistrationNav" class="sb-item {% if request.path == '/student/registration' %}on{% endif %}" data-page="registration" href="/student/registration">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">app_registration</span></span>
       <span class="sb-label">Registration</span>
     </a>
@@ -59,3 +59,17 @@
     </a>
   </div>
 </div>
+<script>
+(function () {
+  const link = document.getElementById('studentRegistrationNav');
+  if (!link) return;
+  fetch('/api/student/distribution-window-status')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.is_open && window.location.pathname !== '/student/registration') {
+        link.style.display = 'none';
+      }
+    })
+    .catch(() => {});
+})();
+</script>
