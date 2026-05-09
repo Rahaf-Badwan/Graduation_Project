@@ -5,34 +5,150 @@
 {% block topbar_title %}Notifications{% endblock %}
 
 {% block content %}
+<style>
+  .notif-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;align-items:start}
+  .notif-card{background:#fff;border:1px solid #e6ece8;border-radius:18px;box-shadow:0 10px 28px rgba(16,24,40,.06);overflow:hidden}
+  .notif-card-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:1px solid #edf2ef}
+  .notif-card-title{font-size:18px;font-weight:800;color:#173b24}.notif-card-sub{font-size:12px;color:#6b7280;margin-top:3px}.notif-body{padding:16px 18px}
+  .notif-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.notif-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+  .notif-field label{font-size:13px;font-weight:700;color:#344054}.notif-field input,.notif-field select,.notif-field textarea{border:1px solid #d8e2dc;border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;outline:none}
+  .notif-field textarea{min-height:112px;resize:vertical;line-height:1.5}.notif-field input:focus,.notif-field select:focus,.notif-field textarea:focus{border-color:#2e7d42;box-shadow:0 0 0 3px rgba(46,125,66,.12)}
+  .notif-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:8px}.notif-btn{border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;background:#2e7d42;color:#fff}
+  .notif-btn.secondary{background:#f3f7f4;color:#245c33;border:1px solid #cfe0d4}.notif-list{display:flex;flex-direction:column;gap:10px}.notif-message{border:1px solid #e7eee9;background:#fff;border-radius:14px;padding:13px 14px;display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start}
+  .notif-message.unread{background:#f3fbf5;border-color:#bee4c7}.notif-icon{width:36px;height:36px;border-radius:12px;background:#eaf6ee;color:#2e7d42;display:flex;align-items:center;justify-content:center;font-weight:900}
+  .notif-msg-title{font-weight:800;color:#172b1d;margin-bottom:4px}.notif-msg-meta{font-size:12px;color:#667085;margin-bottom:7px}.notif-msg-text{font-size:14px;line-height:1.5;color:#344054;white-space:pre-wrap}
+  .notif-pill{font-size:11px;font-weight:800;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#3538cd;white-space:nowrap}.notif-pill.unread{background:#fef3c7;color:#92400e}.course-pill{display:inline-block;margin-right:6px;margin-bottom:6px;font-size:11px;font-weight:900;padding:4px 8px;border-radius:999px;background:#ecfdf3;color:#027a48}
+  .notif-tabs{display:flex;gap:8px;padding:12px 18px 0}.notif-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;padding:8px 12px;border-radius:999px;font-weight:800;cursor:pointer}.notif-tab.on{background:#2e7d42;color:#fff;border-color:#2e7d42}
+  .notif-empty{padding:22px;border:1px dashed #cddbd2;border-radius:14px;color:#667085;text-align:center;background:#fbfdfb}.notif-toast{position:fixed;right:22px;bottom:22px;z-index:50;background:#111827;color:white;padding:12px 14px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.22);display:none;max-width:360px}
+  .notice-preview{border-left:5px solid #2e7d42;background:#f7fbf8;border-radius:14px;padding:13px 14px;margin-top:8px}.notice-preview-title{font-weight:900;color:#163b24;margin-bottom:8px}.notice-preview-body{font-size:13px;color:#344054;line-height:1.55;white-space:pre-wrap}.notice-preview-hl{color:#b42318;font-weight:900;margin-top:8px}
+  @media(max-width:980px){.notif-grid{grid-template-columns:1fr}.notif-form-grid{grid-template-columns:1fr}}
+</style>
+
 <div class="page page-single on" id="pg-notifs">
-<div class="card">
-<div class="card-hd"><span class="card-title">Notifications</span><button class="card-action" type="button">Mark All as Read</button></div>
-<div class="u-38744a5b">Today</div>
-<div class="notif-item unread">
-<div class="notif-icon-wrap u-200b39d1">◈</div>
-<div class="u-d5e8c5f3"><div class="notif-title">A new project is waiting for your review</div><div class="notif-meta">Student Records Management System — Salma Al-Khatib · 2 hours ago</div></div>
-<div class="notif-dot-red"></div>
+  <div class="notif-grid">
+    <section class="notif-card">
+      <div class="notif-card-hd"><div><div class="notif-card-title">Send Message</div><div class="notif-card-sub">Send to Head of Department, doctors, all sections, one section, one doctor, or one student.</div></div></div>
+      <div class="notif-body">
+        <form id="notifSendForm">
+          <div class="notif-form-grid">
+            <div class="notif-field"><label for="notifScope">Send to</label><select id="notifScope" required><option value="">Choose receiver...</option><option value="head">Head of Department</option><option value="doctors">All Doctors / Supervisors</option><option value="all_sections">All Sections</option><option value="doctor">One Doctor</option><option value="section">One Section</option><option value="student">One Student</option></select></div>
+            <div class="notif-field" id="notifSpecificWrap" style="display:none;"><label for="notifSpecific">Choose specific receiver</label><select id="notifSpecific"></select></div>
+          </div>
+          <div class="notif-field">
+            <label for="notifCourseScope">Message for</label>
+            <select id="notifCourseScope" required>
+              <option value="introduction">Project Introduction / COMP4200</option>
+              <option value="graduation_project">Graduation Project / COMP4300</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div class="notif-field"><label for="notifTitle">Title</label><input id="notifTitle" placeholder="Example: Committee meeting reminder" maxlength="250" required></div>
+          <div class="notif-field"><label for="notifMessage">Message</label><textarea id="notifMessage" placeholder="Write your message here..." required></textarea></div>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#344054;"><input type="checkbox" id="notifUrgent"> Mark as urgent</label>
+          <div class="notif-actions"><button class="notif-btn secondary" type="reset">Clear</button><button class="notif-btn" type="submit">Send Message</button></div>
+        </form>
+      </div>
+    </section>
+
+    <section class="notif-card">
+      <div class="notif-card-hd"><div><div class="notif-card-title">Messages</div><div class="notif-card-sub">Inbox receives messages from Head of Department, supervisors, and students.</div></div><button class="notif-btn secondary" id="markAllReadBtn" type="button">Mark All Read</button></div>
+      <div class="notif-tabs"><button class="notif-tab on" type="button" data-tab="inbox">Inbox</button><button class="notif-tab" type="button" data-tab="sent">Sent</button></div>
+      <div class="notif-body"><div id="notifList" class="notif-list"><div class="notif-empty">Loading messages...</div></div></div>
+    </section>
+
+    <section class="notif-card" style="grid-column:1 / -1;">
+      <div class="notif-card-hd"><div><div class="notif-card-title">Important Notice on Login Screen</div><div class="notif-card-sub">This updates the notice shown on the main login screen in your screenshot.</div></div></div>
+      <div class="notif-body">
+        <form id="noticeForm">
+          <div class="notif-form-grid">
+            <div class="notif-field"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="250" placeholder="Important Notice — APMS System" required></div>
+            <div class="notif-field"><label for="noticeHighlight">Highlight / deadline text</label><input id="noticeHighlight" maxlength="150" placeholder="Example: Deadline: 15/2/2026"></div>
+          </div>
+          <div class="notif-field">
+            <label for="noticeCourseScope">Notice for</label>
+            <select id="noticeCourseScope" required>
+              <option value="introduction">Project Introduction / COMP4200</option>
+              <option value="graduation_project">Graduation Project / COMP4300</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div class="notif-field"><label for="noticeBody">Notice body</label><textarea id="noticeBody" placeholder="Write the notice that students, supervisors, and head will see before login..." required></textarea></div>
+          <div class="notif-form-grid">
+            <div class="notif-field"><label for="noticeBtn1">Button 1 text</label><input id="noticeBtn1" placeholder="ⓘ How does the system work?"></div>
+            <div class="notif-field"><label for="noticeBtn2">Button 2 text</label><input id="noticeBtn2" placeholder="⬆ Project Upload Guide"></div>
+          </div>
+          <div class="notif-field"><label for="noticeBtn3">Button 3 text</label><input id="noticeBtn3" placeholder="⚙ Roles & Permissions"></div>
+          <div class="notice-preview"><div class="notice-preview-title" id="noticePreviewTitle">Important Notice — APMS System</div><div class="notice-preview-body" id="noticePreviewBody">Preview will appear here.</div><div class="notice-preview-hl" id="noticePreviewHl"></div></div>
+          <div class="notif-actions"><button class="notif-btn secondary" type="button" id="reloadNoticeBtn">Reload Current</button><button class="notif-btn" type="submit">Update Login Notice</button></div>
+        </form>
+      </div>
+    </section>
+  </div>
 </div>
-<div class="notif-item unread">
-<div class="notif-icon-wrap u-c58c61d5">✦</div>
-<div class="u-d5e8c5f3"><div class="notif-title">Dr. Mahmoud Salem completed evaluation of 3 projects</div><div class="notif-meta">Average score: 89.3 · 4 hours ago</div></div>
-<div class="notif-dot-red"></div>
-</div>
-<div class="notif-item unread">
-<div class="notif-icon-wrap u-ab1fb024">⚑</div>
-<div class="u-d5e8c5f3"><div class="notif-title">7 projects are waiting for a review decision</div><div class="notif-meta">Some have been waiting over 48 hours · Review is recommended today</div></div>
-<div class="notif-dot-red"></div>
-</div>
-<div class="u-34c2bf8a">Last Week</div>
-<div class="notif-item">
-<div class="notif-icon-wrap u-e394f28c">◎</div>
-<div class="u-d5e8c5f3"><div class="notif-title">The APMS project discussion was scheduled</div><div class="notif-meta">20 Feb 2026 — 10:00 AM · All members were notified</div></div>
-</div>
-<div class="notif-item">
-<div class="notif-icon-wrap u-c58c61d5">✓</div>
-<div class="u-d5e8c5f3"><div class="notif-title">The AI Disease System project was archived</div><div class="notif-meta">Final score: 92/100 · The student was notified</div></div>
-</div>
-</div>
-</div>
+
+<div class="notif-toast" id="notifToast"></div>
+
+<script>
+(() => {
+  const state = { options: { heads: [], doctors: [], students: [], sections: [] }, currentTab: 'inbox' };
+  const $ = (id) => document.getElementById(id);
+  const list = $('notifList');
+  const toast = $('notifToast');
+
+  function showToast(message, isError = false){ toast.textContent = message; toast.style.background = isError ? '#991b1b' : '#111827'; toast.style.display = 'block'; setTimeout(() => toast.style.display = 'none', 3200); }
+  async function fetchJSON(url, options = {}){
+    const res = await fetch(url, { headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, ...options });
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch(e) {
+      const preview = text.replace(/\s+/g, ' ').slice(0, 180);
+      throw new Error(`Server returned HTML/not JSON. Status ${res.status}. ${preview}`);
+    }
+    if(!res.ok) throw new Error(data.error || `Request failed with status ${res.status}.`);
+    return data;
+  }
+  function escapeHTML(value){ return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
+  function roleLabel(role){ return ({head_of_department:'Head of Department', supervisor:'Supervisor', coordinator:'Coordinator', student:'Student'}[role] || role || 'System'); }
+  function courseLabel(scope){ return ({introduction:'Project Introduction', graduation_project:'Graduation Project', both:'Both Courses'}[scope] || 'Both Courses'); }
+
+  async function loadOptions(){ state.options = await fetchJSON('/api/coordinator/notifications/options'); updateSpecificReceiver(); }
+  function updateSpecificReceiver(){
+    const scope = $('notifScope').value, wrap = $('notifSpecificWrap'), select = $('notifSpecific'); select.innerHTML = '';
+    let rows = [], placeholder = 'Choose...';
+    if(scope === 'doctor'){ rows = state.options.doctors || []; placeholder='Choose doctor...'; rows.forEach(d => select.insertAdjacentHTML('beforeend', `<option value="${d.faculty_id}">${escapeHTML(d.full_name)} — ${escapeHTML(d.university_id || '')}</option>`)); }
+    else if(scope === 'student'){ rows = state.options.students || []; placeholder='Choose student...'; rows.forEach(s => select.insertAdjacentHTML('beforeend', `<option value="${s.student_id}">${escapeHTML(s.full_name)} — ${escapeHTML(s.university_id || '')}</option>`)); }
+    else if(scope === 'section'){ rows = state.options.sections || []; placeholder='Choose section...'; rows.forEach(sec => select.insertAdjacentHTML('beforeend', `<option value="${sec.section_id}">${escapeHTML(sec.section_name)} — ${escapeHTML(sec.supervisor_name || '')} (${sec.students_count || 0} students)</option>`)); }
+    if(['doctor','student','section'].includes(scope)){ select.insertAdjacentHTML('afterbegin', `<option value="">${placeholder}</option>`); wrap.style.display = 'flex'; } else { wrap.style.display = 'none'; }
+  }
+
+  function renderInbox(rows){
+    if(!rows.length){ list.innerHTML = '<div class="notif-empty">No received messages yet.</div>'; return; }
+    list.innerHTML = rows.map(row => `<article class="notif-message ${row.is_read ? '' : 'unread'}"><div class="notif-icon">${row.notification_type === 'urgent_alert' ? '!' : '✉'}</div><div><div class="notif-msg-title">${escapeHTML(row.title)}</div><div class="notif-msg-meta">From: ${escapeHTML(row.sender_name || 'System')} · ${escapeHTML(roleLabel(row.sender_role))} · ${escapeHTML(row.created_at || '')}</div><div><span class="course-pill">${escapeHTML(courseLabel(row.course_scope))}</span></div><div class="notif-msg-text">${escapeHTML(row.message)}</div></div><div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;"><span class="notif-pill ${row.is_read ? '' : 'unread'}">${row.is_read ? 'Read' : 'Unread'}</span>${row.is_read ? '' : `<button class="notif-btn secondary" style="padding:6px 9px;font-size:12px;" data-read="${row.notification_id}">Read</button>`}</div></article>`).join('');
+  }
+  function renderSent(rows){
+    if(!rows.length){ list.innerHTML = '<div class="notif-empty">No sent messages yet.</div>'; return; }
+    list.innerHTML = rows.map(row => `<article class="notif-message"><div class="notif-icon">↗</div><div><div class="notif-msg-title">${escapeHTML(row.title)}</div><div class="notif-msg-meta">To: ${escapeHTML(row.recipient_name || '')} · ${escapeHTML(roleLabel(row.recipient_role))} · ${escapeHTML(row.created_at || '')}</div><div><span class="course-pill">${escapeHTML(courseLabel(row.course_scope))}</span></div><div class="notif-msg-text">${escapeHTML(row.message)}</div></div><span class="notif-pill">Sent</span></article>`).join('');
+  }
+  async function loadMessages(){ list.innerHTML = '<div class="notif-empty">Loading messages...</div>'; try{ if(state.currentTab === 'sent'){ const data = await fetchJSON('/api/coordinator/notifications/sent'); renderSent(data.sent || []); } else { const data = await fetchJSON('/api/coordinator/notifications/inbox'); renderInbox(data.notifications || []); } } catch(err){ list.innerHTML = `<div class="notif-empty">${escapeHTML(err.message)}</div>`; } }
+
+  function updateNoticePreview(){ $('noticePreviewTitle').textContent = ($('noticeTitle').value || 'Important Notice — APMS System') + ' · ' + courseLabel($('noticeCourseScope').value || 'both'); $('noticePreviewBody').textContent = $('noticeBody').value || 'Preview will appear here.'; $('noticePreviewHl').textContent = $('noticeHighlight').value || ''; }
+  async function loadNotice(){
+    try{ const data = await fetchJSON('/api/coordinator/important-notice'); const n = data.notice || {}; $('noticeTitle').value = n.title || 'Important Notice — APMS System'; $('noticeBody').value = n.body || ''; $('noticeHighlight').value = n.highlight_text || ''; $('noticeBtn1').value = n.button1_text || 'ⓘ How does the system work?'; $('noticeBtn2').value = n.button2_text || '⬆ Project Upload Guide'; $('noticeBtn3').value = n.button3_text || '⚙ Roles & Permissions'; $('noticeCourseScope').value = n.course_scope || 'both'; updateNoticePreview(); }
+    catch(err){ showToast(err.message, true); }
+  }
+
+  $('notifScope').addEventListener('change', updateSpecificReceiver);
+  $('notifSendForm').addEventListener('submit', async (event) => { event.preventDefault(); const scope = $('notifScope').value; const payload = { scope, value: ['doctor','student','section'].includes(scope) ? $('notifSpecific').value : null, course_scope: $('notifCourseScope').value, title: $('notifTitle').value.trim(), message: $('notifMessage').value.trim(), urgent: $('notifUrgent').checked }; try{ const data = await fetchJSON('/api/coordinator/notifications/send', { method:'POST', body:JSON.stringify(payload) }); showToast(data.message || 'Message sent successfully.'); $('notifSendForm').reset(); updateSpecificReceiver(); state.currentTab = 'sent'; document.querySelectorAll('.notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.tab === 'sent')); await loadMessages(); } catch(err){ showToast(err.message, true); } });
+  document.querySelectorAll('.notif-tab').forEach(btn => btn.addEventListener('click', () => { state.currentTab = btn.dataset.tab; document.querySelectorAll('.notif-tab').forEach(b => b.classList.toggle('on', b === btn)); loadMessages(); }));
+  list.addEventListener('click', async (event) => { const btn = event.target.closest('[data-read]'); if(!btn) return; try{ await fetchJSON(`/api/coordinator/notifications/${btn.dataset.read}/read`, { method:'POST' }); await loadMessages(); } catch(err){ showToast(err.message, true); } });
+  $('markAllReadBtn').addEventListener('click', async () => { try{ await fetchJSON('/api/coordinator/notifications/read-all', { method:'POST' }); showToast('All messages marked as read.'); await loadMessages(); } catch(err){ showToast(err.message, true); } });
+  ['noticeTitle','noticeBody','noticeHighlight'].forEach(id => $(id).addEventListener('input', updateNoticePreview)); $('noticeCourseScope').addEventListener('change', updateNoticePreview);
+  $('reloadNoticeBtn').addEventListener('click', loadNotice);
+  $('noticeForm').addEventListener('submit', async (event) => { event.preventDefault(); const payload = { title:$('noticeTitle').value.trim(), body:$('noticeBody').value.trim(), highlight_text:$('noticeHighlight').value.trim(), button1_text:$('noticeBtn1').value.trim(), button2_text:$('noticeBtn2').value.trim(), button3_text:$('noticeBtn3').value.trim(), course_scope:$('noticeCourseScope').value }; try{ const data = await fetchJSON('/api/coordinator/important-notice', { method:'POST', body:JSON.stringify(payload) }); showToast(data.message || 'Notice updated.'); updateNoticePreview(); } catch(err){ showToast(err.message, true); } });
+
+  loadOptions().catch(err => showToast(err.message, true));
+  loadMessages();
+  loadNotice();
+})();
+</script>
 {% endblock %}

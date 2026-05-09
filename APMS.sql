@@ -45,7 +45,7 @@ DROP TABLE IF EXISTS users;
 --  TABLE 1 — users
 --  All system users regardless of role
 -- ============================================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     user_id        INT            PRIMARY KEY AUTO_INCREMENT,
     university_id  VARCHAR(20)    UNIQUE NOT NULL          COMMENT 'University ID number',
     full_name      VARCHAR(120)   NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE users (
 --  TABLE 2 — faculty
 --  Extra data for supervisors, coordinators, head
 -- ============================================================
-CREATE TABLE faculty (
+CREATE TABLE IF NOT EXISTS faculty (
     faculty_id       INT   PRIMARY KEY AUTO_INCREMENT,
     user_id          INT   UNIQUE NOT NULL,
     specialization   ENUM(
@@ -89,7 +89,7 @@ CREATE TABLE faculty (
 --  TABLE 3 — students
 --  Extra data for student users
 -- ============================================================
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
     student_id      INT  PRIMARY KEY AUTO_INCREMENT,
     user_id         INT  UNIQUE NOT NULL,
     enrollment_year YEAR NULL,
@@ -100,7 +100,7 @@ CREATE TABLE students (
 --  TABLE 4 — semesters
 --  Academic semesters (COMP4200 course)
 -- ============================================================
-CREATE TABLE semesters (
+CREATE TABLE IF NOT EXISTS semesters (
     semester_id      INT          PRIMARY KEY AUTO_INCREMENT,
     academic_year    VARCHAR(20)  NOT NULL                COMMENT 'e.g. 2025/2026',
     semester_number  TINYINT      NOT NULL                COMMENT '1 or 2',
@@ -115,7 +115,7 @@ CREATE TABLE semesters (
 --  TABLE 5 — coordinator_assignments
 --  Head assigns one coordinator per semester
 -- ============================================================
-CREATE TABLE coordinator_assignments (
+CREATE TABLE IF NOT EXISTS coordinator_assignments (
     assignment_id INT       PRIMARY KEY AUTO_INCREMENT,
     faculty_id    INT       NOT NULL                      COMMENT 'Assigned coordinator faculty_id',
     semester_id   INT       NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE coordinator_assignments (
 --  TABLE 6 — projects
 --  Core project entity
 -- ============================================================
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
     project_id        INT             PRIMARY KEY AUTO_INCREMENT,
     title             VARCHAR(300)    NOT NULL,
     title_en          VARCHAR(300)    NULL,
@@ -174,7 +174,7 @@ CREATE TABLE projects (
 --  TABLE 7 — project_members
 --  Team members for each project (up to ~3 students)
 -- ============================================================
-CREATE TABLE project_members (
+CREATE TABLE IF NOT EXISTS project_members (
     member_id          INT      PRIMARY KEY AUTO_INCREMENT,
     project_id         INT      NOT NULL,
     student_id         INT      NOT NULL,
@@ -189,7 +189,7 @@ CREATE TABLE project_members (
 --  TABLE 8 — project_files
 --  Files uploaded for each project (report, code, slides)
 -- ============================================================
-CREATE TABLE project_files (
+CREATE TABLE IF NOT EXISTS project_files (
     file_id       INT             PRIMARY KEY AUTO_INCREMENT,
     project_id    INT             NOT NULL,
     file_type     ENUM(
@@ -200,6 +200,8 @@ CREATE TABLE project_files (
                   )               NOT NULL,
     file_name     VARCHAR(255)    NOT NULL,
     file_path     VARCHAR(600)    NULL,
+    file_data     LONGBLOB        NULL                    COMMENT 'Binary file content stored in DB',
+    file_mime     VARCHAR(100)    NULL                    COMMENT 'MIME type of the uploaded file',
     file_size_mb  DECIMAL(7,2)    NULL,
     upload_status ENUM(
                     'not_uploaded',
@@ -209,6 +211,7 @@ CREATE TABLE project_files (
     uploaded_by   INT             NULL                    COMMENT 'student user_id',
     uploaded_at   TIMESTAMP       NULL,
     version       TINYINT         NOT NULL DEFAULT 1,
+    UNIQUE KEY uq_project_file_type (project_id, file_type),
     FOREIGN KEY (project_id)  REFERENCES projects(project_id)  ON DELETE CASCADE,
     FOREIGN KEY (uploaded_by) REFERENCES users(user_id)        ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -217,7 +220,7 @@ CREATE TABLE project_files (
 --  TABLE 9 — project_progress
 --  Completion percentage per component and overall
 -- ============================================================
-CREATE TABLE project_progress (
+CREATE TABLE IF NOT EXISTS project_progress (
     progress_id INT     PRIMARY KEY AUTO_INCREMENT,
     project_id  INT     NOT NULL,
     component   ENUM(
@@ -240,7 +243,7 @@ CREATE TABLE project_progress (
 --  TABLE 10 — project_lifecycle
 --  Tracks each stage of a project's lifecycle
 -- ============================================================
-CREATE TABLE project_lifecycle (
+CREATE TABLE IF NOT EXISTS project_lifecycle (
     lifecycle_id   INT  PRIMARY KEY AUTO_INCREMENT,
     project_id     INT  NOT NULL,
     stage          ENUM(
@@ -269,7 +272,7 @@ CREATE TABLE project_lifecycle (
 --  TABLE 11 — feedback
 --  Feedback from supervisors and committee members
 -- ============================================================
-CREATE TABLE feedback (
+CREATE TABLE IF NOT EXISTS feedback (
     feedback_id   INT             PRIMARY KEY AUTO_INCREMENT,
     project_id    INT             NOT NULL,
     reviewer_id   INT             NOT NULL                COMMENT 'Reviewer user_id',
@@ -298,7 +301,7 @@ CREATE TABLE feedback (
 --  TABLE 12 — feedback_improvement_points
 --  Action items / improvement points attached to feedback
 -- ============================================================
-CREATE TABLE feedback_improvement_points (
+CREATE TABLE IF NOT EXISTS feedback_improvement_points (
     point_id    INT          PRIMARY KEY AUTO_INCREMENT,
     feedback_id INT          NOT NULL,
     point_text  VARCHAR(600) NOT NULL,
@@ -310,7 +313,7 @@ CREATE TABLE feedback_improvement_points (
 --  TABLE 13 — committees
 --  Evaluation committee for each project
 -- ============================================================
-CREATE TABLE committees (
+CREATE TABLE IF NOT EXISTS committees (
     committee_id      INT         PRIMARY KEY AUTO_INCREMENT,
     project_id        INT         UNIQUE NOT NULL,
     committee_name    VARCHAR(255) NULL,
@@ -334,7 +337,7 @@ CREATE TABLE committees (
 --  TABLE 14 — committee_members
 --  Faculty members of each evaluation committee
 -- ============================================================
-CREATE TABLE committee_members (
+CREATE TABLE IF NOT EXISTS committee_members (
     cm_id                   INT          PRIMARY KEY AUTO_INCREMENT,
     committee_id            INT          NOT NULL,
     faculty_id              INT          NOT NULL,
@@ -356,7 +359,7 @@ CREATE TABLE committee_members (
 --  TABLE 15 — coordinator_decisions
 --  Coordinator actions on projects (accept / reject / revise)
 -- ============================================================
-CREATE TABLE coordinator_decisions (
+CREATE TABLE IF NOT EXISTS coordinator_decisions (
     decision_id    INT       PRIMARY KEY AUTO_INCREMENT,
     project_id     INT       NOT NULL,
     coordinator_id INT       NOT NULL COMMENT 'user_id',
@@ -376,7 +379,7 @@ CREATE TABLE coordinator_decisions (
 --  TABLE 16 — final_decisions
 --  Coordinator final decision after committee evaluation
 -- ============================================================
-CREATE TABLE final_decisions (
+CREATE TABLE IF NOT EXISTS final_decisions (
     decision_id    INT          PRIMARY KEY AUTO_INCREMENT,
     project_id     INT          UNIQUE NOT NULL,
     coordinator_id INT          NOT NULL COMMENT 'user_id',
@@ -397,7 +400,7 @@ CREATE TABLE final_decisions (
 --  TABLE 17 — supervisor_notes
 --  Follow-up notes a supervisor adds to a project
 -- ============================================================
-CREATE TABLE supervisor_notes (
+CREATE TABLE IF NOT EXISTS supervisor_notes (
     note_id      INT       PRIMARY KEY AUTO_INCREMENT,
     project_id   INT       NOT NULL,
     supervisor_id INT      NOT NULL COMMENT 'faculty_id',
@@ -416,7 +419,7 @@ CREATE TABLE supervisor_notes (
 --  TABLE 18 — deadlines
 --  Important dates per semester or per individual project
 -- ============================================================
-CREATE TABLE deadlines (
+CREATE TABLE IF NOT EXISTS deadlines (
     deadline_id   INT          PRIMARY KEY AUTO_INCREMENT,
     semester_id   INT          NOT NULL,
     project_id    INT          NULL    COMMENT 'NULL = applies to whole semester',
@@ -430,7 +433,7 @@ CREATE TABLE deadlines (
 -- ============================================================
 --  TABLE 19 — notifications
 -- ============================================================
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     notification_id    INT          PRIMARY KEY AUTO_INCREMENT,
     recipient_id       INT          NOT NULL COMMENT 'user_id',
     sender_id          INT          NULL     COMMENT 'user_id or NULL for system',
@@ -459,7 +462,7 @@ CREATE TABLE notifications (
 --  TABLE 20 — challenges_reflections
 --  Student-submitted challenges & lessons learned
 -- ============================================================
-CREATE TABLE challenges_reflections (
+CREATE TABLE IF NOT EXISTS challenges_reflections (
     challenge_id    INT       PRIMARY KEY AUTO_INCREMENT,
     project_id      INT       NOT NULL,
     student_id      INT       NOT NULL COMMENT 'user_id',
@@ -468,6 +471,7 @@ CREATE TABLE challenges_reflections (
                       'administrative',
                       'reflection'
                     )         NOT NULL,
+    title           VARCHAR(255) NOT NULL COMMENT 'Short title for the challenge or reflection',
     description     TEXT      NOT NULL,
     solution_lesson TEXT      NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -479,7 +483,7 @@ CREATE TABLE challenges_reflections (
 --  TABLE 21 — supervisor_assignments
 --  Head assigns a supervisor to a pending student group
 -- ============================================================
-CREATE TABLE supervisor_assignments (
+CREATE TABLE IF NOT EXISTS supervisor_assignments (
     sa_id        INT       PRIMARY KEY AUTO_INCREMENT,
     faculty_id   INT       NOT NULL,
     project_id   INT       NOT NULL,
@@ -494,13 +498,24 @@ CREATE TABLE supervisor_assignments (
 ) ENGINE=InnoDB;
 
 -- ============================================================
---  TABLE 22 — ai_conversations
+--  TABLE 22 — student_groups
+--  Groups students into teams for duplicate-submission checks
+-- ============================================================
+CREATE TABLE IF NOT EXISTS student_groups (
+    group_id    INT NOT NULL  COMMENT 'Shared group identifier for teammates',
+    student_id  INT NOT NULL,
+    PRIMARY KEY (group_id, student_id),
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Maps students to their project groups for duplicate-submission checks';
+
+-- ============================================================
+--  TABLE 23 — ai_conversations
 --  AI assistant chat history per user
 --  Merged from: APMS.sql + AI_ARCHIVE_MIGRATION.sql
 --  • session_id is NOT NULL (migration applied)
 --  • Includes both indexes from the migration
 -- ============================================================
-CREATE TABLE ai_conversations (
+CREATE TABLE IF NOT EXISTS ai_conversations (
     conv_id      INT           PRIMARY KEY AUTO_INCREMENT,
     user_id      INT           NOT NULL,
     session_id   VARCHAR(120)  NOT NULL COMMENT 'Client-generated conversation session ID',
@@ -519,7 +534,7 @@ CREATE TABLE ai_conversations (
 --  TABLE 23 — password_reset_tokens
 --  Temporary tokens for password reset (valid for 1 hour)
 -- ============================================================
-CREATE TABLE password_reset_tokens (
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
     token_id    INT           PRIMARY KEY AUTO_INCREMENT,
     user_id     INT           NOT NULL,
     token       VARCHAR(100)  NOT NULL UNIQUE,
@@ -634,7 +649,7 @@ GROUP BY c.committee_id;
 -- ============================================================
 
 -- Semesters
-INSERT INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active) VALUES
+INSERT IGNORE INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active) VALUES
 ('2025/2026', 1, 'COMP4200', '2025-09-01', '2026-02-28', TRUE),
 ('2024/2025', 1, 'COMP4200', '2024-09-01', '2025-02-28', FALSE),
 ('2023/2024', 1, 'COMP4200', '2023-09-01', '2024-02-28', FALSE),
@@ -642,7 +657,7 @@ INSERT INTO semesters (academic_year, semester_number, course_code, start_date, 
 
 -- Users
 -- Faculty IDs are 4 digits (1001–1007); student IDs start from 1220000
-INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active) VALUES
+INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active) VALUES
 -- Head of Department  (ID: 1001)
 ('1001', 'Prof. Raed Al-Qadi',     '1001@birzeit.edu', '$2b$12$EbPsSfvh6ScacL2l4uCkdOMwbfukrx0EdkL/0GBk/ntRtwRapvvBu',  'head_of_department', 'RQ', TRUE),
 -- Coordinator         (ID: 1002)
@@ -677,7 +692,7 @@ ADD COLUMN distribution_closed_at DATETIME NULL;
 
 
 -- Faculty records (user_ids 1–7 match insertion order above)
-INSERT INTO faculty (user_id, specialization, years_experience, title) VALUES
+INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title) VALUES
 (1, 'software_engineering',    15, 'Prof.'),
 (2, 'software_engineering',    10, 'Dr.'),
 (3, 'software_engineering',     6, 'Dr.'),
@@ -687,7 +702,7 @@ INSERT INTO faculty (user_id, specialization, years_experience, title) VALUES
 (7, 'security_networks',        7, 'Dr.');
 
 -- Student records (user_ids 8–17)
-INSERT INTO students (user_id, enrollment_year) VALUES
+INSERT IGNORE INTO students (user_id, enrollment_year) VALUES
 ( 8, 2022),  -- Rahaf Badwan
 ( 9, 2022),  -- Amna Abu Muslim
 (10, 2022),  -- Tima Abd
@@ -700,26 +715,26 @@ INSERT INTO students (user_id, enrollment_year) VALUES
 (17, 2022);  -- Mona Nassar
 
 -- Coordinator Assignment (faculty_id 2 = Dr. Ahmad, semester 1, assigned by user 1 = Prof. Raed)
-INSERT INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes) VALUES
+INSERT IGNORE INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes) VALUES
 (2, 1, 1, 'Official coordinator for Semester 1 — 2025/2026');
 
 -- Projects
-INSERT INTO projects (title, title_en, abstract, keywords, project_type, semester_id, supervisor_id, status, submission_date, final_score) VALUES
+INSERT IGNORE INTO projects (title, title_en, abstract, keywords, project_type, semester_id, supervisor_id, status, submission_date, final_score) VALUES
 (
-  'Academic Project Lifecycle Management System (APMS)',
-  'Academic Project Lifecycle Management System',
-  'Most educational institutions lack an efficient way to centrally manage graduation projects from submission through archiving. This system provides a comprehensive web-based solution with AI features and automatic notifications, supporting more than 300 projects annually.',
-  'project management, lifecycle, web application, AI, COMP4200',
+  '',
+  NULL,
+  NULL,
+  NULL,
   'web,ai',
-  1, 3, 'under_review', '2026-02-01', NULL
+  1, 3, 'draft', NULL, NULL
 ),
 (
-  'Electronic Student Records Management System',
-  'Electronic Student Records Management System',
-  'A digital system for managing student academic records and grades with multi-role access control and academic performance reporting.',
-  'student records, academic, grades, permissions',
+  '',
+  NULL,
+  NULL,
+  NULL,
   'web',
-  1, 4, 'submitted', '2026-02-03', NULL
+  1, 4, 'draft', NULL, NULL
 ),
 (
   'Smart Order Delivery Application',
@@ -727,7 +742,7 @@ INSERT INTO projects (title, title_en, abstract, keywords, project_type, semeste
   'A mobile application for order delivery using intelligent routing algorithms to optimize delivery time and cost.',
   'mobile, delivery, smart routing, GPS',
   'mobile',
-  1, 5, 'under_review', '2026-01-20', NULL
+  1, 5, 'draft', NULL, NULL
 ),
 (
   'AI-Based Disease Recognition System',
@@ -751,7 +766,7 @@ INSERT INTO projects (title, title_en, abstract, keywords, project_type, semeste
   'A mobile application for tracking patient records and treatment appointments, with strong data protection protocols compliant with privacy standards.',
   'mobile, healthcare, security, HIPAA, patient records',
   'mobile',
-  1, 7, 'needs_revision', '2026-02-02', NULL
+  1, 7, 'draft', NULL, NULL
 ),
 (
   'Smart Medical Appointment Booking System',
@@ -767,7 +782,7 @@ INSERT INTO projects (title, title_en, abstract, keywords, project_type, semeste
   'An integrated system for managing digital library resources with an advanced full-text search engine and borrowing workflow.',
   'library, digital, search engine, web, resources',
   'web',
-  1, 6, 'accepted', '2026-01-18', 88.00
+  1, 6, 'draft', NULL, NULL
 ),
 (
   'Cyber Infrastructure Protection System',
@@ -775,11 +790,11 @@ INSERT INTO projects (title, title_en, abstract, keywords, project_type, semeste
   'An integrated system for monitoring and protecting digital infrastructure against cyberattacks using real-time threat detection.',
   'cybersecurity, infrastructure, monitoring, intrusion detection',
   'security',
-  1, 7, 'rejected', '2026-01-25', NULL
+  1, 7, 'draft', NULL, NULL
 );
 
 -- Project Members
-INSERT INTO project_members (project_id, student_id, is_primary_contact) VALUES
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact) VALUES
 -- Project 1: APMS team
 (1, 2, FALSE),   -- Amna Abu Muslim
 (1, 1, TRUE),    -- Rahaf Badwan (primary contact)
@@ -793,18 +808,10 @@ INSERT INTO project_members (project_id, student_id, is_primary_contact) VALUES
 (9, 8, FALSE);   -- Khaled Mansour (also on project 9)
 
 -- Project Files
-INSERT INTO project_files (project_id, file_type, file_name, file_size_mb, upload_status, uploaded_by, uploaded_at, version) VALUES
--- APMS (project 1)
-(1, 'final_report',  'APMS_Final_Report.pdf',        4.20, 'uploaded',     8, '2026-02-01 10:00:00', 2),
-(1, 'source_code',   'APMS_SourceCode.zip',          18.50, 'uploaded',    8, '2026-02-01 10:05:00', 1),
-(1, 'presentation',  'APMS_Presentation.pptx',        NULL, 'not_uploaded', NULL, NULL, 1),
--- Student Records (project 2)
-(2, 'final_report',  'StudentRecords_Report.pdf',     3.10, 'uploaded',    11, '2026-02-03 09:00:00', 1),
-(2, 'source_code',   'StudentRecords_Code.zip',       9.80, 'uploaded',    11, '2026-02-03 09:05:00', 1),
-(2, 'presentation',  'StudentRecords_Slides.pptx',    NULL, 'not_uploaded', NULL, NULL, 1);
+-- (no seed files — students upload via the application)
 
 -- Project Progress
-INSERT INTO project_progress (project_id, component, percentage, updated_by) VALUES
+INSERT IGNORE INTO project_progress (project_id, component, percentage, updated_by) VALUES
 -- APMS
 (1, 'final_report', 85, 3),
 (1, 'source_code',  70, 3),
@@ -816,7 +823,7 @@ INSERT INTO project_progress (project_id, component, percentage, updated_by) VAL
 (3, 'overall',      31, 5);
 
 -- Project Lifecycle
-INSERT INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes) VALUES
+INSERT IGNORE INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes) VALUES
 -- APMS (project 1) — currently in initial review
 (1, 'registration',         'completed',   '2026-01-25', '2026-01-25', 'Project registered successfully'),
 (1, 'file_submission',      'completed',   '2026-02-01', '2026-02-01', 'Report and source code uploaded — slides still required'),
@@ -834,7 +841,7 @@ INSERT INTO project_lifecycle (project_id, stage, status, scheduled_date, comple
 (4, 'archiving',            'completed', '2025-03-01', '2025-03-01', NULL);
 
 -- Feedback
-INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, score, priority, is_draft) VALUES
+INSERT IGNORE INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, score, priority, is_draft) VALUES
 -- Supervisor feedback on APMS (reviewer = user 3, Dr. Naima)
 (
   1, 3, 'final_report_review',
@@ -861,7 +868,7 @@ INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, sco
 );
 
 -- Feedback Improvement Points
-INSERT INTO feedback_improvement_points (feedback_id, point_text, is_resolved) VALUES
+INSERT IGNORE INTO feedback_improvement_points (feedback_id, point_text, is_resolved) VALUES
 (1, 'Expand system architecture section with detailed ERD diagrams',       FALSE),
 (1, 'Ensure consistent technical terminology across all chapters',         FALSE),
 (2, 'Detail the chatbot training methodology and accuracy evaluation',     FALSE),
@@ -870,13 +877,13 @@ INSERT INTO feedback_improvement_points (feedback_id, point_text, is_resolved) V
 (3, 'Upload presentation slides before February 15',                       FALSE);
 
 -- Committees
-INSERT INTO committees (project_id, committee_name, discussion_date, discussion_time, room, status, final_average, created_by) VALUES
+INSERT IGNORE INTO committees (project_id, committee_name, discussion_date, discussion_time, room, status, final_average, created_by) VALUES
 (1, 'APMS Evaluation Committee',                     '2026-02-20', '10:00:00', 'A101', 'scheduled',  NULL,  2),
 (4, 'AI Disease Recognition Evaluation Committee',   '2025-02-21', '14:00:00', 'B203', 'completed', 92.30,  2),
 (5, 'E-Learning Platform Evaluation Committee',      '2024-02-22', '10:00:00', 'C105', 'completed', 87.00,  2);
 
 -- Committee Members
-INSERT INTO committee_members (committee_id, faculty_id, role, evaluation_score, evaluation_comments, evaluation_submitted, evaluation_submitted_at) VALUES
+INSERT IGNORE INTO committee_members (committee_id, faculty_id, role, evaluation_score, evaluation_comments, evaluation_submitted, evaluation_submitted_at) VALUES
 -- Committee 1: APMS (scheduled — evaluations not yet submitted)
 (1, 3, 'supervisor', NULL, NULL, FALSE, NULL),
 (1, 4, 'member',     NULL, NULL, FALSE, NULL),
@@ -891,26 +898,26 @@ INSERT INTO committee_members (committee_id, faculty_id, role, evaluation_score,
 (2, 7, 'member',     92.00, 'Security standards are well applied throughout the system.',              TRUE, '2025-02-21 18:00:00');
 
 -- Supervisor Notes
-INSERT INTO supervisor_notes (project_id, supervisor_id, note_text, urgency) VALUES
+INSERT IGNORE INTO supervisor_notes (project_id, supervisor_id, note_text, urgency) VALUES
 (1, 3, 'Team is working diligently and progress is satisfactory. Presentation slides still need to be uploaded before the deadline.', 'on_track'),
 (3, 5, 'No files have been uploaded for two weeks — requires immediate follow-up.',                                                   'urgent'),
 (2, 4, 'Progress is slightly slow but still within acceptable range. Awaiting source code update.',                                   'needs_follow_up');
 
 -- Coordinator Decisions
-INSERT INTO coordinator_decisions (project_id, coordinator_id, decision, notes) VALUES
+INSERT IGNORE INTO coordinator_decisions (project_id, coordinator_id, decision, notes) VALUES
 (4, 2, 'send_to_committee', 'Project accepted and forwarded to committee evaluation after a satisfactory initial review.'),
 (5, 2, 'accepted',          'Excellent project — archiving completed successfully.'),
 (7, 2, 'rejected',          'Project score is below the minimum required threshold of 60%.'),
 (6, 2, 'needs_revision',    'Student must add a security and privacy section and clarify the patient data protection protocol.');
 
 -- Final Decisions
-INSERT INTO final_decisions (project_id, coordinator_id, decision, final_score, notes, is_archived, archived_at) VALUES
+INSERT IGNORE INTO final_decisions (project_id, coordinator_id, decision, final_score, notes, is_archived, archived_at) VALUES
 (4, 2, 'accepted', 92.30, 'Outstanding project — archived successfully.',          TRUE,  '2025-03-01 09:00:00'),
 (5, 2, 'accepted', 87.00, 'Very good project — archived successfully.',             TRUE,  '2024-03-01 09:00:00'),
 (7, 2, 'rejected', 54.00, 'Score below minimum threshold — student notified.',      FALSE, NULL);
 
 -- Deadlines
-INSERT INTO deadlines (semester_id, project_id, deadline_type, deadline_date, description) VALUES
+INSERT IGNORE INTO deadlines (semester_id, project_id, deadline_type, deadline_date, description) VALUES
 (1, NULL, 'project_registration',    '2026-02-15', 'Deadline for all project registrations'),
 (1, NULL, 'file_submission',         '2026-02-15', 'Deadline for uploading all required project files'),
 (1, NULL, 'results_announcement',    '2026-02-28', 'Final results announcement date'),
@@ -919,7 +926,7 @@ INSERT INTO deadlines (semester_id, project_id, deadline_type, deadline_date, de
 (1, 1,    'supervisor_feedback',     '2026-02-08', 'Deadline for supervisor feedback on APMS report');
 
 -- Notifications
-INSERT INTO notifications (recipient_id, sender_id, notification_type, title, message, related_project_id, is_read) VALUES
+INSERT IGNORE INTO notifications (recipient_id, sender_id, notification_type, title, message, related_project_id, is_read) VALUES
 -- Student (Rahaf, user 8) notifications
 (8, 3,    'feedback_received',  'Your project has been reviewed',          'Dr. Naima Harbawi has submitted new feedback on your project.',             1, FALSE),
 (8, 2,    'committee_assigned', 'Committee discussion scheduled',          'Your project discussion is scheduled for February 20 at 10:00 AM.',         1, FALSE),
@@ -932,29 +939,6 @@ INSERT INTO notifications (recipient_id, sender_id, notification_type, title, me
 (2, NULL, 'file_uploaded',      'New project pending your review',         'Electronic Student Records Management System — Salma Al-Khatib.',            2, FALSE),
 (2, 4,    'project_reviewed',   'Dr. Mahmoud Salem completed evaluations', 'Dr. Mahmoud Salem completed 3 project evaluations — avg score: 89.3.',      NULL, FALSE),
 (2, NULL, 'deadline_reminder',  '7 projects awaiting your decision',       '7 projects are pending coordinator review — some exceeded 48 hours.',       NULL, TRUE);
-
--- Student Challenges & Reflections (all linked to APMS project, submitted by Rahaf, user 8)
-INSERT INTO challenges_reflections (project_id, student_id, type, description, solution_lesson) VALUES
-(
-  1, 8, 'technical',
-  'We struggled to efficiently integrate the NLP model with the MySQL database without degrading system performance under a large number of concurrent project queries.',
-  'We implemented query caching for frequent lookups and decoupled the AI service as an independent microservice to isolate performance bottlenecks.'
-),
-(
-  1, 8, 'administrative',
-  'Based on our meeting with Dr. Abu Sneina, fairly distributing supervisors across projects every semester is one of the biggest coordination challenges handled manually each term.',
-  'We designed an automatic distribution algorithm that considers each supervisor''s specialization and enforces a balanced workload across all faculty members.'
-),
-(
-  1, 8, 'reflection',
-  'We learned that thorough documentation from the very beginning saves a significant amount of time later, especially when drawing UML diagrams and defining system requirements.',
-  'Early and continuous documentation from the analysis phase is the key to a successful project delivery.'
-);
-
--- AI Assistant Conversations (sample — coordinator session)
-INSERT INTO ai_conversations (user_id, session_id, message_role, message_text) VALUES
-(2, 'sess-coord-001', 'user',      'Show me projects similar to APMS'),
-(2, 'sess-coord-001', 'assistant', 'Found 4 similar projects in the archive: Academic Task Management System (2024/2025), Electronic Supervision Platform (2023/2024), PhD Thesis Tracking System (2022/2023), and Scientific Review Management System (2022/2023).');
 
 -- ============================================================
 --  STORED PROCEDURES
@@ -1057,7 +1041,7 @@ BEGIN
     FROM users u WHERE u.user_id = NEW.reviewer_id;
 
     -- Notify all students in the project
-    INSERT INTO notifications (recipient_id, sender_id, notification_type, title, message, related_project_id)
+    INSERT IGNORE INTO notifications (recipient_id, sender_id, notification_type, title, message, related_project_id)
     SELECT st.user_id,
            NEW.reviewer_id,
            'feedback_received',
@@ -1075,7 +1059,7 @@ AFTER UPDATE ON projects
 FOR EACH ROW
 BEGIN
     IF OLD.status <> NEW.status THEN
-        INSERT INTO notifications (recipient_id, sender_id, notification_type, title, message, related_project_id)
+        INSERT IGNORE INTO notifications (recipient_id, sender_id, notification_type, title, message, related_project_id)
         SELECT st.user_id,
                NULL,
                'status_changed',
@@ -1157,7 +1141,7 @@ VALUES ('2025/2026', 2, 'COMP4300', '2026-03-01', '2026-07-01', TRUE);
 
 -- ── 2. Coordinator for COMP4300 (Dr. Lina Haddad, faculty_id=5) ─────────
 --       Assigned by Prof. Raed (user_id=1). Skipped if already assigned.
-INSERT INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes)
+INSERT IGNORE INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes)
 SELECT
     5,
     s.semester_id,
@@ -1176,7 +1160,7 @@ LIMIT 1;
 -- ── 3. Sample Projects for COMP4300 (doctors overview panel) ─────────────
 
 -- Dr. Mahmoud Salem (faculty_id = 4)
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT
     'Advanced AI Decision System', 'ai', s.semester_id, 4, 'submitted', CURDATE()
 FROM semesters s
@@ -1191,7 +1175,7 @@ WHERE s.course_code   = 'COMP4300'
 LIMIT 1;
 
 -- Dr. Lina Haddad (faculty_id = 5)
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT
     'Enterprise Web Platform', 'web', s.semester_id, 5, 'submitted', CURDATE()
 FROM semesters s
@@ -1206,7 +1190,7 @@ WHERE s.course_code   = 'COMP4300'
 LIMIT 1;
 
 -- Dr. Osama Arikat (faculty_id = 7)
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT
     'Cyber Security Audit Platform', 'security', s.semester_id, 7, 'submitted', CURDATE()
 FROM semesters s
@@ -1414,15 +1398,16 @@ CREATE TABLE IF NOT EXISTS section_students (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS faculty_load_settings (
-    load_id          INT PRIMARY KEY AUTO_INCREMENT,
-    faculty_id       INT NOT NULL,
-    semester_id      INT NOT NULL,
-    min_hours        DECIMAL(5,2) NOT NULL DEFAULT 12,
-    max_hours        DECIMAL(5,2) NOT NULL DEFAULT 36,
-    employment_type  ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time',
-    intro_students   INT NOT NULL DEFAULT 0,
-    extra_bonus      DECIMAL(5,2) NOT NULL DEFAULT 0,
-    assigned_courses TEXT NULL,
+    load_id                   INT PRIMARY KEY AUTO_INCREMENT,
+    faculty_id                INT NOT NULL,
+    semester_id               INT NOT NULL,
+    graduation_project_hours  DECIMAL(5,2) NOT NULL DEFAULT 0,
+    min_hours                 DECIMAL(5,2) NOT NULL DEFAULT 12,
+    max_hours                 DECIMAL(5,2) NOT NULL DEFAULT 36,
+    employment_type           ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time',
+    intro_students            INT NOT NULL DEFAULT 0,
+    extra_bonus               DECIMAL(5,2) NOT NULL DEFAULT 0,
+    assigned_courses          TEXT NULL,
     updated_by       INT NULL,
     updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id),
@@ -1438,7 +1423,7 @@ CREATE TABLE IF NOT EXISTS faculty_load_settings (
 
 SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
 
-INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
 SELECT * FROM (
     SELECT '2101' AS university_id, 'Dr. Iyad Jaber' AS full_name, 'iyad.jaber.temp@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'IJ' AS avatar_initials, TRUE AS is_active
     UNION ALL SELECT '2102', 'Dr. Adel Taweel', 'adel.taweel.temp@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
@@ -1458,7 +1443,7 @@ WHERE NOT EXISTS (
     WHERE u.full_name = new_users.full_name
 );
 
-INSERT INTO faculty (user_id, specialization, years_experience, title)
+INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title)
 SELECT
     u.user_id,
     CASE u.full_name
@@ -1537,7 +1522,7 @@ SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
 -- 1) Add missing users
 --    university_id/emails are temporary placeholders.
 -- ============================================================
-INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
 SELECT * FROM (
     SELECT '2112' AS university_id, 'Dr. Ruba Awadallah' AS full_name, 'ruba.awadallah.temp@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'RA' AS avatar_initials, TRUE AS is_active
     UNION ALL SELECT '2113', 'Dr. Samer Zein', 'samer.zein.temp@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
@@ -1563,7 +1548,7 @@ WHERE NOT EXISTS (
 --    mobile, security_networks, databases, other
 --    We intentionally do NOT use 'other'.
 -- ============================================================
-INSERT INTO faculty (user_id, specialization, years_experience, title)
+INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title)
 SELECT
     u.user_id,
     CASE u.full_name
@@ -1809,7 +1794,7 @@ BEGIN
         updated_by = p_coordinator_id,
         notes      = p_notes;
 
-    INSERT INTO notifications
+    INSERT IGNORE INTO notifications
         (recipient_id, sender_id, notification_type, title, message)
     SELECT
         u.user_id,
@@ -1867,7 +1852,7 @@ BEGIN
         promoted_at             = NOW()
     WHERE result_id = p_result_id;
 
-    INSERT INTO notifications
+    INSERT IGNORE INTO notifications
         (recipient_id, sender_id, notification_type, title, message)
     SELECT
         u.user_id,
@@ -1904,7 +1889,7 @@ JOIN users u ON u.user_id = st.user_id
 ORDER BY st.student_id;
 
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact) VALUES
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact) VALUES
 (10, 9, TRUE),
 (10, 10, FALSE),
 
@@ -1950,7 +1935,7 @@ SET NAMES utf8mb4;
 -- Temporary student password hash
 SET @student_pwd := '$2b$12$eJmEAFs2Cci7.foj61N6tOthlgHqqs0XccNvIRuzvkK70jQixoWb.';
 
-INSERT INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
 SELECT *
 FROM (
     SELECT '1221001' AS university_id, 'Yousef Hamdan'      AS full_name, '1221001@students.birzeit.edu' AS email, @student_pwd AS password_hash, 'student' AS role, 'YH' AS avatar_initials, TRUE AS is_active
@@ -1984,7 +1969,7 @@ WHERE NOT EXISTS (
     WHERE u.university_id = new_students.university_id
 );
 
-INSERT INTO students (user_id, enrollment_year)
+INSERT IGNORE INTO students (user_id, enrollment_year)
 SELECT u.user_id, 2022
 FROM users u
 WHERE u.university_id IN (
@@ -2014,11 +1999,11 @@ ORDER BY u.university_id;
 
 
 CREATE TABLE IF NOT EXISTS discussion_rooms (
-    room_id INT PRIMARY KEY AUTO_INCREMENT,
-    room_name VARCHAR(120) NOT NULL UNIQUE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    room_id    INT          PRIMARY KEY AUTO_INCREMENT,
+    room_name  VARCHAR(120) NOT NULL UNIQUE,
+    sort_order INT          NOT NULL DEFAULT 1,
+    is_active  BOOLEAN      NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 -- ============================================================
 -- Committee Plans (one committee can discuss multiple projects)
 -- ============================================================
@@ -2141,7 +2126,7 @@ CREATE TABLE IF NOT EXISTS committee_plan_projects (
 -- 2) Default rooms
 -- ============================================================
 
-INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+INSERT IGNORE INTO discussion_rooms (room_name, sort_order, is_active)
 SELECT * FROM (
     SELECT 'Room 201 — Engineering Building' AS room_name, 1 AS sort_order, 1 AS is_active
     UNION ALL SELECT 'Room 202 — Engineering Building', 2, 1
@@ -2168,7 +2153,7 @@ SET @target_semester_id := (
     LIMIT 1
 );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Smart Clinic Management Platform', 'web', @target_semester_id, 5, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2177,7 +2162,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Smart Clinic Management Platform'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'AI Resume Screening System', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2186,7 +2171,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'AI Resume Screening System'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Secure Campus Access Control', 'security', @target_semester_id, 7, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2195,7 +2180,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Secure Campus Access Control'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Mobile Pharmacy Assistant', 'mobile', @target_semester_id, 5, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2204,7 +2189,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Mobile Pharmacy Assistant'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Intelligent Library Recommender', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2213,7 +2198,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Intelligent Library Recommender'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Cloud Attendance Tracker', 'web', @target_semester_id, 3, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2222,7 +2207,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Cloud Attendance Tracker'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Database Performance Analyzer', 'databases', @target_semester_id, 6, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2231,7 +2216,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Database Performance Analyzer'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Smart Graduation Project Marketplace', 'web', @target_semester_id, 3, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2245,7 +2230,7 @@ WHERE @target_semester_id IS NOT NULL
 --    Safe re-run. Uses the extra students you added before.
 -- ============================================================
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221001'
@@ -2257,7 +2242,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221002'
@@ -2269,7 +2254,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221003'
@@ -2281,7 +2266,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221004'
@@ -2293,7 +2278,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221005'
@@ -2305,7 +2290,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221006'
@@ -2317,7 +2302,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221007'
@@ -2329,7 +2314,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221008'
@@ -2341,7 +2326,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221009'
@@ -2353,7 +2338,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221010'
@@ -2365,7 +2350,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221011'
@@ -2377,7 +2362,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221012'
@@ -2389,7 +2374,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221013'
@@ -2401,7 +2386,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221014'
@@ -2413,7 +2398,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221015'
@@ -2425,7 +2410,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221016'
@@ -2518,7 +2503,7 @@ CREATE TABLE IF NOT EXISTS committee_plan_projects (
 -- 2) Default rooms
 -- ============================================================
 
-INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+INSERT IGNORE INTO discussion_rooms (room_name, sort_order, is_active)
 SELECT * FROM (
     SELECT 'Room 201 — Engineering Building' AS room_name, 1 AS sort_order, 1 AS is_active
     UNION ALL SELECT 'Room 202 — Engineering Building', 2, 1
@@ -2545,7 +2530,7 @@ SET @target_semester_id := (
     LIMIT 1
 );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Smart Clinic Management Platform', 'web', @target_semester_id, 5, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2554,7 +2539,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Smart Clinic Management Platform'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'AI Resume Screening System', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2563,7 +2548,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'AI Resume Screening System'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Secure Campus Access Control', 'security', @target_semester_id, 7, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2572,7 +2557,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Secure Campus Access Control'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Mobile Pharmacy Assistant', 'mobile', @target_semester_id, 5, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2581,7 +2566,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Mobile Pharmacy Assistant'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Intelligent Library Recommender', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2590,7 +2575,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Intelligent Library Recommender'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Cloud Attendance Tracker', 'web', @target_semester_id, 3, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2599,7 +2584,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Cloud Attendance Tracker'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Database Performance Analyzer', 'databases', @target_semester_id, 6, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2608,7 +2593,7 @@ WHERE @target_semester_id IS NOT NULL
         AND title = 'Database Performance Analyzer'
   );
 
-INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT 'Smart Graduation Project Marketplace', 'web', @target_semester_id, 3, 'submitted', CURDATE()
 WHERE @target_semester_id IS NOT NULL
   AND NOT EXISTS (
@@ -2622,7 +2607,7 @@ WHERE @target_semester_id IS NOT NULL
 --    Safe re-run. Uses the extra students you added before.
 -- ============================================================
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221001'
@@ -2634,7 +2619,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221002'
@@ -2646,7 +2631,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221003'
@@ -2658,7 +2643,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221004'
@@ -2670,7 +2655,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221005'
@@ -2682,7 +2667,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221006'
@@ -2694,7 +2679,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221007'
@@ -2706,7 +2691,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221008'
@@ -2718,7 +2703,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221009'
@@ -2730,7 +2715,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221010'
@@ -2742,7 +2727,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221011'
@@ -2754,7 +2739,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221012'
@@ -2766,7 +2751,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221013'
@@ -2778,7 +2763,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221014'
@@ -2790,7 +2775,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 1
 FROM projects p
 JOIN users u ON u.university_id = '1221015'
@@ -2802,7 +2787,7 @@ WHERE p.semester_id = @target_semester_id
       WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
   );
 
-INSERT INTO project_members (project_id, student_id, is_primary_contact)
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
 SELECT p.project_id, s.student_id, 0
 FROM projects p
 JOIN users u ON u.university_id = '1221016'
@@ -3034,7 +3019,7 @@ CREATE TABLE IF NOT EXISTS committee_plan_projects (
 -- E) Default rooms safe insert
 -- ============================================================
 
-INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+INSERT IGNORE INTO discussion_rooms (room_name, sort_order, is_active)
 SELECT * FROM (
     SELECT 'Room 201 — Engineering Building' AS room_name, 1 AS sort_order, 1 AS is_active
     UNION ALL SELECT 'Room 202 — Engineering Building', 2, 1
@@ -3058,199 +3043,71 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 
 
-
-SET @db_name = DATABASE();
-
-SET @sql = (
-  SELECT IF(COUNT(*) = 0,
-    'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0',
-    'SELECT ''distribution_open already exists'' AS msg'
-  )
-  FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_open'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql = (
-  SELECT IF(COUNT(*) = 0,
-    'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL',
-    'SELECT ''distribution_opened_at already exists'' AS msg'
-  )
-  FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_opened_at'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql = (
-  SELECT IF(COUNT(*) = 0,
-    'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL',
-    'SELECT ''distribution_closed_at already exists'' AS msg'
-  )
-  FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_closed_at'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql = (
-  SELECT IF(COUNT(*) = 0,
-    'ALTER TABLE semesters ADD COLUMN distribution_deadline DATETIME NULL',
-    'SELECT ''distribution_deadline already exists'' AS msg'
-  )
-  FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_deadline'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-ALTER TABLE faculty_load_settings
-ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER semester_id;
-
-
--- 1) Student Distribution window columns
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_open') = 0,
-  'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active',
-  'SELECT "distribution_open already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_opened_at') = 0,
-  'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL AFTER distribution_open',
-  'SELECT "distribution_opened_at already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_closed_at') = 0,
-  'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL AFTER distribution_opened_at',
-  'SELECT "distribution_closed_at already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_close_at') = 0,
-  'ALTER TABLE semesters ADD COLUMN distribution_close_at DATETIME NULL AFTER distribution_closed_at',
-  'SELECT "distribution_close_at already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
--- 2) Faculty Hours: only graduation project hours wanted
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'faculty_load_settings' AND COLUMN_NAME = 'graduation_project_hours') = 0,
-  'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER semester_id',
-  'SELECT "graduation_project_hours already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
--- 3) Student distribution sections for unassigned students
-CREATE TABLE IF NOT EXISTS student_distribution_sections (
-  section_id INT PRIMARY KEY AUTO_INCREMENT,
-  section_name VARCHAR(100) NOT NULL,
-  supervisor_id INT NOT NULL,
-  entered_by INT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
-  FOREIGN KEY (entered_by) REFERENCES users(user_id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS section_students (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  section_id INT NOT NULL,
-  student_id INT NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_section_student (section_id, student_id),
-  FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
-  FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 4) Committee scheduling tables
-CREATE TABLE IF NOT EXISTS discussion_rooms (
-  room_id INT PRIMARY KEY AUTO_INCREMENT,
-  room_name VARCHAR(100) NOT NULL,
-  sort_order INT NOT NULL DEFAULT 0,
-  is_active TINYINT(1) NOT NULL DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-INSERT INTO discussion_rooms (room_name, sort_order, is_active)
-SELECT 'Room 101', 1, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 101');
-INSERT INTO discussion_rooms (room_name, sort_order, is_active)
-SELECT 'Room 102', 2, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 102');
-INSERT INTO discussion_rooms (room_name, sort_order, is_active)
-SELECT 'Room 103', 3, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 103');
-INSERT INTO discussion_rooms (room_name, sort_order, is_active)
-SELECT 'Room 104', 4, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 104');
-
-CREATE TABLE IF NOT EXISTS committee_plans (
-  plan_id INT PRIMARY KEY AUTO_INCREMENT,
-  committee_name VARCHAR(150) NOT NULL,
-  academic_year VARCHAR(20) NULL,
-  discussion_date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  room_id INT NOT NULL,
-  responsible_faculty_id INT NULL,
-  status ENUM('draft','scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
-  created_by INT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (room_id) REFERENCES discussion_rooms(room_id),
-  FOREIGN KEY (responsible_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
-  FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS committee_plan_members (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  plan_id INT NOT NULL,
-  faculty_id INT NOT NULL,
-  role ENUM('member','responsible') NOT NULL DEFAULT 'member',
-  UNIQUE KEY uq_committee_plan_member (plan_id, faculty_id),
-  FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
-  FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS committee_plan_projects (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  plan_id INT NOT NULL,
-  project_id INT NOT NULL,
-  slot_order INT NOT NULL,
-  slot_start TIME NOT NULL,
-  slot_end TIME NOT NULL,
-  UNIQUE KEY uq_committee_project (project_id),
-  FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
-  FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 5) Make sure projects can store preferred doctors
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'preferred_supervisor_1') = 0,
-  'ALTER TABLE projects ADD COLUMN preferred_supervisor_1 INT NULL AFTER supervisor_id',
-  'SELECT "preferred_supervisor_1 already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'preferred_supervisor_2') = 0,
-  'ALTER TABLE projects ADD COLUMN preferred_supervisor_2 INT NULL AFTER preferred_supervisor_1',
-  'SELECT "preferred_supervisor_2 already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := IF(
-  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'preferred_supervisor_3') = 0,
-  'ALTER TABLE projects ADD COLUMN preferred_supervisor_3 INT NULL AFTER preferred_supervisor_2',
-  'SELECT "preferred_supervisor_3 already exists"'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-
-
 -- ============================================================
 --  END OF REPAIR APPENDIX
 -- ============================================================
+
+
+-- Rescue migration for dashboard/review/notifications.
+SET @db := DATABASE();
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_open');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_opened_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_closed_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_close_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_close_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS faculty_load_settings (
+  faculty_id INT NOT NULL,
+  semester_id INT NOT NULL,
+  graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+  updated_by INT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (faculty_id, semester_id)
+);
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='graduation_project_hours');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN updated_by INT NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='updated_by');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE notifications ADD COLUMN sender_id INT NULL AFTER recipient_id', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND COLUMN_NAME='sender_id');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (
+  SELECT IF(
+    COUNT(*) = 0,
+    'ALTER TABLE notifications ADD COLUMN course_scope ENUM(''introduction'',''graduation_project'',''both'') NOT NULL DEFAULT ''both'' AFTER message',
+    'SELECT 1'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db
+    AND TABLE_NAME = 'notifications'
+    AND COLUMN_NAME = 'course_scope'
+);PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS system_notices (
+  notice_id INT PRIMARY KEY AUTO_INCREMENT,
+  title VARCHAR(255) NOT NULL,
+  body TEXT NOT NULL,
+  highlight_text VARCHAR(255) NULL,
+  button1_text VARCHAR(100) NULL,
+  button2_text VARCHAR(100) NULL,
+  button3_text VARCHAR(100) NULL,
+  course_scope ENUM('introduction','graduation_project','both') NOT NULL DEFAULT 'both',
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  updated_by INT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+UPDATE semesters
+SET is_active = 1
+WHERE semester_id = (SELECT semester_id FROM (SELECT semester_id FROM semesters ORDER BY semester_id DESC LIMIT 1) AS newest)
+  AND NOT EXISTS (SELECT 1 FROM (SELECT semester_id FROM semesters WHERE is_active = 1 LIMIT 1) AS active_sem);

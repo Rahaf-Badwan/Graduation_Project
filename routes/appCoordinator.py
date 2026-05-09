@@ -364,6 +364,396 @@ def coordinator_page(page):
     return render_template(template)
 
 
+# ─── Coordinator Notifications / Messaging ───────────────────────────────
+def _notification_row_to_json(row):
+    """Convert MySQL notification rows to safe JSON values."""
+    if not row:
+        return row
+    clean = dict(row)
+    if clean.get("created_at") is not None:
+        clean["created_at"] = str(clean["created_at"])
+    clean["is_read"] = bool(clean.get("is_read"))
+    clean["course_scope"] = clean.get("course_scope") or "both"
+    return clean
+
+
+
+def _table_exists(cursor, table_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
+        """,
+        (table_name,),
+    )
+    row = cursor.fetchone() or {}
+    return int(row.get("cnt") or 0) > 0
+
+def _notification_recipients(cursor, scope, value=None):
+    """Return user_ids for the coordinator selected target."""
+    scope = (scope or "").strip()
+
+    if scope == "head":
+        cursor.execute("SELECT user_id FROM users WHERE role = 'head_of_department' AND is_active = TRUE")
+        return [r["user_id"] for r in cursor.fetchall()]
+
+    if scope == "doctors":
+        cursor.execute("SELECT user_id FROM users WHERE role = 'supervisor' AND is_active = TRUE")
+        return [r["user_id"] for r in cursor.fetchall()]
+
+    if scope == "doctor":
+        cursor.execute(
+            """
+            SELECT u.user_id
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE f.faculty_id = %s AND u.role = 'supervisor' AND u.is_active = TRUE
+            """,
+            (value,),
+        )
+        return [r["user_id"] for r in cursor.fetchall()]
+
+    if scope == "student":
+        cursor.execute(
+            """
+            SELECT u.user_id
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE st.student_id = %s AND u.role = 'student' AND u.is_active = TRUE
+            """,
+            (value,),
+        )
+        return [r["user_id"] for r in cursor.fetchall()]
+
+    if scope == "section":
+        if not (_table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students")):
+            return []
+        cursor.execute(
+            """
+            SELECT DISTINCT recipient_id
+            FROM (
+                SELECT us.user_id AS recipient_id
+                FROM student_distribution_sections sec
+                JOIN section_students ss ON ss.section_id = sec.section_id
+                JOIN students st ON st.student_id = ss.student_id
+                JOIN users us ON us.user_id = st.user_id
+                WHERE sec.section_id = %s AND us.is_active = TRUE
+                UNION
+                SELECT u_sup.user_id AS recipient_id
+                FROM student_distribution_sections sec
+                JOIN faculty f ON f.faculty_id = sec.supervisor_id
+                JOIN users u_sup ON u_sup.user_id = f.user_id
+                WHERE sec.section_id = %s AND u_sup.is_active = TRUE
+            ) x
+            """,
+            (value, value),
+        )
+        return [r["recipient_id"] for r in cursor.fetchall()]
+
+    if scope == "all_sections":
+        if not (_table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students")):
+            return []
+        cursor.execute(
+            """
+            SELECT DISTINCT recipient_id
+            FROM (
+                SELECT us.user_id AS recipient_id
+                FROM student_distribution_sections sec
+                JOIN section_students ss ON ss.section_id = sec.section_id
+                JOIN students st ON st.student_id = ss.student_id
+                JOIN users us ON us.user_id = st.user_id
+                WHERE us.is_active = TRUE
+                UNION
+                SELECT u_sup.user_id AS recipient_id
+                FROM student_distribution_sections sec
+                JOIN faculty f ON f.faculty_id = sec.supervisor_id
+                JOIN users u_sup ON u_sup.user_id = f.user_id
+                WHERE u_sup.is_active = TRUE
+            ) x
+            """
+        )
+        return [r["recipient_id"] for r in cursor.fetchall()]
+
+    return []
+
+
+@coordinator_bp.route("/api/coordinator/notifications/options", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_notification_options():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT user_id, full_name, university_id
+            FROM users
+            WHERE role = 'head_of_department' AND is_active = TRUE
+            ORDER BY full_name
+            """
+        )
+        heads = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT f.faculty_id, u.user_id, u.full_name, u.university_id
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE u.role = 'supervisor' AND u.is_active = TRUE
+            ORDER BY u.full_name
+            """
+        )
+        doctors = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT st.student_id, u.user_id, u.full_name, u.university_id
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE u.role = 'student' AND u.is_active = TRUE
+            ORDER BY u.full_name
+            """
+        )
+        students = cursor.fetchall()
+
+        sections = []
+        if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
+            cursor.execute(
+                """
+                SELECT sec.section_id,
+                       sec.section_name,
+                       u_sup.full_name AS supervisor_name,
+                       COUNT(ss.student_id) AS students_count
+                FROM student_distribution_sections sec
+                JOIN faculty f ON f.faculty_id = sec.supervisor_id
+                JOIN users u_sup ON u_sup.user_id = f.user_id
+                LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+                GROUP BY sec.section_id, sec.section_name, u_sup.full_name
+                ORDER BY sec.section_id DESC
+                """
+            )
+            sections = cursor.fetchall()
+
+        cursor.close()
+        db.close()
+        return jsonify({"heads": heads, "doctors": doctors, "students": students, "sections": sections})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/notifications/inbox", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_notifications_inbox():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT n.notification_id, n.notification_type, n.title, n.message,
+                   n.course_scope, n.related_project_id, n.is_read, n.created_at,
+                   sender.full_name AS sender_name, sender.role AS sender_role
+            FROM notifications n
+            LEFT JOIN users sender ON sender.user_id = n.sender_id
+            WHERE n.recipient_id = %s
+            ORDER BY n.created_at DESC, n.notification_id DESC
+            LIMIT 100
+            """,
+            (session.get("user_id"),),
+        )
+        rows = [_notification_row_to_json(r) for r in cursor.fetchall()]
+        cursor.close()
+        db.close()
+        return jsonify({"notifications": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/notifications/sent", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_notifications_sent():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT n.notification_id, n.title, n.message, n.notification_type,
+                   n.course_scope, n.is_read, n.created_at,
+                   recipient.full_name AS recipient_name, recipient.role AS recipient_role
+            FROM notifications n
+            JOIN users recipient ON recipient.user_id = n.recipient_id
+            WHERE n.sender_id = %s
+            ORDER BY n.created_at DESC, n.notification_id DESC
+            LIMIT 100
+            """,
+            (session.get("user_id"),),
+        )
+        rows = [_notification_row_to_json(r) for r in cursor.fetchall()]
+        cursor.close()
+        db.close()
+        return jsonify({"sent": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/notifications/send", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_notifications_send():
+    data = request.get_json(silent=True) or {}
+    scope = (data.get("scope") or "").strip()
+    value = data.get("value")
+    title = (data.get("title") or "").strip()
+    message = (data.get("message") or "").strip()
+    urgent = bool(data.get("urgent"))
+    course_scope = (data.get("course_scope") or "both").strip()
+    allowed_course_scopes = {"introduction", "graduation_project", "both"}
+
+    if course_scope not in allowed_course_scopes:
+        return jsonify({"error": "Please choose if this message is for Project Introduction, Graduation Project, or both."}), 400
+
+    if not scope:
+        return jsonify({"error": "Please choose who should receive the message."}), 400
+    if not title:
+        return jsonify({"error": "Please write a title."}), 400
+    if not message:
+        return jsonify({"error": "Please write a message."}), 400
+    if scope in {"student", "section", "doctor"} and not value:
+        return jsonify({"error": "Please choose the exact receiver."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        recipients = _notification_recipients(cursor, scope, value)
+        sender_id = session.get("user_id")
+        recipients = sorted({int(r) for r in recipients if int(r) != int(sender_id)})
+
+        if not recipients:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No recipients found for this choice."}), 404
+
+        notification_type = "urgent_alert" if urgent else "system"
+        for recipient_id in recipients:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message, course_scope, related_project_id, is_read)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE)
+                """,
+                (recipient_id, sender_id, notification_type, title, message, course_scope),
+            )
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": f"Message sent successfully to {len(recipients)} recipient(s).", "sent_count": len(recipients)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/notifications/<int:notification_id>/read", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_notification_mark_read(notification_id):
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """
+            UPDATE notifications
+            SET is_read = TRUE
+            WHERE notification_id = %s AND recipient_id = %s
+            """,
+            (notification_id, session.get("user_id")),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Notification marked as read."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/notifications/read-all", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_notifications_mark_all_read():
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("UPDATE notifications SET is_read = TRUE WHERE recipient_id = %s", (session.get("user_id"),))
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "All notifications marked as read."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── Public Important Notice ─────────────────────────────────────────────
+@coordinator_bp.route("/api/coordinator/important-notice", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_important_notice_get():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT notice_id, title, body, highlight_text, button1_text, button2_text, button3_text, course_scope, is_active, updated_at
+            FROM system_notices
+            WHERE is_active = TRUE
+            ORDER BY updated_at DESC, notice_id DESC
+            LIMIT 1
+            """
+        )
+        notice = cursor.fetchone()
+        if notice and notice.get("updated_at") is not None:
+            notice["updated_at"] = str(notice["updated_at"])
+        cursor.close()
+        db.close()
+        return jsonify({"notice": notice})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/important-notice", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_important_notice_save():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    body = (data.get("body") or "").strip()
+    highlight_text = (data.get("highlight_text") or "").strip() or None
+    button1_text = (data.get("button1_text") or "").strip() or None
+    button2_text = (data.get("button2_text") or "").strip() or None
+    button3_text = (data.get("button3_text") or "").strip() or None
+    course_scope = (data.get("course_scope") or "both").strip()
+    allowed_course_scopes = {"introduction", "graduation_project", "both"}
+
+    if course_scope not in allowed_course_scopes:
+        return jsonify({"error": "Please choose if this notice is for Project Introduction, Graduation Project, or both."}), 400
+
+    if not title:
+        return jsonify({"error": "Please write the notice title."}), 400
+    if not body:
+        return jsonify({"error": "Please write the notice body."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("UPDATE system_notices SET is_active = FALSE")
+        cursor.execute(
+            """
+            INSERT INTO system_notices
+                (title, body, highlight_text, button1_text, button2_text, button3_text, course_scope, is_active, updated_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s)
+            """,
+            (title, body, highlight_text, button1_text, button2_text, button3_text, course_scope, session.get("user_id")),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Important notice updated successfully."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ─── Distribution Window ─────────────────────────────────────────────────
 @coordinator_bp.route("/api/coordinator/distribution-window", methods=["GET"])
 @login_required(role="coordinator")

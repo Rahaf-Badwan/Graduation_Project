@@ -3,7 +3,6 @@ import bcrypt
 import secrets
 import datetime
 import os
-from datetime import datetime
 import csv
 import io
 import re
@@ -59,52 +58,18 @@ def fetch_supervisors():
     return rows
 
 
-def _db_column_exists(cursor, table_name, column_name):
-    cursor.execute(
-        """
-        SELECT COUNT(*) AS cnt
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = %s
-          AND COLUMN_NAME = %s
-        """,
-        (table_name, column_name),
-    )
-    row = cursor.fetchone() or {}
-    return int(row.get("cnt") or 0) > 0
-
-
 def _get_active_semester(cursor):
-    has_open = _db_column_exists(cursor, "semesters", "distribution_open")
-    has_opened = _db_column_exists(cursor, "semesters", "distribution_opened_at")
-    has_closed = _db_column_exists(cursor, "semesters", "distribution_closed_at")
-    has_close_at = _db_column_exists(cursor, "semesters", "distribution_close_at")
-
-    fields = ["semester_id", "academic_year", "semester_number", "course_code"]
-    fields.append("COALESCE(distribution_open, 0) AS distribution_open" if has_open else "0 AS distribution_open")
-    fields.append("distribution_opened_at" if has_opened else "NULL AS distribution_opened_at")
-    fields.append("distribution_closed_at" if has_closed else "NULL AS distribution_closed_at")
-    fields.append("distribution_close_at" if has_close_at else "NULL AS distribution_close_at")
-
-    cursor.execute(f"""
-        SELECT {', '.join(fields)}
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number, course_code,
+               COALESCE(distribution_open, 0) AS distribution_open,
+               distribution_opened_at,
+               distribution_closed_at
         FROM semesters
         WHERE is_active = TRUE
         ORDER BY semester_id DESC
         LIMIT 1
     """)
     return cursor.fetchone()
-
-
-def _distribution_is_open(semester):
-    if not semester:
-        return False
-    if not bool(semester.get("distribution_open") or 0):
-        return False
-    close_at = semester.get("distribution_close_at")
-    if close_at and datetime.now() >= close_at:
-        return False
-    return True
 
 
 def _csv_response(filename, headers, rows):
@@ -122,12 +87,39 @@ def _csv_response(filename, headers, rows):
     )
 
 
+def _get_public_notice():
+    """Return the active important notice for the public login page."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT title, body, highlight_text, button1_text, button2_text, button3_text, course_scope
+            FROM system_notices
+            WHERE is_active = TRUE
+            ORDER BY updated_at DESC, notice_id DESC
+            LIMIT 1
+            """
+        )
+        notice = cursor.fetchone()
+        cursor.close()
+        db.close()
+        return notice
+    except Exception:
+        return None
+
+
+def _render_login(**context):
+    context.setdefault("public_notice", _get_public_notice())
+    return render_template("login.html", **context)
+
+
 # ─── Login / Logout ──────────────────────────────────────────────────────
 @app.route("/", methods=["GET"])
 def login_page():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
-    return render_template("login.html")
+    return _render_login()
 
 
 @app.route("/login", methods=["POST"])
@@ -136,7 +128,7 @@ def login():
     pwd = request.form.get("password", "").strip()
 
     if not uid or not pwd:
-        return render_template("login.html", error="Please fill in all fields.")
+        return _render_login(error="Please fill in all fields.")
 
     try:
         db = get_db()
@@ -148,13 +140,13 @@ def login():
         cursor.close()
         db.close()
     except Exception as e:
-        return render_template("login.html", error=f"Database error: {e}")
+        return _render_login(error=f"Database error: {e}")
 
     if not user:
-        return render_template("login.html", error="Invalid University ID or password.")
+        return _render_login(error="Invalid University ID or password.")
 
     if not bcrypt.checkpw(pwd.encode(), user["password_hash"].encode()):
-        return render_template("login.html", error="Invalid University ID or password.")
+        return _render_login(error="Invalid University ID or password.")
 
     session["user_id"] = user["user_id"]
     session["university_id"] = user["university_id"]
@@ -661,13 +653,13 @@ def api_student_registration_check():
             return jsonify({
                 "registered": True,
                 "project": project,
-                "distribution_open": _distribution_is_open(semester)
+                "distribution_open": bool(semester.get("distribution_open"))
             })
 
         return jsonify({
             "registered": False,
             "project": None,
-            "distribution_open": _distribution_is_open(semester)
+            "distribution_open": bool(semester.get("distribution_open"))
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -687,10 +679,9 @@ def api_student_distribution_window_status():
             return jsonify({"error": "No active semester found."}), 400
 
         return jsonify({
-            "is_open": _distribution_is_open(semester),
+            "is_open": bool(semester.get("distribution_open")),
             "opened_at": str(semester.get("distribution_opened_at") or ""),
-            "closed_at": str(semester.get("distribution_closed_at") or ""),
-            "close_at": str(semester.get("distribution_close_at") or "")
+            "closed_at": str(semester.get("distribution_closed_at") or "")
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -725,7 +716,7 @@ def api_student_distribution_submit():
             db.close()
             return jsonify({"error": "No active semester is configured."}), 400
 
-        if not _distribution_is_open(semester):
+        if int(semester.get("distribution_open") or 0) != 1:
             cursor.close()
             db.close()
             return jsonify({"error": "Student distribution is currently closed."}), 403

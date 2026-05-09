@@ -89,7 +89,7 @@ async function askAI() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: q })
     });
-    const data = await res.json();
+    const data = await readApiJson(res);
     appendChatMessage(data.answer || data.error || 'No answer returned.', 'bot');
   } catch (e) {
     appendChatMessage('Could not connect to the AI service.', 'bot');
@@ -235,7 +235,7 @@ async function toggleDistributionWindow() {
       body: JSON.stringify({ is_open: opening, close_at: closeAt })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to update registration window.');
 
     if (msg) {
@@ -374,7 +374,7 @@ async function loadDistributionData() {
 
   try {
     const res = await fetch('/api/coordinator/distribution-data');
-    const data = await res.json();
+    const data = await readApiJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to load distribution data.');
 
     professorsCache = data.professors || [];
@@ -434,7 +434,7 @@ async function assignGroupSupervisor(projectId) {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to assign supervisor.');
@@ -512,7 +512,7 @@ async function addSectionEntry() {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to add section.');
@@ -766,7 +766,7 @@ async function generateCommittees() {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to generate committees.');
@@ -798,7 +798,7 @@ async function saveResponsibleDoctor(planId) {
       body: JSON.stringify({ faculty_id: facultyId })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to save the responsible doctor.');
@@ -845,7 +845,7 @@ async function resetAndRedistributeCommittees() {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to reset and redistribute committees.');
@@ -955,6 +955,26 @@ function renderDashboardProgress(stats) {
   }).join('');
 }
 
+
+
+async function readApiJson(res) {
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  const bodyText = await res.text();
+
+  if (!contentType.includes('application/json')) {
+    if (bodyText.trim().startsWith('<')) {
+      throw new Error('The server returned an HTML page instead of JSON. This means the API route is missing, you are not logged in as coordinator, or Flask has an error. Check the Flask terminal.');
+    }
+    throw new Error(bodyText || 'The server did not return JSON.');
+  }
+
+  try {
+    return JSON.parse(bodyText || '{}');
+  } catch (e) {
+    throw new Error('Invalid JSON returned from server. Check the Flask terminal.');
+  }
+}
+
 async function loadDashboardData() {
   if (!document.getElementById('pg-dashboard')) return;
   try {
@@ -1049,7 +1069,7 @@ async function loadReviewProjects() {
   try {
     if (msg) msg.textContent = 'Loading...';
     const res = await fetch('/api/coordinator/review-projects');
-    const data = await res.json();
+    const data = await readApiJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to load projects.');
     reviewProjectsCache = data.projects || [];
     if (msg) msg.textContent = '';
@@ -1077,7 +1097,7 @@ async function saveReviewDecision(projectId, decision) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision, notes })
     });
-    const data = await res.json();
+    const data = await readApiJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to save decision.');
     if (msg) {
       msg.style.color = 'green';
