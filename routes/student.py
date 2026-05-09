@@ -58,15 +58,15 @@ def registration():
 @login_required(role="student")
 def submit():
     user_id = session["user_id"]
-    academic_year   = None
+    academic_year = None
     supervisor_name = None
-    team_members    = []
-    already_submitted_by = None   # اسم من سلّم من الفريق
-    is_my_submission      = False  # هل أنا من سلّم؟
-    proj_title    = ""
+    team_members = []
+    already_submitted_by = None  # اسم من سلّم من الفريق
+    is_my_submission = False  # هل أنا من سلّم؟
+    proj_title = ""
     proj_abstract = ""
     proj_keywords = ""
-    proj_type     = ""
+    proj_type = ""
 
     try:
         db = get_db()
@@ -130,13 +130,13 @@ def submit():
         project = cursor.fetchone()
 
         if project:
-            academic_year   = project["academic_year"]
+            academic_year = project["academic_year"]
             supervisor_name = project["supervisor_name"]
             is_my_submission = bool(project["is_primary_contact"])
-            proj_title    = project["title"]       or ""
-            proj_abstract = project["abstract"]    or ""
-            proj_keywords = project["keywords"]    or ""
-            proj_type     = project["project_type"] or ""
+            proj_title = project["title"] or ""
+            proj_abstract = project["abstract"] or ""
+            proj_keywords = project["keywords"] or ""
+            proj_type = project["project_type"] or ""
             if isinstance(proj_type, set):
                 proj_type = ",".join(sorted(proj_type))
         else:
@@ -161,9 +161,9 @@ def submit():
             prev = cursor.fetchone()
             if prev:
                 supervisor_name = prev["supervisor_name"]
-                academic_year   = prev["academic_year"]
-                proj_title    = prev["title"]        or ""
-                proj_type     = prev["project_type"] or ""
+                academic_year = prev["academic_year"]
+                proj_title = prev["title"] or ""
+                proj_type = prev["project_type"] or ""
                 if isinstance(proj_type, set):
                     proj_type = ",".join(sorted(proj_type))
                 # جيب الفريق من مشروع COMP4200 القديم — هم نفسهم
@@ -209,7 +209,9 @@ def submit():
                     (project["project_id"],),
                 )
                 submitter = cursor.fetchone()
-                already_submitted_by = submitter["full_name"] if submitter else "your teammate"
+                already_submitted_by = (
+                    submitter["full_name"] if submitter else "your teammate"
+                )
 
         cursor.close()
         db.close()
@@ -769,15 +771,20 @@ def api_submit_project():
                 if team_submission:
                     cursor.close()
                     db.close()
-                    return jsonify({
-                        "error": (
-                            f"Your teammate '{team_submission['submitted_by']}' "
-                            f"has already submitted the project. "
-                            f"Only one member per team can submit."
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    f"Your teammate '{team_submission['submitted_by']}' "
+                                    f"has already submitted the project. "
+                                    f"Only one member per team can submit."
+                                ),
+                                "already_submitted_by_team": True,
+                                "project_id": team_submission["project_id"],
+                            }
                         ),
-                        "already_submitted_by_team": True,
-                        "project_id": team_submission["project_id"],
-                    }), 409
+                        409,
+                    )
 
         if existing:
             # ── إذا المشروع draft → أي عضو يقدر يسلم ويصير primary contact ──
@@ -831,14 +838,19 @@ def api_submit_project():
                     name = submitter["full_name"] if submitter else "your teammate"
                     cursor.close()
                     db.close()
-                    return jsonify({
-                        "error": (
-                            f"This project has already been submitted by {name}. "
-                            f"Only the student who created the submission can update it."
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    f"This project has already been submitted by {name}. "
+                                    f"Only the student who created the submission can update it."
+                                ),
+                                "already_submitted_by_team": True,
+                                "project_id": existing["project_id"],
+                            }
                         ),
-                        "already_submitted_by_team": True,
-                        "project_id": existing["project_id"],
-                    }), 409
+                        409,
+                    )
 
                 cursor.execute(
                     """
@@ -1016,7 +1028,14 @@ def api_upload_file():
         if not row:
             cursor.close()
             db.close()
-            return jsonify({"error": "No project found for the current semester. Please submit your project first."}), 400
+            return (
+                jsonify(
+                    {
+                        "error": "No project found for the current semester. Please submit your project first."
+                    }
+                ),
+                400,
+            )
         project_id = row["project_id"]
 
         # Read file bytes into memory (already size-checked above)
@@ -1132,7 +1151,14 @@ def api_clear_submission():
         if not row["is_primary_contact"]:
             cursor.close()
             db.close()
-            return jsonify({"error": "Only the student who submitted can clear the submission."}), 403
+            return (
+                jsonify(
+                    {
+                        "error": "Only the student who submitted can clear the submission."
+                    }
+                ),
+                403,
+            )
 
         project_id = row["project_id"]
 
