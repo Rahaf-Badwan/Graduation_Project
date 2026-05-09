@@ -3043,71 +3043,199 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 
 
+
+SET @db_name = DATABASE();
+
+SET @sql = (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0',
+    'SELECT ''distribution_open already exists'' AS msg'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_open'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL',
+    'SELECT ''distribution_opened_at already exists'' AS msg'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_opened_at'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL',
+    'SELECT ''distribution_closed_at already exists'' AS msg'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_closed_at'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE semesters ADD COLUMN distribution_deadline DATETIME NULL',
+    'SELECT ''distribution_deadline already exists'' AS msg'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_deadline'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+ALTER TABLE faculty_load_settings
+ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER semester_id;
+
+
+-- 1) Student Distribution window columns
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_open') = 0,
+  'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active',
+  'SELECT "distribution_open already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_opened_at') = 0,
+  'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL AFTER distribution_open',
+  'SELECT "distribution_opened_at already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_closed_at') = 0,
+  'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL AFTER distribution_opened_at',
+  'SELECT "distribution_closed_at already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'semesters' AND COLUMN_NAME = 'distribution_close_at') = 0,
+  'ALTER TABLE semesters ADD COLUMN distribution_close_at DATETIME NULL AFTER distribution_closed_at',
+  'SELECT "distribution_close_at already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2) Faculty Hours: only graduation project hours wanted
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'faculty_load_settings' AND COLUMN_NAME = 'graduation_project_hours') = 0,
+  'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER semester_id',
+  'SELECT "graduation_project_hours already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 3) Student distribution sections for unassigned students
+CREATE TABLE IF NOT EXISTS student_distribution_sections (
+  section_id INT PRIMARY KEY AUTO_INCREMENT,
+  section_name VARCHAR(100) NOT NULL,
+  supervisor_id INT NOT NULL,
+  entered_by INT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+  FOREIGN KEY (entered_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS section_students (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  section_id INT NOT NULL,
+  student_id INT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_section_student (section_id, student_id),
+  FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
+  FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4) Committee scheduling tables
+CREATE TABLE IF NOT EXISTS discussion_rooms (
+  room_id INT PRIMARY KEY AUTO_INCREMENT,
+  room_name VARCHAR(100) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+SELECT 'Room 101', 1, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 101');
+INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+SELECT 'Room 102', 2, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 102');
+INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+SELECT 'Room 103', 3, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 103');
+INSERT INTO discussion_rooms (room_name, sort_order, is_active)
+SELECT 'Room 104', 4, 1 WHERE NOT EXISTS (SELECT 1 FROM discussion_rooms WHERE room_name = 'Room 104');
+
+CREATE TABLE IF NOT EXISTS committee_plans (
+  plan_id INT PRIMARY KEY AUTO_INCREMENT,
+  committee_name VARCHAR(150) NOT NULL,
+  academic_year VARCHAR(20) NULL,
+  discussion_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  room_id INT NOT NULL,
+  responsible_faculty_id INT NULL,
+  status ENUM('draft','scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+  created_by INT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (room_id) REFERENCES discussion_rooms(room_id),
+  FOREIGN KEY (responsible_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plan_members (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  plan_id INT NOT NULL,
+  faculty_id INT NOT NULL,
+  role ENUM('member','responsible') NOT NULL DEFAULT 'member',
+  UNIQUE KEY uq_committee_plan_member (plan_id, faculty_id),
+  FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+  FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS committee_plan_projects (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  plan_id INT NOT NULL,
+  project_id INT NOT NULL,
+  slot_order INT NOT NULL,
+  slot_start TIME NOT NULL,
+  slot_end TIME NOT NULL,
+  UNIQUE KEY uq_committee_project (project_id),
+  FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+  FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5) Make sure projects can store preferred doctors
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'preferred_supervisor_1') = 0,
+  'ALTER TABLE projects ADD COLUMN preferred_supervisor_1 INT NULL AFTER supervisor_id',
+  'SELECT "preferred_supervisor_1 already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'preferred_supervisor_2') = 0,
+  'ALTER TABLE projects ADD COLUMN preferred_supervisor_2 INT NULL AFTER preferred_supervisor_1',
+  'SELECT "preferred_supervisor_2 already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'preferred_supervisor_3') = 0,
+  'ALTER TABLE projects ADD COLUMN preferred_supervisor_3 INT NULL AFTER preferred_supervisor_2',
+  'SELECT "preferred_supervisor_3 already exists"'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+
+
 -- ============================================================
 --  END OF REPAIR APPENDIX
 -- ============================================================
-
-
--- Rescue migration for dashboard/review/notifications.
-SET @db := DATABASE();
-
-SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_open');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_opened_at');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_closed_at');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_close_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_close_at');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-CREATE TABLE IF NOT EXISTS faculty_load_settings (
-  faculty_id INT NOT NULL,
-  semester_id INT NOT NULL,
-  graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
-  updated_by INT NULL,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (faculty_id, semester_id)
-);
-
-SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='graduation_project_hours');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN updated_by INT NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='updated_by');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE notifications ADD COLUMN sender_id INT NULL AFTER recipient_id', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND COLUMN_NAME='sender_id');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @sql := (
-  SELECT IF(
-    COUNT(*) = 0,
-    'ALTER TABLE notifications ADD COLUMN course_scope ENUM(''introduction'',''graduation_project'',''both'') NOT NULL DEFAULT ''both'' AFTER message',
-    'SELECT 1'
-  )
-  FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = @db
-    AND TABLE_NAME = 'notifications'
-    AND COLUMN_NAME = 'course_scope'
-);PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-CREATE TABLE IF NOT EXISTS system_notices (
-  notice_id INT PRIMARY KEY AUTO_INCREMENT,
-  title VARCHAR(255) NOT NULL,
-  body TEXT NOT NULL,
-  highlight_text VARCHAR(255) NULL,
-  button1_text VARCHAR(100) NULL,
-  button2_text VARCHAR(100) NULL,
-  button3_text VARCHAR(100) NULL,
-  course_scope ENUM('introduction','graduation_project','both') NOT NULL DEFAULT 'both',
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  updated_by INT NULL,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-UPDATE semesters
-SET is_active = 1
-WHERE semester_id = (SELECT semester_id FROM (SELECT semester_id FROM semesters ORDER BY semester_id DESC LIMIT 1) AS newest)
-  AND NOT EXISTS (SELECT 1 FROM (SELECT semester_id FROM semesters WHERE is_active = 1 LIMIT 1) AS active_sem);

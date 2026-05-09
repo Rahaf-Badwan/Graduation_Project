@@ -77,7 +77,36 @@ def submit():
         st_row = cursor.fetchone()
         student_id = st_row["student_id"] if st_row else None
 
-        # آخر مشروع للطالب — بغض النظر عن الـ status (draft أو submitted)
+        # تحديد الكورس الصح بناءً على نتيجة الطالب
+        cursor.execute(
+            """
+            SELECT scr.status AS course_status
+            FROM   student_course_results scr
+            JOIN   semesters s ON s.semester_id = scr.semester_id
+            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
+            ORDER  BY scr.semester_id DESC LIMIT 1
+            """,
+            (student_id,),
+        )
+        result_row = cursor.fetchone()
+        course_status = (result_row or {}).get("course_status", "pending")
+        target_course = "COMP4300" if course_status == "passed" else "COMP4200"
+
+        # جيب السمستر الأكتف للكورس الصح
+        cursor.execute(
+            "SELECT semester_id FROM semesters WHERE is_active = TRUE AND course_code = %s ORDER BY semester_id DESC LIMIT 1",
+            (target_course,),
+        )
+        sem_row = cursor.fetchone()
+        if not sem_row and target_course == "COMP4300":
+            cursor.execute(
+                "SELECT semester_id FROM semesters WHERE is_active = TRUE AND course_code = 'COMP4200' ORDER BY semester_id DESC LIMIT 1"
+            )
+            sem_row = cursor.fetchone()
+            target_course = "COMP4200"
+        active_semester_id = sem_row["semester_id"] if sem_row else None
+
+        # جيب المشروع الخاص بهذا السمستر تحديداً
         cursor.execute(
             """
             SELECT p.project_id, p.status,
@@ -89,14 +118,14 @@ def submit():
             JOIN   students st   ON st.student_id = pm.student_id
             JOIN   projects p    ON p.project_id  = pm.project_id
             JOIN   semesters s   ON s.semester_id = p.semester_id
-                                AND s.is_active   = TRUE
             LEFT JOIN faculty f      ON f.faculty_id = p.supervisor_id
             LEFT JOIN users sup_u    ON sup_u.user_id = f.user_id
             WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             ORDER  BY p.project_id DESC
             LIMIT  1
             """,
-            (user_id,),
+            (user_id, active_semester_id),
         )
         project = cursor.fetchone()
 
@@ -108,11 +137,51 @@ def submit():
             proj_abstract = project["abstract"] or ""
             proj_keywords = project["keywords"] or ""
             proj_type = project["project_type"] or ""
-            # MySQL SET columns come back as Python set — convert
             if isinstance(proj_type, set):
                 proj_type = ",".join(sorted(proj_type))
+        else:
+            # ما في مشروع بالسمستر الجديد → جيب السوبرفايزر والفريق من آخر مشروع قديم
+            cursor.execute(
+                """
+                SELECT p.project_id, p.title, p.project_type,
+                       s.academic_year,
+                       sup_u.full_name AS supervisor_name
+                FROM   project_members pm
+                JOIN   students st   ON st.student_id = pm.student_id
+                JOIN   projects p    ON p.project_id  = pm.project_id
+                JOIN   semesters s   ON s.semester_id = p.semester_id
+                LEFT JOIN faculty f      ON f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_u    ON sup_u.user_id = f.user_id
+                WHERE  st.user_id = %s
+                ORDER  BY p.project_id DESC
+                LIMIT  1
+                """,
+                (user_id,),
+            )
+            prev = cursor.fetchone()
+            if prev:
+                supervisor_name = prev["supervisor_name"]
+                academic_year = prev["academic_year"]
+                proj_title = prev["title"] or ""
+                proj_type = prev["project_type"] or ""
+                if isinstance(proj_type, set):
+                    proj_type = ",".join(sorted(proj_type))
+                # جيب الفريق من مشروع COMP4200 القديم — هم نفسهم
+                cursor.execute(
+                    """
+                    SELECT u.full_name, u.university_id
+                    FROM   project_members pm
+                    JOIN   students st ON st.student_id = pm.student_id
+                    JOIN   users    u  ON u.user_id     = st.user_id
+                    WHERE  pm.project_id = %s
+                    ORDER  BY pm.is_primary_contact DESC
+                    """,
+                    (prev["project_id"],),
+                )
+                team_members = cursor.fetchall()
 
-            # أعضاء الفريق
+        if project:
+            # أعضاء الفريق من المشروع الحالي
             cursor.execute(
                 """
                 SELECT u.full_name, u.university_id
@@ -483,7 +552,7 @@ def api_submit_info():
             target_sem = cursor.fetchone()
             target_course = "COMP4200"
 
-        # Get current project for this student (any active semester)
+        # Get current project — بس من السمستر الأكتف الصح (COMP4200 أو COMP4300)
         cursor.execute(
             """
             SELECT p.project_id, p.title, p.title_en, p.abstract, p.keywords,
@@ -502,15 +571,16 @@ def api_submit_info():
             LEFT JOIN students st2 ON st2.student_id = pm2.student_id
             LEFT JOIN users u2 ON u2.user_id = st2.user_id
             WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             GROUP  BY p.project_id
             ORDER  BY p.project_id DESC
             LIMIT  1
             """,
-            (user_id,),
+            (user_id, (target_sem or {}).get("semester_id")),
         )
         project = cursor.fetchone()
 
-        # Get uploaded files for the project
+        # Get uploaded files — بس من نفس السمستر الحالي
         files = []
         if project:
             cursor.execute(
