@@ -58,15 +58,15 @@ def registration():
 @login_required(role="student")
 def submit():
     user_id = session["user_id"]
-    academic_year = None
+    academic_year   = None
     supervisor_name = None
-    team_members = []
-    already_submitted_by = None  # اسم من سلّم من الفريق
-    is_my_submission = False  # هل أنا من سلّم؟
-    proj_title = ""
+    team_members    = []
+    already_submitted_by = None   # اسم من سلّم من الفريق
+    is_my_submission      = False  # هل أنا من سلّم؟
+    proj_title    = ""
     proj_abstract = ""
     proj_keywords = ""
-    proj_type = ""
+    proj_type     = ""
 
     try:
         db = get_db()
@@ -77,7 +77,36 @@ def submit():
         st_row = cursor.fetchone()
         student_id = st_row["student_id"] if st_row else None
 
-        # آخر مشروع للطالب — بغض النظر عن الـ status (draft أو submitted)
+        # تحديد الكورس الصح بناءً على نتيجة الطالب
+        cursor.execute(
+            """
+            SELECT scr.status AS course_status
+            FROM   student_course_results scr
+            JOIN   semesters s ON s.semester_id = scr.semester_id
+            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
+            ORDER  BY scr.semester_id DESC LIMIT 1
+            """,
+            (student_id,),
+        )
+        result_row = cursor.fetchone()
+        course_status = (result_row or {}).get("course_status", "pending")
+        target_course = "COMP4300" if course_status == "passed" else "COMP4200"
+
+        # جيب السمستر الأكتف للكورس الصح
+        cursor.execute(
+            "SELECT semester_id FROM semesters WHERE is_active = TRUE AND course_code = %s ORDER BY semester_id DESC LIMIT 1",
+            (target_course,),
+        )
+        sem_row = cursor.fetchone()
+        if not sem_row and target_course == "COMP4300":
+            cursor.execute(
+                "SELECT semester_id FROM semesters WHERE is_active = TRUE AND course_code = 'COMP4200' ORDER BY semester_id DESC LIMIT 1"
+            )
+            sem_row = cursor.fetchone()
+            target_course = "COMP4200"
+        active_semester_id = sem_row["semester_id"] if sem_row else None
+
+        # جيب المشروع الخاص بهذا السمستر تحديداً
         cursor.execute(
             """
             SELECT p.project_id, p.status,
@@ -89,30 +118,70 @@ def submit():
             JOIN   students st   ON st.student_id = pm.student_id
             JOIN   projects p    ON p.project_id  = pm.project_id
             JOIN   semesters s   ON s.semester_id = p.semester_id
-                                AND s.is_active   = TRUE
             LEFT JOIN faculty f      ON f.faculty_id = p.supervisor_id
             LEFT JOIN users sup_u    ON sup_u.user_id = f.user_id
             WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             ORDER  BY p.project_id DESC
             LIMIT  1
             """,
-            (user_id,),
+            (user_id, active_semester_id),
         )
         project = cursor.fetchone()
 
         if project:
-            academic_year = project["academic_year"]
+            academic_year   = project["academic_year"]
             supervisor_name = project["supervisor_name"]
             is_my_submission = bool(project["is_primary_contact"])
-            proj_title = project["title"] or ""
-            proj_abstract = project["abstract"] or ""
-            proj_keywords = project["keywords"] or ""
-            proj_type = project["project_type"] or ""
-            # MySQL SET columns come back as Python set — convert
+            proj_title    = project["title"]       or ""
+            proj_abstract = project["abstract"]    or ""
+            proj_keywords = project["keywords"]    or ""
+            proj_type     = project["project_type"] or ""
             if isinstance(proj_type, set):
                 proj_type = ",".join(sorted(proj_type))
+        else:
+            # ما في مشروع بالسمستر الجديد → جيب السوبرفايزر والفريق من آخر مشروع قديم
+            cursor.execute(
+                """
+                SELECT p.project_id, p.title, p.project_type,
+                       s.academic_year,
+                       sup_u.full_name AS supervisor_name
+                FROM   project_members pm
+                JOIN   students st   ON st.student_id = pm.student_id
+                JOIN   projects p    ON p.project_id  = pm.project_id
+                JOIN   semesters s   ON s.semester_id = p.semester_id
+                LEFT JOIN faculty f      ON f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_u    ON sup_u.user_id = f.user_id
+                WHERE  st.user_id = %s
+                ORDER  BY p.project_id DESC
+                LIMIT  1
+                """,
+                (user_id,),
+            )
+            prev = cursor.fetchone()
+            if prev:
+                supervisor_name = prev["supervisor_name"]
+                academic_year   = prev["academic_year"]
+                proj_title    = prev["title"]        or ""
+                proj_type     = prev["project_type"] or ""
+                if isinstance(proj_type, set):
+                    proj_type = ",".join(sorted(proj_type))
+                # جيب الفريق من مشروع COMP4200 القديم — هم نفسهم
+                cursor.execute(
+                    """
+                    SELECT u.full_name, u.university_id
+                    FROM   project_members pm
+                    JOIN   students st ON st.student_id = pm.student_id
+                    JOIN   users    u  ON u.user_id     = st.user_id
+                    WHERE  pm.project_id = %s
+                    ORDER  BY pm.is_primary_contact DESC
+                    """,
+                    (prev["project_id"],),
+                )
+                team_members = cursor.fetchall()
 
-            # أعضاء الفريق
+        if project:
+            # أعضاء الفريق من المشروع الحالي
             cursor.execute(
                 """
                 SELECT u.full_name, u.university_id
@@ -140,9 +209,7 @@ def submit():
                     (project["project_id"],),
                 )
                 submitter = cursor.fetchone()
-                already_submitted_by = (
-                    submitter["full_name"] if submitter else "your teammate"
-                )
+                already_submitted_by = submitter["full_name"] if submitter else "your teammate"
 
         cursor.close()
         db.close()
@@ -483,7 +550,7 @@ def api_submit_info():
             target_sem = cursor.fetchone()
             target_course = "COMP4200"
 
-        # Get current project for this student (any active semester)
+        # Get current project — بس من السمستر الأكتف الصح (COMP4200 أو COMP4300)
         cursor.execute(
             """
             SELECT p.project_id, p.title, p.title_en, p.abstract, p.keywords,
@@ -502,15 +569,16 @@ def api_submit_info():
             LEFT JOIN students st2 ON st2.student_id = pm2.student_id
             LEFT JOIN users u2 ON u2.user_id = st2.user_id
             WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             GROUP  BY p.project_id
             ORDER  BY p.project_id DESC
             LIMIT  1
             """,
-            (user_id,),
+            (user_id, (target_sem or {}).get("semester_id")),
         )
         project = cursor.fetchone()
 
-        # Get uploaded files for the project
+        # Get uploaded files — بس من نفس السمستر الحالي
         files = []
         if project:
             cursor.execute(
@@ -701,20 +769,15 @@ def api_submit_project():
                 if team_submission:
                     cursor.close()
                     db.close()
-                    return (
-                        jsonify(
-                            {
-                                "error": (
-                                    f"Your teammate '{team_submission['submitted_by']}' "
-                                    f"has already submitted the project. "
-                                    f"Only one member per team can submit."
-                                ),
-                                "already_submitted_by_team": True,
-                                "project_id": team_submission["project_id"],
-                            }
+                    return jsonify({
+                        "error": (
+                            f"Your teammate '{team_submission['submitted_by']}' "
+                            f"has already submitted the project. "
+                            f"Only one member per team can submit."
                         ),
-                        409,
-                    )
+                        "already_submitted_by_team": True,
+                        "project_id": team_submission["project_id"],
+                    }), 409
 
         if existing:
             # ── إذا المشروع draft → أي عضو يقدر يسلم ويصير primary contact ──
@@ -768,19 +831,14 @@ def api_submit_project():
                     name = submitter["full_name"] if submitter else "your teammate"
                     cursor.close()
                     db.close()
-                    return (
-                        jsonify(
-                            {
-                                "error": (
-                                    f"This project has already been submitted by {name}. "
-                                    f"Only the student who created the submission can update it."
-                                ),
-                                "already_submitted_by_team": True,
-                                "project_id": existing["project_id"],
-                            }
+                    return jsonify({
+                        "error": (
+                            f"This project has already been submitted by {name}. "
+                            f"Only the student who created the submission can update it."
                         ),
-                        409,
-                    )
+                        "already_submitted_by_team": True,
+                        "project_id": existing["project_id"],
+                    }), 409
 
                 cursor.execute(
                     """
@@ -958,14 +1016,7 @@ def api_upload_file():
         if not row:
             cursor.close()
             db.close()
-            return (
-                jsonify(
-                    {
-                        "error": "No project found for the current semester. Please submit your project first."
-                    }
-                ),
-                400,
-            )
+            return jsonify({"error": "No project found for the current semester. Please submit your project first."}), 400
         project_id = row["project_id"]
 
         # Read file bytes into memory (already size-checked above)
@@ -1081,14 +1132,7 @@ def api_clear_submission():
         if not row["is_primary_contact"]:
             cursor.close()
             db.close()
-            return (
-                jsonify(
-                    {
-                        "error": "Only the student who submitted can clear the submission."
-                    }
-                ),
-                403,
-            )
+            return jsonify({"error": "Only the student who submitted can clear the submission."}), 403
 
         project_id = row["project_id"]
 
