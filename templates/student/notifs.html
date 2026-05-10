@@ -5,63 +5,512 @@
 {% block topbar_title %}Notifications{% endblock %}
 
 {% block content %}
-<div class="page on" id="pg-notifs">
+<style>
+  .sn-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;align-items:start}
+  @media(max-width:900px){.sn-grid{grid-template-columns:1fr}}
 
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">Notifications</span>
-                <button class="card-action">Mark All as Read</button>
-              </div>
-              <div
-                style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
-                Today</div>
-              <div class="notif-item notif-unread" style="border-radius:var(--rm);padding:10px">
-                <div class="notif-icon" style="background:var(--green-light)"><span
-                    class="material-symbols-outlined icon-inline">reviews</span></div>
-                <div class="notif-body">
-                  <div class="notif-title">Your project was reviewed by the supervisor</div>
-                  <div class="notif-meta">Dr. Naema Harbawi reviewed the report and added feedback · 2 hours ago</div>
-                </div>
-                <div class="notif-dot"></div>
-              </div>
-              <div class="notif-item notif-unread" style="border-radius:var(--rm);padding:10px">
-                <div class="notif-icon" style="background:var(--amber-light)"><span
-                    class="material-symbols-outlined icon-inline">flag</span></div>
-                <div class="notif-body">
-                  <div class="notif-title">Reminder: Presentation slides upload required</div>
-                  <div class="notif-meta">Deadline for uploading Presentation.pptx is Feb 15 · 4 hours ago</div>
-                </div>
-                <div class="notif-dot"></div>
-              </div>
-              <div class="notif-item notif-unread" style="border-radius:var(--rm);padding:10px">
-                <div class="notif-icon" style="background:var(--blue-light)"><span
-                    class="material-symbols-outlined icon-inline">schedule</span></div>
-                <div class="notif-body">
-                  <div class="notif-title">Defense meeting scheduled</div>
-                  <div class="notif-meta">APMS project defense: Feb 20, 2026 at 10:00 AM · 5 hours ago</div>
-                </div>
-                <div class="notif-dot"></div>
-              </div>
-              <div
-                style="font-size:12px;color:var(--color-text-secondary);margin:12px 0 10px;padding-top:8px;border-top:1px solid var(--color-border-tertiary)">
-                Last Week</div>
-              <div class="notif-item" style="padding:10px">
-                <div class="notif-icon" style="background:var(--green-light)"><span
-                    class="material-symbols-outlined icon-inline">upload_file</span></div>
-                <div class="notif-body">
-                  <div class="notif-title">Your project files were accepted successfully</div>
-                  <div class="notif-meta">Report and source code uploaded and accepted · Feb 1, 2026</div>
-                </div>
-              </div>
-              <div class="notif-item" style="padding:10px">
-                <div class="notif-icon" style="background:var(--green-light)"><span
-                    class="material-symbols-outlined icon-inline">notifications</span></div>
-                <div class="notif-body">
-                  <div class="notif-title">Your project was registered in the system</div>
-                  <div class="notif-meta">Project No.: 24 · Jan 25, 2026</div>
-                </div>
-              </div>
+  .sn-card{background:#fff;border:1px solid #e6ece8;border-radius:18px;box-shadow:0 10px 28px rgba(16,24,40,.06);overflow:hidden}
+  .sn-card-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:1px solid #edf2ef}
+  .sn-card-title{font-size:18px;font-weight:800;color:#173b24}
+  .sn-card-sub{font-size:12px;color:#6b7280;margin-top:3px}
+  .sn-body{padding:16px 18px}
+
+  .sn-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:600px){.sn-form-row{grid-template-columns:1fr}}
+  .sn-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+  .sn-field label{font-size:13px;font-weight:700;color:#344054}
+  .sn-field input,.sn-field select,.sn-field textarea{border:1px solid #d8e2dc;border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;outline:none;font-family:inherit;transition:border-color .15s,box-shadow .15s}
+  .sn-field textarea{min-height:108px;resize:vertical;line-height:1.5}
+  .sn-field input:focus,.sn-field select:focus,.sn-field textarea:focus{border-color:#2e7d42;box-shadow:0 0 0 3px rgba(46,125,66,.12)}
+
+  /* File drop zone */
+  .sn-file-zone{border:2px dashed #cfe0d4;border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:#fafdfb;position:relative}
+  .sn-file-zone:hover,.sn-file-zone.drag{border-color:#2e7d42;background:#f0faf2}
+  .sn-file-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .sn-file-zone-label{font-size:13px;color:#667085;pointer-events:none}
+  .sn-file-zone-label strong{color:#2e7d42}
+  .sn-file-chosen{display:none;align-items:center;gap:8px;background:#ecfdf3;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;color:#027a48;margin-top:8px}
+  .sn-file-chosen .remove-att{cursor:pointer;color:#b42318;margin-left:auto;font-size:16px;line-height:1}
+
+  .sn-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+  .sn-btn{border:0;border-radius:12px;padding:10px 16px;font-weight:800;font-size:14px;cursor:pointer;transition:opacity .15s;background:#2e7d42;color:#fff}
+  .sn-btn:hover{opacity:.88}
+  .sn-btn.secondary{background:#f3f7f4;color:#245c33;border:1px solid #cfe0d4}
+  .sn-btn.danger{background:#fef2f2;color:#b42318;border:1px solid #fecaca}
+  .sn-btn.small{padding:6px 10px;font-size:12px}
+
+  .sn-tabs{display:flex;gap:8px;padding:12px 18px 0}
+  .sn-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;padding:8px 14px;border-radius:999px;font-weight:800;font-size:13px;cursor:pointer;transition:background .15s,color .15s}
+  .sn-tab.on{background:#2e7d42;color:#fff;border-color:#2e7d42}
+
+  .sn-list{display:flex;flex-direction:column;gap:10px}
+  .sn-msg{border:1px solid #e7eee9;background:#fff;border-radius:14px;padding:13px 14px;display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:start;cursor:pointer;transition:box-shadow .15s}
+  .sn-msg:hover{box-shadow:0 4px 14px rgba(46,125,66,.10)}
+  .sn-msg.unread{background:#f3fbf5;border-color:#bee4c7}
+  .sn-msg-icon{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;flex-shrink:0}
+  .sn-msg-icon.inbox-icon{background:#eaf6ee;color:#2e7d42}
+  .sn-msg-icon.sent-icon{background:#eff6ff;color:#1d4ed8}
+  .sn-msg-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px}
+  .sn-msg-title{font-weight:800;color:#172b1d;font-size:15px}
+  .sn-msg-meta{font-size:12px;color:#667085;margin-bottom:5px}
+  .sn-msg-preview{font-size:13px;color:#5a6a5f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .sn-pill{font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;white-space:nowrap;flex-shrink:0}
+  .sn-pill.read{background:#eef4ff;color:#3538cd}
+  .sn-pill.unread-pill{background:#fef3c7;color:#92400e}
+  .sn-pill.sent-pill{background:#ecfdf3;color:#027a48}
+  .sn-att-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:999px;padding:3px 8px;margin-top:4px}
+
+  .sn-empty{padding:22px;border:1px dashed #cddbd2;border-radius:14px;color:#667085;text-align:center;background:#fbfdfb;font-size:14px}
+
+  /* ── Modal ── */
+  .sn-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;padding:16px}
+  .sn-overlay.open{display:flex}
+  .sn-modal{background:#fff;border-radius:20px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.22);display:flex;flex-direction:column}
+  .sn-modal-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #edf2ef;gap:10px}
+  .sn-modal-title{font-size:17px;font-weight:800;color:#173b24}
+  .sn-modal-close{background:none;border:none;cursor:pointer;font-size:22px;color:#667085;line-height:1;padding:0}
+  .sn-modal-body{padding:18px 20px;flex:1}
+  .sn-modal-msg-meta{font-size:12px;color:#667085;margin-bottom:4px}
+  .sn-modal-msg-body{font-size:14px;line-height:1.6;color:#344054;white-space:pre-wrap;background:#f8faf8;border-radius:10px;padding:12px 14px;margin-bottom:12px;border:1px solid #e6ece8}
+  .sn-modal-att-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#2e7d42;background:#ecfdf3;border-radius:8px;padding:6px 12px;text-decoration:none;margin-bottom:14px}
+  .sn-modal-att-link:hover{background:#d1fae5}
+  .sn-modal-divider{height:1px;background:#edf2ef;margin:14px 0}
+  .sn-modal-reply-title{font-size:13px;font-weight:800;color:#344054;margin-bottom:10px}
+
+  .sn-toast{position:fixed;right:22px;bottom:22px;z-index:999;background:#111827;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.22);display:none;max-width:360px;font-size:14px;font-weight:600}
+
+  .sn-specific-wrap{display:none}
+</style>
+
+<div class="page page-single on" id="pg-notifs">
+  <div class="sn-grid">
+
+    <!-- LEFT: Send Memo -->
+    <section class="sn-card">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Send Memo</div>
+          <div class="sn-card-sub">Send a message to your team members or supervisor.</div>
+        </div>
+      </div>
+      <div class="sn-body">
+        <form id="snSendForm" enctype="multipart/form-data">
+          <div class="sn-form-row">
+            <div class="sn-field">
+              <label for="snScope">Send to</label>
+              <select id="snScope" name="scope" required>
+                <option value="">Choose receiver…</option>
+                <option value="team">All Team Members</option>
+                <option value="supervisor">My Supervisor</option>
+                <option value="member">One Team Member</option>
+              </select>
             </div>
-
+            <div class="sn-field sn-specific-wrap" id="snSpecificWrap">
+              <label for="snSpecific">Choose team member</label>
+              <select id="snSpecific" name="value"></select>
+            </div>
           </div>
+          <div class="sn-field">
+            <label for="snTitle">Title</label>
+            <input id="snTitle" name="title" placeholder="e.g. Meeting request for tomorrow" maxlength="250" required>
+          </div>
+          <div class="sn-field">
+            <label for="snMessage">Message</label>
+            <textarea id="snMessage" name="message" placeholder="Write your memo here…" required></textarea>
+          </div>
+          <div class="sn-field">
+            <label>Attachment <span style="font-weight:400;color:#9ca3af">(optional, max 10 MB)</span></label>
+            <div class="sn-file-zone" id="snFileZone">
+              <input type="file" id="snFile" name="file" accept="*/*">
+              <div class="sn-file-zone-label">📎 <strong>Click to attach</strong> or drag a file here</div>
+            </div>
+            <div class="sn-file-chosen" id="snFileChosen">
+              <span>📄</span>
+              <span id="snFileName"></span>
+              <span class="remove-att" id="snRemoveAtt" title="Remove">✕</span>
+            </div>
+          </div>
+          <div class="sn-actions">
+            <button class="sn-btn secondary" type="button" id="snClearBtn">Clear</button>
+            <button class="sn-btn" type="submit">Send Memo</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- RIGHT: Inbox / Sent -->
+    <section class="sn-card">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Messages</div>
+          <div class="sn-card-sub">Click a message to open, read, and reply.</div>
+        </div>
+        <button class="sn-btn secondary" id="snMarkAllBtn" type="button">Mark All Read</button>
+      </div>
+      <div class="sn-tabs">
+        <button class="sn-tab on" type="button" data-tab="inbox">Inbox</button>
+        <button class="sn-tab" type="button" data-tab="sent">Sent</button>
+      </div>
+      <div class="sn-body">
+        <div id="snList" class="sn-list">
+          <div class="sn-empty">Loading messages…</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ── Message Modal ── -->
+<div class="sn-overlay" id="snOverlay">
+  <div class="sn-modal" id="snModal">
+    <div class="sn-modal-hd">
+      <div class="sn-modal-title" id="modalTitle">Message</div>
+      <button class="sn-modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="sn-modal-body">
+      <div class="sn-modal-msg-meta" id="modalMeta"></div>
+      <div class="sn-modal-msg-body" id="modalBody"></div>
+      <a class="sn-modal-att-link" id="modalAttLink" href="#" target="_blank" style="display:none">
+        📎 <span id="modalAttName"></span>
+      </a>
+
+      <!-- Reply section (inbox only) -->
+      <div id="modalReplySection">
+        <div class="sn-modal-divider"></div>
+        <div class="sn-modal-reply-title">↩ Reply to <span id="modalReplyTo"></span></div>
+        <form id="modalReplyForm" enctype="multipart/form-data">
+          <input type="hidden" id="modalReplyUserId" name="value">
+          <input type="hidden" name="scope" value="reply">
+          <div class="sn-field">
+            <input id="modalReplyTitle" name="title" placeholder="Re: …" maxlength="250" required>
+          </div>
+          <div class="sn-field">
+            <textarea id="modalReplyMsg" name="message" placeholder="Write your reply…" style="min-height:80px" required></textarea>
+          </div>
+          <div class="sn-field">
+            <div class="sn-file-zone" id="replyFileZone">
+              <input type="file" id="replyFile" name="file" accept="*/*">
+              <div class="sn-file-zone-label">📎 <strong>Attach a file</strong> (optional)</div>
+            </div>
+            <div class="sn-file-chosen" id="replyFileChosen">
+              <span>📄</span>
+              <span id="replyFileName"></span>
+              <span class="remove-att" id="replyRemoveAtt" title="Remove">✕</span>
+            </div>
+          </div>
+          <div class="sn-actions">
+            <button class="sn-btn secondary small" type="button" id="modalCancelBtn">Cancel</button>
+            <button class="sn-btn small" type="submit">Send Reply</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sn-toast" id="snToast"></div>
+
+<script>
+(() => {
+  const state = { tab: 'inbox', options: { team_members: [], supervisor: null }, currentMsg: null };
+  const $ = id => document.getElementById(id);
+  const list  = $('snList');
+  const toast = $('snToast');
+  const overlay = $('snOverlay');
+
+  // ── Toast ────────────────────────────────────────────────────
+  function showToast(msg, isErr = false) {
+    toast.textContent = msg;
+    toast.style.background = isErr ? '#991b1b' : '#111827';
+    toast.style.display = 'block';
+    setTimeout(() => (toast.style.display = 'none'), 3400);
+  }
+
+  // ── Fetch helpers ────────────────────────────────────────────
+  async function fetchJSON(url, opts = {}) {
+    const res  = await fetch(url, { headers: { Accept: 'application/json' }, ...opts });
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch(e) { throw new Error('Server error (' + res.status + ').'); }
+    if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ').');
+    return data;
+  }
+
+  async function postForm(url, formData) {
+    const res  = await fetch(url, { method: 'POST', headers: { Accept: 'application/json' }, body: formData });
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch(e) { throw new Error('Server error (' + res.status + ').'); }
+    if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ').');
+    return data;
+  }
+
+  function esc(v) {
+    return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+
+  function roleLabel(role) {
+    return ({ head_of_department:'Head of Department', supervisor:'Supervisor', coordinator:'Coordinator', student:'Student' }[role] || role || 'System');
+  }
+
+  // ── File zone wiring ─────────────────────────────────────────
+  function wireFileZone(zoneId, inputId, chosenId, nameId, removeId) {
+    const zone   = $(zoneId);
+    const input  = $(inputId);
+    const chosen = $(chosenId);
+    const nameEl = $(nameId);
+    const remove = $(removeId);
+
+    function showChosen(name) {
+      nameEl.textContent = name;
+      chosen.style.display = 'flex';
+      zone.style.display   = 'none';
+    }
+    function clearChosen() {
+      input.value = '';
+      chosen.style.display = 'none';
+      zone.style.display   = 'block';
+    }
+
+    input.addEventListener('change', () => {
+      if (input.files[0]) showChosen(input.files[0].name);
+    });
+    remove.addEventListener('click', clearChosen);
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag');
+      const f = e.dataTransfer.files[0];
+      if (f) {
+        const dt = new DataTransfer(); dt.items.add(f);
+        input.files = dt.files;
+        showChosen(f.name);
+      }
+    });
+  }
+
+  wireFileZone('snFileZone',    'snFile',    'snFileChosen',    'snFileName',    'snRemoveAtt');
+  wireFileZone('replyFileZone', 'replyFile', 'replyFileChosen', 'replyFileName', 'replyRemoveAtt');
+
+  // ── Options ──────────────────────────────────────────────────
+  async function loadOptions() {
+    try { state.options = await fetchJSON('/student/api/notifications/options'); }
+    catch(e) { showToast(e.message, true); }
+  }
+
+  function updateSpecificWrap() {
+    const scope  = $('snScope').value;
+    const wrap   = $('snSpecificWrap');
+    const select = $('snSpecific');
+    select.innerHTML = '';
+    if (scope === 'member') {
+      const members = state.options.team_members || [];
+      if (!members.length) {
+        select.insertAdjacentHTML('beforeend', '<option value="">No team members found</option>');
+      } else {
+        select.insertAdjacentHTML('beforeend', '<option value="">Choose member…</option>');
+        members.forEach(m => {
+          select.insertAdjacentHTML('beforeend',
+            '<option value="' + esc(m.user_id) + '">' + esc(m.full_name) + ' — ' + esc(m.university_id || '') + '</option>');
+        });
+      }
+      wrap.style.display = 'flex';
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+
+  // ── Render inbox ─────────────────────────────────────────────
+  function renderInbox(rows) {
+    if (!rows.length) { list.innerHTML = '<div class="sn-empty">No received messages yet.</div>'; return; }
+    list.innerHTML = rows.map(r =>
+      '<article class="sn-msg ' + (r.is_read ? '' : 'unread') + '" data-id="' + r.notification_id + '" data-tab="inbox">' +
+        '<div class="sn-msg-icon inbox-icon">' + (r.notification_type === 'urgent_alert' ? '🔴' : '✉') + '</div>' +
+        '<div style="min-width:0">' +
+          '<div class="sn-msg-top">' +
+            '<div class="sn-msg-title">' + esc(r.title) + '</div>' +
+            '<span class="sn-pill ' + (r.is_read ? 'read' : 'unread-pill') + '">' + (r.is_read ? 'Read' : 'New') + '</span>' +
+          '</div>' +
+          '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
+          '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+          (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
+        '</div>' +
+      '</article>'
+    ).join('');
+  }
+
+  // ── Render sent ──────────────────────────────────────────────
+  function renderSent(rows) {
+    if (!rows.length) { list.innerHTML = '<div class="sn-empty">No sent messages yet.</div>'; return; }
+    list.innerHTML = rows.map(r =>
+      '<article class="sn-msg" data-id="' + r.notification_id + '" data-tab="sent">' +
+        '<div class="sn-msg-icon sent-icon">↗</div>' +
+        '<div style="min-width:0">' +
+          '<div class="sn-msg-top">' +
+            '<div class="sn-msg-title">' + esc(r.title) + '</div>' +
+            '<span class="sn-pill sent-pill">Sent</span>' +
+          '</div>' +
+          '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
+          '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+          (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
+        '</div>' +
+      '</article>'
+    ).join('');
+  }
+
+  // ── Load messages ────────────────────────────────────────────
+  async function loadMessages() {
+    list.innerHTML = '<div class="sn-empty">Loading messages…</div>';
+    try {
+      if (state.tab === 'sent') {
+        const data = await fetchJSON('/student/api/notifications/sent');
+        renderSent(data.sent || []);
+        state._sentRows = data.sent || [];
+      } else {
+        const data = await fetchJSON('/student/api/notifications/inbox');
+        renderInbox(data.notifications || []);
+        state._inboxRows = data.notifications || [];
+        const dot = document.querySelector('.tb-notif-dot');
+        if (dot) dot.style.display = (data.notifications || []).some(n => !n.is_read) ? 'block' : 'none';
+      }
+    } catch(e) {
+      list.innerHTML = '<div class="sn-empty">' + esc(e.message) + '</div>';
+    }
+  }
+
+  // ── Open message modal ───────────────────────────────────────
+  function openModal(msgData, tab) {
+    state.currentMsg = msgData;
+    $('modalTitle').textContent = msgData.title;
+    const isInbox = tab === 'inbox';
+    const from = isInbox
+      ? 'From: ' + (msgData.sender_name || 'System') + ' · ' + roleLabel(msgData.sender_role) + ' · ' + (msgData.created_at || '')
+      : 'To: ' + (msgData.recipient_name || '') + ' · ' + roleLabel(msgData.recipient_role) + ' · ' + (msgData.created_at || '');
+    $('modalMeta').textContent = from;
+    $('modalBody').textContent = msgData.message;
+
+    // Attachment link
+    const attLink = $('modalAttLink');
+    if (msgData.has_attachment) {
+      attLink.href = '/student/api/notifications/' + msgData.notification_id + '/attachment';
+      $('modalAttName').textContent = msgData.attachment_name || 'Download attachment';
+      attLink.style.display = 'inline-flex';
+    } else {
+      attLink.style.display = 'none';
+    }
+
+    // Reply section only for inbox AND if there's a real sender
+    const replySection = $('modalReplySection');
+    if (isInbox && msgData.sender_user_id) {
+      $('modalReplyUserId').value = msgData.sender_user_id;
+      $('modalReplyTo').textContent = msgData.sender_name || 'sender';
+      $('modalReplyTitle').value = 'Re: ' + msgData.title;
+      $('modalReplyMsg').value = '';
+      // reset reply file
+      $('replyFile').value = '';
+      $('replyFileChosen').style.display = 'none';
+      $('replyFileZone').style.display   = 'block';
+      replySection.style.display = 'block';
+    } else {
+      replySection.style.display = 'none';
+    }
+
+    overlay.classList.add('open');
+
+    // Mark as read automatically
+    if (isInbox && !msgData.is_read) {
+      fetchJSON('/student/api/notifications/' + msgData.notification_id + '/read', { method: 'POST' })
+        .then(() => loadMessages())
+        .catch(() => {});
+    }
+  }
+
+  function closeModal() {
+    overlay.classList.remove('open');
+    state.currentMsg = null;
+  }
+
+  // ── Click on message card ────────────────────────────────────
+  list.addEventListener('click', e => {
+    const card = e.target.closest('.sn-msg');
+    if (!card) return;
+    const id  = parseInt(card.dataset.id);
+    const tab = card.dataset.tab;
+    const rows = tab === 'inbox' ? (state._inboxRows || []) : (state._sentRows || []);
+    const msg  = rows.find(r => r.notification_id === id);
+    if (msg) openModal(msg, tab);
+  });
+
+  $('modalClose').addEventListener('click', closeModal);
+  $('modalCancelBtn').addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+  // ── Reply form submit ────────────────────────────────────────
+  $('modalReplyForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData($('modalReplyForm'));
+    try {
+      const data = await postForm('/student/api/notifications/send', fd);
+      showToast(data.message || 'Reply sent!');
+      closeModal();
+      state.tab = 'sent';
+      document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent'));
+      await loadMessages();
+    } catch(e) { showToast(e.message, true); }
+  });
+
+  // ── Send form submit ─────────────────────────────────────────
+  $('snSendForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if ($('snScope').value === 'member' && !$('snSpecific').value) {
+      showToast('Please choose a team member.', true); return;
+    }
+    const fd = new FormData($('snSendForm'));
+    if ($('snScope').value === 'member') fd.set('value', $('snSpecific').value);
+    try {
+      const data = await postForm('/student/api/notifications/send', fd);
+      showToast(data.message || 'Memo sent successfully.');
+      $('snSendForm').reset();
+      $('snFile').value = '';
+      $('snFileChosen').style.display = 'none';
+      $('snFileZone').style.display   = 'block';
+      updateSpecificWrap();
+      state.tab = 'sent';
+      document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent'));
+      await loadMessages();
+    } catch(e) { showToast(e.message, true); }
+  });
+
+  $('snClearBtn').addEventListener('click', () => {
+    $('snSendForm').reset();
+    $('snFile').value = '';
+    $('snFileChosen').style.display = 'none';
+    $('snFileZone').style.display   = 'block';
+    setTimeout(updateSpecificWrap, 0);
+  });
+
+  $('snScope').addEventListener('change', updateSpecificWrap);
+
+  document.querySelectorAll('.sn-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.tab = btn.dataset.tab;
+      document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b === btn));
+      loadMessages();
+    });
+  });
+
+  $('snMarkAllBtn').addEventListener('click', async () => {
+    try {
+      await fetchJSON('/student/api/notifications/read-all', { method: 'POST' });
+      showToast('All messages marked as read.');
+      await loadMessages();
+    } catch(e) { showToast(e.message, true); }
+  });
+
+  // ── Init ─────────────────────────────────────────────────────
+  loadOptions().then(() => updateSpecificWrap());
+  loadMessages();
+})();
+</script>
 {% endblock %}

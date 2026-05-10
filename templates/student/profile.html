@@ -18,8 +18,7 @@
       </div>
       <div style="margin-top:6px;display:flex;gap:6px">
         <span class="pill p-accepted">Active Student</span>
-        <span style="font-size:11px;padding:3px 10px;border-radius:20px;
-                     background:var(--blue-light);color:var(--blue)">COMP4200</span>
+        <span id="profileCourseBadge" style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--blue-light);color:var(--blue)">…</span>
       </div>
     </div>
   </div>
@@ -150,5 +149,17 @@ function togglePwd(btn) {
   input.type = hidden ? 'text' : 'password';
   btn.textContent = hidden ? '🙈' : '👁';
 }
+(function () {
+  fetch('/student/api/topbar-info')
+    .then(r => r.json())
+    .then(d => {
+      var badge = document.getElementById('profileCourseBadge');
+      if (badge) badge.textContent = d.course_code || 'COMP4200';
+    })
+    .catch(() => {
+      var badge = document.getElementById('profileCourseBadge');
+      if (badge) badge.textContent = 'COMP4200';
+    });
+})();
 </script>
 {% endblock %}

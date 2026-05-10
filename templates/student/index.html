@@ -1,150 +1,303 @@
 {% extends 'student/base.html' %}
 
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}Student Dashboard{% endblock %}
 {% block page_id %}dashboard{% endblock %}
-{% block topbar_title %}Dashboard{% endblock %}
+{% block topbar_title %}Student Dashboard{% endblock %}
 
 {% block content %}
 <div class="page on" id="pg-dashboard">
 
-            <div class="stats-row">
-              <div class="stat">
-                <div class="stat-num" style="color:var(--blue)">Under Review</div>
-                <div class="stat-label">Current Project Status</div>
-              </div>
-              <div class="stat">
-                <div class="stat-num" style="color:var(--green)">78%</div>
-                <div class="stat-label">Completion Rate</div>
-              </div>
-              <div class="stat">
-                <div class="stat-num" style="color:var(--amber)">3</div>
-                <div class="stat-label">New Feedback Items</div>
-              </div>
-              <div class="stat">
-                <div class="stat-num" style="color:var(--coral)">15 Days</div>
-                <div class="stat-label">Until Final Deadline</div>
-              </div>
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-num" id="stat-student" style="color:var(--blue);font-size:14px;font-weight:700;line-height:1.3">—</div>
+      <div class="stat-label">Student Name</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-supervisor" style="color:var(--green);font-size:14px;font-weight:700;line-height:1.3">—</div>
+      <div class="stat-label">Supervisor</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-team" style="color:var(--amber)">—</div>
+      <div class="stat-label">Team Members</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-overall" style="color:var(--coral)">—</div>
+      <div class="stat-label">Required Report Completion</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Project Information</span>
+          <span class="pill p-review" id="pill-status" style="display:none"></span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+          <div style="position:relative;width:140px;height:140px;flex-shrink:0">
+            <canvas id="overallChart" width="140" height="140"></canvas>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+              <div id="overall-center" style="font-size:22px;font-weight:700;color:var(--color-text-primary);line-height:1">—</div>
+              <div style="font-size:10px;color:var(--color-text-secondary);margin-top:2px">Complete</div>
             </div>
-            <div class="two-col">
-              <div>
-                <div class="card">
-                  <div class="card-hd"><span class="card-title">My Current Project</span><span
-                      class="pill p-review">Under Review</span></div>
-                  <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px">Academic
-                    Project Lifecycle Management System</div>
-                  <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">Supervisor: Dr. Naema
-                    Harbawi · 2025/2026</div>
-                  <div class="prog-wrap">
-                    <div class="prog-label"><span>Final Report</span><span>85%</span></div>
-                    <div class="prog-bg">
-                      <div class="prog-fill" style="width:85%;background:var(--green)"></div>
-                    </div>
-                  </div>
-                  <div class="prog-wrap">
-                    <div class="prog-label"><span>Source Code</span><span>70%</span></div>
-                    <div class="prog-bg">
-                      <div class="prog-fill" style="width:70%;background:var(--blue)"></div>
-                    </div>
-                  </div>
-                  <div class="prog-wrap">
-                    <div class="prog-label"><span>Presentation Slides</span><span>60%</span></div>
-                    <div class="prog-bg">
-                      <div class="prog-fill" style="width:60%;background:var(--amber)"></div>
-                    </div>
-                  </div>
-                  <div class="btn-row" style="margin-top:10px">
-                    <button class="btn btn-primary" onclick="window.location.href='/student/status'">Status Details</button>
-                    <button class="btn btn-outline" onclick="window.location.href='/student/submit'">Update Files</button>
-                  </div>
-                </div>
-                <div class="card">
-                  <div class="card-hd"><span class="card-title">Upcoming Deadlines</span></div>
-                  <div style="display:flex;flex-direction:column;gap:8px">
-                    <div
-                      style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--amber-light);border-radius:var(--rm)">
-                      <div style="font-size:11px;font-weight:700;color:var(--amber);min-width:36px;text-align:center">
-                        Feb<br />15</div>
-                      <div style="font-size:12px;color:var(--color-text-primary)">Final Report submission deadline</div>
-                    </div>
-                    <div
-                      style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--blue-light);border-radius:var(--rm)">
-                      <div style="font-size:11px;font-weight:700;color:var(--blue);min-width:36px;text-align:center">
-                        Feb<br />20</div>
-                      <div style="font-size:12px;color:var(--color-text-primary)">Project presentation before the
-                        committee</div>
-                    </div>
-                    <div
-                      style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--green-light);border-radius:var(--rm)">
-                      <div style="font-size:11px;font-weight:700;color:var(--green);min-width:36px;text-align:center">
-                        Feb<br />28</div>
-                      <div style="font-size:12px;color:var(--color-text-primary)">Final results announcement</div>
-                    </div>
-                  </div>
-                </div>
+          </div>
+
+          <div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px">
+            <div>
+              <div id="project-title" style="font-size:16px;font-weight:700;color:var(--color-text-primary);margin-bottom:4px">Loading...</div>
+              <div id="project-meta" style="font-size:12px;color:var(--color-text-secondary);line-height:1.6"></div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
+                <div style="font-size:11px;color:var(--color-text-secondary)">Student</div>
+                <div id="student-name" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
               </div>
-              <div>
-                <div class="card">
-                  <div class="card-hd"><span class="card-title">Latest Feedback</span><button class="card-action"
-                      onclick="window.location.href='/student/feedback'">See All</button></div>
-                  <div class="fb-item" style="margin-bottom:0;border:none;padding:0">
-                    <div class="fb-head">
-                      <div class="fb-avatar" style="background:var(--green-light);color:var(--green)">NH</div>
-                      <div>
-                        <div class="fb-name">Dr. Naema Harbawi</div>
-                        <div class="fb-role">Supervisor</div>
-                      </div>
-                      <div class="fb-date">2 days ago</div>
-                    </div>
-                    <div class="fb-text">The report is generally good, but I recommend elaborating more on the system
-                      architecture section and adding detailed ERD diagrams.</div>
-                  </div>
-                </div>
-                <div class="card">
-                  <div class="card-hd"><span class="card-title">Team Members</span></div>
-                  <div style="display:flex;flex-direction:column;gap:8px">
-                    <div style="display:flex;align-items:center;gap:10px">
-                      <div class="fb-avatar"
-                        style="background:var(--green-light);color:var(--green);width:32px;height:32px;font-size:11px">
-                        AM</div>
-                      <div>
-                        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Amna Abu Muslim
-                        </div>
-                        <div style="font-size:11px;color:var(--color-text-secondary)">1220670</div>
-                      </div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:10px">
-                      <div class="fb-avatar"
-                        style="background:var(--blue-light);color:var(--blue);width:32px;height:32px;font-size:11px">RB
-                      </div>
-                      <div>
-                        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Rahaf Badwan</div>
-                        <div style="font-size:11px;color:var(--color-text-secondary)">1220654 · You</div>
-                      </div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:10px">
-                      <div class="fb-avatar"
-                        style="background:#FBEAF0;color:#993556;width:32px;height:32px;font-size:11px">TA</div>
-                      <div>
-                        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Tima Abd</div>
-                        <div style="font-size:11px;color:var(--color-text-secondary)">1220174</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="card">
-                  <div class="card-hd"><span class="card-title">Quick Alerts</span><button class="card-action"
-                      onclick="window.location.href='/student/notifs'">See All</button></div>
-                  <div
-                    style="font-size:12px;color:var(--color-text-primary);padding:6px 0;border-bottom:1px solid var(--color-border-tertiary)">
-                    ✦ Your project was reviewed by the supervisor</div>
-                  <div
-                    style="font-size:12px;color:var(--color-text-primary);padding:6px 0;border-bottom:1px solid var(--color-border-tertiary)">
-                    ◎ Defense date: Feb 20 at 10:00 AM</div>
-                  <div style="font-size:12px;color:var(--color-text-primary);padding:6px 0">⚑ Please upload source code
-                    before Feb 15</div>
-                </div>
+              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
+                <div style="font-size:11px;color:var(--color-text-secondary)">Supervisor</div>
+                <div id="supervisor-name" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
+              </div>
+              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
+                <div style="font-size:11px;color:var(--color-text-secondary)">Project Type</div>
+                <div id="project-type" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
+              </div>
+              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
+                <div style="font-size:11px;color:var(--color-text-secondary)">Registration Date</div>
+                <div id="registration-date" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
               </div>
             </div>
 
+            <div class="btn-row" style="margin-top:4px">
+              <button class="btn btn-primary" onclick="window.location.href='/student/status'">View Status</button>
+              <button class="btn btn-outline" onclick="window.location.href='/student/submit'">Upload Files</button>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Most Used Project Types</span>
+          <span style="font-size:11px;color:var(--color-text-secondary)">Chart 2 of 2</span>
+        </div>
+        <canvas id="projectTypesChart" height="95"></canvas>
+        <div id="project-types-empty" style="display:none;font-size:13px;color:var(--color-text-secondary);text-align:center;padding:18px 0">No project types found yet</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Team Members</span></div>
+        <div id="team-list">
+          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Upcoming Deadlines</span></div>
+        <div id="deadlines-list">
+          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Summary</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="font-size:12px;color:var(--color-text-secondary)">Academic Year</span>
+            <span id="academic-year" style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="font-size:12px;color:var(--color-text-secondary)">Project Status</span>
+            <span id="project-status" style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:12px">
+            <span style="font-size:12px;color:var(--color-text-secondary)">My Role</span>
+            <span id="student-role" style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  const cs = getComputedStyle(document.documentElement);
+  const green = cs.getPropertyValue('--green').trim() || '#1a6b3a';
+  const blue = cs.getPropertyValue('--blue').trim() || '#185FA5';
+  const amber = cs.getPropertyValue('--amber').trim() || '#BA7517';
+  const coral = cs.getPropertyValue('--coral').trim() || '#8A3A1B';
+  const border = cs.getPropertyValue('--color-border-tertiary').trim() || '#e5e7eb';
+  const textSec = cs.getPropertyValue('--color-text-secondary').trim() || '#6b7280';
+  const textPri = cs.getPropertyValue('--color-text-primary').trim() || '#1a1d23';
+
+  Chart.defaults.font.family = "'Segoe UI', Tahoma, Arial, sans-serif";
+  Chart.defaults.plugins.legend.display = false;
+
+  let overallChart, projectTypesChart;
+
+  function fmtStatus(value) {
+    return (value || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function fmtProjectType(value) {
+    if (!value) return '—';
+    return value.split(',').map(v => fmtStatus(v.trim())).join(', ');
+  }
+
+  function safeText(value, fallback = '—') {
+    return value === null || value === undefined || value === '' ? fallback : value;
+  }
+
+  const MEMBER_COLORS = [
+    { bg: 'var(--green-light)', tx: 'var(--green)' },
+    { bg: 'var(--blue-light)', tx: 'var(--blue)' },
+    { bg: '#FBEAF0', tx: '#993556' },
+    { bg: 'var(--amber-light)', tx: 'var(--amber)' },
+  ];
+
+  function initCharts() {
+    overallChart = new Chart(document.getElementById('overallChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Completed', 'Remaining'],
+        datasets: [{ data: [0, 100], backgroundColor: [green, border], borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: {
+        cutout: '72%',
+        animation: { duration: 800, easing: 'easeOutQuart' },
+        plugins: { tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}%` } } }
+      }
+    });
+
+    projectTypesChart = new Chart(document.getElementById('projectTypesChart'), {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Projects',
+          data: [],
+          backgroundColor: [green, blue, amber, coral, border],
+          borderRadius: 5,
+          barPercentage: 0.55,
+          categoryPercentage: 0.75
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        animation: { duration: 800, easing: 'easeOutQuart' },
+        scales: {
+          x: { beginAtZero: true, grid: { color: border }, ticks: { color: textSec, font: { size: 10 }, precision: 0 }, border: { dash: [3, 3] } },
+          y: { grid: { display: false }, ticks: { color: textPri, font: { size: 11, weight: '500' } } }
+        },
+        plugins: { tooltip: { callbacks: { label: ctx => ` ${ctx.raw} project${ctx.raw === 1 ? '' : 's'}` } } }
+      }
+    });
+  }
+
+  function updateUI(d) {
+    const project = d.project || {};
+    const members = d.team_members || [];
+    const overall = d.progress?.overall ?? 0;
+    const typeLabel = fmtProjectType(project.project_type);
+    const statusLabel = fmtStatus(project.status) || '—';
+
+    document.getElementById('stat-student').textContent = safeText(d.student_name);
+    document.getElementById('stat-supervisor').textContent = safeText(d.supervisor_name);
+    document.getElementById('stat-team').textContent = members.length || '—';
+    document.getElementById('stat-overall').textContent = overall + '%';
+
+    const pill = document.getElementById('pill-status');
+    if (project.status) {
+      pill.textContent = statusLabel;
+      pill.style.display = '';
+    } else {
+      pill.style.display = 'none';
+    }
+
+    document.getElementById('project-title').textContent = project.project_id ? (project.title || 'Registered Project') : 'No registered project yet';
+    document.getElementById('project-meta').textContent = project.project_id
+      ? `Type: ${typeLabel} · Academic Year: ${safeText(d.academic_year)}`
+      : 'Register your project to see its details here.';
+    document.getElementById('student-name').textContent = safeText(d.student_name);
+    document.getElementById('supervisor-name').textContent = safeText(d.supervisor_name);
+    document.getElementById('project-type').textContent = typeLabel;
+    document.getElementById('registration-date').textContent = safeText(d.registration_date);
+    document.getElementById('academic-year').textContent = safeText(d.academic_year);
+    document.getElementById('project-status').textContent = statusLabel;
+    document.getElementById('student-role').textContent = project.project_id ? (project.is_primary_contact ? 'Primary Contact' : 'Team Member') : '—';
+    document.getElementById('overall-center').textContent = overall + '%';
+
+    overallChart.data.datasets[0].data = [overall, Math.max(0, 100 - overall)];
+    overallChart.update();
+
+    const typeDistribution = d.project_type_distribution || [];
+    const emptyTypes = document.getElementById('project-types-empty');
+    const typesCanvas = document.getElementById('projectTypesChart');
+    if (typeDistribution.length) {
+      emptyTypes.style.display = 'none';
+      typesCanvas.style.display = '';
+      projectTypesChart.data.labels = typeDistribution.map(item => item.type);
+      projectTypesChart.data.datasets[0].data = typeDistribution.map(item => item.count);
+      projectTypesChart.update();
+    } else {
+      typesCanvas.style.display = 'none';
+      emptyTypes.style.display = '';
+    }
+
+    const teamList = document.getElementById('team-list');
+    if (members.length) {
+      teamList.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">` +
+        members.map((m, i) => {
+          const col = MEMBER_COLORS[i % MEMBER_COLORS.length];
+          return `<div style="display:flex;align-items:center;gap:10px">
+            <div class="fb-avatar" style="background:${col.bg};color:${col.tx};width:32px;height:32px;font-size:11px">${safeText(m.initials, '??')}</div>
+            <div>
+              <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${safeText(m.full_name)}</div>
+              <div style="font-size:11px;color:var(--color-text-secondary)">${safeText(m.university_id)}${m.is_me ? ' · You' : ''}</div>
+            </div>
+          </div>`;
+        }).join('') + `</div>`;
+    } else {
+      teamList.innerHTML = '<div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">No registered team members yet</div>';
+    }
+
+    const deadlinesList = document.getElementById('deadlines-list');
+    const deadlines = d.deadlines || [];
+    if (deadlines.length) {
+      deadlinesList.innerHTML = deadlines.map(dl => `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--color-bg-secondary);border-radius:var(--rm);margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--amber);min-width:50px;text-align:center;flex-shrink:0">${safeText(dl.date_str)}</div>
+        <div style="font-size:12px;color:var(--color-text-primary)">${safeText(dl.label)}</div>
+      </div>`).join('');
+    } else {
+      deadlinesList.innerHTML = '<div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">No upcoming deadlines</div>';
+    }
+  }
+
+  async function loadDashboard() {
+    try {
+      const res = await fetch('/student/api/dashboard-data');
+      if (!res.ok) {
+        console.error('API HTTP error', res.status, await res.text());
+        return;
+      }
+      const data = await res.json();
+      if (data.error) {
+        console.error('API returned error:', data.error);
+        return;
+      }
+      updateUI(data);
+    } catch (err) {
+      console.error('loadDashboard failed:', err);
+    }
+  }
+
+  initCharts();
+  loadDashboard();
+</script>
 {% endblock %}

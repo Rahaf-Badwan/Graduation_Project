@@ -44,7 +44,7 @@
     <a class="sb-item {% if request.path == '/student/notifs' %}on{% endif %}" data-page="notifs" href="/student/notifs">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
       <span class="sb-label">Notifications</span>
-      <span class="sb-badge">3</span>
+      <span class="sb-badge" id="sbNotifBadge" style="display:none"></span>
     </a>
     <a class="sb-item {% if request.path == '/student/ai' %}on{% endif %}" data-page="ai" href="/student/ai">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
@@ -63,7 +63,7 @@
 (function () {
   const link = document.getElementById('studentRegistrationNav');
   if (!link) return;
-  fetch('/api/student/distribution-window-status')
+  fetch('/student/api/distribution-window-status')
     .then(r => r.json())
     .then(data => {
       if (!data.is_open && window.location.pathname !== '/student/registration') {
@@ -71,5 +71,23 @@
       }
     })
     .catch(() => {});
+})();
+
+// Dynamic notification badge
+(function () {
+  function updateBadge() {
+    fetch('/student/api/notifications/unread-count')
+      .then(r => r.json())
+      .then(data => {
+        var badge = document.getElementById('sbNotifBadge');
+        if (!badge) return;
+        var count = data.unread || 0;
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? '' : 'none';
+      })
+      .catch(() => {});
+  }
+  updateBadge();
+  setInterval(updateBadge, 60000);
 })();
 </script>
