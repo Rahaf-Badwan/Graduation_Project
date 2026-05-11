@@ -31,7 +31,6 @@ def archive_search_page():
 def _archive_report_dirs():
     return [
         os.path.abspath(os.path.join(current_app.root_path, "static", "archived_reports")),
-        os.path.abspath(os.path.join(current_app.root_path, "uploads")),
     ]
 
 
@@ -140,7 +139,7 @@ def serve_archived_report(filename):
         return _inline_pdf_response(path)
 
     return jsonify({
-        "error": f"PDF not found: {safe}. Checked static/archived_reports/ and uploads/."
+        "error": f"PDF not found: {safe}. Checked static/archived_reports/."
     }), 404
 
 
@@ -184,7 +183,7 @@ def serve_archived_report_project(project_id):
             return _inline_pdf_response(path)
 
         return jsonify({
-            "error": "Archived report file was not found in static/archived_reports or uploads."
+            "error": "Archived report file was not found in static/archived_reports."
         }), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -6,6 +6,7 @@ import os
 import csv
 import io
 import re
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dotenv import load_dotenv
 load_dotenv()
 from flask_mail import Mail, Message
@@ -21,6 +22,8 @@ from ai_engine import ask_apms_ai, search_uploaded_semantic
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+AI_RESPONSE_TIMEOUT_SECONDS = int(os.environ.get("AI_RESPONSE_TIMEOUT_SECONDS", "55"))
+_ai_executor = ThreadPoolExecutor(max_workers=2)
 
 # ─── Mail config ─────────────────────────────────────────────────────────
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
@@ -455,7 +458,14 @@ def api_ai_ask():
         return jsonify({"error": "Please write a question before sending.", "session_id": session_id}), 400
 
     try:
-        answer = ask_apms_ai(question)
+        future = _ai_executor.submit(ask_apms_ai, question)
+        answer = future.result(timeout=AI_RESPONSE_TIMEOUT_SECONDS)
+    except TimeoutError:
+        future.cancel()
+        return jsonify({
+            "error": "AI service timed out. Please try a shorter question or try again in a moment.",
+            "session_id": session_id,
+        }), 504
     except Exception as exc:
         import traceback
         traceback.print_exc()

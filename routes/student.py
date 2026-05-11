@@ -1537,7 +1537,7 @@ def api_submit_project():
 def api_upload_file():
     """
     Accept a file upload (report / source_code / presentation),
-    save to disk and record in project_files.
+    store it in project_files so the archive and AI training use the same file.
     """
     user_id = session["user_id"]
     file_type = request.form.get("file_type", "").strip()

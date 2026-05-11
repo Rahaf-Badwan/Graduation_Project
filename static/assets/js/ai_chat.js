@@ -44,7 +44,7 @@ async function fetchJson(url, options = {}, timeoutMs = AI_API_TIMEOUT_MS) {
     return { res, data };
   } catch (err) {
     if (err.name === 'AbortError') {
-      throw new Error('Request timed out. The server or AI service is taking too long to respond.');
+      throw new Error('The AI service timed out. Please try a shorter question or try again in a moment.');
     }
     throw err;
   } finally {
@@ -362,7 +362,7 @@ async function askAI() {
     loadArchive(currentSessionId);
   } catch (err) {
     hideLoading();
-    addMessage(formatResponse('⚠️ **Could not reach the server** — make sure `app.py` is running.\n- Error: ' + err.message), 'bot');
+    addMessage(formatResponse('⚠️ **Could not complete the AI request.**\n- Error: ' + err.message), 'bot');
   } finally {
     if (btn) btn.disabled = false;
     if (inp) { inp.disabled = false; inp.focus(); }

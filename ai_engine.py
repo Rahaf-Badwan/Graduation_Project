@@ -8,13 +8,14 @@ import time
 
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from db import get_db
 
 try:
     from google import genai
+    from google.genai import types as genai_types
 except Exception:
     genai = None
+    genai_types = None
 
 FORMAT_INSTRUCTION = (
     "\n\nFORMATTING RULES — always follow these:\n"
@@ -29,19 +30,24 @@ FORMAT_INSTRUCTION = (
 INDEX_DIR = "faiss_index"
 INDEX_FILE = os.path.join(INDEX_DIR, "docs.index")
 META_FILE = os.path.join(INDEX_DIR, "metadata.pkl")
+AI_HTTP_TIMEOUT_MS = int(os.environ.get("AI_HTTP_TIMEOUT_MS", "25000"))
+AI_PDF_TOP_K = int(os.environ.get("AI_PDF_TOP_K", "12"))
+AI_PDF_CONTEXT_CHARS = int(os.environ.get("AI_PDF_CONTEXT_CHARS", "12000"))
+AI_ALLOW_MODEL_DOWNLOAD = os.environ.get("AI_ALLOW_MODEL_DOWNLOAD", "0").lower() in {"1", "true", "yes"}
 
 _embed_model = None
 _faiss_index = None
 _chunks = []
 _chunk_meta = []
+_sentence_transformer_cls = None
 
 
 def normalize_arabic(text: str) -> str:
     if not text:
         return ""
-    text = text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
-    text = text.replace("ى", "ي").replace("ة", "ه")
-    text = text.replace("ؤ", "و").replace("ئ", "ي")
+    text = text.replace("\u0623", "\u0627").replace("\u0625", "\u0627").replace("\u0622", "\u0627")
+    text = text.replace("\u0649", "\u064a").replace("\u0629", "\u0647")
+    text = text.replace("\u0624", "\u0648").replace("\u0626", "\u064a")
     return text
 
 def _get_gemini_client():
@@ -51,7 +57,22 @@ def _get_gemini_client():
     )
     if not api_key or genai is None:
         return None
-    return genai.Client(api_key=api_key)
+    if genai_types is None:
+        return genai.Client(api_key=api_key)
+    return genai.Client(
+        api_key=api_key,
+        http_options=genai_types.HttpOptions(timeout=AI_HTTP_TIMEOUT_MS),
+    )
+
+
+def _generate_content(client, prompt: str):
+    kwargs = {
+        "model": "gemini-2.5-flash",
+        "contents": prompt,
+    }
+    if genai_types is not None:
+        kwargs["config"] = genai_types.GenerateContentConfig(max_output_tokens=1200)
+    return client.models.generate_content(**kwargs)
 
 
 def _call_ai(prompt: str) -> str:
@@ -62,10 +83,7 @@ def _call_ai(prompt: str) -> str:
     last_error = None
     for attempt in range(3):
         try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+            response = _generate_content(client, prompt)
             text = getattr(response, "text", "") or ""
             return text.strip() or "I could not generate a response."
         except Exception as e:
@@ -81,6 +99,28 @@ def _call_ai(prompt: str) -> str:
             return "AI service error: " + last_error
 
     return "AI service error: Service is temporarily busy. Please try again in a moment."
+
+
+def _pdf_hits_to_context(pdf_hits, max_chars: int = AI_PDF_CONTEXT_CHARS) -> str:
+    parts = []
+    used = 0
+    for hit in pdf_hits:
+        text = (
+            "[File: "
+            + str(hit["meta"].get("file"))
+            + " | Chunk: "
+            + str(hit["meta"].get("chunk_id"))
+            + "]\n"
+            + (hit.get("text") or "")
+        )
+        remaining = max_chars - used
+        if remaining <= 0:
+            break
+        if len(text) > remaining:
+            text = text[:remaining].rstrip() + "\n[Context truncated]"
+        parts.append(text)
+        used += len(text)
+    return "\n\n".join(parts)
 
 
 def _looks_like_document_question(question: str) -> bool:
@@ -117,9 +157,22 @@ def _needs_document_search(question: str) -> bool:
 
 
 def _get_embed_model():
-    global _embed_model
+    global _embed_model, _sentence_transformer_cls
+    if _embed_model is False:
+        return None
     if _embed_model is None:
-        _embed_model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+        try:
+            if _sentence_transformer_cls is None:
+                from sentence_transformers import SentenceTransformer
+                _sentence_transformer_cls = SentenceTransformer
+            _embed_model = _sentence_transformer_cls(
+                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                local_files_only=not AI_ALLOW_MODEL_DOWNLOAD,
+            )
+        except Exception as e:
+            print(f"[ai_engine] Could not load local embedding model: {e}")
+            _embed_model = False
+            return None
     return _embed_model
 
 
@@ -147,6 +200,8 @@ def _search_pdf_chunks(question: str, top_k: int = 60):
         return []
 
     model = _get_embed_model()
+    if model is None:
+        return []
     question = normalize_arabic(question)
     q_emb = model.encode([question], convert_to_numpy=True)
     q_emb = np.asarray(q_emb, dtype="float32")
@@ -354,7 +409,7 @@ def _keyword_stats_answer(question: str) -> str | None:
 def _build_context(question: str) -> str:
     projects = _fetch_projects()[:50]
     supervisors = _fetch_supervisor_stats()[:25]
-    pdf_hits = _search_pdf_chunks(question, top_k=60)
+    pdf_hits = _search_pdf_chunks(question, top_k=AI_PDF_TOP_K)
 
     proj_lines = [
         "- " + (p["title"] or "") +
@@ -372,10 +427,7 @@ def _build_context(question: str) -> str:
         for s in supervisors
     ]
 
-    pdf_context = [
-        "[File: " + str(hit["meta"].get("file")) + " | Chunk: " + str(hit["meta"].get("chunk_id")) + "]\n" + hit["text"]
-        for hit in pdf_hits
-    ]
+    pdf_context = _pdf_hits_to_context(pdf_hits)
 
     return (
         "You are APMS AI assistant for Birzeit University.\n"
@@ -388,7 +440,7 @@ def _build_context(question: str) -> str:
         "5. Start answers with: 'Based on uploaded PDFs:', 'Based on APMS data:', or 'General AI answer:'\n\n"
         "User question: " + question + "\n\n"
         "Retrieved PDF context:\n"
-        + ("\n\n".join(pdf_context) if pdf_context else "No relevant PDF chunks found.")
+        + (pdf_context if pdf_context else "No relevant PDF chunks found.")
         + "\n\nAPMS database context:\nRecent projects:\n"
         + "\n".join(proj_lines)
         + "\n\nSupervisor stats:\n"
@@ -428,6 +480,7 @@ def search_uploaded_semantic(
             if file_name not in grouped:
                 grouped[file_name] = {
                     "file_name": file_name,
+                    "meta": dict(meta or {}),
                     "all_text": [],
                     "preview": text[:300].replace("\n", " ").strip(),
                     "matched_chunks": 0,
@@ -447,6 +500,7 @@ def search_uploaded_semantic(
             if file_name not in grouped:
                 grouped[file_name] = {
                     "file_name": file_name,
+                    "meta": dict(hit.get("meta") or {}),
                     "all_text": [],
                     "preview": text[:300].replace("\n", " ").strip(),
                     "matched_chunks": 0,
@@ -473,16 +527,28 @@ def search_uploaded_semantic(
         full_text = "\n".join(item["all_text"]).lower()
         file_name_l = item["file_name"].lower()
         preview_l = item["preview"].lower()
+        meta = item.get("meta") or {}
+        meta_text = " ".join(
+            str(meta.get(key) or "")
+            for key in (
+                "title",
+                "project_type",
+                "status",
+                "academic_year",
+                "supervisor_name",
+                "final_score",
+            )
+        ).lower()
 
-        if year and year not in full_text and year not in file_name_l and year not in preview_l:
+        if year and year not in full_text and year not in file_name_l and year not in preview_l and year not in meta_text:
             continue
 
         if project_type:
             keywords = type_keywords.get(project_type, [project_type])
-            if keywords and not any(k in full_text or k in preview_l or k in file_name_l for k in keywords):
+            if keywords and not any(k in full_text or k in preview_l or k in file_name_l or k in meta_text for k in keywords):
                 continue
 
-        if supervisor and supervisor not in full_text and supervisor not in preview_l and supervisor not in file_name_l:
+        if supervisor and supervisor not in full_text and supervisor not in preview_l and supervisor not in file_name_l and supervisor not in meta_text:
             continue
 
         if status:
@@ -492,6 +558,7 @@ def search_uploaded_semantic(
                 f" {v} " in f" {full_text} "
                 or f" {v} " in f" {preview_l} "
                 or f" {v} " in f" {file_name_l} "
+                or f" {v} " in f" {meta_text} "
                 for v in variants
             ):
                 continue
@@ -499,6 +566,11 @@ def search_uploaded_semantic(
         if score:
             score_matches = re.findall(r"\b(?:[1-9]\d(?:\.\d+)?|100(?:\.0+)?)\b", full_text)
             numeric_scores = [float(x) for x in score_matches]
+            try:
+                if meta.get("final_score") is not None:
+                    numeric_scores.append(float(meta.get("final_score")))
+            except (TypeError, ValueError):
+                pass
 
             if score == "90_plus" and not any(s >= 90 for s in numeric_scores):
                 continue
@@ -511,6 +583,18 @@ def search_uploaded_semantic(
 
         filtered.append({
             "file_name": item["file_name"],
+            "project_id": meta.get("project_id"),
+            "title": meta.get("title") or item["file_name"],
+            "project_type": meta.get("project_type") or "",
+            "status": meta.get("status") or "",
+            "academic_year": meta.get("academic_year") or "",
+            "supervisor_name": meta.get("supervisor_name") or "",
+            "final_score": meta.get("final_score"),
+            "report_url": (
+                f"/archive/report/project/{meta.get('project_id')}"
+                if meta.get("project_id") and meta.get("status") == "archived"
+                else None
+            ),
             "preview": item["preview"],
             "matched_chunks": item["matched_chunks"],
         })
@@ -549,12 +633,9 @@ def ask_apms_ai(question: str) -> str:
     if any(x in q for x in ["names of projects", "project names", "list all projects", "all projects"]):
         return _extract_all_project_names_from_chunks()
 
-    pdf_hits = _search_pdf_chunks(question, top_k=60)
+    pdf_hits = _search_pdf_chunks(question, top_k=AI_PDF_TOP_K)
     if pdf_hits:
-        pdf_context = "\n\n".join(
-            "[File: " + str(hit["meta"].get("file")) + " | Chunk: " + str(hit["meta"].get("chunk_id")) + "]\n" + hit["text"]
-            for hit in pdf_hits
-        )
+        pdf_context = _pdf_hits_to_context(pdf_hits)
 
         result = _call_ai(
             "You are APMS AI assistant.\n"
