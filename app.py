@@ -11,6 +11,8 @@ load_dotenv()
 from flask_mail import Mail, Message
 from db import get_db
 from auth import login_required
+from routes.archive_search import archive_bp
+from routes.shared_ai import shared_ai_bp
 from routes.student import student_bp
 from routes.head import head_bp
 from routes.appCoordinator import coordinator_bp
@@ -31,6 +33,8 @@ app.config["MAIL_DEFAULT_SENDER"] = ("APMS — Birzeit University", "rahafbadwan
 mail = Mail(app)
 
 # ─── Register Blueprints ─────────────────────────────────────────────────
+app.register_blueprint(archive_bp)
+app.register_blueprint(shared_ai_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(head_bp)
 app.register_blueprint(coordinator_bp)
@@ -843,9 +847,9 @@ SUPERVISOR_PAGES = {
     "progress":   "supervisor/progress.html",
     "feedback":   "supervisor/feedback.html",
     "evaluation": "supervisor/evaluation.html",
-    "search":     "supervisor/search.html",
+    "search":     "shared/archive_search.html",
     "notifs":     "supervisor/notifs.html",
-    "ai":         "supervisor/ai.html",
+    "ai":         "shared/ai.html",
     "profile":    "supervisor/profile.html",
 }
 

@@ -6,11 +6,9 @@ from flask import (
     url_for,
     session,
     jsonify,
-    current_app,
     Response,
 )
 import bcrypt
-import os
 from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
@@ -1809,13 +1807,6 @@ def api_clear_submission():
         return jsonify({"error": str(e)}), 500
 
 
-# ─── Search ─────────────────────────────────────────────────
-@student_bp.route("/search")
-@login_required(role="student")
-def search():
-    return render_template("student/search.html")
-
-
 @student_bp.route("/api/supervisors", methods=["GET"])
 @login_required(role="student")
 def api_student_supervisors():
@@ -2211,7 +2202,7 @@ def api_student_topbar_info():
         return jsonify({"course_code": "COMP4200", "academic_year": ""})
 
 
-# ─── Notifications ──────────────────────────────────────────
+
 @student_bp.route("/notifs")
 @login_required(role="student")
 def notifs():
@@ -2222,7 +2213,7 @@ def notifs():
 @student_bp.route("/ai")
 @login_required(role="student")
 def ai():
-    return render_template("student/ai.html")
+    return render_template("shared/ai.html", base_template="student/base.html")
 
 
 # ─── Profile ────────────────────────────────────────────────

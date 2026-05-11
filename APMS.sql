@@ -718,81 +718,6 @@ INSERT IGNORE INTO students (user_id, enrollment_year) VALUES
 INSERT IGNORE INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes) VALUES
 (2, 1, 1, 'Official coordinator for Semester 1 — 2025/2026');
 
--- Projects
-INSERT IGNORE INTO projects (title, title_en, abstract, keywords, project_type, semester_id, supervisor_id, status, submission_date, final_score) VALUES
-(
-  '',
-  NULL,
-  NULL,
-  NULL,
-  'web,ai',
-  1, 3, 'draft', NULL, NULL
-),
-(
-  '',
-  NULL,
-  NULL,
-  NULL,
-  'web',
-  1, 4, 'draft', NULL, NULL
-),
-(
-  'Smart Order Delivery Application',
-  'Smart Order Delivery Application',
-  'A mobile application for order delivery using intelligent routing algorithms to optimize delivery time and cost.',
-  'mobile, delivery, smart routing, GPS',
-  'mobile',
-  1, 5, 'draft', NULL, NULL
-),
-(
-  'AI-Based Disease Recognition System',
-  'AI-Based Disease Recognition System',
-  'A system that uses deep learning techniques to recognize diseases from medical images with high accuracy using CNN architectures.',
-  'AI, deep learning, medical imaging, CNN, classification',
-  'ai',
-  2, 4, 'accepted', '2025-02-01', 92.30
-),
-(
-  'Adaptive E-Learning Platform',
-  'Adaptive E-Learning Platform',
-  'An e-learning platform that adapts to each student\'s learning level and delivers personalized content based on performance analytics.',
-  'e-learning, adaptive, personalization, education',
-  'web',
-  3, 5, 'archived', '2024-02-01', 87.00
-),
-(
-  'Mobile Patient Tracking Application',
-  'Mobile Patient Tracking Application',
-  'A mobile application for tracking patient records and treatment appointments, with strong data protection protocols compliant with privacy standards.',
-  'mobile, healthcare, security, HIPAA, patient records',
-  'mobile',
-  1, 7, 'draft', NULL, NULL
-),
-(
-  'Smart Medical Appointment Booking System',
-  'Smart Medical Appointment Booking System',
-  'A web-based system for booking medical appointments with automated reminders and queue congestion analysis.',
-  'web, appointments, healthcare, AI, notifications',
-  'web',
-  2, 3, 'rejected', '2025-01-15', 54.00
-),
-(
-  'Digital Library Management System',
-  'Digital Library Management System',
-  'An integrated system for managing digital library resources with an advanced full-text search engine and borrowing workflow.',
-  'library, digital, search engine, web, resources',
-  'web',
-  1, 6, 'draft', NULL, NULL
-),
-(
-  'Cyber Infrastructure Protection System',
-  'Cyber Infrastructure Protection System',
-  'An integrated system for monitoring and protecting digital infrastructure against cyberattacks using real-time threat detection.',
-  'cybersecurity, infrastructure, monitoring, intrusion detection',
-  'security',
-  1, 7, 'draft', NULL, NULL
-);
-
 -- Project Members
 INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact) VALUES
 -- Project 1: APMS team
@@ -3111,3 +3036,630 @@ UPDATE semesters
 SET is_active = 1
 WHERE semester_id = (SELECT semester_id FROM (SELECT semester_id FROM semesters ORDER BY semester_id DESC LIMIT 1) AS newest)
   AND NOT EXISTS (SELECT 1 FROM (SELECT semester_id FROM semesters WHERE is_active = 1 LIMIT 1) AS active_sem);
+  
+  
+-- ============================================================
+-- Archived Projects from Uploads (44 projects)
+-- Run AFTER your main APMS.sql
+-- Each project gets a supervisor assigned from existing faculty
+-- ============================================================
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Smart Invoice', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 82.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Smart Invoice' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Kitchen Station Management System', 'web', s.semester_id, 4, 'archived', '2025-02-01', 79.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Kitchen Station Management System' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'DreamsJob Recruitment Platform', 'web', s.semester_id, 5, 'archived', '2025-02-01', 85.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='DreamsJob Recruitment Platform' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'YallaRehla Travel App', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 88.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='YallaRehla Travel App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'StudentHub', 'web', s.semester_id, 7, 'archived', '2025-02-01', 76.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='StudentHub' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Wasselha Delivery System', 'mobile', s.semester_id, 3, 'archived', '2025-02-01', 83.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wasselha Delivery System' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Home Sweet Home Real Estate', 'web', s.semester_id, 4, 'archived', '2025-02-01', 80.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Home Sweet Home Real Estate' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Birzeit University Insurance System', 'web', s.semester_id, 5, 'archived', '2024-02-01', 91.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Birzeit University Insurance System' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Sal7ly Maintenance App', 'mobile', s.semester_id, 6, 'archived', '2024-02-01', 78.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Sal7ly Maintenance App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Monitoring World News System', 'web', s.semester_id, 7, 'archived', '2024-02-01', 74.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Monitoring World News System' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Prediction of Anti-Cancer Peptide ACP-XG', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 94.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Prediction of Anti-Cancer Peptide ACP-XG' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'FitScoop Fitness Platform', 'mobile', s.semester_id, 4, 'archived', '2025-02-01', 81.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='FitScoop Fitness Platform' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Wedding Planning System', 'web', s.semester_id, 5, 'archived', '2025-02-01', 77.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wedding Planning System' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'PharmaApp Pharmacy Management', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 86.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='PharmaApp Pharmacy Management' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Student Digital Guide', 'web', s.semester_id, 7, 'archived', '2025-02-01', 80.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Student Digital Guide' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Palestine Charity Platform', 'web', s.semester_id, 3, 'archived', '2025-02-01', 75.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Palestine Charity Platform' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Gamified Trip Planner App', 'mobile', s.semester_id, 4, 'archived', '2025-02-01', 89.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Gamified Trip Planner App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'TechSpotter Tech News Platform', 'web', s.semester_id, 5, 'archived', '2025-02-01', 78.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='TechSpotter Tech News Platform' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Multi-Environment Video Game', 'other', s.semester_id, 6, 'archived', '2025-02-01', 83.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Multi-Environment Video Game' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Birzeit Library Chatbot', 'ai', s.semester_id, 7, 'archived', '2025-02-01', 92.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Birzeit Library Chatbot' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Policy Peek Policy Analyzer', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 87.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Policy Peek Policy Analyzer' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'LifeActive Health Tracker', 'mobile', s.semester_id, 4, 'archived', '2025-02-01', 84.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='LifeActive Health Tracker' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Tronix Electronics Web Application', 'web', s.semester_id, 5, 'archived', '2025-02-01', 79.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Tronix Electronics Web Application' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Smart School Portal', 'web', s.semester_id, 6, 'archived', '2025-02-01', 88.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Smart School Portal' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'GoHelp Volunteer Platform', 'web', s.semester_id, 7, 'archived', '2025-02-01', 76.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='GoHelp Volunteer Platform' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'KhatClarifier AI Writing Tool', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 90.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='KhatClarifier AI Writing Tool' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'ConvoConvert Communication Tool', 'ai', s.semester_id, 4, 'archived', '2025-02-01', 85.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='ConvoConvert Communication Tool' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Wasselni Transportation App', 'mobile', s.semester_id, 5, 'archived', '2025-02-01', 82.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wasselni Transportation App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Ackerra Fitness Platform', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 87.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Ackerra Fitness Platform' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Darak Real Estate Marketplace', 'web', s.semester_id, 7, 'archived', '2025-02-01', 83.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Darak Real Estate Marketplace' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Flora Palestine Plant Guide', 'mobile', s.semester_id, 3, 'archived', '2025-02-01', 81.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Flora Palestine Plant Guide' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Max Scheduling System', 'web', s.semester_id, 4, 'archived', '2025-02-01', 77.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Max Scheduling System' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'PayWithPalKoin Payment System', 'web', s.semester_id, 5, 'archived', '2025-02-01', 86.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='PayWithPalKoin Payment System' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Nomad Travel Companion App', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 84.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Nomad Travel Companion App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'CarPal Car Sharing App', 'mobile', s.semester_id, 7, 'archived', '2025-02-01', 88.00
+FROM semesters s
+WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='CarPal Car Sharing App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'E-Voting System Using Blockchain', 'security', s.semester_id, 3, 'archived', '2024-02-01', 93.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='E-Voting System Using Blockchain' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Nossrah Arabic Learning App', 'mobile', s.semester_id, 4, 'archived', '2024-02-01', 80.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Nossrah Arabic Learning App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Wanderlust in Palestine Travel App', 'web', s.semester_id, 5, 'archived', '2024-02-01', 85.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wanderlust in Palestine Travel App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Medica Healthcare App', 'mobile', s.semester_id, 6, 'archived', '2024-02-01', 82.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Medica Healthcare App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'BZU Note Share App', 'mobile', s.semester_id, 7, 'archived', '2024-02-01', 79.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='BZU Note Share App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Plestia Events Platform', 'web', s.semester_id, 3, 'archived', '2024-02-01', 83.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Plestia Events Platform' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Baby Voice Identification App', 'ai', s.semester_id, 4, 'archived', '2024-02-01', 88.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Baby Voice Identification App' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'Traffic Light Synchronization Optimizer', 'ai', s.semester_id, 5, 'archived', '2024-02-01', 91.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Traffic Light Synchronization Optimizer' AND status='archived')
+LIMIT 1;
+
+INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
+SELECT 'CampusConnect University Network', 'web', s.semester_id, 6, 'archived', '2024-02-01', 86.00
+FROM semesters s
+WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
+AND NOT EXISTS (SELECT 1 FROM projects WHERE title='CampusConnect University Network' AND status='archived')
+LIMIT 1;
+
+-- ============================================================
+-- Link PDF files to projects
+-- ============================================================
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'smart_invoice.pdf', 'archived_reports/smart_invoice.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Smart Invoice' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'kitchen_station.pdf', 'archived_reports/kitchen_station.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Kitchen Station Management System' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'dreamsjob.pdf', 'archived_reports/dreamsjob.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='DreamsJob Recruitment Platform' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'yallarehla.pdf', 'archived_reports/yallarehla.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='YallaRehla Travel App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'studenthub.pdf', 'archived_reports/studenthub.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='StudentHub' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'wasselha.pdf', 'archived_reports/wasselha.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Wasselha Delivery System' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'home_sweet_home.pdf', 'archived_reports/home_sweet_home.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Home Sweet Home Real Estate' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'bzu_insurance.pdf', 'archived_reports/bzu_insurance.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Birzeit University Insurance System' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'sal7ly.pdf', 'archived_reports/sal7ly.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Sal7ly Maintenance App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'monitoring_world_news.pdf', 'archived_reports/monitoring_world_news.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Monitoring World News System' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'anti_cancer_peptide.pdf', 'archived_reports/anti_cancer_peptide.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Prediction of Anti-Cancer Peptide ACP-XG' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'fitscoop.pdf', 'archived_reports/fitscoop.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='FitScoop Fitness Platform' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'wedding_planning.pdf', 'archived_reports/wedding_planning.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Wedding Planning System' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'pharmaapp.pdf', 'archived_reports/pharmaapp.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='PharmaApp Pharmacy Management' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'student_digital_guide.pdf', 'archived_reports/student_digital_guide.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Student Digital Guide' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'palestine_charity.pdf', 'archived_reports/palestine_charity.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Palestine Charity Platform' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'gamified_trip_planner.pdf', 'archived_reports/gamified_trip_planner.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Gamified Trip Planner App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'techspotter.pdf', 'archived_reports/techspotter.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='TechSpotter Tech News Platform' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'multi_env_videogame.pdf', 'archived_reports/multi_env_videogame.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Multi-Environment Video Game' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'bzu_library_chatbot.pdf', 'archived_reports/bzu_library_chatbot.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Birzeit Library Chatbot' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'policy_peek.pdf', 'archived_reports/policy_peek.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Policy Peek Policy Analyzer' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'lifeactive.pdf', 'archived_reports/lifeactive.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='LifeActive Health Tracker' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'tronix.pdf', 'archived_reports/tronix.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Tronix Electronics Web Application' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'smart_school_portal.pdf', 'archived_reports/smart_school_portal.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Smart School Portal' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'gohelp.pdf', 'archived_reports/gohelp.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='GoHelp Volunteer Platform' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'khatclarifier.pdf', 'archived_reports/khatclarifier.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='KhatClarifier AI Writing Tool' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'convoconvert.pdf', 'archived_reports/convoconvert.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='ConvoConvert Communication Tool' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'wasselni.pdf', 'archived_reports/wasselni.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Wasselni Transportation App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'ackerra.pdf', 'archived_reports/ackerra.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Ackerra Fitness Platform' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'darak.pdf', 'archived_reports/darak.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Darak Real Estate Marketplace' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'flora_palestine.pdf', 'archived_reports/flora_palestine.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Flora Palestine Plant Guide' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'max_scheduling.pdf', 'archived_reports/max_scheduling.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Max Scheduling System' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'paywithpalkoin.pdf', 'archived_reports/paywithpalkoin.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='PayWithPalKoin Payment System' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'nomad.pdf', 'archived_reports/nomad.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Nomad Travel Companion App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'carpal.pdf', 'archived_reports/carpal.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='CarPal Car Sharing App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'evoting_blockchain.pdf', 'archived_reports/evoting_blockchain.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='E-Voting System Using Blockchain' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'nossrah.pdf', 'archived_reports/nossrah.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Nossrah Arabic Learning App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'wanderlust_palestine.pdf', 'archived_reports/wanderlust_palestine.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Wanderlust in Palestine Travel App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'medica_app.pdf', 'archived_reports/medica_app.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Medica Healthcare App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'bzu_note_share.pdf', 'archived_reports/bzu_note_share.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='BZU Note Share App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'plestia_events.pdf', 'archived_reports/plestia_events.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Plestia Events Platform' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'baby_voice_id.pdf', 'archived_reports/baby_voice_id.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Baby Voice Identification App' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'traffic_light_optimizer.pdf', 'archived_reports/traffic_light_optimizer.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='Traffic Light Synchronization Optimizer' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;
+
+INSERT INTO project_files (project_id, file_type, file_name, file_path, upload_status, uploaded_at)
+SELECT p.project_id, 'final_report', 'campus_connect.pdf', 'archived_reports/campus_connect.pdf', 'uploaded', NOW()
+FROM projects p
+WHERE p.title='CampusConnect University Network' AND p.status='archived'
+AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
+LIMIT 1;

@@ -44,7 +44,7 @@ def supervisors():
 @head_bp.route("/search")
 @login_required(role="head_of_department")
 def search():
-    return render_template("head/search.html")
+    return render_template("shared/archive_search.html", base_template="head/base.html")
 
 
 # ─── Notifications ──────────────────────────────────────────
@@ -58,7 +58,7 @@ def notifs():
 @head_bp.route("/ai")
 @login_required(role="head_of_department")
 def ai():
-    return render_template("head/ai.html")
+    return render_template("shared/ai.html", base_template="head/base.html")
 
 
 # ─── Profile ────────────────────────────────────────────────

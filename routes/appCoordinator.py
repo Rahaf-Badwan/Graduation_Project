@@ -250,9 +250,9 @@ COORDINATOR_PAGES = {
     "evaluation": "coordinator/evaluation.html",
     "lectures": "coordinator/lectures.html",
     "exams": "coordinator/exams.html",
-    "search": "coordinator/search.html",
+    "search": "shared/archive_search.html",
     "notifs": "coordinator/notifs.html",
-    "ai": "coordinator/ai.html",
+    "ai": "shared/ai.html",
     "profile": "coordinator/profile.html",
 }
 
