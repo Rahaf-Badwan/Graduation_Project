@@ -6,53 +6,630 @@
 
 {% block content %}
 <div class="page page-single on" id="pg-dashboard">
-  <div class="stats-row u-0e216688">
-    <div class="stat"><div class="stat-num u-c293fd73" id="dashTotalProjects">0</div><div class="stat-label">Total Projects</div></div>
-    <div class="stat"><div class="stat-num u-90f01645" id="dashAwaitingReview">0</div><div class="stat-label">Awaiting Review</div></div>
-    <div class="stat"><div class="stat-num u-a9721929" id="dashUnderEvaluation">0</div><div class="stat-label">Under Evaluation</div></div>
-    <div class="stat"><div class="stat-num u-cfb6c12e" id="dashAccepted">0</div><div class="stat-label">Accepted / Archived</div></div>
-    <div class="stat"><div class="stat-num u-bc7c441e" id="dashRejected">0</div><div class="stat-label">Rejected</div></div>
+
+  <style>
+    html,
+    body {
+      scroll-behavior: auto !important;
+    }
+
+    #pg-dashboard {
+      display: block !important;
+      min-height: auto !important;
+      height: auto !important;
+      padding: 20px 22px 90px !important;
+      margin: 0 !important;
+    }
+
+    #pg-dashboard .dash-hero {
+      background: linear-gradient(135deg, #2e7d42, #173b24);
+      border-radius: 22px;
+      padding: 22px;
+      color: #fff;
+      box-shadow: 0 16px 36px rgba(46, 125, 66, 0.18);
+      margin-bottom: 16px;
+    }
+
+    #pg-dashboard .dash-hero-title {
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    #pg-dashboard .dash-hero-sub {
+      font-size: 13px;
+      opacity: 0.9;
+      line-height: 1.6;
+    }
+
+    #pg-dashboard .dash-tabs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 0 0 16px 0;
+      padding: 0;
+    }
+
+    #pg-dashboard .dash-tab {
+      border: 1px solid #d7e3dc;
+      background: #fff;
+      color: #2d5137;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    #pg-dashboard .dash-tab:hover {
+      background: #f3f7f4;
+    }
+
+    #pg-dashboard .dash-tab.on {
+      background: #2e7d42;
+      border-color: #2e7d42;
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+    }
+
+    #pg-dashboard .dash-section {
+      display: none;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    #pg-dashboard .dash-section.active {
+      display: block !important;
+    }
+
+    #pg-dashboard .stats-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    #pg-dashboard .stat {
+      background: #fff;
+      border: 1px solid #e6ece8;
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
+    }
+
+    #pg-dashboard .stat-num {
+      font-size: 28px;
+      font-weight: 900;
+      color: #2e7d42;
+      margin-bottom: 4px;
+    }
+
+    #pg-dashboard .stat-label {
+      font-size: 13px;
+      color: #667085;
+      font-weight: 700;
+    }
+
+    #pg-dashboard .dash-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    #pg-dashboard .card {
+      background: #fff;
+      border: 1px solid #e6ece8;
+      border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    #pg-dashboard .card-hd {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 16px 18px;
+      border-bottom: 1px solid #edf2ef;
+    }
+
+    #pg-dashboard .card-title {
+      font-size: 16px;
+      font-weight: 900;
+      color: #173b24;
+    }
+
+    #pg-dashboard .card-action {
+      border: 1px solid #d7e3dc;
+      background: #f3f7f4;
+      color: #245c33;
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    #pg-dashboard .card-action:hover {
+      background: #e8f3eb;
+      border-color: #b9d7c2;
+    }
+
+    #pg-dashboard .dash-card-body {
+      padding: 16px 18px;
+    }
+
+    #pg-dashboard .dash-info-box {
+      border-left: 5px solid #2e7d42;
+      background: #f7fbf8;
+      border-radius: 14px;
+      padding: 13px 14px;
+      color: #344054;
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    #pg-dashboard .dash-chart-body {
+      height: 320px;
+      padding: 16px;
+    }
+
+    #pg-dashboard .dash-chart-body.small {
+      height: 280px;
+    }
+
+    #pg-dashboard .dash-badge {
+      font-size: 11px;
+      font-weight: 900;
+      color: #2e7d42;
+      background: #ecfdf3;
+      border: 1px solid #ccebd5;
+      padding: 5px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    #pg-dashboard .dash-subtitle {
+      font-size: 12px;
+      color: #667085;
+      margin-top: 3px;
+      line-height: 1.5;
+    }
+
+    #pg-dashboard .dash-list-box {
+      padding: 16px 18px;
+    }
+
+    #pg-dashboard .dash-loading,
+    #pg-dashboard .dash-empty {
+      padding: 18px;
+      border: 1px dashed #cddbd2;
+      border-radius: 14px;
+      color: #667085;
+      text-align: center;
+      background: #fbfdfb;
+      font-size: 13px;
+    }
+
+    #pg-dashboard .semester-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    #pg-dashboard .btn {
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    #pg-dashboard .btn-primary {
+      background: #2e7d42;
+      color: #fff;
+      border: 1px solid #2e7d42;
+    }
+
+    #pg-dashboard .btn-outline {
+      background: #fff;
+      color: #2e7d42;
+      border: 1px solid #ccebd5;
+    }
+
+    #pg-dashboard .btn-outline:hover {
+      background: #f3f7f4;
+    }
+
+    @media (max-width: 1100px) {
+      #pg-dashboard .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      #pg-dashboard .dash-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      #pg-dashboard .stats-row {
+        grid-template-columns: 1fr;
+      }
+
+      #pg-dashboard .dash-tab {
+        width: 100%;
+        text-align: center;
+      }
+
+      #pg-dashboard .dash-hero-title {
+        font-size: 20px;
+      }
+    }
+  </style>
+
+  <div class="dash-hero">
+    <div class="dash-hero-title">Welcome to APMS Coordinator Dashboard</div>
+    <div class="dash-hero-sub">
+      Monitor submitted projects, reviews, committees, semester control, and project statistics.
+    </div>
   </div>
 
-  <div class="two-col">
-    <div>
+  <div class="dash-tabs" role="tablist" aria-label="Dashboard tabs">
+    <button class="dash-tab on" type="button" onclick="showDashSection('dashOverviewTab', this)">
+      Overview
+    </button>
+
+    <button class="dash-tab" type="button" onclick="showDashSection('dashChartsTab', this)">
+      Projects Charts
+    </button>
+
+    <button class="dash-tab" type="button" onclick="showDashSection('dashWorkflowTab', this)">
+      Workflow
+    </button>
+
+    <button class="dash-tab" type="button" onclick="showDashSection('dashSemesterTab', this)">
+      Semester Control
+    </button>
+  </div>
+
+  <!-- =========================
+       TAB 1: OVERVIEW
+  ========================== -->
+  <div id="dashOverviewTab" class="dash-section active">
+    <div class="stats-row u-0e216688">
+      <div class="stat">
+        <div class="stat-num u-c293fd73" id="dashTotalProjects">0</div>
+        <div class="stat-label">Total Projects</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-num u-90f01645" id="dashAwaitingReview">0</div>
+        <div class="stat-label">Awaiting Review</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-num u-a9721929" id="dashUnderEvaluation">0</div>
+        <div class="stat-label">Under Evaluation</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-num u-cfb6c12e" id="dashAccepted">0</div>
+        <div class="stat-label">Accepted / Archived</div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-num u-bc7c441e" id="dashRejected">0</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Projects Waiting for Your Decision</span>
+        <button class="card-action" data-go="review" type="button">Review All ←</button>
+      </div>
+
+      <div class="dash-list-box" id="dashLatestProjects">
+        <div class="dash-loading">Loading latest projects...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================
+       TAB 2: PROJECTS CHARTS
+  ========================== -->
+  <div id="dashChartsTab" class="dash-section">
+    <div class="dash-grid">
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Projects Waiting for Your Decision</span>
-          <button class="card-action" data-go="review" type="button">Review All ←</button>
+          <div>
+            <span class="card-title">Project Distribution by Status</span>
+            <div class="dash-subtitle">Accepted, rejected, awaiting review, and under evaluation</div>
+          </div>
+          <span class="dash-badge">Doughnut</span>
         </div>
-        <div id="dashLatestProjects"><div>Loading...</div></div>
-      </div>
 
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Coordinator Workflow Progress</span></div>
-        <div id="dashWorkflowProgress"><div>Loading...</div></div>
-      </div>
-    </div>
-
-    <div>
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Project Distribution by Status</span></div>
-        <div id="dashStatusDistribution" class="u-a10c5e0d"><div>Loading...</div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Projects by Type</span></div>
-        <div id="dashTypeDistribution" class="u-a10c5e0d"><div>Loading...</div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Semester Control</span></div>
-        <div class="u-510af369">
-          Student registration window: <b id="dashDistributionStatus">Loading...</b><br>
-          Scheduled committees: <b id="dashCommitteesCount">0</b>
+        <div class="dash-chart-body small">
+          <canvas id="dashStatusChart"></canvas>
         </div>
-        <div class="btn-row" style="margin-top:12px">
-          <button class="btn btn-primary" type="button" data-go="registration">Student Distribution</button>
-          <button class="btn btn-outline" type="button" data-go="committee">Committees</button>
+
+        <div id="dashStatusDistribution" class="u-a10c5e0d dash-list-box">
+          <div class="dash-loading">Loading status distribution...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <span class="card-title">Projects by Type</span>
+            <div class="dash-subtitle">Web, mobile, AI, database, security, and other</div>
+          </div>
+          <span class="dash-badge">Bar</span>
+        </div>
+
+        <div class="dash-chart-body small">
+          <canvas id="dashTypeChart"></canvas>
+        </div>
+
+        <div id="dashTypeDistribution" class="u-a10c5e0d dash-list-box">
+          <div class="dash-loading">Loading project types...</div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- =========================
+       TAB 3: WORKFLOW
+  ========================== -->
+  <div id="dashWorkflowTab" class="dash-section">
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <span class="card-title">Coordinator Workflow Progress</span>
+            <div class="dash-subtitle">Review, committee evaluation, and final decision progress</div>
+          </div>
+          <span class="dash-badge">Progress</span>
+        </div>
+
+        <div class="dash-list-box" id="dashWorkflowProgress">
+          <div class="dash-loading">Loading workflow progress...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <div>
+            <span class="card-title">Review Status Overview</span>
+            <div class="dash-subtitle">Simple comparison between project stages</div>
+          </div>
+          <span class="dash-badge">Bar</span>
+        </div>
+
+        <div class="dash-chart-body">
+          <canvas id="dashReviewBarChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================
+       TAB 4: SEMESTER CONTROL
+  ========================== -->
+  <div id="dashSemesterTab" class="dash-section">
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <span class="card-title">Semester Control</span>
+          <div class="dash-subtitle">Current registration window and committee status</div>
+        </div>
+      </div>
+
+      <div class="dash-card-body">
+        <div class="dash-info-box">
+          Student registration window:
+          <b id="dashDistributionStatus">Loading...</b>
+          <br>
+          Scheduled committees:
+          <b id="dashCommitteesCount">0</b>
+        </div>
+
+        <div class="semester-actions">
+          <button class="btn btn-primary" type="button" data-go="registration">
+            Student Distribution
+          </button>
+
+          <button class="btn btn-outline" type="button" data-go="committee">
+            Committees
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  function resetDashboardScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-dashboard'].forEach(selector => {
+      const el = document.querySelector(selector);
+      if (el) el.scrollTop = 0;
+    });
+  }
+
+  function showDashSection(id, btn) {
+    document.querySelectorAll('#pg-dashboard .dash-section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    const selected = document.getElementById(id);
+    if (selected) {
+      selected.classList.add('active');
+    }
+
+    document.querySelectorAll('#pg-dashboard .dash-tab').forEach(tab => {
+      tab.classList.remove('on');
+    });
+
+    if (btn) {
+      btn.classList.add('on');
+    }
+
+    setTimeout(function () {
+      createDashboardCharts();
+      resetDashboardScroll();
+    }, 60);
+  }
+
+  function dashGetNum(id, fallback) {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+
+    const n = parseInt(String(el.textContent || '').replace(/[^\d-]/g, ''), 10);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function dashCreateChart(canvasId, config) {
+    const canvas = document.getElementById(canvasId);
+
+    if (!canvas || typeof Chart === 'undefined') {
+      return null;
+    }
+
+    if (canvas._chartInstance) {
+      canvas._chartInstance.destroy();
+    }
+
+    canvas._chartInstance = new Chart(canvas, config);
+    return canvas._chartInstance;
+  }
+
+  function createDashboardCharts() {
+    const total = dashGetNum('dashTotalProjects', 49);
+    const awaiting = dashGetNum('dashAwaitingReview', 8);
+    const underEvaluation = dashGetNum('dashUnderEvaluation', 6);
+    const accepted = dashGetNum('dashAccepted', 27);
+    const rejected = dashGetNum('dashRejected', 4);
+
+    const green = '#2e7d42';
+    const lightGreen = '#7ac58a';
+    const yellow = '#c58a17';
+    const red = '#b42318';
+    const teal = '#0f766e';
+    const gray = '#64748b';
+
+    dashCreateChart('dashStatusChart', {
+      type: 'doughnut',
+      data: {
+        labels: ['Accepted / Archived', 'Awaiting Review', 'Under Evaluation', 'Rejected'],
+        datasets: [{
+          data: [accepted, awaiting, underEvaluation, rejected],
+          backgroundColor: [green, yellow, teal, red],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+
+    dashCreateChart('dashTypeChart', {
+      type: 'bar',
+      data: {
+        labels: ['Web', 'Mobile', 'AI', 'Security', 'Database', 'Other'],
+        datasets: [{
+          label: 'Projects',
+          data: [12, 8, 10, 5, 7, 4],
+          backgroundColor: [green, lightGreen, teal, yellow, gray, '#173b24'],
+          borderRadius: 10
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0
+            }
+          }
+        }
+      }
+    });
+
+    dashCreateChart('dashReviewBarChart', {
+      type: 'bar',
+      data: {
+        labels: ['Awaiting', 'Evaluation', 'Accepted', 'Rejected'],
+        datasets: [{
+          label: 'Projects',
+          data: [awaiting, underEvaluation, accepted, rejected],
+          backgroundColor: [yellow, teal, green, red],
+          borderRadius: 10
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0
+            }
+          }
+        }
+      }
+    });
+  }
+
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    createDashboardCharts();
+
+    setTimeout(createDashboardCharts, 600);
+    setTimeout(createDashboardCharts, 1200);
+
+    setTimeout(resetDashboardScroll, 0);
+    setTimeout(resetDashboardScroll, 100);
+  });
+
+  window.addEventListener('load', function () {
+    createDashboardCharts();
+    setTimeout(createDashboardCharts, 800);
+  });
+</script>
 {% endblock %}

@@ -6,7 +6,6 @@
 
 {% block content %}
 <style>
-  .notif-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;align-items:start}
   .notif-card{background:#fff;border:1px solid #e6ece8;border-radius:18px;box-shadow:0 10px 28px rgba(16,24,40,.06);overflow:hidden}
   .notif-card-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:1px solid #edf2ef}
   .notif-card-title{font-size:18px;font-weight:800;color:#173b24}.notif-card-sub{font-size:12px;color:#6b7280;margin-top:3px}.notif-body{padding:16px 18px}
@@ -21,69 +20,74 @@
   .notif-tabs{display:flex;gap:8px;padding:12px 18px 0}.notif-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;padding:8px 12px;border-radius:999px;font-weight:800;cursor:pointer}.notif-tab.on{background:#2e7d42;color:#fff;border-color:#2e7d42}
   .notif-empty{padding:22px;border:1px dashed #cddbd2;border-radius:14px;color:#667085;text-align:center;background:#fbfdfb}.notif-toast{position:fixed;right:22px;bottom:22px;z-index:50;background:#111827;color:white;padding:12px 14px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.22);display:none;max-width:360px}
   .notice-preview{border-left:5px solid #2e7d42;background:#f7fbf8;border-radius:14px;padding:13px 14px;margin-top:8px}.notice-preview-title{font-weight:900;color:#163b24;margin-bottom:8px}.notice-preview-body{font-size:13px;color:#344054;line-height:1.55;white-space:pre-wrap}.notice-preview-hl{color:#b42318;font-weight:900;margin-top:8px}
-  @media(max-width:980px){.notif-grid{grid-template-columns:1fr}.notif-form-grid{grid-template-columns:1fr}}
+  .main-notif-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.main-notif-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;padding:10px 14px;border-radius:999px;font-weight:900;cursor:pointer}.main-notif-tab.on{background:#2e7d42;color:#fff;border-color:#2e7d42}.notif-tab-pane{display:none}.notif-tab-pane.active{display:block}
+  @media(max-width:980px){ .notif-form-grid{grid-template-columns:1fr} }
 </style>
 
 <div class="page page-single on" id="pg-notifs">
-  <div class="notif-grid">
-    <section class="notif-card">
-      <div class="notif-card-hd"><div><div class="notif-card-title">Send Message</div><div class="notif-card-sub">Send to Head of Department, doctors, all sections, one section, one doctor, or one student.</div></div></div>
-      <div class="notif-body">
-        <form id="notifSendForm">
-          <div class="notif-form-grid">
-            <div class="notif-field"><label for="notifScope">Send to</label><select id="notifScope" required><option value="">Choose receiver...</option><option value="head">Head of Department</option><option value="doctors">All Doctors / Supervisors</option><option value="all_sections">All Sections</option><option value="doctor">One Doctor</option><option value="section">One Section</option><option value="student">One Student</option></select></div>
-            <div class="notif-field" id="notifSpecificWrap" style="display:none;"><label for="notifSpecific">Choose specific receiver</label><select id="notifSpecific"></select></div>
-          </div>
-          <div class="notif-field">
-            <label for="notifCourseScope">Message for</label>
-            <select id="notifCourseScope" required>
-              <option value="introduction">Project Introduction / COMP4200</option>
-              <option value="graduation_project">Graduation Project / COMP4300</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          <div class="notif-field"><label for="notifTitle">Title</label><input id="notifTitle" placeholder="Example: Committee meeting reminder" maxlength="250" required></div>
-          <div class="notif-field"><label for="notifMessage">Message</label><textarea id="notifMessage" placeholder="Write your message here..." required></textarea></div>
-          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#344054;"><input type="checkbox" id="notifUrgent"> Mark as urgent</label>
-          <div class="notif-actions"><button class="notif-btn secondary" type="reset">Clear</button><button class="notif-btn" type="submit">Send Message</button></div>
-        </form>
-      </div>
-    </section>
-
-    <section class="notif-card">
-      <div class="notif-card-hd"><div><div class="notif-card-title">Messages</div><div class="notif-card-sub">Inbox receives messages from Head of Department, supervisors, and students.</div></div><button class="notif-btn secondary" id="markAllReadBtn" type="button">Mark All Read</button></div>
-      <div class="notif-tabs"><button class="notif-tab on" type="button" data-tab="inbox">Inbox</button><button class="notif-tab" type="button" data-tab="sent">Sent</button></div>
-      <div class="notif-body"><div id="notifList" class="notif-list"><div class="notif-empty">Loading messages...</div></div></div>
-    </section>
-
-    <section class="notif-card" style="grid-column:1 / -1;">
-      <div class="notif-card-hd"><div><div class="notif-card-title">Important Notice on Login Screen</div><div class="notif-card-sub">This updates the notice shown on the main login screen in your screenshot.</div></div></div>
-      <div class="notif-body">
-        <form id="noticeForm">
-          <div class="notif-form-grid">
-            <div class="notif-field"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="250" placeholder="Important Notice — APMS System" required></div>
-            <div class="notif-field"><label for="noticeHighlight">Highlight / deadline text</label><input id="noticeHighlight" maxlength="150" placeholder="Example: Deadline: 15/2/2026"></div>
-          </div>
-          <div class="notif-field">
-            <label for="noticeCourseScope">Notice for</label>
-            <select id="noticeCourseScope" required>
-              <option value="introduction">Project Introduction / COMP4200</option>
-              <option value="graduation_project">Graduation Project / COMP4300</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          <div class="notif-field"><label for="noticeBody">Notice body</label><textarea id="noticeBody" placeholder="Write the notice that students, supervisors, and head will see before login..." required></textarea></div>
-          <div class="notif-form-grid">
-            <div class="notif-field"><label for="noticeBtn1">Button 1 text</label><input id="noticeBtn1" placeholder="ⓘ How does the system work?"></div>
-            <div class="notif-field"><label for="noticeBtn2">Button 2 text</label><input id="noticeBtn2" placeholder="⬆ Project Upload Guide"></div>
-          </div>
-          <div class="notif-field"><label for="noticeBtn3">Button 3 text</label><input id="noticeBtn3" placeholder="⚙ Roles & Permissions"></div>
-          <div class="notice-preview"><div class="notice-preview-title" id="noticePreviewTitle">Important Notice — APMS System</div><div class="notice-preview-body" id="noticePreviewBody">Preview will appear here.</div><div class="notice-preview-hl" id="noticePreviewHl"></div></div>
-          <div class="notif-actions"><button class="notif-btn secondary" type="button" id="reloadNoticeBtn">Reload Current</button><button class="notif-btn" type="submit">Update Login Notice</button></div>
-        </form>
-      </div>
-    </section>
+  <div class="main-notif-tabs">
+    <button class="main-notif-tab on" type="button" data-main-tab="send">Send Message</button>
+    <button class="main-notif-tab" type="button" data-main-tab="messages">Messages</button>
+    <button class="main-notif-tab" type="button" data-main-tab="notice">Important Notice</button>
   </div>
+
+  <section class="notif-card notif-tab-pane active" id="tab-send">
+    <div class="notif-card-hd"><div><div class="notif-card-title">Send Message</div><div class="notif-card-sub">Send to Head of Department, doctors, all sections, one section, one doctor, or one student.</div></div></div>
+    <div class="notif-body">
+      <form id="notifSendForm">
+        <div class="notif-form-grid">
+          <div class="notif-field"><label for="notifScope">Send to</label><select id="notifScope" required><option value="">Choose receiver...</option><option value="head">Head of Department</option><option value="doctors">All Doctors / Supervisors</option><option value="all_sections">All Sections</option><option value="doctor">One Doctor</option><option value="section">One Section</option><option value="student">One Student</option></select></div>
+          <div class="notif-field" id="notifSpecificWrap" style="display:none;"><label for="notifSpecific">Choose specific receiver</label><select id="notifSpecific"></select></div>
+        </div>
+        <div class="notif-field">
+          <label for="notifCourseScope">Message for</label>
+          <select id="notifCourseScope" required>
+            <option value="introduction">Project Introduction / COMP4200</option>
+            <option value="graduation_project">Graduation Project / COMP4300</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+        <div class="notif-field"><label for="notifTitle">Title</label><input id="notifTitle" placeholder="Example: Committee meeting reminder" maxlength="250" required></div>
+        <div class="notif-field"><label for="notifMessage">Message</label><textarea id="notifMessage" placeholder="Write your message here..." required></textarea></div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#344054;"><input type="checkbox" id="notifUrgent"> Mark as urgent</label>
+        <div class="notif-actions"><button class="notif-btn secondary" type="reset">Clear</button><button class="notif-btn" type="submit">Send Message</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="notif-card notif-tab-pane" id="tab-messages">
+    <div class="notif-card-hd"><div><div class="notif-card-title">Messages</div><div class="notif-card-sub">Inbox receives messages from Head of Department, supervisors, and students.</div></div><button class="notif-btn secondary" id="markAllReadBtn" type="button">Mark All Read</button></div>
+    <div class="notif-tabs"><button class="notif-tab on" type="button" data-tab="inbox">Inbox</button><button class="notif-tab" type="button" data-tab="sent">Sent</button></div>
+    <div class="notif-body"><div id="notifList" class="notif-list"><div class="notif-empty">Loading messages...</div></div></div>
+  </section>
+
+  <section class="notif-card notif-tab-pane" id="tab-notice">
+    <div class="notif-card-hd"><div><div class="notif-card-title">Important Notice on Login Screen</div><div class="notif-card-sub">This updates the notice shown on the main login screen.</div></div></div>
+    <div class="notif-body">
+      <form id="noticeForm">
+        <div class="notif-form-grid">
+          <div class="notif-field"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="250" placeholder="Important Notice — APMS System" required></div>
+          <div class="notif-field"><label for="noticeHighlight">Highlight / deadline text</label><input id="noticeHighlight" maxlength="150" placeholder="Example: Deadline: 15/2/2026"></div>
+        </div>
+        <div class="notif-field">
+          <label for="noticeCourseScope">Notice for</label>
+          <select id="noticeCourseScope" required>
+            <option value="introduction">Project Introduction / COMP4200</option>
+            <option value="graduation_project">Graduation Project / COMP4300</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+        <div class="notif-field"><label for="noticeBody">Notice body</label><textarea id="noticeBody" placeholder="Write the notice that students, supervisors, and head will see before login..." required></textarea></div>
+        <div class="notif-form-grid">
+          <div class="notif-field"><label for="noticeBtn1">Button 1 text</label><input id="noticeBtn1" placeholder="ⓘ How does the system work?"></div>
+          <div class="notif-field"><label for="noticeBtn2">Button 2 text</label><input id="noticeBtn2" placeholder="⬆ Project Upload Guide"></div>
+        </div>
+        <div class="notif-field"><label for="noticeBtn3">Button 3 text</label><input id="noticeBtn3" placeholder="⚙ Roles & Permissions"></div>
+        <div class="notice-preview"><div class="notice-preview-title" id="noticePreviewTitle">Important Notice — APMS System</div><div class="notice-preview-body" id="noticePreviewBody">Preview will appear here.</div><div class="notice-preview-hl" id="noticePreviewHl"></div></div>
+        <div class="notif-actions"><button class="notif-btn secondary" type="button" id="reloadNoticeBtn">Reload Current</button><button class="notif-btn" type="submit">Update Login Notice</button></div>
+      </form>
+    </div>
+  </section>
 </div>
 
 <div class="notif-toast" id="notifToast"></div>
@@ -94,6 +98,15 @@
   const $ = (id) => document.getElementById(id);
   const list = $('notifList');
   const toast = $('notifToast');
+
+  function showMainTab(tabName){
+    document.querySelectorAll('.main-notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.mainTab === tabName));
+    document.querySelectorAll('.notif-tab-pane').forEach(pane => pane.classList.remove('active'));
+    const pane = document.getElementById(`tab-${tabName}`);
+    if(pane) pane.classList.add('active');
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('.main-notif-tab').forEach(btn => btn.addEventListener('click', () => showMainTab(btn.dataset.mainTab)));
 
   function showToast(message, isError = false){ toast.textContent = message; toast.style.background = isError ? '#991b1b' : '#111827'; toast.style.display = 'block'; setTimeout(() => toast.style.display = 'none', 3200); }
   async function fetchJSON(url, options = {}){
@@ -138,7 +151,7 @@
   }
 
   $('notifScope').addEventListener('change', updateSpecificReceiver);
-  $('notifSendForm').addEventListener('submit', async (event) => { event.preventDefault(); const scope = $('notifScope').value; const payload = { scope, value: ['doctor','student','section'].includes(scope) ? $('notifSpecific').value : null, course_scope: $('notifCourseScope').value, title: $('notifTitle').value.trim(), message: $('notifMessage').value.trim(), urgent: $('notifUrgent').checked }; try{ const data = await fetchJSON('/api/coordinator/notifications/send', { method:'POST', body:JSON.stringify(payload) }); showToast(data.message || 'Message sent successfully.'); $('notifSendForm').reset(); updateSpecificReceiver(); state.currentTab = 'sent'; document.querySelectorAll('.notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.tab === 'sent')); await loadMessages(); } catch(err){ showToast(err.message, true); } });
+  $('notifSendForm').addEventListener('submit', async (event) => { event.preventDefault(); const scope = $('notifScope').value; const payload = { scope, value: ['doctor','student','section'].includes(scope) ? $('notifSpecific').value : null, course_scope: $('notifCourseScope').value, title: $('notifTitle').value.trim(), message: $('notifMessage').value.trim(), urgent: $('notifUrgent').checked }; try{ const data = await fetchJSON('/api/coordinator/notifications/send', { method:'POST', body:JSON.stringify(payload) }); showToast(data.message || 'Message sent successfully.'); $('notifSendForm').reset(); updateSpecificReceiver(); state.currentTab = 'sent'; document.querySelectorAll('.notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.tab === 'sent')); showMainTab('messages'); await loadMessages(); } catch(err){ showToast(err.message, true); } });
   document.querySelectorAll('.notif-tab').forEach(btn => btn.addEventListener('click', () => { state.currentTab = btn.dataset.tab; document.querySelectorAll('.notif-tab').forEach(b => b.classList.toggle('on', b === btn)); loadMessages(); }));
   list.addEventListener('click', async (event) => { const btn = event.target.closest('[data-read]'); if(!btn) return; try{ await fetchJSON(`/api/coordinator/notifications/${btn.dataset.read}/read`, { method:'POST' }); await loadMessages(); } catch(err){ showToast(err.message, true); } });
   $('markAllReadBtn').addEventListener('click', async () => { try{ await fetchJSON('/api/coordinator/notifications/read-all', { method:'POST' }); showToast('All messages marked as read.'); await loadMessages(); } catch(err){ showToast(err.message, true); } });
