@@ -29,6 +29,10 @@
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">schedule</span></span>
       <span class="sb-label">Project Status</span>
     </a>
+    <a class="sb-item {% if request.path == '/student/timeline' %}on{% endif %}" data-page="timeline" href="/student/timeline">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">timeline</span></span>
+      <span class="sb-label">Student Timeline</span>
+    </a>
     <a class="sb-item {% if request.path == '/student/feedback' %}on{% endif %}" data-page="feedback" href="/student/feedback">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">reviews</span></span>
       <span class="sb-label">Feedback</span>

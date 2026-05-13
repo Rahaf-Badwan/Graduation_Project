@@ -7,9 +7,18 @@
 {% block content %}
 <div class="page page-single on" id="pg-exams">
 
+<style>
+  /* Keep the Exam Distribution tab content directly under the tabs */
+  #pg-exams { min-height: auto !important; padding-top: 20px; }
+  #pg-exams .tab-bar { margin-bottom: 14px !important; }
+  #examProfessors, #examSummary, #introTimeline { margin-top: 0 !important; }
+  #introTimeline .card { margin-top: 0 !important; }
+</style>
+
 <div class="tab-bar" style="margin-bottom:16px;">
   <button class="tab on" type="button" onclick="showExamSection('examProfessors',this)">Professors Distribution</button>
   <button class="tab" type="button" onclick="showExamSection('examSummary',this)">Summary & Timetable</button>
+  <button class="tab" type="button" onclick="showExamSection('introTimeline',this)">COMP4200 Timeline</button>
 </div>
 
 <div id="examProfessors">
@@ -173,19 +182,179 @@ type="button">Confirm Distribution ↗</button>
 
 </div>
 
+
+<div id="introTimeline" style="display:none;">
+  <div class="card">
+    <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <span class="card-title">Project Introduction Timeline Builder</span>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+          Design the COMP4200 student timeline here. After publishing, students will see it in their Student Timeline page and receive a notification.
+        </div>
+      </div>
+      <span class="pill p-review" id="timelinePublishState">Draft</span>
+    </div>
+
+    <div class="u-343f9d13" style="margin-bottom:14px;">
+      Use this tab for <b>Project Introduction</b> milestones, submissions, and deadlines. The student submission link opens on the Start date and closes after the Deadline date. Items marked as deadline will also appear in the students’ dashboard upcoming deadlines.
+    </div>
+
+    <form id="introTimelineForm" onsubmit="return false;">
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--color-text-primary);display:block;margin-bottom:6px">Timeline Title</label>
+          <input id="timelineTitle" type="text" value="Project Introduction Timeline" style="width:100%;padding:10px 12px;border:1px solid var(--color-border-tertiary);border-radius:10px;background:#fff;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:var(--color-text-primary);display:block;margin-bottom:6px">Status</label>
+          <div id="timelineMeta" style="padding:10px 12px;border:1px solid var(--color-border-tertiary);border-radius:10px;background:var(--color-bg-secondary);font-size:12px;color:var(--color-text-secondary);min-height:40px">Loading...</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;font-weight:700;color:var(--color-text-primary);display:block;margin-bottom:6px">Note to students</label>
+        <textarea id="timelineNote" rows="3" placeholder="Example: Please follow the timeline and check with your supervisor weekly." style="width:100%;padding:10px 12px;border:1px solid var(--color-border-tertiary);border-radius:10px;background:#fff;resize:vertical"></textarea>
+      </div>
+
+      <div class="btn-row" style="margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn btn-outline" type="button" onclick="addTimelineRow()">+ Add Milestone</button>
+        <button class="btn btn-outline" type="button" onclick="loadDefaultTimeline()">Load COMP4200 Sample</button>
+        <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(false)">Save Draft</button>
+        <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(true)">Save & Publish to Students</button>
+      </div>
+
+      <div style="overflow:auto;border:1px solid var(--color-border-tertiary);border-radius:14px;">
+        <table style="width:100%;border-collapse:collapse;min-width:980px;background:#fff;">
+          <thead>
+            <tr style="background:var(--color-bg-secondary);font-size:12px;color:var(--color-text-secondary);text-align:left;">
+              <th style="padding:10px;width:52px">#</th>
+              <th style="padding:10px;width:180px">Title</th>
+              <th style="padding:10px;width:260px">Description</th>
+              <th style="padding:10px;width:125px">Open submission</th>
+              <th style="padding:10px;width:125px">Close / Deadline</th>
+              <th style="padding:10px;width:160px">Milestone / Submission</th>
+              <th style="padding:10px;width:90px">Deadline?</th>
+              <th style="padding:10px;width:80px">Action</th>
+            </tr>
+          </thead>
+          <tbody id="timelineRows"></tbody>
+        </table>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 function showExamSection(id,btn){
-document.getElementById('examProfessors').style.display='none';
-document.getElementById('examSummary').style.display='none';
+  ['examProfessors','examSummary','introTimeline'].forEach(sectionId => {
+    const section = document.getElementById(sectionId);
+    if (section) section.style.display = 'none';
+  });
 
-document.getElementById(id).style.display='block';
+  const selected = document.getElementById(id);
+  if (selected) selected.style.display = 'block';
 
-document.querySelectorAll('#pg-exams > .tab-bar .tab').forEach(tab=>{
-tab.classList.remove('on');
+  document.querySelectorAll('#pg-exams > .tab-bar .tab').forEach(tab => {
+    tab.classList.remove('on');
+  });
+
+  if (btn) btn.classList.add('on');
+
+  // Important: reset the inner page scroll so the selected tab starts at the top,
+  // not at the old scroll position from another section.
+  const scroller = document.querySelector('.content-area');
+  if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+const defaultIntroTimeline = [
+  {title:'Project idea and scope', description:'Agree on weekly supervisor appointments, define the main project idea, and agree on the initial scope.', start_date:'2025-09-29', due_date:'2025-10-20', milestone_label:'Milestone 1'},
+  {title:'Related work summary', description:'Identify relevant articles, previous work, and similar apps. Submit a summary report to the supervisor.', start_date:'2025-10-21', due_date:'2025-11-01', milestone_label:'Summary report (to supervisor)'},
+  {title:'Finalize features and proposal start', description:'Finalize main features and scope, then start writing the project proposal.', start_date:'2025-11-01', due_date:'2025-11-07', milestone_label:'Proposed Idea (to supervisor)'},
+  {title:'Tools and software selection', description:'Identify development tools/software, explain their advantages, and how they will be used.', start_date:'2025-11-07', due_date:'2025-11-13', milestone_label:'Tools section'},
+  {title:'Detailed proposal submission', description:'Submit the project proposal to the supervisor and electronic copy to the course coordinator using the template.', start_date:'2025-11-13', due_date:'2025-11-20', milestone_label:'Detailed Proposal (to Course Coordinator)'},
+  {title:'Learn implementation tools', description:'Learn the software and tools needed for the project implementation.', start_date:'2025-11-20', due_date:'2025-11-28', milestone_label:'Learning tools'},
+  {title:'System requirements', description:'Specify functional and non-functional requirements, use case descriptions, and use case diagram.', start_date:'2025-11-21', due_date:'2025-12-03', milestone_label:'Requirements'},
+  {title:'System analysis', description:'Provide conceptual system models including class diagrams, sequence diagrams, and state chart diagrams.', start_date:'2025-12-03', due_date:'2025-12-13', milestone_label:'Analysis models'},
+  {title:'System design', description:'Describe high-level architecture, subsystems, and deployment diagram.', start_date:'2025-12-14', due_date:'2025-12-31', milestone_label:'Design'},
+  {title:'Progress report writing', description:'Start writing and finalizing the COMP4200 progress report.', start_date:'2026-01-01', due_date:'2026-01-12', milestone_label:'Progress report'},
+  {title:'Turnitin report', description:'Generate the Turnitin report.', start_date:'2026-01-12', due_date:'2026-01-14', milestone_label:'Turnitin Report'},
+  {title:'Supervisor report review', description:'Review the report with your supervisor.', start_date:'2026-01-14', due_date:'2026-01-22', milestone_label:'Supervisor Review'},
+  {title:'Final report submission', description:'Submit the final report to the department.', start_date:'', due_date:'2026-01-22', milestone_label:'Graduation Report'}
+];
+
+function escAttr(value){ return String(value || '').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+function timelineRowTemplate(item, index){
+  return `<tr data-row="timeline" style="border-top:1px solid var(--color-border-tertiary);">
+    <td style="padding:8px"><input class="tl-order" type="number" min="1" value="${item.item_order || index + 1}" style="width:48px;padding:8px;border:1px solid var(--color-border-tertiary);border-radius:8px"></td>
+    <td style="padding:8px"><input class="tl-title" value="${escAttr(item.title)}" placeholder="Milestone title" style="width:100%;padding:8px;border:1px solid var(--color-border-tertiary);border-radius:8px"></td>
+    <td style="padding:8px"><textarea class="tl-desc" rows="2" placeholder="Description" style="width:100%;padding:8px;border:1px solid var(--color-border-tertiary);border-radius:8px;resize:vertical">${escAttr(item.description)}</textarea></td>
+    <td style="padding:8px"><input class="tl-start" type="date" value="${escAttr(item.start_date)}" style="width:100%;padding:8px;border:1px solid var(--color-border-tertiary);border-radius:8px"></td>
+    <td style="padding:8px"><input class="tl-due" type="date" value="${escAttr(item.due_date)}" style="width:100%;padding:8px;border:1px solid var(--color-border-tertiary);border-radius:8px"></td>
+    <td style="padding:8px"><input class="tl-label" value="${escAttr(item.milestone_label)}" placeholder="Optional" style="width:100%;padding:8px;border:1px solid var(--color-border-tertiary);border-radius:8px"></td>
+    <td style="padding:8px;text-align:center"><input class="tl-deadline" type="checkbox" ${item.is_deadline === false ? '' : 'checked'}></td>
+    <td style="padding:8px"><button class="btn btn-outline" type="button" onclick="this.closest('tr').remove(); renumberTimelineRows();" style="padding:7px 9px">Delete</button></td>
+  </tr>`;
+}
+function renderTimelineRows(items){ document.getElementById('timelineRows').innerHTML = (items || []).map((item, idx) => timelineRowTemplate(item, idx)).join(''); }
+function renumberTimelineRows(){ document.querySelectorAll('#timelineRows .tl-order').forEach((el, i)=>{ if(!el.value) el.value = i + 1; }); }
+function addTimelineRow(item){ const body = document.getElementById('timelineRows'); body.insertAdjacentHTML('beforeend', timelineRowTemplate(item || {is_deadline:true}, body.querySelectorAll('tr').length)); }
+function loadDefaultTimeline(){ renderTimelineRows(defaultIntroTimeline); }
+function collectTimelineItems(){
+  return Array.from(document.querySelectorAll('#timelineRows tr')).map((row, idx) => ({
+    item_order: Number(row.querySelector('.tl-order').value || idx + 1),
+    title: row.querySelector('.tl-title').value.trim(),
+    description: row.querySelector('.tl-desc').value.trim(),
+    start_date: row.querySelector('.tl-start').value,
+    due_date: row.querySelector('.tl-due').value,
+    milestone_label: row.querySelector('.tl-label').value.trim(),
+    is_deadline: row.querySelector('.tl-deadline').checked
+  }));
+}
+async function timelineFetch(url, options){
+  const res = await fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, options || {}));
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.error) throw new Error(data.error || 'Timeline request failed.');
+  return data;
+}
+function updateTimelineMeta(timeline){
+  const state = document.getElementById('timelinePublishState');
+  const meta = document.getElementById('timelineMeta');
+  if(!timeline){ state.textContent = 'Draft'; meta.textContent = 'Not published yet'; return; }
+  state.textContent = timeline.is_published ? 'Published' : 'Draft';
+  meta.textContent = timeline.is_published ? `Published at ${timeline.published_at || '—'}` : 'Draft saved — not visible to students yet';
+}
+async function loadIntroTimeline(){
+  try{
+    const data = await timelineFetch('/api/coordinator/intro-timeline');
+    document.getElementById('timelineTitle').value = data.timeline?.title || 'Project Introduction Timeline';
+    document.getElementById('timelineNote').value = data.timeline?.note || '';
+    renderTimelineRows((data.items && data.items.length) ? data.items : defaultIntroTimeline);
+    updateTimelineMeta(data.timeline);
+  }catch(err){ document.getElementById('timelineMeta').textContent = err.message; renderTimelineRows(defaultIntroTimeline); }
+}
+async function saveIntroTimeline(publishAfter){
+  try{
+    const payload = {title:document.getElementById('timelineTitle').value.trim(), note:document.getElementById('timelineNote').value.trim(), items:collectTimelineItems()};
+    const saved = await timelineFetch('/api/coordinator/intro-timeline', {method:'POST', body:JSON.stringify(payload)});
+    if(publishAfter){
+      const published = await timelineFetch('/api/coordinator/intro-timeline/publish', {method:'POST', body:JSON.stringify({})});
+      updateTimelineMeta(published.timeline);
+      alert(published.message || 'Timeline published.');
+    }else{
+      updateTimelineMeta(saved.timeline);
+      alert(saved.message || 'Timeline saved.');
+    }
+  }catch(err){ alert(err.message); }
+}
+window.addEventListener('load', () => {
+  const scroller = document.querySelector('.content-area');
+  if (scroller) scroller.scrollTop = 0;
+  window.scrollTo(0, 0);
 });
 
-btn.classList.add('on');
-}
+loadIntroTimeline();
+
 </script>
 
 {% endblock %}

@@ -3663,3 +3663,94 @@ FROM projects p
 WHERE p.title='CampusConnect University Network' AND p.status='archived'
 AND NOT EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.project_id AND pf.file_type='final_report')
 LIMIT 1;
+-- ============================================================
+-- COMP4200 Project Introduction Timeline Builder
+-- Coordinator creates timeline in Exam Distribution page and publishes it to students.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS comp4200_timelines (
+    timeline_id  INT PRIMARY KEY AUTO_INCREMENT,
+    semester_id  INT NOT NULL UNIQUE,
+    title        VARCHAR(180) NOT NULL DEFAULT 'Project Introduction Timeline',
+    note         TEXT NULL,
+    is_published BOOLEAN NOT NULL DEFAULT FALSE,
+    published_at DATETIME NULL,
+    created_by   INT NULL,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by)  REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS comp4200_timeline_items (
+    item_id         INT PRIMARY KEY AUTO_INCREMENT,
+    timeline_id     INT NOT NULL,
+    item_order      INT NOT NULL DEFAULT 1,
+    title           VARCHAR(180) NOT NULL,
+    description     TEXT NULL,
+    start_date      DATE NULL,
+    due_date        DATE NOT NULL,
+    milestone_label VARCHAR(180) NULL,
+    is_deadline     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (timeline_id) REFERENCES comp4200_timelines(timeline_id) ON DELETE CASCADE,
+    INDEX idx_comp4200_timeline_items_due (due_date),
+    INDEX idx_comp4200_timeline_items_order (timeline_id, item_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS comp4200_timelines (
+    timeline_id  INT PRIMARY KEY AUTO_INCREMENT,
+    semester_id  INT NOT NULL UNIQUE,
+    title        VARCHAR(180) NOT NULL DEFAULT 'Project Introduction Timeline',
+    note         TEXT NULL,
+    is_published BOOLEAN NOT NULL DEFAULT FALSE,
+    published_at DATETIME NULL,
+    created_by   INT NULL,
+    updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by)  REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS comp4200_timeline_items (
+    item_id         INT PRIMARY KEY AUTO_INCREMENT,
+    timeline_id     INT NOT NULL,
+    item_order      INT NOT NULL DEFAULT 1,
+    title           VARCHAR(180) NOT NULL,
+    description     TEXT NULL,
+    start_date      DATE NULL,
+    due_date        DATE NOT NULL,
+    milestone_label VARCHAR(180) NULL,
+    is_deadline     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (timeline_id) REFERENCES comp4200_timelines(timeline_id) ON DELETE CASCADE,
+    INDEX idx_comp4200_timeline_items_due (due_date),
+    INDEX idx_comp4200_timeline_items_order (timeline_id, item_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+
+
+
+
+
+-- ============================================================
+-- APMS Section Results Migration
+-- Coordinator marks Project Introduction sections and Graduation Project groups.
+-- Only succeeded sections appear for the Head of Department.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS section_completion_status (
+    status_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    reference_id INT NOT NULL,
+    status ENUM('pending','succeeded','not_succeeded') NOT NULL DEFAULT 'pending',
+    notes TEXT NULL,
+    marked_by INT NULL,
+    marked_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_section_completion (course_scope, reference_id),
+    INDEX idx_section_completion_status (status),
+    INDEX idx_section_completion_scope_status (course_scope, status),
+    FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

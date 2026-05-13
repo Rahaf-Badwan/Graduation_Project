@@ -249,6 +249,7 @@ COORDINATOR_PAGES = {
     "committee": "coordinator/committee.html",
     "evaluation": "coordinator/evaluation.html",
     "lectures": "coordinator/lectures.html",
+    "sections": "coordinator/sections.html",
     "exams": "coordinator/exams.html",
     "search": "shared/archive_search.html",
     "notifs": "coordinator/notifs.html",
@@ -754,6 +755,268 @@ def api_coordinator_important_notice_save():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+
+# ─── COMP4200 Introduction Timeline ─────────────────────────────────────
+def _ensure_intro_timeline_tables(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS comp4200_timelines (
+            timeline_id INT PRIMARY KEY AUTO_INCREMENT,
+            semester_id INT NOT NULL UNIQUE,
+            title VARCHAR(180) NOT NULL DEFAULT 'Project Introduction Timeline',
+            note TEXT NULL,
+            is_published BOOLEAN NOT NULL DEFAULT FALSE,
+            published_at DATETIME NULL,
+            created_by INT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS comp4200_timeline_items (
+            item_id INT PRIMARY KEY AUTO_INCREMENT,
+            timeline_id INT NOT NULL,
+            item_order INT NOT NULL DEFAULT 1,
+            title VARCHAR(180) NOT NULL,
+            description TEXT NULL,
+            start_date DATE NULL,
+            due_date DATE NOT NULL,
+            milestone_label VARCHAR(180) NULL,
+            is_deadline BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (timeline_id) REFERENCES comp4200_timelines(timeline_id) ON DELETE CASCADE,
+            INDEX idx_comp4200_timeline_items_due (due_date),
+            INDEX idx_comp4200_timeline_items_order (timeline_id, item_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
+
+def _get_or_create_intro_timeline(cursor, semester_id, user_id=None):
+    _ensure_intro_timeline_tables(cursor)
+    cursor.execute(
+        """
+        SELECT timeline_id, semester_id, title, note, is_published, published_at, updated_at
+        FROM comp4200_timelines
+        WHERE semester_id = %s
+        LIMIT 1
+        """,
+        (semester_id,),
+    )
+    timeline = cursor.fetchone()
+    if timeline:
+        return timeline
+    cursor.execute(
+        """
+        INSERT INTO comp4200_timelines (semester_id, title, note, created_by)
+        VALUES (%s, 'Project Introduction Timeline', 'Timeline for COMP4200 students.', %s)
+        """,
+        (semester_id, user_id),
+    )
+    timeline_id = cursor.lastrowid
+    return {
+        "timeline_id": timeline_id,
+        "semester_id": semester_id,
+        "title": "Project Introduction Timeline",
+        "note": "Timeline for COMP4200 students.",
+        "is_published": False,
+        "published_at": None,
+        "updated_at": None,
+    }
+
+
+def _intro_timeline_payload(cursor, semester_id, user_id=None, students_only=False):
+    timeline = _get_or_create_intro_timeline(cursor, semester_id, user_id)
+    if students_only and not bool(timeline.get("is_published")):
+        return {"timeline": None, "items": []}
+    cursor.execute(
+        """
+        SELECT item_id, item_order, title, description, start_date, due_date, milestone_label, is_deadline
+        FROM comp4200_timeline_items
+        WHERE timeline_id = %s
+        ORDER BY item_order ASC, due_date ASC, item_id ASC
+        """,
+        (timeline["timeline_id"],),
+    )
+    items = cursor.fetchall()
+    for item in items:
+        item["is_deadline"] = bool(item.get("is_deadline"))
+    timeline["is_published"] = bool(timeline.get("is_published"))
+    return {"timeline": timeline, "items": items}
+
+
+@coordinator_bp.route("/api/coordinator/intro-timeline", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_intro_timeline_get():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester(cursor)
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active semester found."}), 400
+        payload = _intro_timeline_payload(cursor, semester["semester_id"], session.get("user_id"))
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value(payload))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/intro-timeline", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_intro_timeline_save():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "Project Introduction Timeline").strip()
+    note = (data.get("note") or "").strip() or None
+    items = data.get("items") or []
+    if not title:
+        return jsonify({"error": "Timeline title is required."}), 400
+    if not items:
+        return jsonify({"error": "Add at least one timeline item."}), 400
+
+    clean_items = []
+    for index, item in enumerate(items, start=1):
+        item_title = (item.get("title") or "").strip()
+        due_date = (item.get("due_date") or "").strip()
+        if not item_title or not due_date:
+            return jsonify({"error": f"Item #{index} must have a title and due date."}), 400
+        start_date = (item.get("start_date") or "").strip() or None
+        description = (item.get("description") or "").strip() or None
+        milestone_label = (item.get("milestone_label") or "").strip() or None
+        try:
+            if start_date:
+                datetime.strptime(start_date, "%Y-%m-%d")
+            datetime.strptime(due_date, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": f"Item #{index} has an invalid date. Use YYYY-MM-DD."}), 400
+        clean_items.append({
+            "order": int(item.get("item_order") or index),
+            "title": item_title,
+            "description": description,
+            "start_date": start_date,
+            "due_date": due_date,
+            "milestone_label": milestone_label,
+            "is_deadline": bool(item.get("is_deadline", True)),
+        })
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester(cursor)
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active semester found."}), 400
+        timeline = _get_or_create_intro_timeline(cursor, semester["semester_id"], session.get("user_id"))
+        cursor.execute(
+            """
+            UPDATE comp4200_timelines
+            SET title = %s, note = %s, created_by = %s
+            WHERE timeline_id = %s
+            """,
+            (title, note, session.get("user_id"), timeline["timeline_id"]),
+        )
+        cursor.execute("DELETE FROM comp4200_timeline_items WHERE timeline_id = %s", (timeline["timeline_id"],))
+        for item in clean_items:
+            cursor.execute(
+                """
+                INSERT INTO comp4200_timeline_items
+                    (timeline_id, item_order, title, description, start_date, due_date, milestone_label, is_deadline)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    timeline["timeline_id"], item["order"], item["title"], item["description"],
+                    item["start_date"], item["due_date"], item["milestone_label"], item["is_deadline"],
+                ),
+            )
+        db.commit()
+        payload = _intro_timeline_payload(cursor, semester["semester_id"], session.get("user_id"))
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value({"message": "Timeline saved successfully.", **payload}))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/intro-timeline/publish", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_intro_timeline_publish():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester(cursor)
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active semester found."}), 400
+        timeline = _get_or_create_intro_timeline(cursor, semester["semester_id"], session.get("user_id"))
+        cursor.execute("SELECT COUNT(*) AS cnt FROM comp4200_timeline_items WHERE timeline_id = %s", (timeline["timeline_id"],))
+        if int((cursor.fetchone() or {}).get("cnt") or 0) == 0:
+            cursor.close(); db.close()
+            return jsonify({"error": "Save at least one timeline item before publishing."}), 400
+
+        cursor.execute(
+            "UPDATE comp4200_timelines SET is_published = TRUE, published_at = NOW(), created_by = %s WHERE timeline_id = %s",
+            (session.get("user_id"), timeline["timeline_id"]),
+        )
+
+        # Keep student dashboard deadlines synced with this timeline.
+        cursor.execute(
+            "DELETE FROM deadlines WHERE semester_id = %s AND deadline_type LIKE 'comp4200_timeline_%'",
+            (semester["semester_id"],),
+        )
+        cursor.execute(
+            """
+            SELECT item_order, title, due_date, milestone_label
+            FROM comp4200_timeline_items
+            WHERE timeline_id = %s AND is_deadline = TRUE
+            ORDER BY item_order ASC
+            """,
+            (timeline["timeline_id"],),
+        )
+        items = cursor.fetchall()
+        for item in items:
+            label = item.get("milestone_label") or item.get("title")
+            cursor.execute(
+                """
+                INSERT INTO deadlines (semester_id, project_id, deadline_type, deadline_date, description)
+                VALUES (%s, NULL, %s, %s, %s)
+                """,
+                (semester["semester_id"], f"comp4200_timeline_{item['item_order']}", item["due_date"], label),
+            )
+
+        # Notify all active students when the coordinator posts/publishes.
+        cursor.execute("SELECT user_id FROM users WHERE role = 'student' AND is_active = TRUE")
+        recipients = [r["user_id"] for r in cursor.fetchall() if r.get("user_id") != session.get("user_id")]
+        has_course_scope = _db_column_exists(cursor, "notifications", "course_scope")
+        msg = "The coordinator published the Project Introduction timeline. Open Student Timeline to view all milestones and deadlines."
+        for uid in recipients:
+            if has_course_scope:
+                cursor.execute(
+                    """
+                    INSERT INTO notifications
+                        (recipient_id, sender_id, notification_type, title, message, course_scope, related_project_id, is_read)
+                    VALUES (%s, %s, 'deadline_reminder', 'Project Introduction Timeline Published', %s, 'introduction', NULL, FALSE)
+                    """,
+                    (uid, session.get("user_id"), msg),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO notifications
+                        (recipient_id, sender_id, notification_type, title, message, related_project_id, is_read)
+                    VALUES (%s, %s, 'deadline_reminder', 'Project Introduction Timeline Published', %s, NULL, FALSE)
+                    """,
+                    (uid, session.get("user_id"), msg),
+                )
+        db.commit()
+        payload = _intro_timeline_payload(cursor, semester["semester_id"], session.get("user_id"))
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value({"message": f"Timeline published to students and {len(recipients)} notification(s) sent.", **payload}))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ─── Distribution Window ─────────────────────────────────────────────────
 @coordinator_bp.route("/api/coordinator/distribution-window", methods=["GET"])
 @login_required(role="coordinator")
@@ -1176,6 +1439,166 @@ def api_add_section():
             "section_id": section_id
         })
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── Coordinator Section Results ─────────────────────────────────────────
+def _ensure_section_results_schema(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS section_completion_status (
+            status_id INT PRIMARY KEY AUTO_INCREMENT,
+            course_scope ENUM('introduction','graduation_project') NOT NULL,
+            reference_id INT NOT NULL,
+            status ENUM('pending','succeeded','not_succeeded') NOT NULL DEFAULT 'pending',
+            notes TEXT NULL,
+            marked_by INT NULL,
+            marked_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_section_completion (course_scope, reference_id),
+            INDEX idx_section_completion_status (status),
+            INDEX idx_section_completion_scope_status (course_scope, status),
+            FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
+
+@coordinator_bp.route("/api/coordinator/section-results", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_section_results():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+
+        semester = _get_active_semester(cursor)
+        semester_id = semester["semester_id"] if semester else None
+
+        introduction_sections = []
+        if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
+            cursor.execute(
+                """
+                SELECT sec.section_id AS reference_id,
+                       sec.section_name,
+                       'introduction' AS course_scope,
+                       u_sup.full_name AS supervisor_name,
+                       COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '), '') AS students,
+                       COUNT(DISTINCT st.student_id) AS student_count,
+                       COALESCE(scs.status, 'pending') AS result_status,
+                       scs.notes,
+                       scs.marked_at,
+                       u_mark.full_name AS marked_by_name
+                FROM student_distribution_sections sec
+                JOIN faculty f ON f.faculty_id = sec.supervisor_id
+                JOIN users u_sup ON u_sup.user_id = f.user_id
+                LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+                LEFT JOIN students st ON st.student_id = ss.student_id
+                LEFT JOIN users u_st ON u_st.user_id = st.user_id
+                LEFT JOIN section_completion_status scs
+                  ON scs.course_scope = 'introduction' AND scs.reference_id = sec.section_id
+                LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
+                GROUP BY sec.section_id, sec.section_name, u_sup.full_name,
+                         scs.status, scs.notes, scs.marked_at, u_mark.full_name
+                ORDER BY sec.section_id DESC
+                """
+            )
+            introduction_sections = cursor.fetchall()
+
+        grad_where = "WHERE p.semester_id = %s" if semester_id else ""
+        grad_params = (semester_id,) if semester_id else ()
+        cursor.execute(
+            f"""
+            SELECT p.project_id AS reference_id,
+                   COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS section_name,
+                   'graduation_project' AS course_scope,
+                   COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+                   COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
+                   COUNT(DISTINCT st.student_id) AS student_count,
+                   p.status AS project_status,
+                   COALESCE(scs.status, 'pending') AS result_status,
+                   scs.notes,
+                   scs.marked_at,
+                   u_mark.full_name AS marked_by_name
+            FROM projects p
+            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
+            LEFT JOIN project_members pm ON pm.project_id = p.project_id
+            LEFT JOIN students st ON st.student_id = pm.student_id
+            LEFT JOIN users u_st ON u_st.user_id = st.user_id
+            LEFT JOIN section_completion_status scs
+              ON scs.course_scope = 'graduation_project' AND scs.reference_id = p.project_id
+            LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
+            {grad_where}
+            GROUP BY p.project_id, p.title, p.status, u_sup.full_name,
+                     scs.status, scs.notes, scs.marked_at, u_mark.full_name
+            ORDER BY p.project_id DESC
+            """,
+            grad_params,
+        )
+        graduation_sections = cursor.fetchall()
+
+        cursor.close()
+        db.close()
+        return jsonify(_json_safe_value({
+            "semester": semester or {},
+            "introduction_sections": introduction_sections,
+            "graduation_sections": graduation_sections,
+        }))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/section-results/mark", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_mark_section_result():
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "").strip()
+    reference_id = data.get("reference_id")
+    status = (data.get("status") or "pending").strip()
+    notes = (data.get("notes") or "").strip() or None
+
+    if course_scope not in {"introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+    if status not in {"pending", "succeeded", "not_succeeded"}:
+        return jsonify({"error": "status must be pending, succeeded, or not_succeeded."}), 400
+    if not reference_id:
+        return jsonify({"error": "reference_id is required."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+
+        if course_scope == "introduction":
+            cursor.execute("SELECT section_id FROM student_distribution_sections WHERE section_id = %s", (reference_id,))
+        else:
+            cursor.execute("SELECT project_id FROM projects WHERE project_id = %s", (reference_id,))
+        if not cursor.fetchone():
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Section/project not found."}), 404
+
+        cursor.execute(
+            """
+            INSERT INTO section_completion_status
+                (course_scope, reference_id, status, notes, marked_by, marked_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                status = VALUES(status),
+                notes = VALUES(notes),
+                marked_by = VALUES(marked_by),
+                marked_at = NOW(),
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (course_scope, reference_id, status, notes, session.get("user_id")),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Section result saved successfully."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

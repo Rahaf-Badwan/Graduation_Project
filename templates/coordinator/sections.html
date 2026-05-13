@@ -1,0 +1,125 @@
+{% extends 'coordinator/base.html' %}
+
+{% block page_title %}Section Results{% endblock %}
+{% block page_id %}sections{% endblock %}
+{% block topbar_title %}Section Results{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-sections">
+  <style>
+    #pg-sections{padding:20px 22px 90px!important;margin:0!important;display:block!important;min-height:auto!important}
+    .section-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+    .result-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+    .result-stat{background:#fff;border:1px solid var(--color-border-tertiary);border-radius:16px;padding:14px}
+    .result-stat .num{font-size:24px;font-weight:800;color:var(--accent)}
+    .result-stat .lbl{font-size:12px;color:var(--color-text-secondary);margin-top:3px}
+    .section-card{border:1px solid var(--color-border-tertiary);border-radius:16px;background:#fff;padding:14px;margin-bottom:12px;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start}
+    .section-title{font-weight:800;color:var(--color-text-primary);font-size:15px;margin-bottom:5px}
+    .section-meta{font-size:12px;color:var(--color-text-secondary);line-height:1.6}
+    .section-actions{min-width:260px;display:flex;flex-direction:column;gap:8px}
+    .section-actions select,.section-actions textarea{width:100%;padding:9px 10px;border:1px solid var(--color-border-tertiary);border-radius:10px;background:#fff;font:inherit;font-size:12px}
+    .section-actions textarea{resize:vertical;min-height:56px}
+    .status-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;margin-left:6px}
+    .status-pending{background:#f3f4f6;color:#4b5563}.status-succeeded{background:#dcfce7;color:#166534}.status-not_succeeded{background:#fee2e2;color:#991b1b}
+    .empty-box{padding:20px;border:1px dashed var(--color-border-tertiary);border-radius:16px;color:var(--color-text-secondary);background:#fff;text-align:center}
+    @media(max-width:900px){.result-grid{grid-template-columns:1fr 1fr}.section-card{grid-template-columns:1fr}.section-actions{min-width:0}}
+  </style>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap">
+      <div>
+        <span class="card-title">Sections Completion</span>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+          Mark Project Introduction sections and Graduation Project groups as succeeded. Only succeeded items will appear for the Head of Department.
+        </div>
+      </div>
+      <button class="btn btn-outline" type="button" onclick="loadSectionResults()">Refresh</button>
+    </div>
+  </div>
+
+  <div class="result-grid">
+    <div class="result-stat"><div class="num" id="introTotal">0</div><div class="lbl">Introduction Sections</div></div>
+    <div class="result-stat"><div class="num" id="introDone">0</div><div class="lbl">Succeeded Introduction</div></div>
+    <div class="result-stat"><div class="num" id="gradTotal">0</div><div class="lbl">Graduation Project Groups</div></div>
+    <div class="result-stat"><div class="num" id="gradDone">0</div><div class="lbl">Succeeded Graduation</div></div>
+  </div>
+
+  <div class="section-tabs">
+    <button class="tab on" type="button" onclick="showResultTab('introBox',this)">Project Introduction Sections</button>
+    <button class="tab" type="button" onclick="showResultTab('gradBox',this)">Graduation Project Sections</button>
+  </div>
+
+  <div id="introBox"></div>
+  <div id="gradBox" style="display:none"></div>
+</div>
+
+<script>
+function showResultTab(id, btn){
+  ['introBox','gradBox'].forEach(x => document.getElementById(x).style.display = x === id ? 'block' : 'none');
+  document.querySelectorAll('#pg-sections .section-tabs .tab').forEach(t => t.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+}
+function escapeHtml(v){return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}
+function statusText(s){return s === 'succeeded' ? 'Succeeded' : (s === 'not_succeeded' ? 'Not Succeeded' : 'Pending')}
+function cardTemplate(row){
+  const scopeLabel = row.course_scope === 'introduction' ? 'COMP4200 · Project Introduction' : 'COMP4201 · Graduation Project';
+  const status = row.result_status || 'pending';
+  return `<div class="section-card" data-scope="${row.course_scope}" data-id="${row.reference_id}">
+    <div>
+      <div class="section-title">${escapeHtml(row.section_name)} <span class="status-pill status-${status}">${statusText(status)}</span></div>
+      <div class="section-meta"><b>${scopeLabel}</b></div>
+      <div class="section-meta">Supervisor: <b>${escapeHtml(row.supervisor_name || '—')}</b></div>
+      <div class="section-meta">Students (${row.student_count || 0}): ${escapeHtml(row.students || 'No students')}</div>
+      ${row.marked_at ? `<div class="section-meta">Last update: ${escapeHtml(row.marked_at)} by ${escapeHtml(row.marked_by_name || 'Coordinator')}</div>` : ''}
+    </div>
+    <div class="section-actions">
+      <select class="result-status">
+        <option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option>
+        <option value="succeeded" ${status === 'succeeded' ? 'selected' : ''}>Succeeded / ناجح</option>
+        <option value="not_succeeded" ${status === 'not_succeeded' ? 'selected' : ''}>Not Succeeded</option>
+      </select>
+      <textarea class="result-notes" placeholder="Optional note for Head of Department">${escapeHtml(row.notes || '')}</textarea>
+      <button class="btn btn-primary" type="button" onclick="saveSectionResult(this)">Save Result</button>
+    </div>
+  </div>`;
+}
+function renderList(containerId, rows){
+  const box = document.getElementById(containerId);
+  if(!rows || !rows.length){ box.innerHTML = '<div class="empty-box">No sections found.</div>'; return; }
+  box.innerHTML = rows.map(cardTemplate).join('');
+}
+async function loadSectionResults(){
+  const res = await fetch('/api/coordinator/section-results');
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.error){ alert(data.error || 'Failed to load section results.'); return; }
+  const intro = data.introduction_sections || [];
+  const grad = data.graduation_sections || [];
+  document.getElementById('introTotal').textContent = intro.length;
+  document.getElementById('introDone').textContent = intro.filter(x => x.result_status === 'succeeded').length;
+  document.getElementById('gradTotal').textContent = grad.length;
+  document.getElementById('gradDone').textContent = grad.filter(x => x.result_status === 'succeeded').length;
+  renderList('introBox', intro);
+  renderList('gradBox', grad);
+}
+async function saveSectionResult(button){
+  const card = button.closest('.section-card');
+  const payload = {
+    course_scope: card.dataset.scope,
+    reference_id: Number(card.dataset.id),
+    status: card.querySelector('.result-status').value,
+    notes: card.querySelector('.result-notes').value.trim()
+  };
+  button.disabled = true;
+  button.textContent = 'Saving...';
+  try{
+    const res = await fetch('/api/coordinator/section-results/mark', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || data.error) throw new Error(data.error || 'Failed to save.');
+    await loadSectionResults();
+    alert(data.message || 'Saved.');
+  }catch(err){ alert(err.message); }
+  finally{ button.disabled = false; button.textContent = 'Save Result'; }
+}
+document.addEventListener('DOMContentLoaded', loadSectionResults);
+</script>
+{% endblock %}

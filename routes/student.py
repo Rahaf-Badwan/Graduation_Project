@@ -463,6 +463,84 @@ def api_dashboard_data():
     return jsonify(_json_safe(result))
 
 
+
+
+# ─── Project Introduction Timeline ──────────────────────────────────────
+def _student_intro_timeline_tables_ready(cursor):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME IN ('comp4200_timelines', 'comp4200_timeline_items')
+        """
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) == 2
+
+
+def _student_active_semester(cursor):
+    cursor.execute(
+        """
+        SELECT semester_id, academic_year, semester_number
+        FROM semesters
+        WHERE is_active = TRUE
+        ORDER BY semester_id DESC
+        LIMIT 1
+        """
+    )
+    return cursor.fetchone()
+
+
+@student_bp.route("/timeline")
+@login_required(role="student")
+def timeline():
+    return render_template("student/timeline.html")
+
+
+@student_bp.route("/api/intro-timeline", methods=["GET"])
+@login_required(role="student")
+def api_student_intro_timeline():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        if not _student_intro_timeline_tables_ready(cursor):
+            cursor.close(); db.close()
+            return jsonify({"timeline": None, "items": [], "message": "The coordinator has not published the timeline yet."})
+        semester = _student_active_semester(cursor)
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"timeline": None, "items": [], "message": "No active semester found."})
+        cursor.execute(
+            """
+            SELECT timeline_id, semester_id, title, note, is_published, published_at, updated_at
+            FROM comp4200_timelines
+            WHERE semester_id = %s AND is_published = TRUE
+            LIMIT 1
+            """,
+            (semester["semester_id"],),
+        )
+        timeline = cursor.fetchone()
+        if not timeline:
+            cursor.close(); db.close()
+            return jsonify({"timeline": None, "items": [], "message": "The coordinator has not published the timeline yet."})
+        cursor.execute(
+            """
+            SELECT item_id, item_order, title, description, start_date, due_date, milestone_label, is_deadline
+            FROM comp4200_timeline_items
+            WHERE timeline_id = %s
+            ORDER BY item_order ASC, due_date ASC, item_id ASC
+            """,
+            (timeline["timeline_id"],),
+        )
+        items = cursor.fetchall()
+        for item in items:
+            item["is_deadline"] = bool(item.get("is_deadline"))
+        timeline["is_published"] = bool(timeline.get("is_published"))
+        cursor.close(); db.close()
+        return jsonify(_json_safe({"timeline": timeline, "items": items}))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ─── Registration ───────────────────────────────────────────
 @student_bp.route("/registration")
 @login_required(role="student")

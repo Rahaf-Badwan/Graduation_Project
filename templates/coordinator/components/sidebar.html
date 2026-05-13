@@ -47,6 +47,11 @@
       <span class="sb-label">Lectures &amp; Deliverables</span>
     </a>
 
+    <a class="sb-item {% if request.path == '/coordinator/sections' %}on{% endif %}" data-page="sections" href="/coordinator/sections">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">verified</span></span>
+      <span class="sb-label">Section Results</span>
+    </a>
+
     <a class="sb-item {% if request.path == '/coordinator/exams' %}on{% endif %}" data-page="exams" href="/coordinator/exams">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">assignment</span></span>
       <span class="sb-label">Exam Distribution</span>

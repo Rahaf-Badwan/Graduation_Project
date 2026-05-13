@@ -1,0 +1,264 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Project Introduction Timeline{% endblock %}
+{% block page_id %}timeline{% endblock %}
+{% block topbar_title %}Project Introduction Timeline{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-timeline">
+  <style>
+    .timeline-card {
+      display: grid;
+      grid-template-columns: 44px 1fr 180px;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--color-border-tertiary);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .timeline-number {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--color-bg-secondary);
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--green);
+    }
+
+    .timeline-action-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: stretch;
+      text-align: center;
+      padding-top: 2px;
+    }
+
+    .timeline-state {
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .timeline-open { color: var(--green); }
+    .timeline-locked { color: var(--amber); }
+    .timeline-closed { color: #991b1b; }
+
+    .timeline-submit-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: none;
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    .timeline-submit-link.disabled {
+      pointer-events: none;
+      cursor: not-allowed;
+      border-color: var(--color-border-tertiary);
+      background: var(--color-bg-secondary);
+      color: var(--color-text-secondary);
+    }
+
+    @media (max-width: 820px) {
+      .timeline-card {
+        grid-template-columns: 40px 1fr;
+      }
+      .timeline-action-box {
+        grid-column: 2;
+        text-align: left;
+        align-items: flex-start;
+      }
+    }
+  </style>
+
+  <div class="card">
+    <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <span class="card-title" id="timelineTitle">Project Introduction Timeline</span>
+        <div id="timelineNote" style="font-size:12px;color:var(--color-text-secondary);line-height:1.6;margin-top:4px">Loading...</div>
+      </div>
+      <span class="pill p-review" id="timelineStatus">COMP4200</span>
+    </div>
+
+    <div class="u-343f9d13" style="margin-bottom:14px;">
+      Submission links open on the milestone start date and close automatically after the deadline.
+    </div>
+
+    <div id="timelineEmpty" style="display:none;font-size:13px;color:var(--color-text-secondary);text-align:center;padding:24px;background:var(--color-bg-secondary);border-radius:var(--rm)">
+      The coordinator has not published the Project Introduction timeline yet.
+    </div>
+
+    <div id="timelineList" class="timeline" style="display:flex;flex-direction:column;gap:12px"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function safeText(value, fallback='') {
+  return String(value || fallback).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+}
+
+function formatDate(dateText) {
+  if (!dateText) return '—';
+  const d = new Date(dateText + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return dateText;
+  return d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+}
+
+function dateOnly(dateText) {
+  if (!dateText) return null;
+  const d = new Date(dateText + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function daysLeft(dateText) {
+  if (!dateText) return '';
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const due = dateOnly(dateText);
+  if (!due) return '';
+  const diff = Math.ceil((due - today) / 86400000);
+  if (diff < 0) return 'Finished';
+  if (diff === 0) return 'Due today';
+  return diff + ' day' + (diff === 1 ? '' : 's') + ' left';
+}
+
+function submissionWindow(item) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const start = dateOnly(item.start_date);
+  const due = dateOnly(item.due_date);
+
+  if (start && today < start) {
+    return {
+      state: 'locked',
+      label: 'Not open yet',
+      message: 'Opens ' + formatDate(item.start_date),
+      button: 'Locked',
+      className: 'timeline-locked'
+    };
+  }
+
+  if (due && today > due) {
+    return {
+      state: 'closed',
+      label: 'Closed',
+      message: 'Closed after ' + formatDate(item.due_date),
+      button: 'Closed',
+      className: 'timeline-closed'
+    };
+  }
+
+  return {
+    state: 'open',
+    label: 'Open now',
+    message: daysLeft(item.due_date),
+    button: 'Open Submission',
+    className: 'timeline-open'
+  };
+}
+
+function submissionLink(item) {
+  const params = new URLSearchParams();
+  params.set('timeline_item_id', item.item_id || '');
+  if (item.title) params.set('milestone', item.title);
+  return '/student/submit?' + params.toString();
+}
+
+async function loadTimeline() {
+  const empty = document.getElementById('timelineEmpty');
+  const list = document.getElementById('timelineList');
+
+  try {
+    const res = await fetch('/student/api/intro-timeline');
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Could not load timeline.');
+    }
+
+    if (!data.timeline) {
+      empty.style.display = '';
+      list.style.display = 'none';
+      document.getElementById('timelineNote').textContent = data.message || 'Not published yet.';
+      return;
+    }
+
+    document.getElementById('timelineTitle').textContent = data.timeline.title || 'Project Introduction Timeline';
+    document.getElementById('timelineNote').textContent = data.timeline.note || 'Follow the posted milestones and deadlines.';
+    document.getElementById('timelineStatus').textContent = data.timeline.published_at
+      ? ('Published ' + formatDate(String(data.timeline.published_at).slice(0,10)))
+      : 'Published';
+
+    empty.style.display = 'none';
+    list.style.display = '';
+
+    const items = data.items || [];
+
+    if (!items.length) {
+      list.innerHTML = '<div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">No timeline items found.</div>';
+      return;
+    }
+
+    list.innerHTML = items.map((item, idx) => {
+      const win = submissionWindow(item);
+      const isOpen = win.state === 'open';
+      const href = isOpen ? submissionLink(item) : '#';
+
+      return `
+        <article class="timeline-card">
+          <div class="timeline-number">${idx + 1}</div>
+
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--color-text-primary);margin-bottom:5px">
+              ${safeText(item.title)}
+            </div>
+
+            <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6">
+              ${safeText(item.description || 'No description')}
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
+              <span class="pill p-review">${safeText(item.milestone_label || 'Milestone')}</span>
+              <span class="pill p-fixed">Opens: ${formatDate(item.start_date)}</span>
+              <span class="pill p-temp">Closes: ${formatDate(item.due_date)}</span>
+            </div>
+          </div>
+
+          <div class="timeline-action-box">
+            <div class="timeline-state ${win.className}">${win.label}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.4">${safeText(win.message)}</div>
+            <a class="timeline-submit-link ${isOpen ? '' : 'disabled'}" href="${href}" aria-disabled="${isOpen ? 'false' : 'true'}">
+              ${win.button}
+            </a>
+          </div>
+        </article>
+      `;
+    }).join('');
+  } catch (err) {
+    empty.style.display = '';
+    list.style.display = 'none';
+    empty.textContent = err.message;
+  }
+}
+
+loadTimeline();
+</script>
+{% endblock %}
