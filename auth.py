@@ -13,14 +13,24 @@ def login_required(role=None):
         def decorated(*args, **kwargs):
             if "user_id" not in session:
                 if _wants_json_response():
-                    return jsonify({"error": "Please log in again as coordinator."}), 401
+                    return (
+                        jsonify({"error": "Please log in again as coordinator."}),
+                        401,
+                    )
                 return redirect(url_for("login_page"))
 
             if role and session.get("role") != role:
                 if _wants_json_response():
-                    return jsonify({"error": "You do not have permission to access this page."}), 403
+                    return (
+                        jsonify(
+                            {"error": "You do not have permission to access this page."}
+                        ),
+                        403,
+                    )
                 return redirect(url_for("login_page"))
 
             return f(*args, **kwargs)
+
         return decorated
+
     return decorator

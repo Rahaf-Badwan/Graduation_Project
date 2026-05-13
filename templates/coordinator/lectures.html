@@ -6,34 +6,106 @@
 
 {% block content %}
 <style>
-  #pg-lectures{padding:20px 22px 90px!important;margin:0!important;min-height:auto!important;display:block!important}
-  #pg-lectures .lecture-section{display:none}
-  #pg-lectures .lecture-section.active{display:block}
-  #pg-lectures .lecture-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-  #pg-lectures .mini-form{display:none;border:1px solid var(--color-border-tertiary);border-radius:14px;padding:14px;margin-bottom:14px;background:#fff}
-  #pg-lectures .mini-form.on{display:block}
-  #pg-lectures .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  #pg-lectures label{font-size:12px;font-weight:700;color:var(--color-text-primary);display:block;margin-bottom:5px}
-  #pg-lectures input,#pg-lectures select,#pg-lectures textarea{width:100%;padding:9px 11px;border:1px solid var(--color-border-tertiary);border-radius:10px;background:#fff;font:inherit}
-  #pg-lectures textarea{resize:vertical}
-  #pg-lectures .empty-box{border:1px dashed var(--color-border-tertiary);border-radius:14px;padding:18px;color:var(--color-text-secondary);background:var(--color-bg-secondary);font-size:13px}
-  #pg-lectures .card{margin-top:0!important}
-  @media(max-width:900px){
+  #pg-lectures {
+    padding: 20px 22px 90px !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    display: block !important
+  }
+
+  #pg-lectures .lecture-section {
+    display: none
+  }
+
+  #pg-lectures .lecture-section.active {
+    display: block
+  }
+
+  #pg-lectures .lecture-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start
+  }
+
+  #pg-lectures .mini-form {
+    display: none;
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+    background: #fff
+  }
+
+  #pg-lectures .mini-form.on {
+    display: block
+  }
+
+  #pg-lectures .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px
+  }
+
+  #pg-lectures label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    display: block;
+    margin-bottom: 5px
+  }
+
+  #pg-lectures input,
+  #pg-lectures select,
+  #pg-lectures textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 10px;
+    background: #fff;
+    font: inherit
+  }
+
+  #pg-lectures textarea {
+    resize: vertical
+  }
+
+  #pg-lectures .empty-box {
+    border: 1px dashed var(--color-border-tertiary);
+    border-radius: 14px;
+    padding: 18px;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+    font-size: 13px
+  }
+
+  #pg-lectures .card {
+    margin-top: 0 !important
+  }
+
+  @media(max-width:900px) {
+
     #pg-lectures .lecture-grid,
-    #pg-lectures .form-grid{grid-template-columns:1fr}
+    #pg-lectures .form-grid {
+      grid-template-columns: 1fr
+    }
   }
 </style>
 
 <div class="page page-single on" id="pg-lectures">
 
   <div class="tab-bar" style="margin-bottom:16px;">
-    <button class="tab on" type="button" onclick="showLectureSection('introduction', this)">Project Introduction</button>
-    <button class="tab" type="button" onclick="showLectureSection('graduation_project', this)">Graduation Projects</button>
+    <button class="tab on" type="button" onclick="showLectureSection('introduction', this)">Project
+      Introduction</button>
+    <button class="tab" type="button" onclick="showLectureSection('graduation_project', this)">Graduation
+      Projects</button>
   </div>
 
   <div id="introLectures" class="lecture-section active" data-scope="introduction">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-      <span style="background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">◑ Project Introduction — COMP4200</span>
+      <span
+        style="background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">◑
+        Project Introduction — COMP4200</span>
       <span style="font-size:11px;color:var(--color-text-secondary);">مقدمة المشاريع</span>
     </div>
     <div class="lecture-grid">
@@ -50,7 +122,8 @@
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Deliverables — Project Introduction</span>
-          <button class="card-action" type="button" onclick="toggleDeliverableForm('introduction')">+ Add Deliverable</button>
+          <button class="card-action" type="button" onclick="toggleDeliverableForm('introduction')">+ Add
+            Deliverable</button>
         </div>
         <div class="u-cebcb327">On-time submission carries marks — monitored by the coordinator.</div>
         <div id="deliverableForm-introduction" class="mini-form"></div>
@@ -61,14 +134,16 @@
 
   <div id="gradLectures" class="lecture-section" data-scope="graduation_project">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-      <span style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">✦ Graduation Projects — COMP4201</span>
+      <span style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">✦
+        Graduation Projects — COMP4201</span>
       <span style="font-size:11px;color:var(--color-text-secondary);">مشاريع التخرج</span>
     </div>
     <div class="lecture-grid">
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Coordinator Lectures</span>
-          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add Lecture</button>
+          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add
+            Lecture</button>
         </div>
         <div class="u-3fa92238">Add lecture dates and publish the semester lecture plan.</div>
         <div id="lectureForm-graduation_project" class="mini-form"></div>
@@ -78,7 +153,8 @@
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Deliverables — Graduation Projects</span>
-          <button class="card-action" type="button" onclick="toggleDeliverableForm('graduation_project')">+ Add Deliverable</button>
+          <button class="card-action" type="button" onclick="toggleDeliverableForm('graduation_project')">+ Add
+            Deliverable</button>
         </div>
         <div class="u-cebcb327">On-time submission carries marks — monitored by the coordinator.</div>
         <div id="deliverableForm-graduation_project" class="mini-form"></div>
@@ -89,31 +165,31 @@
 </div>
 
 <script>
-const scopeLabels = {
-  introduction: 'Project Introduction',
-  graduation_project: 'Graduation Projects'
-};
-let lecturesState = {lectures:{introduction:[], graduation_project:[]}, deliverables:{introduction:[], graduation_project:[]}};
+  const scopeLabels = {
+    introduction: 'Project Introduction',
+    graduation_project: 'Graduation Projects'
+  };
+  let lecturesState = { lectures: { introduction: [], graduation_project: [] }, deliverables: { introduction: [], graduation_project: [] } };
 
-function showLectureSection(scope, btn){
-  document.querySelectorAll('#pg-lectures .lecture-section').forEach(s => s.classList.remove('active'));
-  document.getElementById(scope === 'introduction' ? 'introLectures' : 'gradLectures').classList.add('active');
-  document.querySelectorAll('#pg-lectures .tab-bar .tab').forEach(t => t.classList.remove('on'));
-  if(btn) btn.classList.add('on');
-  window.scrollTo(0,0);
-}
+  function showLectureSection(scope, btn) {
+    document.querySelectorAll('#pg-lectures .lecture-section').forEach(s => s.classList.remove('active'));
+    document.getElementById(scope === 'introduction' ? 'introLectures' : 'gradLectures').classList.add('active');
+    document.querySelectorAll('#pg-lectures .tab-bar .tab').forEach(t => t.classList.remove('on'));
+    if (btn) btn.classList.add('on');
+    window.scrollTo(0, 0);
+  }
 
-function pillClass(status){
-  if(status === 'completed') return 'p-accepted';
-  if(status === 'cancelled') return 'p-rejected';
-  if(status === 'in_progress') return 'p-review';
-  return 'p-pending';
-}
-function niceStatus(status){ return String(status || 'scheduled').replaceAll('_',' ').replace(/\b\w/g, c => c.toUpperCase()); }
-function safe(v){return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
+  function pillClass(status) {
+    if (status === 'completed') return 'p-accepted';
+    if (status === 'cancelled') return 'p-rejected';
+    if (status === 'in_progress') return 'p-review';
+    return 'p-pending';
+  }
+  function niceStatus(status) { return String(status || 'scheduled').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+  function safe(v) { return String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'); }
 
-function lectureFormHtml(scope){
-  return `<div class="form-grid">
+  function lectureFormHtml(scope) {
+    return `<div class="form-grid">
     <div><label>Lecture Title</label><input id="lecTitle-${scope}" placeholder="Example: Turnitin Upload & Similarity"></div>
     <div><label>Lecture Date</label><input id="lecDate-${scope}" type="date"></div>
     <div><label>Week Label</label><input id="lecWeek-${scope}" placeholder="Example: Week 3"></div>
@@ -121,10 +197,10 @@ function lectureFormHtml(scope){
     <div style="grid-column:1/-1"><label>Description</label><textarea id="lecDesc-${scope}" rows="2" placeholder="What will be covered in this lecture?"></textarea></div>
   </div>
   <div class="btn-row" style="margin-top:10px"><button class="btn btn-primary" type="button" onclick="saveLecture('${scope}')">Save Lecture</button><button class="btn btn-outline" type="button" onclick="toggleLectureForm('${scope}')">Cancel</button></div>`;
-}
+  }
 
-function deliverableFormHtml(scope){
-  return `<div class="form-grid">
+  function deliverableFormHtml(scope) {
+    return `<div class="form-grid">
     <div><label>Deliverable Title</label><input id="delTitle-${scope}" placeholder="Example: Final Report + Turnitin"></div>
     <div><label>Due Date</label><input id="delDue-${scope}" type="date"></div>
     <div><label>Mark Points</label><input id="delMark-${scope}" type="number" min="0" value="5"></div>
@@ -132,26 +208,26 @@ function deliverableFormHtml(scope){
     <div style="grid-column:1/-1"><label>Description</label><textarea id="delDesc-${scope}" rows="2" placeholder="Submission details"></textarea></div>
   </div>
   <div class="btn-row" style="margin-top:10px"><button class="btn btn-primary" type="button" onclick="saveDeliverable('${scope}')">Save Deliverable</button><button class="btn btn-outline" type="button" onclick="toggleDeliverableForm('${scope}')">Cancel</button></div>`;
-}
+  }
 
-function toggleLectureForm(scope){
-  const box = document.getElementById(`lectureForm-${scope}`);
-  if(!box.innerHTML.trim()) box.innerHTML = lectureFormHtml(scope);
-  box.classList.toggle('on');
-}
-function toggleDeliverableForm(scope){
-  const box = document.getElementById(`deliverableForm-${scope}`);
-  if(!box.innerHTML.trim()) box.innerHTML = deliverableFormHtml(scope);
-  box.classList.toggle('on');
-}
+  function toggleLectureForm(scope) {
+    const box = document.getElementById(`lectureForm-${scope}`);
+    if (!box.innerHTML.trim()) box.innerHTML = lectureFormHtml(scope);
+    box.classList.toggle('on');
+  }
+  function toggleDeliverableForm(scope) {
+    const box = document.getElementById(`deliverableForm-${scope}`);
+    if (!box.innerHTML.trim()) box.innerHTML = deliverableFormHtml(scope);
+    box.classList.toggle('on');
+  }
 
-function renderLectures(scope){
-  const list = document.getElementById(`lectureList-${scope}`);
-  const rows = lecturesState.lectures[scope] || [];
-  if(!rows.length){ list.innerHTML = '<div class="empty-box">No lectures yet. Click + Add Lecture to create one.</div>'; return; }
-  list.innerHTML = rows.map((lec, idx) => `
+  function renderLectures(scope) {
+    const list = document.getElementById(`lectureList-${scope}`);
+    const rows = lecturesState.lectures[scope] || [];
+    if (!rows.length) { list.innerHTML = '<div class="empty-box">No lectures yet. Click + Add Lecture to create one.</div>'; return; }
+    list.innerHTML = rows.map((lec, idx) => `
     <div class="lec-card">
-      <div class="lec-num ${scope === 'introduction' ? 'u-7dd75b5a' : 'u-2fa90a93'}">${idx+1}</div>
+      <div class="lec-num ${scope === 'introduction' ? 'u-7dd75b5a' : 'u-2fa90a93'}">${idx + 1}</div>
       <div class="u-d5e8c5f3">
         <div class="u-d331ec29">${safe(lec.title)}</div>
         <div class="u-c8be14a8">${safe(lec.description || '')}${lec.week_label ? ' · ' + safe(lec.week_label) : ''}${lec.lecture_date ? ' · ' + safe(lec.lecture_date) : ''}</div>
@@ -162,15 +238,15 @@ function renderLectures(scope){
         </div>
       </div>
     </div>`).join('');
-}
+  }
 
-function renderDeliverables(scope){
-  const list = document.getElementById(`deliverableList-${scope}`);
-  const rows = lecturesState.deliverables[scope] || [];
-  if(!rows.length){ list.innerHTML = '<div class="empty-box">No deliverables yet. Click + Add Deliverable to create one.</div>'; return; }
-  list.innerHTML = rows.map((d, idx) => `
+  function renderDeliverables(scope) {
+    const list = document.getElementById(`deliverableList-${scope}`);
+    const rows = lecturesState.deliverables[scope] || [];
+    if (!rows.length) { list.innerHTML = '<div class="empty-box">No deliverables yet. Click + Add Deliverable to create one.</div>'; return; }
+    list.innerHTML = rows.map((d, idx) => `
     <div class="deliv-row">
-      <div class="${idx % 3 === 0 ? 'u-844ebab6' : idx % 3 === 1 ? 'u-64d7500e' : 'u-2d2d4f55'}">T${idx+1}</div>
+      <div class="${idx % 3 === 0 ? 'u-844ebab6' : idx % 3 === 1 ? 'u-64d7500e' : 'u-2d2d4f55'}">T${idx + 1}</div>
       <div class="u-d5e8c5f3">
         <div class="u-2e61148f">${safe(d.title)}</div>
         <div class="u-7d16b22c">${d.due_date ? safe(d.due_date) : 'No due date'} · Commitment mark: ${safe(d.mark_points || 0)} pts</div>
@@ -180,66 +256,66 @@ function renderDeliverables(scope){
         <span class="pill ${pillClass(d.status === 'open' ? 'in_progress' : d.status)}">${niceStatus(d.status)}</span>
       </div>
     </div>`).join('');
-}
-
-function renderAll(){
-  ['introduction','graduation_project'].forEach(scope => { renderLectures(scope); renderDeliverables(scope); });
-}
-
-async function apiFetch(url, options){
-  const res = await fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, options || {}));
-  const data = await res.json().catch(() => ({}));
-  if(!res.ok || data.error) throw new Error(data.error || 'Request failed');
-  return data;
-}
-
-async function loadLecturesData(){
-  try{
-    lecturesState = await apiFetch('/api/coordinator/lectures-data');
-    renderAll();
-  }catch(err){
-    alert('Lectures page error: ' + err.message);
   }
-}
 
-async function saveLecture(scope){
-  const payload = {
-    course_scope: scope,
-    title: document.getElementById(`lecTitle-${scope}`).value.trim(),
-    description: document.getElementById(`lecDesc-${scope}`).value.trim(),
-    lecture_date: document.getElementById(`lecDate-${scope}`).value,
-    week_label: document.getElementById(`lecWeek-${scope}`).value.trim(),
-    status: document.getElementById(`lecStatus-${scope}`).value
-  };
-  if(!payload.title){ alert('Lecture title is required.'); return; }
-  await apiFetch('/api/coordinator/lectures', {method:'POST', body:JSON.stringify(payload)});
-  document.getElementById(`lectureForm-${scope}`).classList.remove('on');
-  document.getElementById(`lectureForm-${scope}`).innerHTML = '';
-  await loadLecturesData();
-}
+  function renderAll() {
+    ['introduction', 'graduation_project'].forEach(scope => { renderLectures(scope); renderDeliverables(scope); });
+  }
 
-async function saveDeliverable(scope){
-  const payload = {
-    course_scope: scope,
-    title: document.getElementById(`delTitle-${scope}`).value.trim(),
-    description: document.getElementById(`delDesc-${scope}`).value.trim(),
-    due_date: document.getElementById(`delDue-${scope}`).value,
-    mark_points: Number(document.getElementById(`delMark-${scope}`).value || 0),
-    status: document.getElementById(`delStatus-${scope}`).value
-  };
-  if(!payload.title){ alert('Deliverable title is required.'); return; }
-  await apiFetch('/api/coordinator/deliverables', {method:'POST', body:JSON.stringify(payload)});
-  document.getElementById(`deliverableForm-${scope}`).classList.remove('on');
-  document.getElementById(`deliverableForm-${scope}`).innerHTML = '';
-  await loadLecturesData();
-}
+  async function apiFetch(url, options) {
+    const res = await fetch(url, Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {}));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || 'Request failed');
+    return data;
+  }
 
-async function updateLectureDate(lectureId){
-  const dateInput = document.getElementById(`lecDateUpdate-${lectureId}`);
-  await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, {method:'POST', body:JSON.stringify({lecture_date:dateInput.value})});
-  await loadLecturesData();
-}
+  async function loadLecturesData() {
+    try {
+      lecturesState = await apiFetch('/api/coordinator/lectures-data');
+      renderAll();
+    } catch (err) {
+      alert('Lectures page error: ' + err.message);
+    }
+  }
 
-document.addEventListener('DOMContentLoaded', loadLecturesData);
+  async function saveLecture(scope) {
+    const payload = {
+      course_scope: scope,
+      title: document.getElementById(`lecTitle-${scope}`).value.trim(),
+      description: document.getElementById(`lecDesc-${scope}`).value.trim(),
+      lecture_date: document.getElementById(`lecDate-${scope}`).value,
+      week_label: document.getElementById(`lecWeek-${scope}`).value.trim(),
+      status: document.getElementById(`lecStatus-${scope}`).value
+    };
+    if (!payload.title) { alert('Lecture title is required.'); return; }
+    await apiFetch('/api/coordinator/lectures', { method: 'POST', body: JSON.stringify(payload) });
+    document.getElementById(`lectureForm-${scope}`).classList.remove('on');
+    document.getElementById(`lectureForm-${scope}`).innerHTML = '';
+    await loadLecturesData();
+  }
+
+  async function saveDeliverable(scope) {
+    const payload = {
+      course_scope: scope,
+      title: document.getElementById(`delTitle-${scope}`).value.trim(),
+      description: document.getElementById(`delDesc-${scope}`).value.trim(),
+      due_date: document.getElementById(`delDue-${scope}`).value,
+      mark_points: Number(document.getElementById(`delMark-${scope}`).value || 0),
+      status: document.getElementById(`delStatus-${scope}`).value
+    };
+    if (!payload.title) { alert('Deliverable title is required.'); return; }
+    await apiFetch('/api/coordinator/deliverables', { method: 'POST', body: JSON.stringify(payload) });
+    document.getElementById(`deliverableForm-${scope}`).classList.remove('on');
+    document.getElementById(`deliverableForm-${scope}`).innerHTML = '';
+    await loadLecturesData();
+  }
+
+  async function updateLectureDate(lectureId) {
+    const dateInput = document.getElementById(`lecDateUpdate-${lectureId}`);
+    await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, { method: 'POST', body: JSON.stringify({ lecture_date: dateInput.value }) });
+    await loadLecturesData();
+  }
+
+  document.addEventListener('DOMContentLoaded', loadLecturesData);
 </script>
 {% endblock %}

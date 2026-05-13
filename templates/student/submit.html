@@ -8,12 +8,14 @@
 <div class="page on" id="pg-submit">
 
   {% if request.args.get('timeline_item_id') %}
-  <div style="display:flex;align-items:center;gap:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:14px;padding:14px 18px;margin-bottom:12px;color:#166534;">
+  <div
+    style="display:flex;align-items:center;gap:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:14px;padding:14px 18px;margin-bottom:12px;color:#166534;">
     <span class="material-symbols-outlined" style="font-size:26px;color:#16a34a;flex-shrink:0">event_available</span>
     <div>
       <div style="font-size:14px;font-weight:800;margin-bottom:2px">Submission link is open</div>
       <div style="font-size:12px;line-height:1.5">
-        You opened this page from the COMP4200 timeline{% if request.args.get('milestone') %} for <b>{{ request.args.get('milestone') }}</b>{% endif %}.
+        You opened this page from the COMP4200 timeline{% if request.args.get('milestone') %} for <b>{{
+          request.args.get('milestone') }}</b>{% endif %}.
       </div>
     </div>
   </div>
@@ -74,19 +76,24 @@
           style="background:var(--surface-2, #f5f5f5); color:var(--text-secondary, #666); cursor:not-allowed;" />
       </div>
 
-      <!-- Project Type: editable -->
+      <!-- Project Type: student must choose for submission -->
       <div class="field-wrap">
         <div class="field-label">Project Type <span>*</span></div>
         <select class="field-select" id="proj-type">
-          <option value="">-- Select type --</option>
-          <option value="web" {{ 'selected' if proj_type=='web' }}>Web Application</option>
-          <option value="mobile" {{ 'selected' if proj_type=='mobile' }}>Mobile Application</option>
-          <option value="ai" {{ 'selected' if proj_type=='ai' }}>Artificial Intelligence</option>
-          <option value="software_engineering" {{ 'selected' if proj_type=='software_engineering' }}>Software
-            Engineering</option>
-          <option value="security" {{ 'selected' if proj_type=='security' }}>Security</option>
-          <option value="databases" {{ 'selected' if proj_type=='databases' }}>Databases</option>
-          <option value="other" {{ 'selected' if proj_type=='other' }}>Other</option>
+          <option value="" {% if not proj_type %}selected{% endif %}>-- Select type --</option>
+          <option value="web" {% if proj_type and 'web' in proj_type.lower() %}selected{% endif %}>Web Application
+          </option>
+          <option value="mobile" {% if proj_type and 'mobile' in proj_type.lower() %}selected{% endif %}>Mobile
+            Application</option>
+          <option value="ai" {% if proj_type and 'ai' in proj_type.lower() %}selected{% endif %}>Artificial Intelligence
+          </option>
+          <option value="software_engineering" {% if proj_type and 'software_engineering' in proj_type.lower()
+            %}selected{% endif %}>Software Engineering</option>
+          <option value="security" {% if proj_type and 'security' in proj_type.lower() %}selected{% endif %}>Security
+          </option>
+          <option value="databases" {% if proj_type and 'databases' in proj_type.lower() %}selected{% endif %}>Databases
+          </option>
+          <option value="other" {% if proj_type and 'other' in proj_type.lower() %}selected{% endif %}>Other</option>
         </select>
       </div>
     </div>
@@ -406,7 +413,7 @@
     fetch('/student/api/submit-project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType || 'software_engineering', status: 'draft' })
+      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType, status: 'draft' })
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {

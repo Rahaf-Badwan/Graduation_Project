@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
@@ -7,7 +8,8 @@
   <title>APMS — {% block page_title %}Dashboard{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+    rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}" />
 </head>
 
@@ -49,20 +51,21 @@
   <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
   <script>
-  (function () {
-    fetch('/student/api/topbar-info')
-      .then(r => r.json())
-      .then(d => {
-        var el = document.getElementById('tbSub');
-        if (!el) return;
-        var year = d.academic_year ? ' · Semester ' + d.academic_year : '';
-        el.textContent = (d.course_code || 'COMP4200') + year;
-      })
-      .catch(() => {
-        var el = document.getElementById('tbSub');
-        if (el) el.textContent = 'COMP4200';
-      });
-  })();
+    (function () {
+      fetch('/student/api/topbar-info')
+        .then(r => r.json())
+        .then(d => {
+          var el = document.getElementById('tbSub');
+          if (!el) return;
+          var year = d.academic_year ? ' · Semester ' + d.academic_year : '';
+          el.textContent = (d.course_code || 'COMP4200') + year;
+        })
+        .catch(() => {
+          var el = document.getElementById('tbSub');
+          if (el) el.textContent = 'COMP4200';
+        });
+    })();
   </script>
 </body>
+
 </html>

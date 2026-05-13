@@ -13,58 +13,69 @@
   </div>
 
   <div class="sb-nav coordinator-nav">
-    <a class="sb-item {% if request.path in ['/coordinator/', '/coordinator/dashboard'] %}on{% endif %}" data-page="dashboard" href="/coordinator/">
+    <a class="sb-item {% if request.path in ['/coordinator/', '/coordinator/dashboard'] %}on{% endif %}"
+      data-page="dashboard" href="/coordinator/">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
       <span class="sb-label">Dashboard</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/coordinator/registration' %}on{% endif %}" data-page="registration" href="/coordinator/registration">
+    <a class="sb-item {% if request.path == '/coordinator/registration' %}on{% endif %}" data-page="registration"
+      href="/coordinator/registration">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">group_add</span></span>
       <span class="sb-label">Student Distribution</span>
     </a>
-    <a class="sb-item {% if request.path == '/coordinator/hours' %}on{% endif %}" data-page="hours" href="/coordinator/hours">
+    <a class="sb-item {% if request.path == '/coordinator/hours' %}on{% endif %}" data-page="hours"
+      href="/coordinator/hours">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">schedule</span></span>
       <span class="sb-label">Faculty Hours</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/coordinator/review' %}on{% endif %}" data-page="review" href="/coordinator/review">
+    <a class="sb-item {% if request.path == '/coordinator/review' %}on{% endif %}" data-page="review"
+      href="/coordinator/review">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">fact_check</span></span>
       <span class="sb-label">Project Review</span>
       <span class="sb-badge">7</span>
     </a>
-    <a class="sb-item {% if request.path == '/coordinator/committee' %}on{% endif %}" data-page="committee" href="/coordinator/committee">
+    <a class="sb-item {% if request.path == '/coordinator/committee' %}on{% endif %}" data-page="committee"
+      href="/coordinator/committee">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">group</span></span>
       <span class="sb-label">Evaluation Committees</span>
     </a>
-    <a class="sb-item {% if request.path == '/coordinator/evaluation' %}on{% endif %}" data-page="evaluation" href="/coordinator/evaluation">
+    <a class="sb-item {% if request.path == '/coordinator/evaluation' %}on{% endif %}" data-page="evaluation"
+      href="/coordinator/evaluation">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">grading</span></span>
       <span class="sb-label">Final Evaluation</span>
       <span class="sb-badge">3</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/coordinator/lectures' %}on{% endif %}" data-page="lectures" href="/coordinator/lectures">
+    <a class="sb-item {% if request.path == '/coordinator/lectures' %}on{% endif %}" data-page="lectures"
+      href="/coordinator/lectures">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">menu_book</span></span>
       <span class="sb-label">Lectures &amp; Deliverables</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/coordinator/sections' %}on{% endif %}" data-page="sections" href="/coordinator/sections">
+    <a class="sb-item {% if request.path == '/coordinator/sections' %}on{% endif %}" data-page="sections"
+      href="/coordinator/sections">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">verified</span></span>
       <span class="sb-label">Section Results</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/coordinator/exams' %}on{% endif %}" data-page="exams" href="/coordinator/exams">
+    <a class="sb-item {% if request.path == '/coordinator/exams' %}on{% endif %}" data-page="exams"
+      href="/coordinator/exams">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">assignment</span></span>
       <span class="sb-label">Exam Distribution</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/coordinator/search' %}on{% endif %}" data-page="search" href="/coordinator/search">
+    <a class="sb-item {% if request.path == '/coordinator/search' %}on{% endif %}" data-page="search"
+      href="/coordinator/search">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
       <span class="sb-label">Search &amp; Filters</span>
     </a>
-    <a class="sb-item {% if request.path == '/coordinator/notifs' %}on{% endif %}" data-page="notifs" href="/coordinator/notifs">
+    <a class="sb-item {% if request.path == '/coordinator/notifs' %}on{% endif %}" data-page="notifs"
+      href="/coordinator/notifs">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
       <span class="sb-label">Notifications</span>
-      <span class="sb-badge">5</span>
+      <span class="sb-badge" id="coordNotifBadge" style="display:none"></span>
     </a>
     <a class="sb-item {% if request.path == '/coordinator/ai' %}on{% endif %}" data-page="ai" href="/coordinator/ai">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
@@ -79,3 +90,21 @@
     </a>
   </div>
 </div>
+<script>
+  (function () {
+    function updateBadge() {
+      fetch('/api/coordinator/notifications/unread-count')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var badge = document.getElementById('coordNotifBadge');
+          if (!badge) return;
+          var count = data.unread || 0;
+          badge.textContent = count > 99 ? '99+' : count;
+          badge.style.display = count > 0 ? '' : 'none';
+        })
+        .catch(function () { });
+    }
+    updateBadge();
+    setInterval(updateBadge, 60000);
+  })();
+</script>

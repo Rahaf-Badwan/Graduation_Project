@@ -34,7 +34,11 @@ CHUNK_OVERLAP = 150
 def normalize_arabic(text: str) -> str:
     if not text:
         return ""
-    text = text.replace("\u0623", "\u0627").replace("\u0625", "\u0627").replace("\u0622", "\u0627")
+    text = (
+        text.replace("\u0623", "\u0627")
+        .replace("\u0625", "\u0627")
+        .replace("\u0622", "\u0627")
+    )
     text = text.replace("\u0649", "\u064a").replace("\u0629", "\u0647")
     text = text.replace("\u0624", "\u0648").replace("\u0626", "\u064a")
     return text
@@ -152,8 +156,7 @@ def _project_report_sources_from_db():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT pf.file_id, pf.project_id, pf.file_name, pf.file_path, pf.file_data,
                    p.title, p.project_type, p.status, p.final_score,
                    s.academic_year,
@@ -166,8 +169,7 @@ def _project_report_sources_from_db():
             WHERE  pf.file_type = 'final_report'
               AND  pf.upload_status = 'uploaded'
             ORDER  BY p.project_id DESC, pf.file_id DESC
-            """
-        )
+            """)
         rows = cursor.fetchall()
         cursor.close()
         db.close()
@@ -177,7 +179,9 @@ def _project_report_sources_from_db():
 
     sources = []
     for row in rows:
-        display_name = _basename(row.get("file_name")) or f"project_{row['project_id']}_report.pdf"
+        display_name = (
+            _basename(row.get("file_name")) or f"project_{row['project_id']}_report.pdf"
+        )
         meta = {
             "file_id": row.get("file_id"),
             "project_id": row.get("project_id"),
@@ -185,7 +189,9 @@ def _project_report_sources_from_db():
             "project_type": str(row.get("project_type") or ""),
             "status": row.get("status") or "",
             "final_score": (
-                float(row["final_score"]) if row.get("final_score") is not None else None
+                float(row["final_score"])
+                if row.get("final_score") is not None
+                else None
             ),
             "academic_year": row.get("academic_year") or "",
             "supervisor_name": row.get("supervisor_name") or "",
@@ -246,7 +252,9 @@ def main():
         print("No PDF reports found for training.")
         return
 
-    model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+    model = SentenceTransformer(
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    )
 
     all_chunks = []
     metadata = []

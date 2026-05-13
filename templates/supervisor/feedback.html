@@ -32,7 +32,7 @@
       <div class="field-wrap">
         <div class="field-label">Feedback <span class="req">*</span></div>
         <textarea class="field-textarea" id="sup-fb-text" style="min-height:100px"
-                  placeholder="Write your notes and comments in detail..."></textarea>
+          placeholder="Write your notes and comments in detail..."></textarea>
       </div>
 
       <div class="field-wrap">
@@ -41,13 +41,13 @@
           <span style="font-size:11px;color:var(--color-text-secondary);font-weight:400">(optional, one per line)</span>
         </div>
         <textarea class="field-textarea" id="sup-fb-points" style="min-height:60px"
-                  placeholder="e.g. Add more ERD diagrams&#10;Improve naming conventions"></textarea>
+          placeholder="e.g. Add more ERD diagrams&#10;Improve naming conventions"></textarea>
       </div>
 
       <div class="form-grid">
         <div class="field-wrap">
           <div class="field-label">Grade (optional)</div>
-          <input class="field-input" id="sup-fb-score" type="number" placeholder="Out of 100" min="0" max="100"/>
+          <input class="field-input" id="sup-fb-score" type="number" placeholder="Out of 100" min="0" max="100" />
         </div>
         <div class="field-wrap">
           <div class="field-label">Priority</div>
@@ -59,8 +59,7 @@
         </div>
       </div>
 
-      <div id="sup-fb-error"
-           style="display:none;color:var(--coral);font-size:13px;
+      <div id="sup-fb-error" style="display:none;color:var(--coral);font-size:13px;
                   background:rgba(220,50,50,.07);border-radius:6px;
                   padding:8px 12px;margin-bottom:12px"></div>
 
@@ -88,107 +87,111 @@
 
 {% block extra_scripts %}
 <script>
-(function(){
-  var projects = [];
-  var COLORS   = ["var(--sup-light)","var(--blue-light)","var(--amber-light)"];
-  var FG       = ["var(--sup)","var(--blue)","var(--amber)"];
+  (function () {
+    var projects = [];
+    var COLORS = ["var(--sup-light)", "var(--blue-light)", "var(--amber-light)"];
+    var FG = ["var(--sup)", "var(--blue)", "var(--amber)"];
 
-  function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-  function ini(name){
-    var p=(name||"").replace(/^(Dr\.|Prof\.)/i,"").trim().split(/\s+/);
-    return p.length>=2?(p[0][0]+p[p.length-1][0]).toUpperCase():(p[0]||"?")[0].toUpperCase();
-  }
-  function typeLabel(t){
-    return {final_report_review:"Final Report Review",source_code_review:"Source Code Review",
-            general_performance:"General Performance",discussion_notes:"Discussion Notes",
-            follow_up:"Follow-up",committee_evaluation:"Committee Evaluation"}[t]||t;
-  }
+    function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function ini(name) {
+      var p = (name || "").replace(/^(Dr\.|Prof\.)/i, "").trim().split(/\s+/);
+      return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : (p[0] || "?")[0].toUpperCase();
+    }
+    function typeLabel(t) {
+      return {
+        final_report_review: "Final Report Review", source_code_review: "Source Code Review",
+        general_performance: "General Performance", discussion_notes: "Discussion Notes",
+        follow_up: "Follow-up", committee_evaluation: "Committee Evaluation"
+      }[t] || t;
+    }
 
-  // Load my projects
-  fetch("/api/supervisor/my-projects")
-    .then(r=>r.json()).then(d=>{
-      projects = d.projects || [];
-      var sel = document.getElementById("sup-fb-project");
-      if (!projects.length){
-        sel.innerHTML = '<option value="">No projects assigned</option>';
-        return;
-      }
-      sel.innerHTML = '<option value="">-- Select project --</option>' +
-        projects.map(p=>`<option value="${p.project_id}">${esc(p.title)}${p.members?" — "+esc(p.members):""}</option>`).join("");
-    }).catch(()=>{
-      document.getElementById("sup-fb-project").innerHTML='<option value="">Could not load projects</option>';
-    });
-
-  // Load history
-  function loadHistory(){
-    fetch("/api/supervisor/my-feedback")
-      .then(r=>r.json()).then(d=>{
-        var list = d.feedback||[];
-        var el   = document.getElementById("sup-fb-history");
-        if (!list.length){
-          el.innerHTML='<div style="text-align:center;padding:30px 0;color:var(--color-text-secondary);font-size:13px">No feedback sent yet.</div>';
+    // Load my projects
+    fetch("/api/supervisor/my-projects")
+      .then(r => r.json()).then(d => {
+        projects = d.projects || [];
+        var sel = document.getElementById("sup-fb-project");
+        if (!projects.length) {
+          sel.innerHTML = '<option value="">No projects assigned</option>';
           return;
         }
-        el.innerHTML = list.slice(0,5).map(function(fb,i){
-          var isLast = i===Math.min(list.length,5)-1;
-          var chip = fb.score!=null
-            ? `<div style="display:flex;align-items:center;gap:6px;margin-top:8px"><span style="font-size:12px;color:var(--color-text-secondary)">Grade:</span><span class="score-chip sc-b">${fb.score}/100</span></div>` : "";
-          return `<div class="fb-item" ${isLast?'style="border:none;margin-bottom:0;padding-bottom:0"':""}>
+        sel.innerHTML = '<option value="">-- Select project --</option>' +
+          projects.map(p => `<option value="${p.project_id}">${esc(p.title)}${p.members ? " — " + esc(p.members) : ""}</option>`).join("");
+      }).catch(() => {
+        document.getElementById("sup-fb-project").innerHTML = '<option value="">Could not load projects</option>';
+      });
+
+    // Load history
+    function loadHistory() {
+      fetch("/api/supervisor/my-feedback")
+        .then(r => r.json()).then(d => {
+          var list = d.feedback || [];
+          var el = document.getElementById("sup-fb-history");
+          if (!list.length) {
+            el.innerHTML = '<div style="text-align:center;padding:30px 0;color:var(--color-text-secondary);font-size:13px">No feedback sent yet.</div>';
+            return;
+          }
+          el.innerHTML = list.slice(0, 5).map(function (fb, i) {
+            var isLast = i === Math.min(list.length, 5) - 1;
+            var chip = fb.score != null
+              ? `<div style="display:flex;align-items:center;gap:6px;margin-top:8px"><span style="font-size:12px;color:var(--color-text-secondary)">Grade:</span><span class="score-chip sc-b">${fb.score}/100</span></div>` : "";
+            return `<div class="fb-item" ${isLast ? 'style="border:none;margin-bottom:0;padding-bottom:0"' : ""}>
             <div class="fb-head">
-              <div class="person-avatar" style="background:${COLORS[i%3]};color:${FG[i%3]};width:30px;height:30px">${ini(fb.project_title)}</div>
-              <div><div class="fb-name">${esc(fb.project_title)}</div><div class="fb-role">${esc(typeLabel(fb.feedback_type))}${fb.is_draft?' · <em>draft</em>':""}</div></div>
+              <div class="person-avatar" style="background:${COLORS[i % 3]};color:${FG[i % 3]};width:30px;height:30px">${ini(fb.project_title)}</div>
+              <div><div class="fb-name">${esc(fb.project_title)}</div><div class="fb-role">${esc(typeLabel(fb.feedback_type))}${fb.is_draft ? ' · <em>draft</em>' : ""}</div></div>
               <div class="fb-date">${esc(fb.created_at)}</div>
             </div>
             <div class="fb-text">${esc(fb.feedback_text)}</div>${chip}</div>`;
-        }).join("");
-      }).catch(()=>{
-        document.getElementById("sup-fb-history").innerHTML='<div style="color:var(--coral);font-size:13px;padding:16px">Could not load history.</div>';
+          }).join("");
+        }).catch(() => {
+          document.getElementById("sup-fb-history").innerHTML = '<div style="color:var(--coral);font-size:13px;padding:16px">Could not load history.</div>';
+        });
+    }
+    loadHistory();
+
+    // Submit
+    function submitFeedback(isDraft) {
+      var err = document.getElementById("sup-fb-error");
+      err.style.display = "none";
+      var projectId = document.getElementById("sup-fb-project").value;
+      var fbType = document.getElementById("sup-fb-type").value;
+      var fbText = document.getElementById("sup-fb-text").value.trim();
+      var scoreRaw = document.getElementById("sup-fb-score").value.trim();
+      var priority = document.getElementById("sup-fb-priority").value;
+      var pointsRaw = document.getElementById("sup-fb-points").value;
+      var points = pointsRaw.split("\n").map(s => s.trim()).filter(Boolean);
+
+      if (!projectId) { err.textContent = "Please select a project."; err.style.display = ""; return; }
+      if (!fbText) { err.textContent = "Feedback text is required."; err.style.display = ""; return; }
+
+      var btn = document.getElementById(isDraft ? "sup-fb-draft" : "sup-fb-send");
+      btn.disabled = true; btn.textContent = isDraft ? "Saving…" : "Sending…";
+
+      fetch("/api/supervisor/submit-feedback", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: parseInt(projectId), feedback_type: fbType,
+          feedback_text: fbText, score: scoreRaw || null, priority: priority,
+          is_draft: isDraft, improvement_points: points
+        })
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          document.getElementById("sup-fb-text").value = "";
+          document.getElementById("sup-fb-score").value = "";
+          document.getElementById("sup-fb-points").value = "";
+          btn.disabled = false; btn.textContent = isDraft ? "Save as draft" : "Send feedback ↗";
+          loadHistory();
+        } else {
+          err.textContent = d.error || "Submission failed."; err.style.display = "";
+          btn.disabled = false; btn.textContent = isDraft ? "Save as draft" : "Send feedback ↗";
+        }
+      }).catch(() => {
+        err.textContent = "Network error. Please try again."; err.style.display = "";
+        btn.disabled = false; btn.textContent = isDraft ? "Save as draft" : "Send feedback ↗";
       });
-  }
-  loadHistory();
+    }
 
-  // Submit
-  function submitFeedback(isDraft){
-    var err = document.getElementById("sup-fb-error");
-    err.style.display="none";
-    var projectId   = document.getElementById("sup-fb-project").value;
-    var fbType      = document.getElementById("sup-fb-type").value;
-    var fbText      = document.getElementById("sup-fb-text").value.trim();
-    var scoreRaw    = document.getElementById("sup-fb-score").value.trim();
-    var priority    = document.getElementById("sup-fb-priority").value;
-    var pointsRaw   = document.getElementById("sup-fb-points").value;
-    var points      = pointsRaw.split("\n").map(s=>s.trim()).filter(Boolean);
-
-    if (!projectId){ err.textContent="Please select a project."; err.style.display=""; return; }
-    if (!fbText)   { err.textContent="Feedback text is required."; err.style.display=""; return; }
-
-    var btn = document.getElementById(isDraft?"sup-fb-draft":"sup-fb-send");
-    btn.disabled=true; btn.textContent=isDraft?"Saving…":"Sending…";
-
-    fetch("/api/supervisor/submit-feedback",{
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({project_id:parseInt(projectId), feedback_type:fbType,
-        feedback_text:fbText, score:scoreRaw||null, priority:priority,
-        is_draft:isDraft, improvement_points:points})
-    }).then(r=>r.json()).then(d=>{
-      if (d.success){
-        document.getElementById("sup-fb-text").value="";
-        document.getElementById("sup-fb-score").value="";
-        document.getElementById("sup-fb-points").value="";
-        btn.disabled=false; btn.textContent=isDraft?"Save as draft":"Send feedback ↗";
-        loadHistory();
-      } else {
-        err.textContent=d.error||"Submission failed."; err.style.display="";
-        btn.disabled=false; btn.textContent=isDraft?"Save as draft":"Send feedback ↗";
-      }
-    }).catch(()=>{
-      err.textContent="Network error. Please try again."; err.style.display="";
-      btn.disabled=false; btn.textContent=isDraft?"Save as draft":"Send feedback ↗";
-    });
-  }
-
-  document.getElementById("sup-fb-send") .addEventListener("click",function(){submitFeedback(false);});
-  document.getElementById("sup-fb-draft").addEventListener("click",function(){submitFeedback(true);});
-})();
+    document.getElementById("sup-fb-send").addEventListener("click", function () { submitFeedback(false); });
+    document.getElementById("sup-fb-draft").addEventListener("click", function () { submitFeedback(true); });
+  })();
 </script>
 {% endblock %}

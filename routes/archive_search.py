@@ -1,10 +1,18 @@
-from flask import Blueprint, Response, current_app, jsonify, render_template, request, send_file, session
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    send_file,
+    session,
+)
 import os
 import re
 
 from auth import login_required
 from db import get_db
-
 
 archive_bp = Blueprint("archive", __name__)
 
@@ -30,7 +38,9 @@ def archive_search_page():
 
 def _archive_report_dirs():
     return [
-        os.path.abspath(os.path.join(current_app.root_path, "static", "archived_reports")),
+        os.path.abspath(
+            os.path.join(current_app.root_path, "static", "archived_reports")
+        ),
     ]
 
 
@@ -138,9 +148,10 @@ def serve_archived_report(filename):
     if path:
         return _inline_pdf_response(path)
 
-    return jsonify({
-        "error": f"PDF not found: {safe}. Checked static/archived_reports/."
-    }), 404
+    return (
+        jsonify({"error": f"PDF not found: {safe}. Checked static/archived_reports/."}),
+        404,
+    )
 
 
 @archive_bp.route("/archive/report/project/<int:project_id>")
@@ -150,7 +161,8 @@ def serve_archived_report_project(project_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT p.title, pf.file_name, pf.file_path, pf.file_mime, pf.file_data
             FROM   projects p
             LEFT JOIN project_files pf
@@ -158,7 +170,9 @@ def serve_archived_report_project(project_id):
                   AND pf.file_type = 'final_report'
             WHERE  p.project_id = %s AND p.status = 'archived'
             LIMIT  1
-        """, (project_id,))
+        """,
+            (project_id,),
+        )
         row = cursor.fetchone()
         cursor.close()
         db.close()
@@ -167,7 +181,10 @@ def serve_archived_report_project(project_id):
             return jsonify({"error": "Archived project report not found."}), 404
 
         if row.get("file_data"):
-            file_name = _archive_basename(row.get("file_name")) or f"project_{project_id}_report.pdf"
+            file_name = (
+                _archive_basename(row.get("file_name"))
+                or f"project_{project_id}_report.pdf"
+            )
             return Response(
                 bytes(row["file_data"]),
                 mimetype=row.get("file_mime") or "application/pdf",
@@ -182,9 +199,14 @@ def serve_archived_report_project(project_id):
         if path:
             return _inline_pdf_response(path)
 
-        return jsonify({
-            "error": "Archived report file was not found in static/archived_reports."
-        }), 404
+        return (
+            jsonify(
+                {
+                    "error": "Archived report file was not found in static/archived_reports."
+                }
+            ),
+            404,
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -209,7 +231,9 @@ def api_archived_projects():
         params = []
 
         if q:
-            where.append("(p.title LIKE %s OR p.keywords LIKE %s OR u.full_name LIKE %s)")
+            where.append(
+                "(p.title LIKE %s OR p.keywords LIKE %s OR u.full_name LIKE %s)"
+            )
             like = f"%{q}%"
             params += [like, like, like]
         if year:
@@ -224,18 +248,22 @@ def api_archived_projects():
 
         where_sql = " AND ".join(where)
 
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT COUNT(*) AS cnt
             FROM   projects p
             JOIN   semesters s ON s.semester_id = p.semester_id
             LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
             LEFT JOIN users   u ON u.user_id    = f.user_id
             WHERE  {where_sql}
-        """, params)
+        """,
+            params,
+        )
         total = (cursor.fetchone() or {}).get("cnt", 0)
 
         offset = (page - 1) * per_page
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT p.project_id, p.title, p.project_type, p.final_score,
                    p.submission_date, s.academic_year,
                    u.full_name AS supervisor_name
@@ -246,25 +274,29 @@ def api_archived_projects():
             WHERE  {where_sql}
             ORDER  BY p.submission_date DESC, p.project_id DESC
             LIMIT  %s OFFSET %s
-        """, params + [per_page, offset])
+        """,
+            params + [per_page, offset],
+        )
 
         rows = []
         for r in cursor.fetchall():
             pt = r["project_type"]
             if isinstance(pt, set):
                 pt = ", ".join(sorted(pt))
-            rows.append({
-                "project_id": r["project_id"],
-                "title": r["title"] or "",
-                "project_type": pt or "",
-                "final_score": (
-                    float(r["final_score"])
-                    if can_view_scores and r.get("final_score")
-                    else None
-                ),
-                "academic_year": r["academic_year"] or "",
-                "supervisor_name": r["supervisor_name"] or "-",
-            })
+            rows.append(
+                {
+                    "project_id": r["project_id"],
+                    "title": r["title"] or "",
+                    "project_type": pt or "",
+                    "final_score": (
+                        float(r["final_score"])
+                        if can_view_scores and r.get("final_score")
+                        else None
+                    ),
+                    "academic_year": r["academic_year"] or "",
+                    "supervisor_name": r["supervisor_name"] or "-",
+                }
+            )
 
         cursor.execute("""
             SELECT DISTINCT s.academic_year
@@ -282,19 +314,23 @@ def api_archived_projects():
             WHERE p.status = 'archived' AND p.supervisor_id IS NOT NULL
             ORDER BY u.full_name
         """)
-        supervisors = [{"id": r["faculty_id"], "name": r["full_name"]} for r in cursor.fetchall()]
+        supervisors = [
+            {"id": r["faculty_id"], "name": r["full_name"]} for r in cursor.fetchall()
+        ]
 
         cursor.close()
         db.close()
-        return jsonify({
-            "projects": rows,
-            "total": int(total),
-            "page": page,
-            "per_page": per_page,
-            "years": years,
-            "supervisors": supervisors,
-            "can_view_scores": can_view_scores,
-        })
+        return jsonify(
+            {
+                "projects": rows,
+                "total": int(total),
+                "page": page,
+                "per_page": per_page,
+                "years": years,
+                "supervisors": supervisors,
+                "can_view_scores": can_view_scores,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -308,7 +344,8 @@ def api_archived_project_detail(project_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT p.project_id, p.title, p.abstract, p.keywords,
                    p.project_type, p.final_score, p.submission_date,
                    s.academic_year,
@@ -318,7 +355,9 @@ def api_archived_project_detail(project_id):
             LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
             LEFT JOIN users   u ON u.user_id    = f.user_id
             WHERE  p.project_id = %s AND p.status = 'archived'
-        """, (project_id,))
+        """,
+            (project_id,),
+        )
         proj = cursor.fetchone()
         if not proj:
             cursor.close()
@@ -336,46 +375,59 @@ def api_archived_project_detail(project_id):
         else:
             proj["final_score"] = None
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT u.full_name, u.university_id
             FROM   project_members pm
             JOIN   students st ON st.student_id = pm.student_id
             JOIN   users    u  ON u.user_id     = st.user_id
             WHERE  pm.project_id = %s
             ORDER  BY pm.is_primary_contact DESC
-        """, (project_id,))
+        """,
+            (project_id,),
+        )
         members = [dict(r) for r in cursor.fetchall()]
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT cr.type, cr.title, cr.description, cr.solution_lesson
             FROM   challenges_reflections cr
             WHERE  cr.project_id = %s AND cr.type IN ('technical','administrative')
             ORDER  BY cr.challenge_id
-        """, (project_id,))
+        """,
+            (project_id,),
+        )
         challenges = [dict(r) for r in cursor.fetchall()]
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT file_name, file_path, file_data IS NOT NULL AS has_blob
             FROM   project_files
             WHERE  project_id = %s AND file_type = 'final_report'
             LIMIT  1
-        """, (project_id,))
+        """,
+            (project_id,),
+        )
         frow = cursor.fetchone()
 
         report_url = None
-        if frow and (frow.get("file_path") or frow.get("file_name") or frow.get("has_blob")):
+        if frow and (
+            frow.get("file_path") or frow.get("file_name") or frow.get("has_blob")
+        ):
             report_url = f"/archive/report/project/{project_id}"
         elif _find_archived_report_path(proj.get("title")):
             report_url = f"/archive/report/project/{project_id}"
 
         cursor.close()
         db.close()
-        return jsonify({
-            "project": proj,
-            "members": members,
-            "challenges": challenges,
-            "report_url": report_url,
-            "can_view_scores": can_view_scores,
-        })
+        return jsonify(
+            {
+                "project": proj,
+                "members": members,
+                "challenges": challenges,
+                "report_url": report_url,
+                "can_view_scores": can_view_scores,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500

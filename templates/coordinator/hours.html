@@ -7,530 +7,510 @@
 {% block content %}
 <div class="page page-single on" id="pg-hours">
 
-<style>
-  html,
-  body {
-    scroll-behavior: auto !important;
-  }
-
-  #pg-hours {
-    display: block !important;
-    min-height: auto !important;
-    height: auto !important;
-    padding: 20px 22px 90px !important;
-    margin: 0 !important;
-  }
-
-  #pg-hours .hours-tabs {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin: 0 0 16px 0;
-    padding: 0;
-  }
-
-  #pg-hours .hours-tab {
-    border: 1px solid #d7e3dc;
-    background: #fff;
-    color: #2d5137;
-    border-radius: 999px;
-    padding: 9px 14px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: 0.18s ease;
-  }
-
-  #pg-hours .hours-tab:hover {
-    background: #f3f7f4;
-  }
-
-  #pg-hours .hours-tab.on {
-    background: #2e7d42;
-    border-color: #2e7d42;
-    color: #fff;
-    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
-  }
-
-  #pg-hours .hours-section {
-    display: none;
-    width: 100%;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  #pg-hours .hours-section.active {
-    display: block !important;
-  }
-
-  #pg-hours .hours-info-box {
-    border-left: 5px solid #2e7d42;
-    background: #f7fbf8;
-    border-radius: 14px;
-    padding: 13px 14px;
-    color: #344054;
-    line-height: 1.55;
-    font-size: 13px;
-  }
-
-  #pg-hours .hours-help-box {
-    border: 1px solid #e7eee9;
-    background: #fbfdfb;
-    border-radius: 14px;
-    padding: 13px 14px;
-    color: #344054;
-    line-height: 1.6;
-    font-size: 13px;
-  }
-
-  #pg-hours .hours-bar-wrap {
-    background: #fff;
-    border: 1px solid #e7eee9;
-    border-radius: 16px;
-    padding: 13px 14px;
-    margin-bottom: 12px;
-  }
-
-  #pg-hours .hours-bar-top {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-
-  #pg-hours .hours-doctor-name {
-    font-weight: 800;
-    color: #173b24;
-  }
-
-  #pg-hours .hours-count {
-    font-size: 12px;
-    font-weight: 800;
-    color: #2e7d42;
-    background: #ecfdf3;
-    border: 1px solid #ccebd5;
-    padding: 4px 9px;
-    border-radius: 999px;
-    white-space: nowrap;
-  }
-
-  #pg-hours .hours-bar-bg {
-    height: 9px;
-    background: #edf2f7;
-    border-radius: 999px;
-    overflow: hidden;
-    margin: 8px 0;
-  }
-
-  #pg-hours .hours-bar-fill {
-    height: 100%;
-    background: #2e7d42;
-    border-radius: 999px;
-  }
-
-  #pg-hours .hours-bar-fill.warning {
-    background: #c58a17;
-  }
-
-  #pg-hours .hours-bar-fill.danger {
-    background: #b42318;
-  }
-
-  #pg-hours .hours-meta {
-    font-size: 12px;
-    color: #667085;
-    line-height: 1.5;
-  }
-
-  #pg-hours .card {
-    margin-top: 0 !important;
-  }
-
-  #pg-hours .hours-message {
-    margin-top: 12px;
-    font-size: 12px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    display: none;
-  }
-
-  #pg-hours .hours-message.ok {
-    display: block;
-    color: #027a48;
-    background: #ecfdf3;
-    border: 1px solid #abefc6;
-  }
-
-  #pg-hours .hours-message.error {
-    display: block;
-    color: #b42318;
-    background: #fef3f2;
-    border: 1px solid #fecdca;
-  }
-
-  #pg-hours .hours-message.loading {
-    display: block;
-    color: #344054;
-    background: #f9fafb;
-    border: 1px solid #eaecf0;
-  }
-
-  #pg-hours .hours-empty {
-    padding: 22px;
-    border: 1px dashed #cddbd2;
-    border-radius: 14px;
-    color: #667085;
-    text-align: center;
-    background: #fbfdfb;
-  }
-
-  #pg-hours .pill-hours-ok {
-    background: #ecfdf3;
-    color: #027a48;
-  }
-
-  #pg-hours .pill-hours-warning {
-    background: #fffaeb;
-    color: #b54708;
-  }
-
-  #pg-hours .pill-hours-danger {
-    background: #fef3f2;
-    color: #b42318;
-  }
-
-  @media (max-width: 620px) {
-    #pg-hours .hours-tab {
-      width: 100%;
-      text-align: center;
+  <style>
+    html,
+    body {
+      scroll-behavior: auto !important;
     }
-  }
-</style>
 
-<div class="hours-tabs" role="tablist" aria-label="Faculty Hours tabs">
-  <button
-    class="hours-tab on"
-    type="button"
-    role="tab"
-    aria-selected="true"
-    aria-controls="hoursBarsTab"
-    onclick="showHoursSection('hoursBarsTab', this)">
-    Graduation Project Hours
-  </button>
+    #pg-hours {
+      display: block !important;
+      min-height: auto !important;
+      height: auto !important;
+      padding: 20px 22px 90px !important;
+      margin: 0 !important;
+    }
 
-  <button
-    class="hours-tab"
-    type="button"
-    role="tab"
-    aria-selected="false"
-    aria-controls="hoursEditTab"
-    onclick="showHoursSection('hoursEditTab', this)">
-    Edit Doctor Hours
-  </button>
+    #pg-hours .hours-tabs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 0 0 16px 0;
+      padding: 0;
+    }
 
-  <button
-    class="hours-tab"
-    type="button"
-    role="tab"
-    aria-selected="false"
-    aria-controls="hoursSummaryTab"
-    onclick="showHoursSection('hoursSummaryTab', this)">
-    Summary
-  </button>
-</div>
+    #pg-hours .hours-tab {
+      border: 1px solid #d7e3dc;
+      background: #fff;
+      color: #2d5137;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
 
-<!-- =========================
+    #pg-hours .hours-tab:hover {
+      background: #f3f7f4;
+    }
+
+    #pg-hours .hours-tab.on {
+      background: #2e7d42;
+      border-color: #2e7d42;
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+    }
+
+    #pg-hours .hours-section {
+      display: none;
+      width: 100%;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    #pg-hours .hours-section.active {
+      display: block !important;
+    }
+
+    #pg-hours .hours-info-box {
+      border-left: 5px solid #2e7d42;
+      background: #f7fbf8;
+      border-radius: 14px;
+      padding: 13px 14px;
+      color: #344054;
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    #pg-hours .hours-help-box {
+      border: 1px solid #e7eee9;
+      background: #fbfdfb;
+      border-radius: 14px;
+      padding: 13px 14px;
+      color: #344054;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    #pg-hours .hours-bar-wrap {
+      background: #fff;
+      border: 1px solid #e7eee9;
+      border-radius: 16px;
+      padding: 13px 14px;
+      margin-bottom: 12px;
+    }
+
+    #pg-hours .hours-bar-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    #pg-hours .hours-doctor-name {
+      font-weight: 800;
+      color: #173b24;
+    }
+
+    #pg-hours .hours-count {
+      font-size: 12px;
+      font-weight: 800;
+      color: #2e7d42;
+      background: #ecfdf3;
+      border: 1px solid #ccebd5;
+      padding: 4px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    #pg-hours .hours-bar-bg {
+      height: 9px;
+      background: #edf2f7;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    #pg-hours .hours-bar-fill {
+      height: 100%;
+      background: #2e7d42;
+      border-radius: 999px;
+    }
+
+    #pg-hours .hours-bar-fill.warning {
+      background: #c58a17;
+    }
+
+    #pg-hours .hours-bar-fill.danger {
+      background: #b42318;
+    }
+
+    #pg-hours .hours-meta {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.5;
+    }
+
+    #pg-hours .card {
+      margin-top: 0 !important;
+    }
+
+    #pg-hours .hours-message {
+      margin-top: 12px;
+      font-size: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    #pg-hours .hours-message.ok {
+      display: block;
+      color: #027a48;
+      background: #ecfdf3;
+      border: 1px solid #abefc6;
+    }
+
+    #pg-hours .hours-message.error {
+      display: block;
+      color: #b42318;
+      background: #fef3f2;
+      border: 1px solid #fecdca;
+    }
+
+    #pg-hours .hours-message.loading {
+      display: block;
+      color: #344054;
+      background: #f9fafb;
+      border: 1px solid #eaecf0;
+    }
+
+    #pg-hours .hours-empty {
+      padding: 22px;
+      border: 1px dashed #cddbd2;
+      border-radius: 14px;
+      color: #667085;
+      text-align: center;
+      background: #fbfdfb;
+    }
+
+    #pg-hours .pill-hours-ok {
+      background: #ecfdf3;
+      color: #027a48;
+    }
+
+    #pg-hours .pill-hours-warning {
+      background: #fffaeb;
+      color: #b54708;
+    }
+
+    #pg-hours .pill-hours-danger {
+      background: #fef3f2;
+      color: #b42318;
+    }
+
+    @media (max-width: 620px) {
+      #pg-hours .hours-tab {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+
+  <div class="hours-tabs" role="tablist" aria-label="Faculty Hours tabs">
+    <button class="hours-tab on" type="button" role="tab" aria-selected="true" aria-controls="hoursBarsTab"
+      onclick="showHoursSection('hoursBarsTab', this)">
+      Graduation Project Hours
+    </button>
+
+    <button class="hours-tab" type="button" role="tab" aria-selected="false" aria-controls="hoursEditTab"
+      onclick="showHoursSection('hoursEditTab', this)">
+      Edit Doctor Hours
+    </button>
+
+    <button class="hours-tab" type="button" role="tab" aria-selected="false" aria-controls="hoursSummaryTab"
+      onclick="showHoursSection('hoursSummaryTab', this)">
+      Summary
+    </button>
+  </div>
+
+  <!-- =========================
      TAB 1: Graduation Project Hours
 ========================== -->
-<div id="hoursBarsTab" class="hours-section active" role="tabpanel">
-  <div class="card">
-    <div class="card-hd">
-      <span class="card-title">Graduation Project Hours Wanted</span>
-    </div>
+  <div id="hoursBarsTab" class="hours-section active" role="tabpanel">
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Graduation Project Hours Wanted</span>
+      </div>
 
-    <div class="hours-info-box">
-      This page only manages the number of <b>graduation project supervision hours</b>
-      each doctor wants to take.
-      It does not calculate all university teaching hours.
-      <br><br>
-      <b>Used hours = number of supervised graduation students × 0.5</b>
-    </div>
+      <div class="hours-info-box">
+        This page only manages the number of <b>graduation project supervision hours</b>
+        each doctor wants to take.
+        It does not calculate all university teaching hours.
+        <br><br>
+        <b>Used hours = number of supervised graduation students × 0.5</b>
+      </div>
 
-    <div id="facultyHoursBars" style="margin-top:14px">
-      <div class="hours-empty">Loading faculty hours...</div>
+      <div id="facultyHoursBars" style="margin-top:14px">
+        <div class="hours-empty">Loading faculty hours...</div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- =========================
+  <!-- =========================
      TAB 2: Edit Doctor Hours
 ========================== -->
-<div id="hoursEditTab" class="hours-section" role="tabpanel">
-  <div class="card">
-    <div class="card-hd">
-      <span class="card-title">Edit Doctor Project Hours</span>
-    </div>
-
-    <div class="form-grid">
-      <div class="field-wrap">
-        <div class="field-label">Doctor</div>
-        <select class="field-select" id="professorSelect" onchange="fillFacultyHourForm()">
-          <option value="">Select doctor...</option>
-        </select>
+  <div id="hoursEditTab" class="hours-section" role="tabpanel">
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Edit Doctor Project Hours</span>
       </div>
 
-      <div class="field-wrap">
-        <div class="field-label">Graduation Project Hours Wanted</div>
-        <input
-          class="field-input"
-          id="graduationProjectHours"
-          type="number"
-          min="0"
-          step="0.5"
-          placeholder="Example: 3" />
+      <div class="form-grid">
+        <div class="field-wrap">
+          <div class="field-label">Doctor</div>
+          <select class="field-select" id="professorSelect" onchange="fillFacultyHourForm()">
+            <option value="">Select doctor...</option>
+          </select>
+        </div>
+
+        <div class="field-wrap">
+          <div class="field-label">Graduation Project Hours Wanted</div>
+          <input class="field-input" id="graduationProjectHours" type="number" min="0" step="0.5"
+            placeholder="Example: 3" />
+        </div>
       </div>
+
+      <div class="hours-help-box" style="margin-top:12px">
+        Example: if a doctor wants <b>3 hours</b>, then the doctor can supervise about
+        <b>6 students</b> because each student counts as <b>0.5 hour</b>.
+      </div>
+
+      <div class="btn-row u-92d17336">
+        <button class="btn btn-primary u-9bd93d36" type="button" onclick="saveFacultyHours()">
+          Save Hours
+        </button>
+
+        <button class="btn btn-outline u-9bd93d36" type="button" onclick="loadFacultyHoursData()">
+          Refresh
+        </button>
+      </div>
+
+      <div id="hoursMsg" class="hours-message"></div>
     </div>
-
-    <div class="hours-help-box" style="margin-top:12px">
-      Example: if a doctor wants <b>3 hours</b>, then the doctor can supervise about
-      <b>6 students</b> because each student counts as <b>0.5 hour</b>.
-    </div>
-
-    <div class="btn-row u-92d17336">
-      <button class="btn btn-primary u-9bd93d36" type="button" onclick="saveFacultyHours()">
-        Save Hours
-      </button>
-
-      <button class="btn btn-outline u-9bd93d36" type="button" onclick="loadFacultyHoursData()">
-        Refresh
-      </button>
-    </div>
-
-    <div id="hoursMsg" class="hours-message"></div>
   </div>
-</div>
 
-<!-- =========================
+  <!-- =========================
      TAB 3: Summary
 ========================== -->
-<div id="hoursSummaryTab" class="hours-section" role="tabpanel">
-  <div class="card">
-    <div class="card-hd">
-      <span class="card-title">Summary</span>
-    </div>
+  <div id="hoursSummaryTab" class="hours-section" role="tabpanel">
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Summary</span>
+      </div>
 
-    <div class="u-77c8140b">
-      <table class="reg-table">
-        <thead>
-          <tr>
-            <th>Doctor</th>
-            <th>Wanted Hours</th>
-            <th>Students</th>
-            <th>Used Hours</th>
-            <th>Remaining</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+      <div class="u-77c8140b">
+        <table class="reg-table">
+          <thead>
+            <tr>
+              <th>Doctor</th>
+              <th>Wanted Hours</th>
+              <th>Students</th>
+              <th>Used Hours</th>
+              <th>Remaining</th>
+              <th>Status</th>
+            </tr>
+          </thead>
 
-        <tbody id="hoursSummaryBody">
-          <tr>
-            <td colspan="6">Loading...</td>
-          </tr>
-        </tbody>
-      </table>
+          <tbody id="hoursSummaryBody">
+            <tr>
+              <td colspan="6">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-</div>
 
 </div>
 
 <script>
-let facultyData = [];
+  let facultyData = [];
 
-function hEscape(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-function hNum(value, fallback = 0) {
-  const n = parseFloat(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function setHoursMessage(message, type) {
-  const msg = document.getElementById('hoursMsg');
-  if (!msg) return;
-
-  msg.textContent = message || '';
-  msg.className = 'hours-message';
-
-  if (type) {
-    msg.classList.add(type);
-  }
-}
-
-function resetHoursScroll() {
-  window.scrollTo(0, 0);
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-
-  ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-hours'].forEach(selector => {
-    const el = document.querySelector(selector);
-    if (el) {
-      el.scrollTop = 0;
-    }
-  });
-}
-
-function showHoursSection(id, btn) {
-  document.querySelectorAll('#pg-hours .hours-section').forEach(section => {
-    section.classList.remove('active');
-  });
-
-  const selected = document.getElementById(id);
-  if (selected) {
-    selected.classList.add('active');
+  function hEscape(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
 
-  document.querySelectorAll('#pg-hours .hours-tab').forEach(tab => {
-    const isActive = tab === btn;
-    tab.classList.toggle('on', isActive);
-    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-  });
+  function hNum(value, fallback = 0) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
 
-  setTimeout(resetHoursScroll, 0);
-}
+  function setHoursMessage(message, type) {
+    const msg = document.getElementById('hoursMsg');
+    if (!msg) return;
 
-function normalizeFacultyHour(row) {
-  const wanted = hNum(row.graduation_project_hours ?? row.wanted_hours, 0);
-  const students = parseInt(row.project_students ?? 0, 10) || 0;
-  const used = hNum(row.used_hours, students * 0.5);
-  const remaining = hNum(row.remaining_hours, wanted - used);
+    msg.textContent = message || '';
+    msg.className = 'hours-message';
 
-  return {
-    ...row,
-    wanted_hours: wanted,
-    project_students: students,
-    used_hours: used,
-    remaining_hours: remaining
-  };
-}
+    if (type) {
+      msg.classList.add(type);
+    }
+  }
 
-async function loadFacultyHoursData() {
-  const barsBox = document.getElementById('facultyHoursBars');
-  const summaryBody = document.getElementById('hoursSummaryBody');
-  const professorSelect = document.getElementById('professorSelect');
+  function resetHoursScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
 
-  try {
-    if (barsBox) {
-      barsBox.innerHTML = '<div class="hours-empty">Loading faculty hours...</div>';
+    ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-hours'].forEach(selector => {
+      const el = document.querySelector(selector);
+      if (el) {
+        el.scrollTop = 0;
+      }
+    });
+  }
+
+  function showHoursSection(id, btn) {
+    document.querySelectorAll('#pg-hours .hours-section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    const selected = document.getElementById(id);
+    if (selected) {
+      selected.classList.add('active');
     }
 
-    if (summaryBody) {
-      summaryBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
-    }
-
-    const res = await fetch('/api/coordinator/faculty-hours-data');
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to load faculty hours.');
-    }
-
-    facultyData = (data.faculty || []).map(normalizeFacultyHour);
-
-    renderFacultyBars(facultyData);
-    renderSummaryTable(facultyData);
-    renderProfessorSelect(facultyData);
-    setHoursMessage('', '');
+    document.querySelectorAll('#pg-hours .hours-tab').forEach(tab => {
+      const isActive = tab === btn;
+      tab.classList.toggle('on', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
 
     setTimeout(resetHoursScroll, 0);
-  } catch (err) {
-    if (barsBox) {
-      barsBox.innerHTML = `<div class="hours-empty">${hEscape(err.message)}</div>`;
+  }
+
+  function normalizeFacultyHour(row) {
+    const wanted = hNum(row.graduation_project_hours ?? row.wanted_hours, 0);
+    const students = parseInt(row.project_students ?? 0, 10) || 0;
+    const used = hNum(row.used_hours, students * 0.5);
+    const remaining = hNum(row.remaining_hours, wanted - used);
+
+    return {
+      ...row,
+      wanted_hours: wanted,
+      project_students: students,
+      used_hours: used,
+      remaining_hours: remaining
+    };
+  }
+
+  async function loadFacultyHoursData() {
+    const barsBox = document.getElementById('facultyHoursBars');
+    const summaryBody = document.getElementById('hoursSummaryBody');
+    const professorSelect = document.getElementById('professorSelect');
+
+    try {
+      if (barsBox) {
+        barsBox.innerHTML = '<div class="hours-empty">Loading faculty hours...</div>';
+      }
+
+      if (summaryBody) {
+        summaryBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+      }
+
+      const res = await fetch('/api/coordinator/faculty-hours-data');
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load faculty hours.');
+      }
+
+      facultyData = (data.faculty || []).map(normalizeFacultyHour);
+
+      renderFacultyBars(facultyData);
+      renderSummaryTable(facultyData);
+      renderProfessorSelect(facultyData);
+      setHoursMessage('', '');
+
+      setTimeout(resetHoursScroll, 0);
+    } catch (err) {
+      if (barsBox) {
+        barsBox.innerHTML = `<div class="hours-empty">${hEscape(err.message)}</div>`;
+      }
+
+      if (summaryBody) {
+        summaryBody.innerHTML = `<tr><td colspan="6">${hEscape(err.message)}</td></tr>`;
+      }
+
+      if (professorSelect) {
+        professorSelect.innerHTML = '<option value="">Select doctor...</option>';
+      }
+
+      setHoursMessage(err.message, 'error');
+    }
+  }
+
+  function getHoursStatus(row) {
+    if (row.status) {
+      return row.status;
     }
 
-    if (summaryBody) {
-      summaryBody.innerHTML = `<tr><td colspan="6">${hEscape(err.message)}</td></tr>`;
+    if (row.wanted_hours <= 0) {
+      return 'Not Set';
     }
 
-    if (professorSelect) {
-      professorSelect.innerHTML = '<option value="">Select doctor...</option>';
+    if (row.remaining_hours < 0) {
+      return 'Over Wanted Hours';
     }
 
-    setHoursMessage(err.message, 'error');
-  }
-}
+    if (row.remaining_hours < 0.5) {
+      return 'Full';
+    }
 
-function getHoursStatus(row) {
-  if (row.status) {
-    return row.status;
+    return 'Available';
   }
 
-  if (row.wanted_hours <= 0) {
-    return 'Not Set';
+  function getHoursPillClass(row) {
+    if (row.wanted_hours <= 0) {
+      return 'pill-hours-warning';
+    }
+
+    if (row.remaining_hours < 0) {
+      return 'pill-hours-danger';
+    }
+
+    if (row.remaining_hours < 0.5) {
+      return 'pill-hours-warning';
+    }
+
+    return 'pill-hours-ok';
   }
 
-  if (row.remaining_hours < 0) {
-    return 'Over Wanted Hours';
+  function getBarClass(row) {
+    if (row.remaining_hours < 0) {
+      return 'danger';
+    }
+
+    if (row.remaining_hours < 0.5) {
+      return 'warning';
+    }
+
+    return '';
   }
 
-  if (row.remaining_hours < 0.5) {
-    return 'Full';
-  }
+  function renderFacultyBars(rows) {
+    const box = document.getElementById('facultyHoursBars');
 
-  return 'Available';
-}
+    if (!box) return;
 
-function getHoursPillClass(row) {
-  if (row.wanted_hours <= 0) {
-    return 'pill-hours-warning';
-  }
+    if (!rows.length) {
+      box.innerHTML = '<div class="hours-empty">No faculty data found.</div>';
+      return;
+    }
 
-  if (row.remaining_hours < 0) {
-    return 'pill-hours-danger';
-  }
+    box.innerHTML = rows.map(row => {
+      const percent = row.wanted_hours > 0
+        ? Math.min((row.used_hours / row.wanted_hours) * 100, 100)
+        : 0;
 
-  if (row.remaining_hours < 0.5) {
-    return 'pill-hours-warning';
-  }
-
-  return 'pill-hours-ok';
-}
-
-function getBarClass(row) {
-  if (row.remaining_hours < 0) {
-    return 'danger';
-  }
-
-  if (row.remaining_hours < 0.5) {
-    return 'warning';
-  }
-
-  return '';
-}
-
-function renderFacultyBars(rows) {
-  const box = document.getElementById('facultyHoursBars');
-
-  if (!box) return;
-
-  if (!rows.length) {
-    box.innerHTML = '<div class="hours-empty">No faculty data found.</div>';
-    return;
-  }
-
-  box.innerHTML = rows.map(row => {
-    const percent = row.wanted_hours > 0
-      ? Math.min((row.used_hours / row.wanted_hours) * 100, 100)
-      : 0;
-
-    return `
+      return `
       <div class="hours-bar-wrap">
         <div class="hours-bar-top">
           <span class="hours-doctor-name">${hEscape(row.full_name)}</span>
@@ -546,24 +526,24 @@ function renderFacultyBars(rows) {
         </div>
       </div>
     `;
-  }).join('');
-}
-
-function renderSummaryTable(rows) {
-  const body = document.getElementById('hoursSummaryBody');
-
-  if (!body) return;
-
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="6">No data found.</td></tr>';
-    return;
+    }).join('');
   }
 
-  body.innerHTML = rows.map(row => {
-    const status = getHoursStatus(row);
-    const pillClass = getHoursPillClass(row);
+  function renderSummaryTable(rows) {
+    const body = document.getElementById('hoursSummaryBody');
 
-    return `
+    if (!body) return;
+
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="6">No data found.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = rows.map(row => {
+      const status = getHoursStatus(row);
+      const pillClass = getHoursPillClass(row);
+
+      return `
       <tr>
         <td>${hEscape(row.full_name)}</td>
         <td>${row.wanted_hours.toFixed(1)}</td>
@@ -573,90 +553,90 @@ function renderSummaryTable(rows) {
         <td><span class="pill ${pillClass}">${hEscape(status)}</span></td>
       </tr>
     `;
-  }).join('');
-}
+    }).join('');
+  }
 
-function renderProfessorSelect(rows) {
-  const select = document.getElementById('professorSelect');
+  function renderProfessorSelect(rows) {
+    const select = document.getElementById('professorSelect');
 
-  if (!select) return;
+    if (!select) return;
 
-  const current = select.value;
+    const current = select.value;
 
-  select.innerHTML = '<option value="">Select doctor...</option>' + rows.map(row => `
+    select.innerHTML = '<option value="">Select doctor...</option>' + rows.map(row => `
     <option value="${row.faculty_id}">${hEscape(row.full_name)}</option>
   `).join('');
 
-  if (current) {
-    select.value = current;
-  }
-}
-
-function fillFacultyHourForm() {
-  const facultyId = document.getElementById('professorSelect').value;
-  const row = facultyData.find(x => String(x.faculty_id) === String(facultyId));
-
-  document.getElementById('graduationProjectHours').value = row ? row.wanted_hours : '';
-}
-
-async function saveFacultyHours() {
-  const facultyId = document.getElementById('professorSelect').value;
-  const hours = document.getElementById('graduationProjectHours').value;
-
-  if (!facultyId) {
-    setHoursMessage('Please choose a doctor.', 'error');
-    return;
+    if (current) {
+      select.value = current;
+    }
   }
 
-  try {
-    setHoursMessage('Saving...', 'loading');
+  function fillFacultyHourForm() {
+    const facultyId = document.getElementById('professorSelect').value;
+    const row = facultyData.find(x => String(x.faculty_id) === String(facultyId));
 
-    const res = await fetch('/api/coordinator/faculty-hours-save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        faculty_id: facultyId,
-        graduation_project_hours: hours
-      })
-    });
+    document.getElementById('graduationProjectHours').value = row ? row.wanted_hours : '';
+  }
 
-    const data = await res.json();
+  async function saveFacultyHours() {
+    const facultyId = document.getElementById('professorSelect').value;
+    const hours = document.getElementById('graduationProjectHours').value;
 
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to save hours.');
+    if (!facultyId) {
+      setHoursMessage('Please choose a doctor.', 'error');
+      return;
     }
 
-    setHoursMessage(data.message || 'Saved successfully.', 'ok');
+    try {
+      setHoursMessage('Saving...', 'loading');
 
-    await loadFacultyHoursData();
+      const res = await fetch('/api/coordinator/faculty-hours-save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          faculty_id: facultyId,
+          graduation_project_hours: hours
+        })
+      });
 
-    document.getElementById('professorSelect').value = facultyId;
-    fillFacultyHourForm();
-  } catch (err) {
-    setHoursMessage(err.message, 'error');
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save hours.');
+      }
+
+      setHoursMessage(data.message || 'Saved successfully.', 'ok');
+
+      await loadFacultyHoursData();
+
+      document.getElementById('professorSelect').value = facultyId;
+      fillFacultyHourForm();
+    } catch (err) {
+      setHoursMessage(err.message, 'error');
+    }
   }
-}
 
-if ('scrollRestoration' in history) {
-  history.scrollRestoration = 'manual';
-}
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
 
-document.addEventListener('DOMContentLoaded', function () {
-  loadFacultyHoursData();
+  document.addEventListener('DOMContentLoaded', function () {
+    loadFacultyHoursData();
 
-  const firstTab = document.querySelector('#pg-hours .hours-tab');
-  showHoursSection('hoursBarsTab', firstTab);
+    const firstTab = document.querySelector('#pg-hours .hours-tab');
+    showHoursSection('hoursBarsTab', firstTab);
 
-  setTimeout(resetHoursScroll, 0);
-  setTimeout(resetHoursScroll, 100);
-  setTimeout(resetHoursScroll, 300);
-});
+    setTimeout(resetHoursScroll, 0);
+    setTimeout(resetHoursScroll, 100);
+    setTimeout(resetHoursScroll, 300);
+  });
 
-window.addEventListener('load', function () {
-  setTimeout(resetHoursScroll, 0);
-  setTimeout(resetHoursScroll, 100);
-});
+  window.addEventListener('load', function () {
+    setTimeout(resetHoursScroll, 0);
+    setTimeout(resetHoursScroll, 100);
+  });
 </script>
 {% endblock %}

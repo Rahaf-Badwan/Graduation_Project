@@ -6,162 +6,1351 @@
 
 {% block content %}
 <style>
-  .notif-card{background:#fff;border:1px solid #e6ece8;border-radius:18px;box-shadow:0 10px 28px rgba(16,24,40,.06);overflow:hidden}
-  .notif-card-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:1px solid #edf2ef}
-  .notif-card-title{font-size:18px;font-weight:800;color:#173b24}.notif-card-sub{font-size:12px;color:#6b7280;margin-top:3px}.notif-body{padding:16px 18px}
-  .notif-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.notif-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
-  .notif-field label{font-size:13px;font-weight:700;color:#344054}.notif-field input,.notif-field select,.notif-field textarea{border:1px solid #d8e2dc;border-radius:12px;padding:10px 12px;font-size:14px;background:#fff;outline:none}
-  .notif-field textarea{min-height:112px;resize:vertical;line-height:1.5}.notif-field input:focus,.notif-field select:focus,.notif-field textarea:focus{border-color:#2e7d42;box-shadow:0 0 0 3px rgba(46,125,66,.12)}
-  .notif-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:8px}.notif-btn{border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer;background:#2e7d42;color:#fff}
-  .notif-btn.secondary{background:#f3f7f4;color:#245c33;border:1px solid #cfe0d4}.notif-list{display:flex;flex-direction:column;gap:10px}.notif-message{border:1px solid #e7eee9;background:#fff;border-radius:14px;padding:13px 14px;display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start}
-  .notif-message.unread{background:#f3fbf5;border-color:#bee4c7}.notif-icon{width:36px;height:36px;border-radius:12px;background:#eaf6ee;color:#2e7d42;display:flex;align-items:center;justify-content:center;font-weight:900}
-  .notif-msg-title{font-weight:800;color:#172b1d;margin-bottom:4px}.notif-msg-meta{font-size:12px;color:#667085;margin-bottom:7px}.notif-msg-text{font-size:14px;line-height:1.5;color:#344054;white-space:pre-wrap}
-  .notif-pill{font-size:11px;font-weight:800;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#3538cd;white-space:nowrap}.notif-pill.unread{background:#fef3c7;color:#92400e}.course-pill{display:inline-block;margin-right:6px;margin-bottom:6px;font-size:11px;font-weight:900;padding:4px 8px;border-radius:999px;background:#ecfdf3;color:#027a48}
-  .notif-tabs{display:flex;gap:8px;padding:12px 18px 0}.notif-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;padding:8px 12px;border-radius:999px;font-weight:800;cursor:pointer}.notif-tab.on{background:#2e7d42;color:#fff;border-color:#2e7d42}
-  .notif-empty{padding:22px;border:1px dashed #cddbd2;border-radius:14px;color:#667085;text-align:center;background:#fbfdfb}.notif-toast{position:fixed;right:22px;bottom:22px;z-index:50;background:#111827;color:white;padding:12px 14px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.22);display:none;max-width:360px}
-  .notice-preview{border-left:5px solid #2e7d42;background:#f7fbf8;border-radius:14px;padding:13px 14px;margin-top:8px}.notice-preview-title{font-weight:900;color:#163b24;margin-bottom:8px}.notice-preview-body{font-size:13px;color:#344054;line-height:1.55;white-space:pre-wrap}.notice-preview-hl{color:#b42318;font-weight:900;margin-top:8px}
-  .main-notif-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.main-notif-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;padding:10px 14px;border-radius:999px;font-weight:900;cursor:pointer}.main-notif-tab.on{background:#2e7d42;color:#fff;border-color:#2e7d42}.notif-tab-pane{display:none}.notif-tab-pane.active{display:block}
-  @media(max-width:980px){ .notif-form-grid{grid-template-columns:1fr} }
+  :root {
+    --sn-green: #2e7d42;
+    --sn-green-dark: #205c31;
+    --sn-green-soft: #eef9f1;
+    --sn-border: #e4ece7;
+    --sn-muted: #667085;
+    --sn-text: #172b1d;
+    --sn-bg: #f6faf7;
+  }
+
+  #pg-notifs {
+    position: relative;
+    min-height: calc(100vh - 120px);
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important
+  }
+
+  #pg-notifs.page,
+  #pg-notifs.page-single,
+  #pg-notifs.page-single.on {
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important
+  }
+
+  .sn-shell {
+    width: 100%;
+    max-width: none !important;
+    margin: 0;
+    padding: 8px 10px 88px
+  }
+
+  .main-notif-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 16px
+  }
+
+  .main-notif-tab {
+    border: 1px solid #d7e3dc;
+    background: #fff;
+    color: #2d5137;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s, box-shadow .15s
+  }
+
+  .main-notif-tab:hover {
+    box-shadow: 0 5px 14px rgba(16, 24, 40, .06)
+  }
+
+  .main-notif-tab.on {
+    background: var(--sn-green);
+    color: #fff;
+    border-color: var(--sn-green)
+  }
+
+  .notif-tab-pane {
+    display: none
+  }
+
+  .notif-tab-pane.active {
+    display: block
+  }
+
+  .sn-messages-card {
+    width: 100%;
+    min-height: calc(100vh - 190px)
+  }
+
+  .sn-card {
+    background: #fff;
+    border: 1px solid var(--sn-border);
+    border-radius: 22px;
+    box-shadow: 0 14px 36px rgba(16, 24, 40, .07);
+    overflow: hidden
+  }
+
+  .sn-card-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 22px;
+    border-bottom: 1px solid #edf2ef;
+    background: linear-gradient(180deg, #fff, #fbfdfb)
+  }
+
+  .sn-card-title {
+    font-size: 20px;
+    font-weight: 900;
+    color: #12351f;
+    letter-spacing: -.02em
+  }
+
+  .sn-card-sub {
+    font-size: 12px;
+    color: var(--sn-muted);
+    margin-top: 4px
+  }
+
+  .sn-body {
+    padding: 18px 22px
+  }
+
+  .sn-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end
+  }
+
+  .sn-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px
+  }
+
+  .sn-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-bottom: 13px
+  }
+
+  .sn-field label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #344054
+  }
+
+  .sn-field input,
+  .sn-field select,
+  .sn-field textarea {
+    border: 1px solid #d8e2dc;
+    border-radius: 14px;
+    padding: 11px 13px;
+    font-size: 14px;
+    background: #fff;
+    outline: none;
+    font-family: inherit;
+    transition: border-color .15s, box-shadow .15s, background .15s
+  }
+
+  .sn-field textarea {
+    min-height: 118px;
+    resize: vertical;
+    line-height: 1.55
+  }
+
+  .sn-field input:focus,
+  .sn-field select:focus,
+  .sn-field textarea:focus {
+    border-color: var(--sn-green);
+    box-shadow: 0 0 0 4px rgba(46, 125, 66, .12);
+    background: #fff
+  }
+
+  .sn-file-zone {
+    border: 2px dashed #c9ddcf;
+    border-radius: 14px;
+    padding: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s, transform .15s;
+    background: #fbfefc;
+    position: relative
+  }
+
+  .sn-file-zone:hover,
+  .sn-file-zone.drag {
+    border-color: var(--sn-green);
+    background: #f0faf2;
+    transform: translateY(-1px)
+  }
+
+  .sn-file-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%
+  }
+
+  .sn-file-zone-label {
+    font-size: 13px;
+    color: var(--sn-muted);
+    pointer-events: none
+  }
+
+  .sn-file-zone-label strong {
+    color: var(--sn-green)
+  }
+
+  .sn-file-chosen {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: #ecfdf3;
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #027a48;
+    margin-top: 8px
+  }
+
+  .sn-file-chosen .remove-att {
+    cursor: pointer;
+    color: #b42318;
+    margin-left: auto;
+    font-size: 16px;
+    line-height: 1
+  }
+
+  .sn-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 10px
+  }
+
+  .sn-btn {
+    border: 0;
+    border-radius: 14px;
+    padding: 10px 16px;
+    font-weight: 900;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
+    background: var(--sn-green);
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(46, 125, 66, .18)
+  }
+
+  .sn-btn:hover {
+    opacity: .94;
+    transform: translateY(-1px)
+  }
+
+  .sn-btn.secondary {
+    background: #f7fbf8;
+    color: #245c33;
+    border: 1px solid #cfe0d4;
+    box-shadow: none
+  }
+
+  .sn-btn.small {
+    padding: 7px 11px;
+    font-size: 12px;
+    border-radius: 11px
+  }
+
+  .sn-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 16px 22px 0;
+    background: #fff
+  }
+
+  .sn-tab {
+    border: 1px solid #d7e3dc;
+    background: #fff;
+    color: #2d5137;
+    padding: 9px 17px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s, box-shadow .15s
+  }
+
+  .sn-tab:hover {
+    box-shadow: 0 5px 14px rgba(16, 24, 40, .06)
+  }
+
+  .sn-tab.on {
+    background: var(--sn-green);
+    color: #fff;
+    border-color: var(--sn-green)
+  }
+
+  .sn-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: calc(100vh - 340px)
+  }
+
+  .sn-msg {
+    border: 1px solid #e5eee8;
+    background: #fff;
+    border-radius: 18px;
+    padding: 15px 16px;
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 14px;
+    align-items: start;
+    cursor: pointer;
+    transition: box-shadow .15s, transform .15s, border-color .15s, background .15s
+  }
+
+  .sn-msg:hover {
+    box-shadow: 0 10px 24px rgba(46, 125, 66, .10);
+    transform: translateY(-1px);
+    border-color: #c9decf
+  }
+
+  .sn-msg.unread {
+    background: linear-gradient(90deg, #f0faf2, #fff);
+    border-color: #b9dfc3
+  }
+
+  .sn-msg-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 900;
+    flex-shrink: 0
+  }
+
+  .sn-msg-icon.inbox-icon {
+    background: #e6f6eb;
+    color: var(--sn-green)
+  }
+
+  .sn-msg-icon.sent-icon {
+    background: #eff6ff;
+    color: #1d4ed8
+  }
+
+  .sn-msg-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px
+  }
+
+  .sn-msg-title {
+    font-weight: 900;
+    color: var(--sn-text);
+    font-size: 15.5px;
+    line-height: 1.35
+  }
+
+  .sn-msg-meta {
+    font-size: 12px;
+    color: var(--sn-muted);
+    margin-bottom: 6px
+  }
+
+  .sn-msg-preview {
+    font-size: 13.5px;
+    color: #52635a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    line-height: 1.45
+  }
+
+  .sn-pill {
+    font-size: 11px;
+    font-weight: 900;
+    padding: 5px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0
+  }
+
+  .sn-pill.read {
+    background: #eef4ff;
+    color: #3538cd
+  }
+
+  .sn-pill.unread-pill {
+    background: #fef3c7;
+    color: #92400e
+  }
+
+  .sn-pill.sent-pill {
+    background: #ecfdf3;
+    color: #027a48
+  }
+
+  .sn-att-badge,
+  .course-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 4px 9px;
+    margin-top: 6px;
+    margin-right: 6px
+  }
+
+  .sn-att-badge {
+    color: #6b7280;
+    background: #f3f4f6
+  }
+
+  .course-pill {
+    color: #027a48;
+    background: #ecfdf3
+  }
+
+  .sn-empty {
+    padding: 28px;
+    border: 1px dashed #cddbd2;
+    border-radius: 16px;
+    color: var(--sn-muted);
+    text-align: center;
+    background: #fbfdfb;
+    font-size: 14px
+  }
+
+  .sn-drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, .42);
+    z-index: 180;
+    backdrop-filter: blur(2px)
+  }
+
+  .sn-drawer-overlay.open {
+    display: block
+  }
+
+  .sn-compose-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(560px, 94vw);
+    background: #fff;
+    z-index: 190;
+    box-shadow: -18px 0 44px rgba(15, 23, 42, .18);
+    transform: translateX(105%);
+    transition: transform .24s ease;
+    border-radius: 22px 0 0 22px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden
+  }
+
+  .sn-compose-drawer.open {
+    transform: translateX(0)
+  }
+
+  .sn-compose-drawer .sn-card {
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column
+  }
+
+  .sn-compose-drawer .sn-body {
+    overflow: auto;
+    flex: 1;
+    padding-bottom: 28px
+  }
+
+  .sn-drawer-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid #d8e2dc;
+    background: #f7fbf8;
+    color: #245c33;
+    font-size: 21px;
+    line-height: 1;
+    cursor: pointer;
+    font-weight: 800
+  }
+
+  .sn-fab {
+    position: fixed;
+    right: 28px;
+    bottom: 28px;
+    z-index: 160;
+    width: 58px;
+    height: 58px;
+    border-radius: 999px;
+    border: 0;
+    background: var(--sn-green);
+    color: #fff;
+    font-size: 24px;
+    box-shadow: 0 14px 30px rgba(46, 125, 66, .30);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .15s, box-shadow .15s, opacity .15s
+  }
+
+  .sn-fab:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 18px 36px rgba(46, 125, 66, .34)
+  }
+
+  .sn-fab::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: 70px;
+    top: 50%;
+    transform: translateY(-50%) translateX(8px);
+    background: #111827;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+    padding: 8px 11px;
+    border-radius: 10px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .20);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .15s, visibility .15s, transform .15s
+  }
+
+  .sn-fab::before {
+    content: "";
+    position: absolute;
+    right: 62px;
+    top: 50%;
+    transform: translateY(-50%) translateX(8px);
+    border: 7px solid transparent;
+    border-left-color: #111827;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .15s, visibility .15s, transform .15s
+  }
+
+  .sn-fab:hover::after,
+  .sn-fab:focus-visible::after,
+  .sn-fab:hover::before,
+  .sn-fab:focus-visible::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0)
+  }
+
+  .sn-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 220;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    backdrop-filter: blur(2px)
+  }
+
+  .sn-overlay.open {
+    display: flex
+  }
+
+  .sn-modal {
+    background: #fff;
+    border-radius: 22px;
+    width: 100%;
+    max-width: 650px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .22);
+    display: flex;
+    flex-direction: column
+  }
+
+  .sn-modal-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 17px 21px;
+    border-bottom: 1px solid #edf2ef;
+    gap: 10px;
+    background: #fbfdfb
+  }
+
+  .sn-modal-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #173b24
+  }
+
+  .sn-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 22px;
+    color: #667085;
+    line-height: 1;
+    padding: 0
+  }
+
+  .sn-modal-body {
+    padding: 18px 21px;
+    flex: 1
+  }
+
+  .sn-modal-msg-meta {
+    font-size: 12px;
+    color: #667085;
+    margin-bottom: 6px
+  }
+
+  .sn-modal-msg-body {
+    font-size: 14px;
+    line-height: 1.65;
+    color: #344054;
+    white-space: pre-wrap;
+    background: #f8faf8;
+    border-radius: 14px;
+    padding: 13px 15px;
+    margin-bottom: 13px;
+    border: 1px solid #e6ece8
+  }
+
+  .sn-modal-att-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--sn-green);
+    background: #ecfdf3;
+    border-radius: 10px;
+    padding: 7px 12px;
+    text-decoration: none;
+    margin-bottom: 14px
+  }
+
+  .sn-modal-att-link:hover {
+    background: #d1fae5
+  }
+
+  .sn-modal-divider {
+    height: 1px;
+    background: #edf2ef;
+    margin: 15px 0
+  }
+
+  .sn-modal-reply-title {
+    font-size: 13px;
+    font-weight: 900;
+    color: #344054;
+    margin-bottom: 10px
+  }
+
+  .sn-toast {
+    position: fixed;
+    right: 22px;
+    bottom: 98px;
+    z-index: 999;
+    background: #111827;
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
+    display: none;
+    max-width: 360px;
+    font-size: 14px;
+    font-weight: 700
+  }
+
+  .sn-specific-wrap {
+    display: none
+  }
+
+  /* Important Notice tab: kept from the coordinator page */
+  .notice-preview {
+    border-left: 5px solid #2e7d42;
+    background: #f7fbf8;
+    border-radius: 14px;
+    padding: 13px 14px;
+    margin-top: 8px
+  }
+
+  .notice-preview-title {
+    font-weight: 900;
+    color: #163b24;
+    margin-bottom: 8px
+  }
+
+  .notice-preview-body {
+    font-size: 13px;
+    color: #344054;
+    line-height: 1.55;
+    white-space: pre-wrap
+  }
+
+  .notice-preview-hl {
+    color: #b42318;
+    font-weight: 900;
+    margin-top: 8px
+  }
+
+  @media(max-width:700px) {
+    .sn-form-row {
+      grid-template-columns: 1fr
+    }
+
+    .sn-card-hd {
+      align-items: flex-start;
+      flex-direction: column
+    }
+
+    .sn-head-actions {
+      width: 100%;
+      justify-content: space-between
+    }
+  }
+
+  @media(max-width:560px) {
+    .sn-shell {
+      padding: 8px 8px 96px
+    }
+
+    .sn-body {
+      padding: 14px
+    }
+
+    .sn-tabs {
+      padding-left: 14px
+    }
+
+    .sn-card-hd {
+      padding: 16px 14px
+    }
+
+    .sn-msg {
+      grid-template-columns: 38px 1fr;
+      padding: 13px
+    }
+
+    .sn-msg-icon {
+      width: 38px;
+      height: 38px
+    }
+
+    .sn-fab {
+      right: 18px;
+      bottom: 20px
+    }
+  }
 </style>
 
 <div class="page page-single on" id="pg-notifs">
-  <div class="main-notif-tabs">
-    <button class="main-notif-tab on" type="button" data-main-tab="send">Send Message</button>
-    <button class="main-notif-tab" type="button" data-main-tab="messages">Messages</button>
-    <button class="main-notif-tab" type="button" data-main-tab="notice">Important Notice</button>
+  <div class="sn-shell">
+    <div class="main-notif-tabs">
+      <button class="main-notif-tab on" type="button" data-main-tab="messages">Messages</button>
+      <button class="main-notif-tab" type="button" data-main-tab="notice">Important Notice</button>
+    </div>
+
+    <section class="sn-card sn-messages-card notif-tab-pane active" id="tab-messages">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Messages</div>
+          <div class="sn-card-sub">Click a message to open, read, reply, and download attachments.</div>
+        </div>
+        <div class="sn-head-actions">
+          <button class="sn-btn secondary" id="snMarkAllBtn" type="button">Mark All Read</button>
+        </div>
+      </div>
+      <div class="sn-tabs">
+        <button class="sn-tab on" type="button" data-tab="inbox">Inbox</button>
+        <button class="sn-tab" type="button" data-tab="sent">Sent</button>
+      </div>
+      <div class="sn-body">
+        <div id="snList" class="sn-list">
+          <div class="sn-empty">Loading messages...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sn-card notif-tab-pane" id="tab-notice">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Important Notice on Login Screen</div>
+          <div class="sn-card-sub">This updates the notice shown on the main login screen.</div>
+        </div>
+      </div>
+      <div class="sn-body">
+        <form id="noticeForm">
+          <div class="sn-form-row">
+            <div class="sn-field"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="250"
+                placeholder="Important Notice — APMS System" required></div>
+            <div class="sn-field"><label for="noticeHighlight">Highlight / deadline text</label><input
+                id="noticeHighlight" maxlength="150" placeholder="Example: Deadline: 15/2/2026"></div>
+          </div>
+          <div class="sn-field">
+            <label for="noticeCourseScope">Notice for</label>
+            <select id="noticeCourseScope" required>
+              <option value="introduction">Project Introduction / COMP4200</option>
+              <option value="graduation_project">Graduation Project / COMP4300</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div class="sn-field"><label for="noticeBody">Notice body</label><textarea id="noticeBody"
+              placeholder="Write the notice that students, supervisors, and head will see before login..."
+              required></textarea></div>
+          <div class="sn-form-row">
+            <div class="sn-field"><label for="noticeBtn1">Button 1 text</label><input id="noticeBtn1"
+                placeholder="ⓘ How does the system work?"></div>
+            <div class="sn-field"><label for="noticeBtn2">Button 2 text</label><input id="noticeBtn2"
+                placeholder="⬆ Project Upload Guide"></div>
+          </div>
+          <div class="sn-field"><label for="noticeBtn3">Button 3 text</label><input id="noticeBtn3"
+              placeholder="⚙ Roles & Permissions"></div>
+          <div class="notice-preview">
+            <div class="notice-preview-title" id="noticePreviewTitle">Important Notice — APMS System</div>
+            <div class="notice-preview-body" id="noticePreviewBody">Preview will appear here.</div>
+            <div class="notice-preview-hl" id="noticePreviewHl"></div>
+          </div>
+          <div class="sn-actions"><button class="sn-btn secondary" type="button" id="reloadNoticeBtn">Reload
+              Current</button><button class="sn-btn" type="submit">Update Login Notice</button></div>
+        </form>
+      </div>
+    </section>
   </div>
 
-  <section class="notif-card notif-tab-pane active" id="tab-send">
-    <div class="notif-card-hd"><div><div class="notif-card-title">Send Message</div><div class="notif-card-sub">Send to Head of Department, doctors, all sections, one section, one doctor, or one student.</div></div></div>
-    <div class="notif-body">
-      <form id="notifSendForm">
-        <div class="notif-form-grid">
-          <div class="notif-field"><label for="notifScope">Send to</label><select id="notifScope" required><option value="">Choose receiver...</option><option value="head">Head of Department</option><option value="doctors">All Doctors / Supervisors</option><option value="all_sections">All Sections</option><option value="doctor">One Doctor</option><option value="section">One Section</option><option value="student">One Student</option></select></div>
-          <div class="notif-field" id="notifSpecificWrap" style="display:none;"><label for="notifSpecific">Choose specific receiver</label><select id="notifSpecific"></select></div>
-        </div>
-        <div class="notif-field">
-          <label for="notifCourseScope">Message for</label>
-          <select id="notifCourseScope" required>
-            <option value="introduction">Project Introduction / COMP4200</option>
-            <option value="graduation_project">Graduation Project / COMP4300</option>
-            <option value="both">Both</option>
-          </select>
-        </div>
-        <div class="notif-field"><label for="notifTitle">Title</label><input id="notifTitle" placeholder="Example: Committee meeting reminder" maxlength="250" required></div>
-        <div class="notif-field"><label for="notifMessage">Message</label><textarea id="notifMessage" placeholder="Write your message here..." required></textarea></div>
-        <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#344054;"><input type="checkbox" id="notifUrgent"> Mark as urgent</label>
-        <div class="notif-actions"><button class="notif-btn secondary" type="reset">Clear</button><button class="notif-btn" type="submit">Send Message</button></div>
-      </form>
-    </div>
-  </section>
+  <button class="sn-fab" id="snFabCompose" type="button" data-tooltip="Send Memo" aria-label="Send Memo">✎</button>
 
-  <section class="notif-card notif-tab-pane" id="tab-messages">
-    <div class="notif-card-hd"><div><div class="notif-card-title">Messages</div><div class="notif-card-sub">Inbox receives messages from Head of Department, supervisors, and students.</div></div><button class="notif-btn secondary" id="markAllReadBtn" type="button">Mark All Read</button></div>
-    <div class="notif-tabs"><button class="notif-tab on" type="button" data-tab="inbox">Inbox</button><button class="notif-tab" type="button" data-tab="sent">Sent</button></div>
-    <div class="notif-body"><div id="notifList" class="notif-list"><div class="notif-empty">Loading messages...</div></div></div>
-  </section>
-
-  <section class="notif-card notif-tab-pane" id="tab-notice">
-    <div class="notif-card-hd"><div><div class="notif-card-title">Important Notice on Login Screen</div><div class="notif-card-sub">This updates the notice shown on the main login screen.</div></div></div>
-    <div class="notif-body">
-      <form id="noticeForm">
-        <div class="notif-form-grid">
-          <div class="notif-field"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="250" placeholder="Important Notice — APMS System" required></div>
-          <div class="notif-field"><label for="noticeHighlight">Highlight / deadline text</label><input id="noticeHighlight" maxlength="150" placeholder="Example: Deadline: 15/2/2026"></div>
+  <div class="sn-drawer-overlay" id="snComposeOverlay"></div>
+  <aside class="sn-compose-drawer" id="snComposeDrawer" aria-hidden="true">
+    <section class="sn-card">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Send Memo</div>
+          <div class="sn-card-sub">Send a message to Head of Department, doctors, sections, or students.</div>
         </div>
-        <div class="notif-field">
-          <label for="noticeCourseScope">Notice for</label>
-          <select id="noticeCourseScope" required>
-            <option value="introduction">Project Introduction / COMP4200</option>
-            <option value="graduation_project">Graduation Project / COMP4300</option>
-            <option value="both">Both</option>
-          </select>
-        </div>
-        <div class="notif-field"><label for="noticeBody">Notice body</label><textarea id="noticeBody" placeholder="Write the notice that students, supervisors, and head will see before login..." required></textarea></div>
-        <div class="notif-form-grid">
-          <div class="notif-field"><label for="noticeBtn1">Button 1 text</label><input id="noticeBtn1" placeholder="ⓘ How does the system work?"></div>
-          <div class="notif-field"><label for="noticeBtn2">Button 2 text</label><input id="noticeBtn2" placeholder="⬆ Project Upload Guide"></div>
-        </div>
-        <div class="notif-field"><label for="noticeBtn3">Button 3 text</label><input id="noticeBtn3" placeholder="⚙ Roles & Permissions"></div>
-        <div class="notice-preview"><div class="notice-preview-title" id="noticePreviewTitle">Important Notice — APMS System</div><div class="notice-preview-body" id="noticePreviewBody">Preview will appear here.</div><div class="notice-preview-hl" id="noticePreviewHl"></div></div>
-        <div class="notif-actions"><button class="notif-btn secondary" type="button" id="reloadNoticeBtn">Reload Current</button><button class="notif-btn" type="submit">Update Login Notice</button></div>
-      </form>
-    </div>
-  </section>
+        <button class="sn-drawer-close" id="snCloseCompose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="sn-body">
+        <form id="snSendForm" enctype="multipart/form-data">
+          <div class="sn-form-row">
+            <div class="sn-field">
+              <label for="snScope">Send to</label>
+              <select id="snScope" name="scope" required>
+                <option value="">Choose receiver...</option>
+                <option value="head">Head of Department</option>
+                <option value="doctors">All Doctors / Supervisors</option>
+                <option value="all_sections">All Sections</option>
+                <option value="doctor">One Doctor</option>
+                <option value="section">One Section</option>
+                <option value="student">One Student</option>
+              </select>
+            </div>
+            <div class="sn-field sn-specific-wrap" id="snSpecificWrap">
+              <label for="snSpecific">Choose specific receiver</label>
+              <select id="snSpecific" name="value"></select>
+            </div>
+          </div>
+          <div class="sn-field">
+            <label for="snCourseScope">Message for</label>
+            <select id="snCourseScope" name="course_scope" required>
+              <option value="introduction">Project Introduction / COMP4200</option>
+              <option value="graduation_project">Graduation Project / COMP4300</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div class="sn-field">
+            <label for="snTitle">Title</label>
+            <input id="snTitle" name="title" placeholder="Example: Committee meeting reminder" maxlength="250" required>
+          </div>
+          <div class="sn-field">
+            <label for="snMessage">Message</label>
+            <textarea id="snMessage" name="message" placeholder="Write your memo here..." required></textarea>
+          </div>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#344054;margin-bottom:13px;">
+            <input type="checkbox" id="snUrgent" name="urgent" value="1"> Mark as urgent
+          </label>
+          <div class="sn-field">
+            <label>Attachment <span style="font-weight:400;color:#9ca3af">(optional, max 10 MB)</span></label>
+            <div class="sn-file-zone" id="snFileZone">
+              <input type="file" id="snFile" name="file" accept="*/*">
+              <div class="sn-file-zone-label">📎 <strong>Click to attach</strong> or drag a file here</div>
+            </div>
+            <div class="sn-file-chosen" id="snFileChosen">
+              <span>📄</span>
+              <span id="snFileName"></span>
+              <span class="remove-att" id="snRemoveAtt" title="Remove">✕</span>
+            </div>
+          </div>
+          <div class="sn-actions">
+            <button class="sn-btn secondary" type="button" id="snClearBtn">Clear</button>
+            <button class="sn-btn" type="submit">Send Memo</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </aside>
 </div>
 
-<div class="notif-toast" id="notifToast"></div>
+<div class="sn-overlay" id="snOverlay">
+  <div class="sn-modal" id="snModal">
+    <div class="sn-modal-hd">
+      <div class="sn-modal-title" id="modalTitle">Message</div>
+      <button class="sn-modal-close" id="modalClose" type="button">✕</button>
+    </div>
+    <div class="sn-modal-body">
+      <div class="sn-modal-msg-meta" id="modalMeta"></div>
+      <div class="sn-modal-msg-body" id="modalBody"></div>
+      <a class="sn-modal-att-link" id="modalAttLink" href="#" target="_blank" style="display:none">
+        📎 <span id="modalAttName"></span>
+      </a>
+
+      <div id="modalReplySection">
+        <div class="sn-modal-divider"></div>
+        <div class="sn-modal-reply-title">↩ Reply to <span id="modalReplyTo"></span></div>
+        <form id="modalReplyForm" enctype="multipart/form-data">
+          <input type="hidden" id="modalReplyUserId" name="value">
+          <input type="hidden" name="scope" value="reply">
+          <input type="hidden" id="modalReplyCourseScope" name="course_scope" value="both">
+          <div class="sn-field">
+            <input id="modalReplyTitle" name="title" placeholder="Re: ..." maxlength="250" required>
+          </div>
+          <div class="sn-field">
+            <textarea id="modalReplyMsg" name="message" placeholder="Write your reply..." style="min-height:80px"
+              required></textarea>
+          </div>
+          <div class="sn-field">
+            <div class="sn-file-zone" id="replyFileZone">
+              <input type="file" id="replyFile" name="file" accept="*/*">
+              <div class="sn-file-zone-label">📎 <strong>Attach a file</strong> (optional)</div>
+            </div>
+            <div class="sn-file-chosen" id="replyFileChosen">
+              <span>📄</span>
+              <span id="replyFileName"></span>
+              <span class="remove-att" id="replyRemoveAtt" title="Remove">✕</span>
+            </div>
+          </div>
+          <div class="sn-actions">
+            <button class="sn-btn secondary small" type="button" id="modalCancelBtn">Cancel</button>
+            <button class="sn-btn small" type="submit">Send Reply</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sn-toast" id="snToast"></div>
 
 <script>
-(() => {
-  const state = { options: { heads: [], doctors: [], students: [], sections: [] }, currentTab: 'inbox' };
-  const $ = (id) => document.getElementById(id);
-  const list = $('notifList');
-  const toast = $('notifToast');
+  (() => {
+    const state = { tab: 'inbox', options: { heads: [], doctors: [], students: [], sections: [] }, currentMsg: null };
+    const $ = id => document.getElementById(id);
+    const list = $('snList');
+    const toast = $('snToast');
+    const overlay = $('snOverlay');
+    const composeDrawer = $('snComposeDrawer');
+    const composeOverlay = $('snComposeOverlay');
 
-  function showMainTab(tabName){
-    document.querySelectorAll('.main-notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.mainTab === tabName));
-    document.querySelectorAll('.notif-tab-pane').forEach(pane => pane.classList.remove('active'));
-    const pane = document.getElementById(`tab-${tabName}`);
-    if(pane) pane.classList.add('active');
-    window.scrollTo(0, 0);
-  }
-  document.querySelectorAll('.main-notif-tab').forEach(btn => btn.addEventListener('click', () => showMainTab(btn.dataset.mainTab)));
-
-  function showToast(message, isError = false){ toast.textContent = message; toast.style.background = isError ? '#991b1b' : '#111827'; toast.style.display = 'block'; setTimeout(() => toast.style.display = 'none', 3200); }
-  async function fetchJSON(url, options = {}){
-    const res = await fetch(url, { headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, ...options });
-    const text = await res.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch(e) {
-      const preview = text.replace(/\s+/g, ' ').slice(0, 180);
-      throw new Error(`Server returned HTML/not JSON. Status ${res.status}. ${preview}`);
+    function showMainTab(tabName) {
+      document.querySelectorAll('.main-notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.mainTab === tabName));
+      document.querySelectorAll('.notif-tab-pane').forEach(pane => pane.classList.remove('active'));
+      const pane = $('tab-' + tabName);
+      if (pane) pane.classList.add('active');
+      window.scrollTo(0, 0);
     }
-    if(!res.ok) throw new Error(data.error || `Request failed with status ${res.status}.`);
-    return data;
-  }
-  function escapeHTML(value){ return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
-  function roleLabel(role){ return ({head_of_department:'Head of Department', supervisor:'Supervisor', coordinator:'Coordinator', student:'Student'}[role] || role || 'System'); }
-  function courseLabel(scope){ return ({introduction:'Project Introduction', graduation_project:'Graduation Project', both:'Both Courses'}[scope] || 'Both Courses'); }
+    document.querySelectorAll('.main-notif-tab').forEach(btn => btn.addEventListener('click', () => showMainTab(btn.dataset.mainTab)));
 
-  async function loadOptions(){ state.options = await fetchJSON('/api/coordinator/notifications/options'); updateSpecificReceiver(); }
-  function updateSpecificReceiver(){
-    const scope = $('notifScope').value, wrap = $('notifSpecificWrap'), select = $('notifSpecific'); select.innerHTML = '';
-    let rows = [], placeholder = 'Choose...';
-    if(scope === 'doctor'){ rows = state.options.doctors || []; placeholder='Choose doctor...'; rows.forEach(d => select.insertAdjacentHTML('beforeend', `<option value="${d.faculty_id}">${escapeHTML(d.full_name)} — ${escapeHTML(d.university_id || '')}</option>`)); }
-    else if(scope === 'student'){ rows = state.options.students || []; placeholder='Choose student...'; rows.forEach(s => select.insertAdjacentHTML('beforeend', `<option value="${s.student_id}">${escapeHTML(s.full_name)} — ${escapeHTML(s.university_id || '')}</option>`)); }
-    else if(scope === 'section'){ rows = state.options.sections || []; placeholder='Choose section...'; rows.forEach(sec => select.insertAdjacentHTML('beforeend', `<option value="${sec.section_id}">${escapeHTML(sec.section_name)} — ${escapeHTML(sec.supervisor_name || '')} (${sec.students_count || 0} students)</option>`)); }
-    if(['doctor','student','section'].includes(scope)){ select.insertAdjacentHTML('afterbegin', `<option value="">${placeholder}</option>`); wrap.style.display = 'flex'; } else { wrap.style.display = 'none'; }
-  }
+    function openCompose() {
+      composeDrawer.classList.add('open');
+      composeOverlay.classList.add('open');
+      composeDrawer.setAttribute('aria-hidden', 'false');
+      setTimeout(() => $('snScope').focus(), 80);
+    }
 
-  function renderInbox(rows){
-    if(!rows.length){ list.innerHTML = '<div class="notif-empty">No received messages yet.</div>'; return; }
-    list.innerHTML = rows.map(row => `<article class="notif-message ${row.is_read ? '' : 'unread'}"><div class="notif-icon">${row.notification_type === 'urgent_alert' ? '!' : '✉'}</div><div><div class="notif-msg-title">${escapeHTML(row.title)}</div><div class="notif-msg-meta">From: ${escapeHTML(row.sender_name || 'System')} · ${escapeHTML(roleLabel(row.sender_role))} · ${escapeHTML(row.created_at || '')}</div><div><span class="course-pill">${escapeHTML(courseLabel(row.course_scope))}</span></div><div class="notif-msg-text">${escapeHTML(row.message)}</div></div><div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;"><span class="notif-pill ${row.is_read ? '' : 'unread'}">${row.is_read ? 'Read' : 'Unread'}</span>${row.is_read ? '' : `<button class="notif-btn secondary" style="padding:6px 9px;font-size:12px;" data-read="${row.notification_id}">Read</button>`}</div></article>`).join('');
-  }
-  function renderSent(rows){
-    if(!rows.length){ list.innerHTML = '<div class="notif-empty">No sent messages yet.</div>'; return; }
-    list.innerHTML = rows.map(row => `<article class="notif-message"><div class="notif-icon">↗</div><div><div class="notif-msg-title">${escapeHTML(row.title)}</div><div class="notif-msg-meta">To: ${escapeHTML(row.recipient_name || '')} · ${escapeHTML(roleLabel(row.recipient_role))} · ${escapeHTML(row.created_at || '')}</div><div><span class="course-pill">${escapeHTML(courseLabel(row.course_scope))}</span></div><div class="notif-msg-text">${escapeHTML(row.message)}</div></div><span class="notif-pill">Sent</span></article>`).join('');
-  }
-  async function loadMessages(){ list.innerHTML = '<div class="notif-empty">Loading messages...</div>'; try{ if(state.currentTab === 'sent'){ const data = await fetchJSON('/api/coordinator/notifications/sent'); renderSent(data.sent || []); } else { const data = await fetchJSON('/api/coordinator/notifications/inbox'); renderInbox(data.notifications || []); } } catch(err){ list.innerHTML = `<div class="notif-empty">${escapeHTML(err.message)}</div>`; } }
+    function closeCompose() {
+      composeDrawer.classList.remove('open');
+      composeOverlay.classList.remove('open');
+      composeDrawer.setAttribute('aria-hidden', 'true');
+    }
 
-  function updateNoticePreview(){ $('noticePreviewTitle').textContent = ($('noticeTitle').value || 'Important Notice — APMS System') + ' · ' + courseLabel($('noticeCourseScope').value || 'both'); $('noticePreviewBody').textContent = $('noticeBody').value || 'Preview will appear here.'; $('noticePreviewHl').textContent = $('noticeHighlight').value || ''; }
-  async function loadNotice(){
-    try{ const data = await fetchJSON('/api/coordinator/important-notice'); const n = data.notice || {}; $('noticeTitle').value = n.title || 'Important Notice — APMS System'; $('noticeBody').value = n.body || ''; $('noticeHighlight').value = n.highlight_text || ''; $('noticeBtn1').value = n.button1_text || 'ⓘ How does the system work?'; $('noticeBtn2').value = n.button2_text || '⬆ Project Upload Guide'; $('noticeBtn3').value = n.button3_text || '⚙ Roles & Permissions'; $('noticeCourseScope').value = n.course_scope || 'both'; updateNoticePreview(); }
-    catch(err){ showToast(err.message, true); }
-  }
+    function showToast(msg, isErr = false) {
+      toast.textContent = msg;
+      toast.style.background = isErr ? '#991b1b' : '#111827';
+      toast.style.display = 'block';
+      setTimeout(() => (toast.style.display = 'none'), 3400);
+    }
 
-  $('notifScope').addEventListener('change', updateSpecificReceiver);
-  $('notifSendForm').addEventListener('submit', async (event) => { event.preventDefault(); const scope = $('notifScope').value; const payload = { scope, value: ['doctor','student','section'].includes(scope) ? $('notifSpecific').value : null, course_scope: $('notifCourseScope').value, title: $('notifTitle').value.trim(), message: $('notifMessage').value.trim(), urgent: $('notifUrgent').checked }; try{ const data = await fetchJSON('/api/coordinator/notifications/send', { method:'POST', body:JSON.stringify(payload) }); showToast(data.message || 'Message sent successfully.'); $('notifSendForm').reset(); updateSpecificReceiver(); state.currentTab = 'sent'; document.querySelectorAll('.notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.tab === 'sent')); showMainTab('messages'); await loadMessages(); } catch(err){ showToast(err.message, true); } });
-  document.querySelectorAll('.notif-tab').forEach(btn => btn.addEventListener('click', () => { state.currentTab = btn.dataset.tab; document.querySelectorAll('.notif-tab').forEach(b => b.classList.toggle('on', b === btn)); loadMessages(); }));
-  list.addEventListener('click', async (event) => { const btn = event.target.closest('[data-read]'); if(!btn) return; try{ await fetchJSON(`/api/coordinator/notifications/${btn.dataset.read}/read`, { method:'POST' }); await loadMessages(); } catch(err){ showToast(err.message, true); } });
-  $('markAllReadBtn').addEventListener('click', async () => { try{ await fetchJSON('/api/coordinator/notifications/read-all', { method:'POST' }); showToast('All messages marked as read.'); await loadMessages(); } catch(err){ showToast(err.message, true); } });
-  ['noticeTitle','noticeBody','noticeHighlight'].forEach(id => $(id).addEventListener('input', updateNoticePreview)); $('noticeCourseScope').addEventListener('change', updateNoticePreview);
-  $('reloadNoticeBtn').addEventListener('click', loadNotice);
-  $('noticeForm').addEventListener('submit', async (event) => { event.preventDefault(); const payload = { title:$('noticeTitle').value.trim(), body:$('noticeBody').value.trim(), highlight_text:$('noticeHighlight').value.trim(), button1_text:$('noticeBtn1').value.trim(), button2_text:$('noticeBtn2').value.trim(), button3_text:$('noticeBtn3').value.trim(), course_scope:$('noticeCourseScope').value }; try{ const data = await fetchJSON('/api/coordinator/important-notice', { method:'POST', body:JSON.stringify(payload) }); showToast(data.message || 'Notice updated.'); updateNoticePreview(); } catch(err){ showToast(err.message, true); } });
+    async function fetchJSON(url, opts = {}) {
+      const res = await fetch(url, { headers: { Accept: 'application/json' }, ...opts });
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error('Server error (' + res.status + ').'); }
+      if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ').');
+      return data;
+    }
 
-  loadOptions().catch(err => showToast(err.message, true));
-  loadMessages();
-  loadNotice();
-})();
+    async function postForm(url, formData) {
+      const res = await fetch(url, { method: 'POST', headers: { Accept: 'application/json' }, body: formData });
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error('Server error (' + res.status + ').'); }
+      if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ').');
+      return data;
+    }
+
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+    }
+
+    function roleLabel(role) {
+      return ({ head_of_department: 'Head of Department', supervisor: 'Supervisor', coordinator: 'Coordinator', student: 'Student' }[role] || role || 'System');
+    }
+
+    function courseLabel(scope) {
+      return ({ introduction: 'Project Introduction', graduation_project: 'Graduation Project', both: 'Both Courses' }[scope] || 'Both Courses');
+    }
+
+    function wireFileZone(zoneId, inputId, chosenId, nameId, removeId) {
+      const zone = $(zoneId);
+      const input = $(inputId);
+      const chosen = $(chosenId);
+      const nameEl = $(nameId);
+      const remove = $(removeId);
+
+      function showChosen(name) {
+        nameEl.textContent = name;
+        chosen.style.display = 'flex';
+        zone.style.display = 'none';
+      }
+      function clearChosen() {
+        input.value = '';
+        chosen.style.display = 'none';
+        zone.style.display = 'block';
+      }
+
+      input.addEventListener('change', () => {
+        if (input.files[0]) showChosen(input.files[0].name);
+      });
+      remove.addEventListener('click', clearChosen);
+
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.classList.remove('drag');
+        const f = e.dataTransfer.files[0];
+        if (f) {
+          const dt = new DataTransfer(); dt.items.add(f);
+          input.files = dt.files;
+          showChosen(f.name);
+        }
+      });
+    }
+
+    wireFileZone('snFileZone', 'snFile', 'snFileChosen', 'snFileName', 'snRemoveAtt');
+    wireFileZone('replyFileZone', 'replyFile', 'replyFileChosen', 'replyFileName', 'replyRemoveAtt');
+
+    $('snFabCompose').addEventListener('click', openCompose);
+    $('snCloseCompose').addEventListener('click', closeCompose);
+    composeOverlay.addEventListener('click', closeCompose);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeCompose();
+        closeModal();
+      }
+    });
+
+    async function loadOptions() {
+      try { state.options = await fetchJSON('/api/coordinator/notifications/options'); }
+      catch (e) { showToast(e.message, true); }
+    }
+
+    function updateSpecificWrap() {
+      const scope = $('snScope').value;
+      const wrap = $('snSpecificWrap');
+      const select = $('snSpecific');
+      select.innerHTML = '';
+      let rows = [], placeholder = 'Choose...';
+
+      if (scope === 'doctor') {
+        rows = state.options.doctors || [];
+        placeholder = 'Choose doctor...';
+        rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' — ' + esc(d.university_id || '') + '</option>'));
+      } else if (scope === 'student') {
+        rows = state.options.students || [];
+        placeholder = 'Choose student...';
+        rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + '</option>'));
+      } else if (scope === 'section') {
+        rows = state.options.sections || [];
+        placeholder = 'Choose section...';
+        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_id) + '">' + esc(sec.section_name) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
+      }
+
+      if (['doctor', 'student', 'section'].includes(scope)) {
+        select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>');
+        wrap.style.display = 'flex';
+      } else {
+        wrap.style.display = 'none';
+      }
+    }
+
+    function renderInbox(rows) {
+      if (!rows.length) { list.innerHTML = '<div class="sn-empty">No received messages yet.</div>'; return; }
+      list.innerHTML = rows.map(r =>
+        '<article class="sn-msg ' + (r.is_read ? '' : 'unread') + '" data-id="' + r.notification_id + '" data-tab="inbox">' +
+        '<div class="sn-msg-icon inbox-icon">' + (r.notification_type === 'urgent_alert' ? '🔴' : '✉') + '</div>' +
+        '<div style="min-width:0">' +
+        '<div class="sn-msg-top">' +
+        '<div class="sn-msg-title">' + esc(r.title) + '</div>' +
+        '<span class="sn-pill ' + (r.is_read ? 'read' : 'unread-pill') + '">' + (r.is_read ? 'Read' : 'New') + '</span>' +
+        '</div>' +
+        '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
+        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '</div>' +
+        '</article>'
+      ).join('');
+    }
+
+    function renderSent(rows) {
+      if (!rows.length) { list.innerHTML = '<div class="sn-empty">No sent messages yet.</div>'; return; }
+      list.innerHTML = rows.map(r =>
+        '<article class="sn-msg" data-id="' + r.notification_id + '" data-tab="sent">' +
+        '<div class="sn-msg-icon sent-icon">↗</div>' +
+        '<div style="min-width:0">' +
+        '<div class="sn-msg-top">' +
+        '<div class="sn-msg-title">' + esc(r.title) + '</div>' +
+        '<span class="sn-pill sent-pill">Sent</span>' +
+        '</div>' +
+        '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
+        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '</div>' +
+        '</article>'
+      ).join('');
+    }
+
+    async function loadMessages() {
+      list.innerHTML = '<div class="sn-empty">Loading messages...</div>';
+      try {
+        if (state.tab === 'sent') {
+          const data = await fetchJSON('/api/coordinator/notifications/sent');
+          renderSent(data.sent || []);
+          state._sentRows = data.sent || [];
+        } else {
+          const data = await fetchJSON('/api/coordinator/notifications/inbox');
+          renderInbox(data.notifications || []);
+          state._inboxRows = data.notifications || [];
+          const dot = document.querySelector('.tb-notif-dot');
+          if (dot) dot.style.display = (data.notifications || []).some(n => !n.is_read) ? 'block' : 'none';
+        }
+      } catch (e) {
+        list.innerHTML = '<div class="sn-empty">' + esc(e.message) + '</div>';
+      }
+    }
+
+    function openModal(msgData, tab) {
+      state.currentMsg = msgData;
+      $('modalTitle').textContent = msgData.title;
+      const isInbox = tab === 'inbox';
+      const meta = isInbox
+        ? 'From: ' + (msgData.sender_name || 'System') + ' · ' + roleLabel(msgData.sender_role) + ' · ' + (msgData.created_at || '')
+        : 'To: ' + (msgData.recipient_name || '') + ' · ' + roleLabel(msgData.recipient_role) + ' · ' + (msgData.created_at || '');
+      $('modalMeta').textContent = meta + ' · ' + courseLabel(msgData.course_scope);
+      $('modalBody').textContent = msgData.message;
+
+      const attLink = $('modalAttLink');
+      if (msgData.has_attachment) {
+        attLink.href = '/api/coordinator/notifications/' + msgData.notification_id + '/attachment';
+        $('modalAttName').textContent = msgData.attachment_name || 'Download attachment';
+        attLink.style.display = 'inline-flex';
+      } else {
+        attLink.style.display = 'none';
+      }
+
+      const replySection = $('modalReplySection');
+      if (isInbox && msgData.sender_user_id) {
+        $('modalReplyUserId').value = msgData.sender_user_id;
+        $('modalReplyCourseScope').value = msgData.course_scope || 'both';
+        $('modalReplyTo').textContent = msgData.sender_name || 'sender';
+        $('modalReplyTitle').value = 'Re: ' + msgData.title;
+        $('modalReplyMsg').value = '';
+        $('replyFile').value = '';
+        $('replyFileChosen').style.display = 'none';
+        $('replyFileZone').style.display = 'block';
+        replySection.style.display = 'block';
+      } else {
+        replySection.style.display = 'none';
+      }
+
+      overlay.classList.add('open');
+
+      if (isInbox && !msgData.is_read) {
+        fetchJSON('/api/coordinator/notifications/' + msgData.notification_id + '/read', { method: 'POST' })
+          .then(() => loadMessages())
+          .catch(() => { });
+      }
+    }
+
+    function closeModal() {
+      overlay.classList.remove('open');
+      state.currentMsg = null;
+    }
+
+    list.addEventListener('click', e => {
+      const card = e.target.closest('.sn-msg');
+      if (!card) return;
+      const id = parseInt(card.dataset.id);
+      const tab = card.dataset.tab;
+      const rows = tab === 'inbox' ? (state._inboxRows || []) : (state._sentRows || []);
+      const msg = rows.find(r => r.notification_id === id);
+      if (msg) openModal(msg, tab);
+    });
+
+    $('modalClose').addEventListener('click', closeModal);
+    $('modalCancelBtn').addEventListener('click', closeModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+    $('modalReplyForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const fd = new FormData($('modalReplyForm'));
+      try {
+        const data = await postForm('/api/coordinator/notifications/send', fd);
+        showToast(data.message || 'Reply sent!');
+        closeModal();
+        state.tab = 'sent';
+        document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent'));
+        showMainTab('messages');
+        await loadMessages();
+      } catch (e) { showToast(e.message, true); }
+    });
+
+    $('snSendForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      if (['doctor', 'student', 'section'].includes($('snScope').value) && !$('snSpecific').value) {
+        showToast('Please choose a specific receiver.', true); return;
+      }
+      const fd = new FormData($('snSendForm'));
+      if (['doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value);
+      if (!$('snUrgent').checked) fd.delete('urgent');
+      try {
+        const data = await postForm('/api/coordinator/notifications/send', fd);
+        showToast(data.message || 'Memo sent successfully.');
+        $('snSendForm').reset();
+        $('snFile').value = '';
+        $('snFileChosen').style.display = 'none';
+        $('snFileZone').style.display = 'block';
+        updateSpecificWrap();
+        closeCompose();
+        state.tab = 'sent';
+        document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent'));
+        showMainTab('messages');
+        await loadMessages();
+      } catch (e) { showToast(e.message, true); }
+    });
+
+    $('snClearBtn').addEventListener('click', () => {
+      $('snSendForm').reset();
+      $('snFile').value = '';
+      $('snFileChosen').style.display = 'none';
+      $('snFileZone').style.display = 'block';
+      setTimeout(updateSpecificWrap, 0);
+    });
+
+    $('snScope').addEventListener('change', updateSpecificWrap);
+
+    document.querySelectorAll('.sn-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.tab = btn.dataset.tab;
+        document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b === btn));
+        loadMessages();
+      });
+    });
+
+    $('snMarkAllBtn').addEventListener('click', async () => {
+      try {
+        await fetchJSON('/api/coordinator/notifications/read-all', { method: 'POST' });
+        showToast('All messages marked as read.');
+        await loadMessages();
+      } catch (e) { showToast(e.message, true); }
+    });
+
+    function updateNoticePreview() {
+      $('noticePreviewTitle').textContent = ($('noticeTitle').value || 'Important Notice — APMS System') + ' · ' + courseLabel($('noticeCourseScope').value || 'both');
+      $('noticePreviewBody').textContent = $('noticeBody').value || 'Preview will appear here.';
+      $('noticePreviewHl').textContent = $('noticeHighlight').value || '';
+    }
+
+    async function loadNotice() {
+      try {
+        const data = await fetchJSON('/api/coordinator/important-notice');
+        const n = data.notice || {};
+        $('noticeTitle').value = n.title || 'Important Notice — APMS System';
+        $('noticeBody').value = n.body || '';
+        $('noticeHighlight').value = n.highlight_text || '';
+        $('noticeBtn1').value = n.button1_text || 'ⓘ How does the system work?';
+        $('noticeBtn2').value = n.button2_text || '⬆ Project Upload Guide';
+        $('noticeBtn3').value = n.button3_text || '⚙ Roles & Permissions';
+        $('noticeCourseScope').value = n.course_scope || 'both';
+        updateNoticePreview();
+      } catch (err) { showToast(err.message, true); }
+    }
+
+    ['noticeTitle', 'noticeBody', 'noticeHighlight'].forEach(id => $(id).addEventListener('input', updateNoticePreview));
+    $('noticeCourseScope').addEventListener('change', updateNoticePreview);
+    $('reloadNoticeBtn').addEventListener('click', loadNotice);
+    $('noticeForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const payload = {
+        title: $('noticeTitle').value.trim(),
+        body: $('noticeBody').value.trim(),
+        highlight_text: $('noticeHighlight').value.trim(),
+        button1_text: $('noticeBtn1').value.trim(),
+        button2_text: $('noticeBtn2').value.trim(),
+        button3_text: $('noticeBtn3').value.trim(),
+        course_scope: $('noticeCourseScope').value
+      };
+      try {
+        const data = await fetchJSON('/api/coordinator/important-notice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        showToast(data.message || 'Notice updated.');
+        updateNoticePreview();
+      } catch (err) { showToast(err.message, true); }
+    });
+
+    loadOptions().then(updateSpecificWrap);
+    loadMessages();
+    loadNotice();
+  })();
 </script>
 {% endblock %}

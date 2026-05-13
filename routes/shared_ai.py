@@ -2,7 +2,6 @@ from flask import Blueprint, render_template, request
 
 from auth import login_required
 
-
 shared_ai_bp = Blueprint("shared_ai", __name__)
 
 

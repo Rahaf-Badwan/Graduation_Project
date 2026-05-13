@@ -7,543 +7,533 @@
 {% block content %}
 <div class="page page-single on" id="pg-evaluation">
 
-<style>
-  /* Final Evaluation tabs - same style/colors as other coordinator pages */
-  html,
-  body {
-    scroll-behavior: auto !important;
-  }
-
-  #pg-evaluation {
-    display: block !important;
-    min-height: auto !important;
-    height: auto !important;
-    padding: 20px 22px 90px !important;
-    margin: 0 !important;
-  }
-
-  #pg-evaluation .eval-tabs {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin: 0 0 16px 0;
-    padding: 0;
-  }
-
-  #pg-evaluation .eval-tab {
-    border: 1px solid #d7e3dc;
-    background: #fff;
-    color: #2d5137;
-    border-radius: 999px;
-    padding: 9px 14px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: 0.18s ease;
-  }
-
-  #pg-evaluation .eval-tab:hover {
-    background: #f3f7f4;
-  }
-
-  #pg-evaluation .eval-tab.on {
-    background: #2e7d42;
-    border-color: #2e7d42;
-    color: #fff;
-    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
-  }
-
-  #pg-evaluation .eval-section {
-    display: none;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  #pg-evaluation .eval-section.active {
-    display: block !important;
-  }
-
-  #pg-evaluation .card {
-    margin-top: 0 !important;
-  }
-
-  #pg-evaluation .course-badge {
-    color: #fff;
-    font-size: 11px;
-    font-weight: 800;
-    padding: 4px 12px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #2e7d42;
-  }
-
-  #pg-evaluation .eval-info-box {
-    border-left: 5px solid #2e7d42;
-    background: #f7fbf8;
-    border-radius: 14px;
-    padding: 13px 14px;
-    color: #344054;
-    line-height: 1.55;
-    font-size: 13px;
-    margin-bottom: 12px;
-  }
-
-  #pg-evaluation .eval-proj-card {
-    background: #fff;
-    border: 1px solid #e7eee9 !important;
-    border-radius: 16px;
-    padding: 14px !important;
-  }
-
-  #pg-evaluation .stat {
-    background: #fbfdfb;
-    border: 1px solid #e7eee9;
-    border-radius: 14px;
-  }
-
-  @media (max-width: 620px) {
-    #pg-evaluation .eval-tab {
-      width: 100%;
-      text-align: center;
+  <style>
+    /* Final Evaluation tabs - same style/colors as other coordinator pages */
+    html,
+    body {
+      scroll-behavior: auto !important;
     }
-  }
-</style>
 
-<div class="eval-tabs" role="tablist" aria-label="Final Evaluation tabs">
-  <button
-    class="eval-tab on"
-    type="button"
-    role="tab"
-    aria-selected="true"
-    aria-controls="introEval"
-    onclick="showEvalSection('introEval', this)">
-    Project Introduction
-  </button>
+    #pg-evaluation {
+      display: block !important;
+      min-height: auto !important;
+      height: auto !important;
+      padding: 20px 22px 90px !important;
+      margin: 0 !important;
+    }
 
-  <button
-    class="eval-tab"
-    type="button"
-    role="tab"
-    aria-selected="false"
-    aria-controls="gradEval"
-    onclick="showEvalSection('gradEval', this)">
-    Graduation Projects
-  </button>
-</div>
+    #pg-evaluation .eval-tabs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 0 0 16px 0;
+      padding: 0;
+    }
 
-<!-- =========================
+    #pg-evaluation .eval-tab {
+      border: 1px solid #d7e3dc;
+      background: #fff;
+      color: #2d5137;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    #pg-evaluation .eval-tab:hover {
+      background: #f3f7f4;
+    }
+
+    #pg-evaluation .eval-tab.on {
+      background: #2e7d42;
+      border-color: #2e7d42;
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+    }
+
+    #pg-evaluation .eval-section {
+      display: none;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    #pg-evaluation .eval-section.active {
+      display: block !important;
+    }
+
+    #pg-evaluation .card {
+      margin-top: 0 !important;
+    }
+
+    #pg-evaluation .course-badge {
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #2e7d42;
+    }
+
+    #pg-evaluation .eval-info-box {
+      border-left: 5px solid #2e7d42;
+      background: #f7fbf8;
+      border-radius: 14px;
+      padding: 13px 14px;
+      color: #344054;
+      line-height: 1.55;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    #pg-evaluation .eval-proj-card {
+      background: #fff;
+      border: 1px solid #e7eee9 !important;
+      border-radius: 16px;
+      padding: 14px !important;
+    }
+
+    #pg-evaluation .stat {
+      background: #fbfdfb;
+      border: 1px solid #e7eee9;
+      border-radius: 14px;
+    }
+
+    @media (max-width: 620px) {
+      #pg-evaluation .eval-tab {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+
+  <div class="eval-tabs" role="tablist" aria-label="Final Evaluation tabs">
+    <button class="eval-tab on" type="button" role="tab" aria-selected="true" aria-controls="introEval"
+      onclick="showEvalSection('introEval', this)">
+      Project Introduction
+    </button>
+
+    <button class="eval-tab" type="button" role="tab" aria-selected="false" aria-controls="gradEval"
+      onclick="showEvalSection('gradEval', this)">
+      Graduation Projects
+    </button>
+  </div>
+
+  <!-- =========================
      TAB 1: Project Introduction
 ========================== -->
-<div id="introEval" class="eval-section active" role="tabpanel">
-  <div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-      <span class="course-badge">◑ Project Introduction — COMP4200</span>
-      <span style="font-size:11px;color:var(--color-text-secondary);">مقدمة المشاريع</span>
-    </div>
-
-    <div class="eval-info-box">
-      ℹ Final grade = <b>Coordinator</b> + <b>Supervisor</b> + <b>Report</b> + <b>Discussion</b>.
-      Grades shared through the Facilitator to all committee members.
-    </div>
-
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Awaiting Final Evaluation</span>
-      </div>
-
-      <div class="eval-proj-card u-0dc8ac5d" style="margin-bottom:14px;">
-        <div class="u-48c2971d">
-          <div>
-            <div class="u-2e61148f">Smart Library Catalog System</div>
-            <div class="u-de9298af">Nour Haddad · Dr. Lina Haddad</div>
-          </div>
-          <span class="pill p-review">Awaiting Decision</span>
-        </div>
-
-        <div class="u-9ecfbc8b">
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">76</div>
-            <div class="u-6fd3896a">Coordinator</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-7af4030e">80</div>
-            <div class="u-6fd3896a">Supervisor</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-7af4030e">74</div>
-            <div class="u-6fd3896a">Report</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-7af4030e">78</div>
-            <div class="u-6fd3896a">Discussion</div>
-          </div>
-
-          <div class="u-9b429454">
-            <div class="u-d85f4169">77.0</div>
-            <div class="u-f675d1f9">Average</div>
-          </div>
-        </div>
-
-        <div class="field-wrap" style="margin-top:10px;">
-          <div class="field-label">Final Coordinator Notes (Optional)</div>
-          <textarea class="field-textarea u-e64f694d" placeholder="Add your final notes..."></textarea>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-success" data-prompt="Issued final acceptance for Library System ↗" type="button">
-            ✓ Issue Final Acceptance ↗
-          </button>
-          <button class="btn btn-danger" type="button">✗ Reject</button>
-        </div>
-      </div>
-
-      <div class="eval-proj-card u-0dc8ac5d">
-        <div class="u-48c2971d">
-          <div>
-            <div class="u-2e61148f">Electronic Student Records Management System</div>
-            <div class="u-de9298af">Salma Al-Khatib · Dr. Mahmoud Salem</div>
-          </div>
-          <span class="pill p-accepted">Ready to Publish</span>
-        </div>
-
-        <div class="u-9ecfbc8b">
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">88</div>
-            <div class="u-6fd3896a">Coordinator</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">85</div>
-            <div class="u-6fd3896a">Supervisor</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">87</div>
-            <div class="u-6fd3896a">Report</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">86</div>
-            <div class="u-6fd3896a">Discussion</div>
-          </div>
-
-          <div class="u-9f99c629">
-            <div class="u-88af7645">86.5</div>
-            <div class="u-38bd4477">Average</div>
-          </div>
-        </div>
-
-        <div class="btn-row" style="margin-top:10px;">
-          <button class="btn btn-primary" data-prompt="Published Student Records project ↗" type="button">
-            Publish &amp; Archive ↗
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Export Grades — Project Introduction</span>
-        <button class="card-action" type="button">Export Excel ↓</button>
+  <div id="introEval" class="eval-section active" role="tabpanel">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span class="course-badge">◑ Project Introduction — COMP4200</span>
+        <span style="font-size:11px;color:var(--color-text-secondary);">مقدمة المشاريع</span>
       </div>
 
       <div class="eval-info-box">
-        ◎ File contains: Group #, Section #, Final Grade — sent to professors who then add student IDs.
+        ℹ Final grade = <b>Coordinator</b> + <b>Supervisor</b> + <b>Report</b> + <b>Discussion</b>.
+        Grades shared through the Facilitator to all committee members.
       </div>
 
-      <div class="u-77c8140b">
-        <table class="reg-table">
-          <thead>
-            <tr>
-              <th>Group #</th>
-              <th>Section #</th>
-              <th>Final Grade</th>
-              <th>Student IDs</th>
-              <th>Status</th>
-            </tr>
-          </thead>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Awaiting Final Evaluation</span>
+        </div>
 
-          <tbody>
-            <tr>
-              <td>G01</td>
-              <td>Sec 01</td>
-              <td>77.0</td>
-              <td>—</td>
-              <td><span class="pill p-pending">Awaiting IDs</span></td>
-            </tr>
+        <div class="eval-proj-card u-0dc8ac5d" style="margin-bottom:14px;">
+          <div class="u-48c2971d">
+            <div>
+              <div class="u-2e61148f">Smart Library Catalog System</div>
+              <div class="u-de9298af">Nour Haddad · Dr. Lina Haddad</div>
+            </div>
+            <span class="pill p-review">Awaiting Decision</span>
+          </div>
 
-            <tr>
-              <td>G02</td>
-              <td>Sec 01</td>
-              <td>86.5</td>
-              <td>1221100</td>
-              <td><span class="pill p-accepted">IDs Added ✓</span></td>
-            </tr>
-          </tbody>
-        </table>
+          <div class="u-9ecfbc8b">
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">76</div>
+              <div class="u-6fd3896a">Coordinator</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-7af4030e">80</div>
+              <div class="u-6fd3896a">Supervisor</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-7af4030e">74</div>
+              <div class="u-6fd3896a">Report</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-7af4030e">78</div>
+              <div class="u-6fd3896a">Discussion</div>
+            </div>
+
+            <div class="u-9b429454">
+              <div class="u-d85f4169">77.0</div>
+              <div class="u-f675d1f9">Average</div>
+            </div>
+          </div>
+
+          <div class="field-wrap" style="margin-top:10px;">
+            <div class="field-label">Final Coordinator Notes (Optional)</div>
+            <textarea class="field-textarea u-e64f694d" placeholder="Add your final notes..."></textarea>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-success" data-prompt="Issued final acceptance for Library System ↗" type="button">
+              ✓ Issue Final Acceptance ↗
+            </button>
+            <button class="btn btn-danger" type="button">✗ Reject</button>
+          </div>
+        </div>
+
+        <div class="eval-proj-card u-0dc8ac5d">
+          <div class="u-48c2971d">
+            <div>
+              <div class="u-2e61148f">Electronic Student Records Management System</div>
+              <div class="u-de9298af">Salma Al-Khatib · Dr. Mahmoud Salem</div>
+            </div>
+            <span class="pill p-accepted">Ready to Publish</span>
+          </div>
+
+          <div class="u-9ecfbc8b">
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">88</div>
+              <div class="u-6fd3896a">Coordinator</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">85</div>
+              <div class="u-6fd3896a">Supervisor</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">87</div>
+              <div class="u-6fd3896a">Report</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">86</div>
+              <div class="u-6fd3896a">Discussion</div>
+            </div>
+
+            <div class="u-9f99c629">
+              <div class="u-88af7645">86.5</div>
+              <div class="u-38bd4477">Average</div>
+            </div>
+          </div>
+
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-primary" data-prompt="Published Student Records project ↗" type="button">
+              Publish &amp; Archive ↗
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Evaluation Statistics — COMP4200</span>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Export Grades — Project Introduction</span>
+          <button class="card-action" type="button">Export Excel ↓</button>
+        </div>
+
+        <div class="eval-info-box">
+          ◎ File contains: Group #, Section #, Final Grade — sent to professors who then add student IDs.
+        </div>
+
+        <div class="u-77c8140b">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Group #</th>
+                <th>Section #</th>
+                <th>Final Grade</th>
+                <th>Student IDs</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr>
+                <td>G01</td>
+                <td>Sec 01</td>
+                <td>77.0</td>
+                <td>—</td>
+                <td><span class="pill p-pending">Awaiting IDs</span></td>
+              </tr>
+
+              <tr>
+                <td>G02</td>
+                <td>Sec 01</td>
+                <td>86.5</td>
+                <td>1221100</td>
+                <td><span class="pill p-accepted">IDs Added ✓</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="u-e1357c22">
-        <div class="stat">
-          <div class="stat-num u-8351a61a">31</div>
-          <div class="stat-label">Total Groups</div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Evaluation Statistics — COMP4200</span>
         </div>
 
-        <div class="stat">
-          <div class="stat-num u-33340b68">81.2</div>
-          <div class="stat-label">Average Score</div>
-        </div>
+        <div class="u-e1357c22">
+          <div class="stat">
+            <div class="stat-num u-8351a61a">31</div>
+            <div class="stat-label">Total Groups</div>
+          </div>
 
-        <div class="stat">
-          <div class="stat-num u-a28c35c7">4</div>
-          <div class="stat-label">Awaiting Decision</div>
-        </div>
+          <div class="stat">
+            <div class="stat-num u-33340b68">81.2</div>
+            <div class="stat-label">Average Score</div>
+          </div>
 
-        <div class="stat">
-          <div class="stat-num u-c0077588">27</div>
-          <div class="stat-label">Completed</div>
+          <div class="stat">
+            <div class="stat-num u-a28c35c7">4</div>
+            <div class="stat-label">Awaiting Decision</div>
+          </div>
+
+          <div class="stat">
+            <div class="stat-num u-c0077588">27</div>
+            <div class="stat-label">Completed</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- =========================
+  <!-- =========================
      TAB 2: Graduation Projects
 ========================== -->
-<div id="gradEval" class="eval-section" role="tabpanel">
-  <div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-      <span class="course-badge">✦ Graduation Projects — COMP4201</span>
-      <span style="font-size:11px;color:var(--color-text-secondary);">مشاريع التخرج</span>
-    </div>
-
-    <div class="eval-info-box">
-      ℹ Final grade = <b>Coordinator</b> + <b>Supervisor</b> + <b>Report</b> + <b>Discussion</b>.
-      Grades shared through the Facilitator to all committee members.
-    </div>
-
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Awaiting Final Evaluation</span>
-      </div>
-
-      <div class="eval-proj-card u-0dc8ac5d" style="margin-bottom:14px;">
-        <div class="u-48c2971d">
-          <div>
-            <div class="u-2e61148f">Academic Project Lifecycle Management System</div>
-            <div class="u-de9298af">Rahaf Badwan and others · Dr. Naemeh Harbawi</div>
-          </div>
-          <span class="pill p-review">Awaiting Decision</span>
-        </div>
-
-        <div class="u-9ecfbc8b">
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">78</div>
-            <div class="u-6fd3896a">Coordinator</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-7af4030e">80</div>
-            <div class="u-6fd3896a">Supervisor</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-7af4030e">75</div>
-            <div class="u-6fd3896a">Report</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-7af4030e">82</div>
-            <div class="u-6fd3896a">Discussion</div>
-          </div>
-
-          <div class="u-9b429454">
-            <div class="u-d85f4169">78.8</div>
-            <div class="u-f675d1f9">Average</div>
-          </div>
-        </div>
-
-        <div class="field-wrap" style="margin-top:10px;">
-          <div class="field-label">Final Coordinator Notes (Optional)</div>
-          <textarea class="field-textarea u-e64f694d" placeholder="Add your final notes..."></textarea>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-success" data-prompt="Issued final acceptance for APMS project ↗" type="button">
-            ✓ Issue Final Acceptance ↗
-          </button>
-          <button class="btn btn-danger" type="button">✗ Reject</button>
-        </div>
-      </div>
-
-      <div class="eval-proj-card u-8a069b16">
-        <div class="u-48c2971d">
-          <div>
-            <div class="u-2e61148f">AI-Based Disease Detection System</div>
-            <div class="u-de9298af">Amjad Al-Rimawi · Dr. Mahmoud Salem</div>
-          </div>
-          <span class="pill p-accepted">Ready to Publish</span>
-        </div>
-
-        <div class="u-9ecfbc8b">
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">92</div>
-            <div class="u-6fd3896a">Coordinator</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">95</div>
-            <div class="u-6fd3896a">Supervisor</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">91</div>
-            <div class="u-6fd3896a">Report</div>
-          </div>
-
-          <div class="u-cdca6521">
-            <div class="u-df4d8f5d">91</div>
-            <div class="u-6fd3896a">Discussion</div>
-          </div>
-
-          <div class="u-9f99c629">
-            <div class="u-88af7645">92.3</div>
-            <div class="u-38bd4477">Average</div>
-          </div>
-        </div>
-
-        <div class="btn-row" style="margin-top:10px;">
-          <button class="btn btn-primary" data-prompt="Published AI Disease project ↗" type="button">
-            Publish &amp; Archive ↗
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Export Grades — Graduation Projects</span>
-        <button class="card-action" type="button">Export Excel ↓</button>
+  <div id="gradEval" class="eval-section" role="tabpanel">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span class="course-badge">✦ Graduation Projects — COMP4201</span>
+        <span style="font-size:11px;color:var(--color-text-secondary);">مشاريع التخرج</span>
       </div>
 
       <div class="eval-info-box">
-        ◎ File contains: Group #, Section #, Final Grade — sent to professors who then add student IDs.
+        ℹ Final grade = <b>Coordinator</b> + <b>Supervisor</b> + <b>Report</b> + <b>Discussion</b>.
+        Grades shared through the Facilitator to all committee members.
       </div>
 
-      <div class="u-77c8140b">
-        <table class="reg-table">
-          <thead>
-            <tr>
-              <th>Group #</th>
-              <th>Section #</th>
-              <th>Final Grade</th>
-              <th>Student IDs</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr>
-              <td>G01</td>
-              <td>Sec 01</td>
-              <td>78.8</td>
-              <td>—</td>
-              <td><span class="pill p-pending">Awaiting IDs</span></td>
-            </tr>
-
-            <tr>
-              <td>G02</td>
-              <td>Sec 02</td>
-              <td>92.3</td>
-              <td>1221102, 1220877</td>
-              <td><span class="pill p-accepted">IDs Added ✓</span></td>
-            </tr>
-
-            <tr>
-              <td>G03</td>
-              <td>Sec 01</td>
-              <td>85.0</td>
-              <td>—</td>
-              <td><span class="pill p-pending">Awaiting IDs</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Evaluation Statistics — COMP4201</span>
-      </div>
-
-      <div class="u-e1357c22">
-        <div class="stat">
-          <div class="stat-num u-8351a61a">18</div>
-          <div class="stat-label">Total Groups</div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Awaiting Final Evaluation</span>
         </div>
 
-        <div class="stat">
-          <div class="stat-num u-33340b68">83.4</div>
-          <div class="stat-label">Average Score</div>
-        </div>
+        <div class="eval-proj-card u-0dc8ac5d" style="margin-bottom:14px;">
+          <div class="u-48c2971d">
+            <div>
+              <div class="u-2e61148f">Academic Project Lifecycle Management System</div>
+              <div class="u-de9298af">Rahaf Badwan and others · Dr. Naemeh Harbawi</div>
+            </div>
+            <span class="pill p-review">Awaiting Decision</span>
+          </div>
 
-        <div class="stat">
-          <div class="stat-num u-a28c35c7">3</div>
-          <div class="stat-label">Awaiting Decision</div>
-        </div>
+          <div class="u-9ecfbc8b">
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">78</div>
+              <div class="u-6fd3896a">Coordinator</div>
+            </div>
 
-        <div class="stat">
-          <div class="stat-num u-c0077588">15</div>
-          <div class="stat-label">Completed</div>
-        </div>
-      </div>
-    </div>
+            <div class="u-cdca6521">
+              <div class="u-7af4030e">80</div>
+              <div class="u-6fd3896a">Supervisor</div>
+            </div>
 
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Recent Decision Log</span>
-      </div>
+            <div class="u-cdca6521">
+              <div class="u-7af4030e">75</div>
+              <div class="u-6fd3896a">Report</div>
+            </div>
 
-      <div class="timeline">
-        <div class="tl-item">
-          <div class="tl-dot u-fd7e872d">✓</div>
-          <div>
-            <div class="tl-title">Accepted: AI Disease System — 92/100</div>
-            <div class="tl-meta">Yesterday · Archiving completed</div>
+            <div class="u-cdca6521">
+              <div class="u-7af4030e">82</div>
+              <div class="u-6fd3896a">Discussion</div>
+            </div>
+
+            <div class="u-9b429454">
+              <div class="u-d85f4169">78.8</div>
+              <div class="u-f675d1f9">Average</div>
+            </div>
+          </div>
+
+          <div class="field-wrap" style="margin-top:10px;">
+            <div class="field-label">Final Coordinator Notes (Optional)</div>
+            <textarea class="field-textarea u-e64f694d" placeholder="Add your final notes..."></textarea>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-success" data-prompt="Issued final acceptance for APMS project ↗" type="button">
+              ✓ Issue Final Acceptance ↗
+            </button>
+            <button class="btn btn-danger" type="button">✗ Reject</button>
           </div>
         </div>
 
-        <div class="tl-item">
-          <div class="tl-dot u-fd7e872d">✓</div>
-          <div>
-            <div class="tl-title">Accepted: Adaptive Learning Platform — 87/100</div>
-            <div class="tl-meta">3 days · Archiving completed</div>
+        <div class="eval-proj-card u-8a069b16">
+          <div class="u-48c2971d">
+            <div>
+              <div class="u-2e61148f">AI-Based Disease Detection System</div>
+              <div class="u-de9298af">Amjad Al-Rimawi · Dr. Mahmoud Salem</div>
+            </div>
+            <span class="pill p-accepted">Ready to Publish</span>
+          </div>
+
+          <div class="u-9ecfbc8b">
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">92</div>
+              <div class="u-6fd3896a">Coordinator</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">95</div>
+              <div class="u-6fd3896a">Supervisor</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">91</div>
+              <div class="u-6fd3896a">Report</div>
+            </div>
+
+            <div class="u-cdca6521">
+              <div class="u-df4d8f5d">91</div>
+              <div class="u-6fd3896a">Discussion</div>
+            </div>
+
+            <div class="u-9f99c629">
+              <div class="u-88af7645">92.3</div>
+              <div class="u-38bd4477">Average</div>
+            </div>
+          </div>
+
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-primary" data-prompt="Published AI Disease project ↗" type="button">
+              Publish &amp; Archive ↗
+            </button>
           </div>
         </div>
+      </div>
 
-        <div class="tl-item u-a2d48c76">
-          <div class="tl-dot u-794dc6f3">✗</div>
-          <div>
-            <div class="tl-title">Rejected: Appointment Booking System — 54/100</div>
-            <div class="tl-meta">5 days · Student notified</div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Export Grades — Graduation Projects</span>
+          <button class="card-action" type="button">Export Excel ↓</button>
+        </div>
+
+        <div class="eval-info-box">
+          ◎ File contains: Group #, Section #, Final Grade — sent to professors who then add student IDs.
+        </div>
+
+        <div class="u-77c8140b">
+          <table class="reg-table">
+            <thead>
+              <tr>
+                <th>Group #</th>
+                <th>Section #</th>
+                <th>Final Grade</th>
+                <th>Student IDs</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr>
+                <td>G01</td>
+                <td>Sec 01</td>
+                <td>78.8</td>
+                <td>—</td>
+                <td><span class="pill p-pending">Awaiting IDs</span></td>
+              </tr>
+
+              <tr>
+                <td>G02</td>
+                <td>Sec 02</td>
+                <td>92.3</td>
+                <td>1221102, 1220877</td>
+                <td><span class="pill p-accepted">IDs Added ✓</span></td>
+              </tr>
+
+              <tr>
+                <td>G03</td>
+                <td>Sec 01</td>
+                <td>85.0</td>
+                <td>—</td>
+                <td><span class="pill p-pending">Awaiting IDs</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Evaluation Statistics — COMP4201</span>
+        </div>
+
+        <div class="u-e1357c22">
+          <div class="stat">
+            <div class="stat-num u-8351a61a">18</div>
+            <div class="stat-label">Total Groups</div>
+          </div>
+
+          <div class="stat">
+            <div class="stat-num u-33340b68">83.4</div>
+            <div class="stat-label">Average Score</div>
+          </div>
+
+          <div class="stat">
+            <div class="stat-num u-a28c35c7">3</div>
+            <div class="stat-label">Awaiting Decision</div>
+          </div>
+
+          <div class="stat">
+            <div class="stat-num u-c0077588">15</div>
+            <div class="stat-label">Completed</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Recent Decision Log</span>
+        </div>
+
+        <div class="timeline">
+          <div class="tl-item">
+            <div class="tl-dot u-fd7e872d">✓</div>
+            <div>
+              <div class="tl-title">Accepted: AI Disease System — 92/100</div>
+              <div class="tl-meta">Yesterday · Archiving completed</div>
+            </div>
+          </div>
+
+          <div class="tl-item">
+            <div class="tl-dot u-fd7e872d">✓</div>
+            <div>
+              <div class="tl-title">Accepted: Adaptive Learning Platform — 87/100</div>
+              <div class="tl-meta">3 days · Archiving completed</div>
+            </div>
+          </div>
+
+          <div class="tl-item u-a2d48c76">
+            <div class="tl-dot u-794dc6f3">✗</div>
+            <div>
+              <div class="tl-title">Rejected: Appointment Booking System — 54/100</div>
+              <div class="tl-meta">5 days · Student notified</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
 </div>
 

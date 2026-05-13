@@ -9,11 +9,13 @@
 
   <div class="stats-row">
     <div class="stat">
-      <div class="stat-num" id="stat-student" style="color:var(--blue);font-size:14px;font-weight:700;line-height:1.3">—</div>
+      <div class="stat-num" id="stat-student" style="color:var(--blue);font-size:14px;font-weight:700;line-height:1.3">—
+      </div>
       <div class="stat-label">Student Name</div>
     </div>
     <div class="stat">
-      <div class="stat-num" id="stat-supervisor" style="color:var(--green);font-size:14px;font-weight:700;line-height:1.3">—</div>
+      <div class="stat-num" id="stat-supervisor"
+        style="color:var(--green);font-size:14px;font-weight:700;line-height:1.3">—</div>
       <div class="stat-label">Supervisor</div>
     </div>
     <div class="stat">
@@ -37,34 +39,42 @@
         <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
           <div style="position:relative;width:140px;height:140px;flex-shrink:0">
             <canvas id="overallChart" width="140" height="140"></canvas>
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
-              <div id="overall-center" style="font-size:22px;font-weight:700;color:var(--color-text-primary);line-height:1">—</div>
+            <div
+              style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+              <div id="overall-center"
+                style="font-size:22px;font-weight:700;color:var(--color-text-primary);line-height:1">—</div>
               <div style="font-size:10px;color:var(--color-text-secondary);margin-top:2px">Complete</div>
             </div>
           </div>
 
           <div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px">
             <div>
-              <div id="project-title" style="font-size:16px;font-weight:700;color:var(--color-text-primary);margin-bottom:4px">Loading...</div>
+              <div id="project-title"
+                style="font-size:16px;font-weight:700;color:var(--color-text-primary);margin-bottom:4px">Loading...
+              </div>
               <div id="project-meta" style="font-size:12px;color:var(--color-text-secondary);line-height:1.6"></div>
             </div>
 
             <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
               <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
                 <div style="font-size:11px;color:var(--color-text-secondary)">Student</div>
-                <div id="student-name" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
+                <div id="student-name"
+                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
               </div>
               <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
                 <div style="font-size:11px;color:var(--color-text-secondary)">Supervisor</div>
-                <div id="supervisor-name" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
+                <div id="supervisor-name"
+                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
               </div>
               <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
                 <div style="font-size:11px;color:var(--color-text-secondary)">Project Type</div>
-                <div id="project-type" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
+                <div id="project-type"
+                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
               </div>
               <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
                 <div style="font-size:11px;color:var(--color-text-secondary)">Registration Date</div>
-                <div id="registration-date" style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
+                <div id="registration-date"
+                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
               </div>
             </div>
 
@@ -82,7 +92,9 @@
           <span style="font-size:11px;color:var(--color-text-secondary)">Chart 2 of 2</span>
         </div>
         <canvas id="projectTypesChart" height="95"></canvas>
-        <div id="project-types-empty" style="display:none;font-size:13px;color:var(--color-text-secondary);text-align:center;padding:18px 0">No project types found yet</div>
+        <div id="project-types-empty"
+          style="display:none;font-size:13px;color:var(--color-text-secondary);text-align:center;padding:18px 0">No
+          project types found yet</div>
       </div>
     </div>
 
@@ -90,31 +102,38 @@
       <div class="card">
         <div class="card-hd"><span class="card-title">Team Members</span></div>
         <div id="team-list">
-          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...
+          </div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-hd"><span class="card-title">Upcoming Deadlines</span></div>
         <div id="deadlines-list">
-          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...
+          </div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-hd"><span class="card-title">Summary</span></div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <div style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
+          <div
+            style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
             <span style="font-size:12px;color:var(--color-text-secondary)">Academic Year</span>
-            <span id="academic-year" style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
+            <span id="academic-year"
+              style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
           </div>
-          <div style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
+          <div
+            style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
             <span style="font-size:12px;color:var(--color-text-secondary)">Project Status</span>
-            <span id="project-status" style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
+            <span id="project-status"
+              style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;gap:12px">
             <span style="font-size:12px;color:var(--color-text-secondary)">My Role</span>
-            <span id="student-role" style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
+            <span id="student-role"
+              style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
           </div>
         </div>
       </div>
@@ -222,7 +241,7 @@
 
     document.getElementById('project-title').textContent = project.project_id ? (project.title || 'Registered Project') : 'No registered project yet';
     document.getElementById('project-meta').textContent = project.project_id
-      ? `Type: ${typeLabel} · Academic Year: ${safeText(d.academic_year)}`
+      ? (project.project_type ? `Type: ${typeLabel} - Academic Year: ${safeText(d.academic_year)}` : `Academic Year: ${safeText(d.academic_year)}`)
       : 'Register your project to see its details here.';
     document.getElementById('student-name').textContent = safeText(d.student_name);
     document.getElementById('supervisor-name').textContent = safeText(d.supervisor_name);
@@ -270,10 +289,47 @@
     const deadlinesList = document.getElementById('deadlines-list');
     const deadlines = d.deadlines || [];
     if (deadlines.length) {
-      deadlinesList.innerHTML = deadlines.map(dl => `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--color-bg-secondary);border-radius:var(--rm);margin-bottom:8px">
-        <div style="font-size:11px;font-weight:700;color:var(--amber);min-width:50px;text-align:center;flex-shrink:0">${safeText(dl.date_str)}</div>
-        <div style="font-size:12px;color:var(--color-text-primary)">${safeText(dl.label)}</div>
-      </div>`).join('');
+      deadlinesList.innerHTML = deadlines.map(dl => {
+        const isTimeline = dl.deadline_type === 'timeline';
+        const parts = safeText(dl.date_str).split(' ');
+        const dayNum = parts[1] || safeText(dl.date_str);
+        const dayMon = parts[0] || '';
+        const color = isTimeline ? 'var(--green)' : 'var(--amber)';
+        const subLabel = isTimeline
+          ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:2px">Timeline Milestone</div>`
+          : '';
+        const actionBtn = isTimeline
+          ? `<a href="/student/timeline"
+               style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;
+                      color:#fff;background:var(--green);border-radius:8px;padding:5px 10px;
+                      text-decoration:none;white-space:nowrap;flex-shrink:0;transition:opacity .15s"
+               onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+              <span class="material-symbols-outlined" style="font-size:13px;line-height:1">open_in_new</span>
+              Submit
+            </a>`
+          : '';
+        const cardId = 'dl-card-' + Math.random().toString(36).slice(2);
+        return `<div id="${cardId}"
+          style="display:flex;align-items:center;gap:12px;padding:10px 12px;
+                 background:var(--color-bg-secondary);border-radius:10px;
+                 border-left:3px solid ${color};margin-bottom:8px;
+                 transition:background .18s,box-shadow .18s,transform .12s;
+                 cursor:default;"
+          onmouseenter="this.style.background='${isTimeline ? 'rgba(26,107,58,.07)' : 'rgba(186,117,23,.07)'}';this.style.boxShadow='0 2px 12px rgba(0,0,0,.08)';this.style.transform='translateY(-1px)'"
+          onmouseleave="this.style.background='var(--color-bg-secondary)';this.style.boxShadow='none';this.style.transform='translateY(0)'">
+          <div style="display:flex;flex-direction:column;align-items:center;min-width:36px;flex-shrink:0">
+            <span style="font-size:16px;font-weight:800;color:${color};line-height:1">${dayNum}</span>
+            <span style="font-size:9px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:1px">${dayMon}</span>
+          </div>
+          <div style="width:1px;height:30px;background:var(--color-border-tertiary);flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--color-text-primary);
+                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeText(dl.label)}</div>
+            ${subLabel}
+          </div>
+          ${actionBtn}
+        </div>`;
+      }).join('');
     } else {
       deadlinesList.innerHTML = '<div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">No upcoming deadlines</div>';
     }

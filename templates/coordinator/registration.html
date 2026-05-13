@@ -6,13 +6,49 @@
 
 {% block content %}
 <style>
-  .reg-main-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-  .reg-main-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;padding:10px 14px;border-radius:999px;font-weight:900;cursor:pointer}
-  .reg-main-tab.on{background:#2e7d42;color:#fff;border-color:#2e7d42}
-  .reg-tab-pane{display:none}
-  .reg-tab-pane.active{display:block}
-  .reg-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-  @media(max-width:980px){ .reg-split{grid-template-columns:1fr} }
+  .reg-main-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px
+  }
+
+  .reg-main-tab {
+    border: 1px solid #d7e3dc;
+    background: #fff;
+    color: #2d5137;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-weight: 900;
+    cursor: pointer
+  }
+
+  .reg-main-tab.on {
+    background: #2e7d42;
+    color: #fff;
+    border-color: #2e7d42
+  }
+
+  .reg-tab-pane {
+    display: none
+  }
+
+  .reg-tab-pane.active {
+    display: block
+  }
+
+  .reg-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start
+  }
+
+  @media(max-width:980px) {
+    .reg-split {
+      grid-template-columns: 1fr
+    }
+  }
 </style>
 
 <div class="page page-single on" id="pg-registration">
@@ -26,11 +62,13 @@
     <div class="card">
       <div class="card-hd">
         <span class="card-title">Student submissions schedule</span>
-        <button class="card-action" type="button" onclick="window.location.href='/api/coordinator/export-groups'">Download Excel ↓</button>
+        <button class="card-action" type="button"
+          onclick="window.location.href='/api/coordinator/export-groups'">Download Excel ↓</button>
       </div>
 
       <div class="u-cebcb327">
-        This schedule reads the registered students directly from the database, shows each group with the preferred doctors, and lets you decide the final supervisor for every group.
+        This schedule reads the registered students directly from the database, shows each group with the preferred
+        doctors, and lets you decide the final supervisor for every group.
       </div>
 
       <div class="u-77c8140b">
@@ -47,7 +85,9 @@
             </tr>
           </thead>
           <tbody id="distributionFormsBody">
-            <tr><td colspan="7">Loading...</td></tr>
+            <tr>
+              <td colspan="7">Loading...</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -59,7 +99,8 @@
       <div class="card">
         <div class="card-hd"><span class="card-title">Unassigned Students</span></div>
         <div class="u-e284fbe5">
-          Students who do not have a group yet are shown here as checkboxes. Select up to 3 students, choose a supervisor, then create a section for them.
+          Students who do not have a group yet are shown here as checkboxes. Select up to 3 students, choose a
+          supervisor, then create a section for them.
         </div>
 
         <div style="font-size:12px;color:#667587;margin-bottom:10px">
@@ -73,7 +114,8 @@
 
       <div class="card">
         <div class="card-hd"><span class="card-title">Create Section for Unassigned Students</span></div>
-        <div class="u-cebcb327">Choose a section name, choose a supervisor, and create a section using the checked students from the left panel.</div>
+        <div class="u-cebcb327">Choose a section name, choose a supervisor, and create a section using the checked
+          students from the left panel.</div>
 
         <div class="form-grid" style="margin-bottom:12px">
           <div class="field-wrap">
@@ -90,8 +132,10 @@
         </div>
 
         <div class="btn-row u-92d17336">
-          <button class="btn btn-primary u-9bd93d36" type="button" onclick="addSectionEntry()">+ Create Section From Selected Students</button>
-          <button class="btn btn-outline u-9bd93d36" type="button" onclick="window.location.href='/api/coordinator/export-sections'">Export Excel</button>
+          <button class="btn btn-primary u-9bd93d36" type="button" onclick="addSectionEntry()">+ Create Section From
+            Selected Students</button>
+          <button class="btn btn-outline u-9bd93d36" type="button"
+            onclick="window.location.href='/api/coordinator/export-sections'">Export Excel</button>
         </div>
 
         <div id="sectionMsg" style="margin-top:12px;font-size:12px"></div>
@@ -110,7 +154,8 @@
       </div>
 
       <div style="font-size:13px;color:#667587;margin-bottom:12px">
-        Open the student registration page and choose an automatic close date. When the close date passes, registration closes automatically.
+        Open the student registration page and choose an automatic close date. When the close date passes, registration
+        closes automatically.
       </div>
 
       <div class="field-wrap" style="margin-bottom:12px">

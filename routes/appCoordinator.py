@@ -1,10 +1,21 @@
-from flask import Blueprint, request, redirect, url_for, session, render_template, jsonify, Response
+from flask import (
+    Blueprint,
+    request,
+    redirect,
+    url_for,
+    session,
+    render_template,
+    jsonify,
+    Response,
+)
 import csv
 import io
 import math
 import random
 from collections import defaultdict
 from datetime import datetime, timedelta
+
+from werkzeug.utils import secure_filename
 
 from db import get_db
 from auth import login_required
@@ -53,21 +64,30 @@ def _get_active_semester(cursor):
     has_close_at = _db_column_exists(cursor, "semesters", "distribution_close_at")
 
     fields = ["semester_id", "academic_year", "semester_number"]
-    fields.append("COALESCE(distribution_open, 0) AS distribution_open" if has_distribution_open else "0 AS distribution_open")
-    fields.append("distribution_opened_at" if has_opened_at else "NULL AS distribution_opened_at")
-    fields.append("distribution_closed_at" if has_closed_at else "NULL AS distribution_closed_at")
-    fields.append("distribution_close_at" if has_close_at else "NULL AS distribution_close_at")
+    fields.append(
+        "COALESCE(distribution_open, 0) AS distribution_open"
+        if has_distribution_open
+        else "0 AS distribution_open"
+    )
+    fields.append(
+        "distribution_opened_at" if has_opened_at else "NULL AS distribution_opened_at"
+    )
+    fields.append(
+        "distribution_closed_at" if has_closed_at else "NULL AS distribution_closed_at"
+    )
+    fields.append(
+        "distribution_close_at" if has_close_at else "NULL AS distribution_close_at"
+    )
 
-    cursor.execute(
-        f"""
+    cursor.execute(f"""
         SELECT {', '.join(fields)}
         FROM semesters
         WHERE is_active = TRUE
         ORDER BY semester_id DESC
         LIMIT 1
-        """
-    )
+        """)
     return cursor.fetchone()
+
 
 def _get_anchor_semester_for_year(cursor, academic_year):
     cursor.execute(
@@ -112,6 +132,110 @@ def _table_exists(cursor, table_name):
     return int(row.get("cnt") or 0) > 0
 
 
+def _insert_notification(
+    cursor,
+    recipient_id,
+    sender_id,
+    notification_type,
+    title,
+    message,
+    related_project_id=None,
+    course_scope="both",
+):
+    if _db_column_exists(cursor, "notifications", "course_scope"):
+        cursor.execute(
+            """
+            INSERT INTO notifications
+                (recipient_id, sender_id, notification_type, title, message,
+                 course_scope, related_project_id, is_read)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE)
+            """,
+            (
+                recipient_id,
+                sender_id,
+                notification_type,
+                title,
+                message,
+                course_scope,
+                related_project_id,
+            ),
+        )
+    else:
+        cursor.execute(
+            """
+            INSERT INTO notifications
+                (recipient_id, sender_id, notification_type, title, message,
+                 related_project_id, is_read)
+            VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+            """,
+            (
+                recipient_id,
+                sender_id,
+                notification_type,
+                title,
+                message,
+                related_project_id,
+            ),
+        )
+
+
+def _project_student_user_ids(cursor, project_id):
+    cursor.execute(
+        """
+        SELECT DISTINCT u.user_id
+        FROM project_members pm
+        JOIN students st ON st.student_id = pm.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE pm.project_id = %s
+          AND u.role = 'student'
+          AND u.is_active = TRUE
+        """,
+        (project_id,),
+    )
+    return [row["user_id"] for row in cursor.fetchall()]
+
+
+def _deliverable_student_user_ids(cursor, semester_id, course_scope):
+    if course_scope == "graduation_project":
+        cursor.execute(
+            """
+            SELECT DISTINCT u.user_id
+            FROM projects p
+            JOIN project_members pm ON pm.project_id = p.project_id
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE p.semester_id = %s
+              AND u.role = 'student'
+              AND u.is_active = TRUE
+            """,
+            (semester_id,),
+        )
+        return [row["user_id"] for row in cursor.fetchall()]
+
+    cursor.execute(
+        """
+        SELECT DISTINCT u.user_id
+        FROM student_course_results scr
+        JOIN students st ON st.student_id = scr.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE scr.semester_id = %s
+          AND u.role = 'student'
+          AND u.is_active = TRUE
+        """,
+        (semester_id,),
+    )
+    recipients = [row["user_id"] for row in cursor.fetchall()]
+    if recipients:
+        return recipients
+
+    cursor.execute("""
+        SELECT user_id
+        FROM users
+        WHERE role = 'student' AND is_active = TRUE
+        """)
+    return [row["user_id"] for row in cursor.fetchall()]
+
+
 def _active_distribution_is_open(semester):
     if not semester:
         return False
@@ -128,11 +252,17 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
         anchor = _get_anchor_semester_for_year(cursor, academic_year)
         anchor_semester_id = anchor["semester_id"] if anchor else None
 
-    has_grad_hours = _db_column_exists(cursor, "faculty_load_settings", "graduation_project_hours")
+    has_grad_hours = _db_column_exists(
+        cursor, "faculty_load_settings", "graduation_project_hours"
+    )
     wanted_hours = 0.0
 
     if anchor_semester_id and _table_exists(cursor, "faculty_load_settings"):
-        select_field = "COALESCE(graduation_project_hours, 0) AS graduation_project_hours" if has_grad_hours else "0 AS graduation_project_hours"
+        select_field = (
+            "COALESCE(graduation_project_hours, 0) AS graduation_project_hours"
+            if has_grad_hours
+            else "0 AS graduation_project_hours"
+        )
         cursor.execute(
             f"""
             SELECT {select_field}
@@ -196,44 +326,57 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
         "total_year_hours": used_hours,
     }
 
+
 def fetch_supervisors():
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
     active_semester = _get_active_semester(cursor)
     academic_year = active_semester["academic_year"] if active_semester else None
-    anchor = _get_anchor_semester_for_year(cursor, academic_year) if academic_year else None
+    anchor = (
+        _get_anchor_semester_for_year(cursor, academic_year) if academic_year else None
+    )
     anchor_semester_id = anchor["semester_id"] if anchor else None
 
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT f.faculty_id, u.full_name
         FROM faculty f
         JOIN users u ON u.user_id = f.user_id
         WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
         ORDER BY u.full_name
-        """
-    )
+        """)
     rows = cursor.fetchall()
 
     result = []
     for row in rows:
-        snapshot = _faculty_load_snapshot(cursor, row["faculty_id"], academic_year, anchor_semester_id) if academic_year else {
-            "supervised_groups": 0, "wanted_hours": 0.0, "used_hours": 0.0,
-            "remaining_hours": 0.0, "status": "Not Set", "can_take_one_student": False
-        }
-        result.append({
-            "faculty_id": row["faculty_id"],
-            "full_name": row["full_name"],
-            "assigned_projects": snapshot["supervised_groups"],
-            "wanted_hours": snapshot["wanted_hours"],
-            "used_hours": snapshot["used_hours"],
-            "current_hours": snapshot["used_hours"],
-            "max_hours": snapshot["wanted_hours"],
-            "remaining_hours": snapshot["remaining_hours"],
-            "status": snapshot["status"],
-            "can_take_one_student": snapshot["can_take_one_student"],
-        })
+        snapshot = (
+            _faculty_load_snapshot(
+                cursor, row["faculty_id"], academic_year, anchor_semester_id
+            )
+            if academic_year
+            else {
+                "supervised_groups": 0,
+                "wanted_hours": 0.0,
+                "used_hours": 0.0,
+                "remaining_hours": 0.0,
+                "status": "Not Set",
+                "can_take_one_student": False,
+            }
+        )
+        result.append(
+            {
+                "faculty_id": row["faculty_id"],
+                "full_name": row["full_name"],
+                "assigned_projects": snapshot["supervised_groups"],
+                "wanted_hours": snapshot["wanted_hours"],
+                "used_hours": snapshot["used_hours"],
+                "current_hours": snapshot["used_hours"],
+                "max_hours": snapshot["wanted_hours"],
+                "remaining_hours": snapshot["remaining_hours"],
+                "status": snapshot["status"],
+                "can_take_one_student": snapshot["can_take_one_student"],
+            }
+        )
 
     cursor.close()
     db.close()
@@ -277,7 +420,8 @@ def api_coordinator_dashboard_data():
         where = "WHERE p.semester_id = %s" if semester_id else ""
         params = (semester_id,) if semester_id else ()
 
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT
                 COUNT(*) AS total_projects,
                 SUM(CASE WHEN p.status IN ('submitted','under_review','needs_revision') THEN 1 ELSE 0 END) AS awaiting_review,
@@ -286,29 +430,38 @@ def api_coordinator_dashboard_data():
                 SUM(CASE WHEN p.status = 'rejected' THEN 1 ELSE 0 END) AS rejected
             FROM projects p
             {where}
-            """, params)
+            """,
+            params,
+        )
         stats = cursor.fetchone() or {}
 
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT p.status, COUNT(*) AS count
             FROM projects p
             {where}
             GROUP BY p.status
             ORDER BY count DESC
-            """, params)
+            """,
+            params,
+        )
         by_status = cursor.fetchall()
 
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT p.project_type, COUNT(*) AS count
             FROM projects p
             {where}
             GROUP BY p.project_type
             ORDER BY count DESC
             LIMIT 8
-            """, params)
+            """,
+            params,
+        )
         by_type = cursor.fetchall()
 
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT p.project_id, p.title, p.status, p.submission_date,
                    sup.full_name AS supervisor_name,
                    COALESCE(GROUP_CONCAT(DISTINCT stu.full_name ORDER BY pm.is_primary_contact DESC, stu.full_name SEPARATOR ', '), '') AS team_members
@@ -322,7 +475,9 @@ def api_coordinator_dashboard_data():
             GROUP BY p.project_id, p.title, p.status, p.submission_date, sup.full_name
             ORDER BY p.updated_at DESC, p.project_id DESC
             LIMIT 5
-            """, params)
+            """,
+            params,
+        )
         latest_projects = cursor.fetchall()
 
         cursor.execute(
@@ -330,28 +485,34 @@ def api_coordinator_dashboard_data():
             SELECT COUNT(*) AS committees
             FROM committee_plans
             WHERE status IN ('scheduled','draft')
-            """ if _table_exists(cursor, "committee_plans") else "SELECT 0 AS committees"
+            """
+            if _table_exists(cursor, "committee_plans")
+            else "SELECT 0 AS committees"
         )
         committees = cursor.fetchone() or {}
 
         cursor.close()
         db.close()
 
-        return jsonify(_json_safe_value({
-            "semester": semester or {},
-            "distribution_open": _active_distribution_is_open(semester),
-            "stats": {
-                "total_projects": int(stats.get("total_projects") or 0),
-                "awaiting_review": int(stats.get("awaiting_review") or 0),
-                "under_evaluation": int(stats.get("under_evaluation") or 0),
-                "accepted": int(stats.get("accepted") or 0),
-                "rejected": int(stats.get("rejected") or 0),
-                "committees": int(committees.get("committees") or 0),
-            },
-            "by_status": by_status,
-            "by_type": by_type,
-            "latest_projects": latest_projects,
-        }))
+        return jsonify(
+            _json_safe_value(
+                {
+                    "semester": semester or {},
+                    "distribution_open": _active_distribution_is_open(semester),
+                    "stats": {
+                        "total_projects": int(stats.get("total_projects") or 0),
+                        "awaiting_review": int(stats.get("awaiting_review") or 0),
+                        "under_evaluation": int(stats.get("under_evaluation") or 0),
+                        "accepted": int(stats.get("accepted") or 0),
+                        "rejected": int(stats.get("rejected") or 0),
+                        "committees": int(committees.get("committees") or 0),
+                    },
+                    "by_status": by_status,
+                    "by_type": by_type,
+                    "latest_projects": latest_projects,
+                }
+            )
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -363,7 +524,6 @@ def coordinator_page(page):
     if not template:
         return redirect(url_for("coordinator_bp.coordinator_dashboard"))
     return render_template(template)
-
 
 
 # ─── Coordinator Lectures & Deliverables ─────────────────────────────────
@@ -438,13 +598,16 @@ def api_coordinator_lectures_data():
         }
 
         if semester_id:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT lecture_id, semester_id, course_scope, title, description,
                        lecture_date, week_label, status, created_at, updated_at
                 FROM coordinator_lectures
                 WHERE semester_id = %s
                 ORDER BY course_scope, COALESCE(lecture_date, '9999-12-31'), lecture_id
-            """, (semester_id,))
+            """,
+                (semester_id,),
+            )
         else:
             cursor.execute("""
                 SELECT lecture_id, semester_id, course_scope, title, description,
@@ -457,13 +620,16 @@ def api_coordinator_lectures_data():
             result["lectures"].setdefault(row["course_scope"], []).append(row)
 
         if semester_id:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT deliverable_id, semester_id, course_scope, title, description,
                        due_date, mark_points, status, created_at, updated_at
                 FROM coordinator_deliverables
                 WHERE semester_id = %s
                 ORDER BY course_scope, COALESCE(due_date, '9999-12-31'), deliverable_id
-            """, (semester_id,))
+            """,
+                (semester_id,),
+            )
         else:
             cursor.execute("""
                 SELECT deliverable_id, semester_id, course_scope, title, description,
@@ -491,8 +657,16 @@ def api_coordinator_create_lecture():
         title = (data.get("title") or "").strip()
         if not title:
             return jsonify({"error": "Lecture title is required."}), 400
-        course_scope = data.get("course_scope") if data.get("course_scope") in ("introduction", "graduation_project") else "introduction"
-        status = data.get("status") if data.get("status") in ("scheduled", "completed", "cancelled") else "scheduled"
+        course_scope = (
+            data.get("course_scope")
+            if data.get("course_scope") in ("introduction", "graduation_project")
+            else "introduction"
+        )
+        status = (
+            data.get("status")
+            if data.get("status") in ("scheduled", "completed", "cancelled")
+            else "scheduled"
+        )
         lecture_date = data.get("lecture_date") or None
 
         db = get_db()
@@ -501,30 +675,37 @@ def api_coordinator_create_lecture():
         semester = _get_active_semester(cursor)
         semester_id = semester["semester_id"] if semester else None
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO coordinator_lectures
                 (semester_id, course_scope, title, description, lecture_date, week_label, status, created_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            semester_id,
-            course_scope,
-            title,
-            data.get("description") or None,
-            lecture_date,
-            data.get("week_label") or None,
-            status,
-            session.get("user_id"),
-        ))
+        """,
+            (
+                semester_id,
+                course_scope,
+                title,
+                data.get("description") or None,
+                lecture_date,
+                data.get("week_label") or None,
+                status,
+                session.get("user_id"),
+            ),
+        )
         db.commit()
         lecture_id = cursor.lastrowid
         cursor.close()
         db.close()
-        return jsonify({"message": "Lecture saved successfully.", "lecture_id": lecture_id})
+        return jsonify(
+            {"message": "Lecture saved successfully.", "lecture_id": lecture_id}
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@coordinator_bp.route("/api/coordinator/lectures/<int:lecture_id>/date", methods=["POST"])
+@coordinator_bp.route(
+    "/api/coordinator/lectures/<int:lecture_id>/date", methods=["POST"]
+)
 @login_required(role="coordinator")
 def api_coordinator_update_lecture_date(lecture_id):
     try:
@@ -533,12 +714,15 @@ def api_coordinator_update_lecture_date(lecture_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_lecture_tables(cursor)
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE coordinator_lectures
             SET lecture_date = %s,
                 status = CASE WHEN %s IS NULL THEN status ELSE 'scheduled' END
             WHERE lecture_id = %s
-        """, (lecture_date, lecture_date, lecture_id))
+        """,
+            (lecture_date, lecture_date, lecture_id),
+        )
         db.commit()
         cursor.close()
         db.close()
@@ -555,8 +739,17 @@ def api_coordinator_create_deliverable():
         title = (data.get("title") or "").strip()
         if not title:
             return jsonify({"error": "Deliverable title is required."}), 400
-        course_scope = data.get("course_scope") if data.get("course_scope") in ("introduction", "graduation_project") else "introduction"
-        status = data.get("status") if data.get("status") in ("not_open", "open", "in_progress", "completed", "closed") else "not_open"
+        course_scope = (
+            data.get("course_scope")
+            if data.get("course_scope") in ("introduction", "graduation_project")
+            else "introduction"
+        )
+        status = (
+            data.get("status")
+            if data.get("status")
+            in ("not_open", "open", "in_progress", "completed", "closed")
+            else "not_open"
+        )
         due_date = data.get("due_date") or None
         mark_points = data.get("mark_points") or 0
 
@@ -566,30 +759,115 @@ def api_coordinator_create_deliverable():
         semester = _get_active_semester(cursor)
         semester_id = semester["semester_id"] if semester else None
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO coordinator_deliverables
                 (semester_id, course_scope, title, description, due_date, mark_points, status, created_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            semester_id,
-            course_scope,
-            title,
-            data.get("description") or None,
-            due_date,
-            mark_points,
-            status,
-            session.get("user_id"),
-        ))
-        db.commit()
+        """,
+            (
+                semester_id,
+                course_scope,
+                title,
+                data.get("description") or None,
+                due_date,
+                mark_points,
+                status,
+                session.get("user_id"),
+            ),
+        )
         deliverable_id = cursor.lastrowid
+
+        if semester_id and due_date:
+            cursor.execute(
+                """
+                INSERT INTO deadlines
+                    (semester_id, project_id, deadline_type, deadline_date, description)
+                VALUES (%s, NULL, %s, %s, %s)
+                """,
+                (
+                    semester_id,
+                    f"coordinator_deliverable_{deliverable_id}",
+                    due_date,
+                    f"Assignment: {title}",
+                ),
+            )
+
+        sent_count = 0
+        if semester_id:
+            recipients = sorted(
+                set(_deliverable_student_user_ids(cursor, semester_id, course_scope))
+            )
+            scope_label = (
+                "Project Introduction"
+                if course_scope == "introduction"
+                else "Graduation Project"
+            )
+            due_text = f" Due date: {due_date}." if due_date else ""
+            points_text = (
+                f" Mark points: {float(mark_points):g}."
+                if str(mark_points).strip() not in ("", "0", "0.0")
+                else ""
+            )
+            details = (data.get("description") or "").strip()
+            message = (
+                f"A new assignment has been posted for {scope_label}: {title}."
+                f"{due_text}{points_text}"
+            )
+            if details:
+                message += f" Details: {details}"
+
+            for recipient_id in recipients:
+                _insert_notification(
+                    cursor,
+                    recipient_id,
+                    session.get("user_id"),
+                    "deadline_reminder" if due_date else "system",
+                    f"New Assignment: {title}",
+                    message,
+                    None,
+                    course_scope,
+                )
+            sent_count = len(recipients)
+
+        db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": "Deliverable saved successfully.", "deliverable_id": deliverable_id})
+        return jsonify(
+            {
+                "message": f"Deliverable saved successfully. {sent_count} student notification(s) sent.",
+                "deliverable_id": deliverable_id,
+                "notifications_sent": sent_count,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 # ─── Coordinator Notifications / Messaging ───────────────────────────────
+def _ensure_notification_attachment_columns(cursor):
+    """Add attachment columns to notifications when the database has not been migrated yet."""
+    if not _db_column_exists(cursor, "notifications", "attachment_name"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN attachment_name VARCHAR(255) NULL"
+        )
+    if not _db_column_exists(cursor, "notifications", "attachment_mime"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN attachment_mime VARCHAR(120) NULL"
+        )
+    if not _db_column_exists(cursor, "notifications", "attachment_data"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN attachment_data LONGBLOB NULL"
+        )
+
+
+def _notification_attachment_select_fields(cursor):
+    """Return safe SELECT fields for attachment metadata."""
+    if _db_column_exists(cursor, "notifications", "attachment_name"):
+        return "n.attachment_name, n.attachment_mime, n.attachment_data IS NOT NULL AS has_attachment"
+    return "NULL AS attachment_name, NULL AS attachment_mime, 0 AS has_attachment"
+
+
 def _notification_row_to_json(row):
     """Convert MySQL notification rows to safe JSON values."""
     if not row:
@@ -599,8 +877,12 @@ def _notification_row_to_json(row):
         clean["created_at"] = str(clean["created_at"])
     clean["is_read"] = bool(clean.get("is_read"))
     clean["course_scope"] = clean.get("course_scope") or "both"
+    clean["has_attachment"] = bool(clean.get("has_attachment"))
+    if not clean["has_attachment"]:
+        clean["attachment_name"] = None
+        clean["attachment_mime"] = None
+    clean.pop("attachment_data", None)
     return clean
-
 
 
 def _table_exists(cursor, table_name):
@@ -615,16 +897,21 @@ def _table_exists(cursor, table_name):
     row = cursor.fetchone() or {}
     return int(row.get("cnt") or 0) > 0
 
+
 def _notification_recipients(cursor, scope, value=None):
     """Return user_ids for the coordinator selected target."""
     scope = (scope or "").strip()
 
     if scope == "head":
-        cursor.execute("SELECT user_id FROM users WHERE role = 'head_of_department' AND is_active = TRUE")
+        cursor.execute(
+            "SELECT user_id FROM users WHERE role = 'head_of_department' AND is_active = TRUE"
+        )
         return [r["user_id"] for r in cursor.fetchall()]
 
     if scope == "doctors":
-        cursor.execute("SELECT user_id FROM users WHERE role = 'supervisor' AND is_active = TRUE")
+        cursor.execute(
+            "SELECT user_id FROM users WHERE role = 'supervisor' AND is_active = TRUE"
+        )
         return [r["user_id"] for r in cursor.fetchall()]
 
     if scope == "doctor":
@@ -652,7 +939,10 @@ def _notification_recipients(cursor, scope, value=None):
         return [r["user_id"] for r in cursor.fetchall()]
 
     if scope == "section":
-        if not (_table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students")):
+        if not (
+            _table_exists(cursor, "student_distribution_sections")
+            and _table_exists(cursor, "section_students")
+        ):
             return []
         cursor.execute(
             """
@@ -677,10 +967,12 @@ def _notification_recipients(cursor, scope, value=None):
         return [r["recipient_id"] for r in cursor.fetchall()]
 
     if scope == "all_sections":
-        if not (_table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students")):
+        if not (
+            _table_exists(cursor, "student_distribution_sections")
+            and _table_exists(cursor, "section_students")
+        ):
             return []
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT DISTINCT recipient_id
             FROM (
                 SELECT us.user_id AS recipient_id
@@ -696,9 +988,19 @@ def _notification_recipients(cursor, scope, value=None):
                 JOIN users u_sup ON u_sup.user_id = f.user_id
                 WHERE u_sup.is_active = TRUE
             ) x
-            """
-        )
+            """)
         return [r["recipient_id"] for r in cursor.fetchall()]
+
+    if scope == "reply":
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM users
+            WHERE user_id = %s AND is_active = TRUE
+            """,
+            (value,),
+        )
+        return [r["user_id"] for r in cursor.fetchall()]
 
     return []
 
@@ -710,42 +1012,37 @@ def api_coordinator_notification_options():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT user_id, full_name, university_id
             FROM users
             WHERE role = 'head_of_department' AND is_active = TRUE
             ORDER BY full_name
-            """
-        )
+            """)
         heads = cursor.fetchall()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT f.faculty_id, u.user_id, u.full_name, u.university_id
             FROM faculty f
             JOIN users u ON u.user_id = f.user_id
             WHERE u.role = 'supervisor' AND u.is_active = TRUE
             ORDER BY u.full_name
-            """
-        )
+            """)
         doctors = cursor.fetchall()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT st.student_id, u.user_id, u.full_name, u.university_id
             FROM students st
             JOIN users u ON u.user_id = st.user_id
             WHERE u.role = 'student' AND u.is_active = TRUE
             ORDER BY u.full_name
-            """
-        )
+            """)
         students = cursor.fetchall()
 
         sections = []
-        if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
-            cursor.execute(
-                """
+        if _table_exists(cursor, "student_distribution_sections") and _table_exists(
+            cursor, "section_students"
+        ):
+            cursor.execute("""
                 SELECT sec.section_id,
                        sec.section_name,
                        u_sup.full_name AS supervisor_name,
@@ -756,13 +1053,19 @@ def api_coordinator_notification_options():
                 LEFT JOIN section_students ss ON ss.section_id = sec.section_id
                 GROUP BY sec.section_id, sec.section_name, u_sup.full_name
                 ORDER BY sec.section_id DESC
-                """
-            )
+                """)
             sections = cursor.fetchall()
 
         cursor.close()
         db.close()
-        return jsonify({"heads": heads, "doctors": doctors, "students": students, "sections": sections})
+        return jsonify(
+            {
+                "heads": heads,
+                "doctors": doctors,
+                "students": students,
+                "sections": sections,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -773,11 +1076,14 @@ def api_coordinator_notifications_inbox():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        attachment_fields = _notification_attachment_select_fields(cursor)
         cursor.execute(
-            """
+            f"""
             SELECT n.notification_id, n.notification_type, n.title, n.message,
                    n.course_scope, n.related_project_id, n.is_read, n.created_at,
-                   sender.full_name AS sender_name, sender.role AS sender_role
+                   n.sender_id AS sender_user_id,
+                   sender.full_name AS sender_name, sender.role AS sender_role,
+                   {attachment_fields}
             FROM notifications n
             LEFT JOIN users sender ON sender.user_id = n.sender_id
             WHERE n.recipient_id = %s
@@ -800,11 +1106,14 @@ def api_coordinator_notifications_sent():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        attachment_fields = _notification_attachment_select_fields(cursor)
         cursor.execute(
-            """
+            f"""
             SELECT n.notification_id, n.title, n.message, n.notification_type,
                    n.course_scope, n.is_read, n.created_at,
-                   recipient.full_name AS recipient_name, recipient.role AS recipient_role
+                   n.recipient_id AS recipient_user_id,
+                   recipient.full_name AS recipient_name, recipient.role AS recipient_role,
+                   {attachment_fields}
             FROM notifications n
             JOIN users recipient ON recipient.user_id = n.recipient_id
             WHERE n.sender_id = %s
@@ -824,17 +1133,34 @@ def api_coordinator_notifications_sent():
 @coordinator_bp.route("/api/coordinator/notifications/send", methods=["POST"])
 @login_required(role="coordinator")
 def api_coordinator_notifications_send():
-    data = request.get_json(silent=True) or {}
+    is_multipart = bool(
+        request.content_type
+        and request.content_type.startswith("multipart/form-data")
+    )
+    if is_multipart:
+        data = request.form
+        uploaded_file = request.files.get("file")
+    else:
+        data = request.get_json(silent=True) or {}
+        uploaded_file = None
+
     scope = (data.get("scope") or "").strip()
     value = data.get("value")
     title = (data.get("title") or "").strip()
     message = (data.get("message") or "").strip()
-    urgent = bool(data.get("urgent"))
+    urgent = str(data.get("urgent") or "").lower() in ("1", "true", "on", "yes")
     course_scope = (data.get("course_scope") or "both").strip()
     allowed_course_scopes = {"introduction", "graduation_project", "both"}
 
     if course_scope not in allowed_course_scopes:
-        return jsonify({"error": "Please choose if this message is for Project Introduction, Graduation Project, or both."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "Please choose if this message is for Project Introduction, Graduation Project, or both."
+                }
+            ),
+            400,
+        )
 
     if not scope:
         return jsonify({"error": "Please choose who should receive the message."}), 400
@@ -842,12 +1168,24 @@ def api_coordinator_notifications_send():
         return jsonify({"error": "Please write a title."}), 400
     if not message:
         return jsonify({"error": "Please write a message."}), 400
-    if scope in {"student", "section", "doctor"} and not value:
+    if scope in {"student", "section", "doctor", "reply"} and not value:
         return jsonify({"error": "Please choose the exact receiver."}), 400
+
+    attachment_name = None
+    attachment_mime = None
+    attachment_data = None
+    if uploaded_file and uploaded_file.filename:
+        attachment_name = secure_filename(uploaded_file.filename) or "attachment"
+        attachment_mime = uploaded_file.mimetype or "application/octet-stream"
+        attachment_data = uploaded_file.read()
+        max_attachment_size = 10 * 1024 * 1024
+        if len(attachment_data) > max_attachment_size:
+            return jsonify({"error": "Attachment must be 10 MB or smaller."}), 400
 
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_notification_attachment_columns(cursor)
         recipients = _notification_recipients(cursor, scope, value)
         sender_id = session.get("user_id")
         recipients = sorted({int(r) for r in recipients if int(r) != int(sender_id)})
@@ -862,21 +1200,40 @@ def api_coordinator_notifications_send():
             cursor.execute(
                 """
                 INSERT INTO notifications
-                    (recipient_id, sender_id, notification_type, title, message, course_scope, related_project_id, is_read)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE)
+                    (recipient_id, sender_id, notification_type, title, message,
+                     course_scope, related_project_id, is_read,
+                     attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s)
                 """,
-                (recipient_id, sender_id, notification_type, title, message, course_scope),
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    course_scope,
+                    attachment_name,
+                    attachment_mime,
+                    attachment_data,
+                ),
             )
 
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": f"Message sent successfully to {len(recipients)} recipient(s).", "sent_count": len(recipients)})
+        return jsonify(
+            {
+                "message": f"Message sent successfully to {len(recipients)} recipient(s).",
+                "sent_count": len(recipients),
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@coordinator_bp.route("/api/coordinator/notifications/<int:notification_id>/read", methods=["POST"])
+@coordinator_bp.route(
+    "/api/coordinator/notifications/<int:notification_id>/read", methods=["POST"]
+)
 @login_required(role="coordinator")
 def api_coordinator_notification_mark_read(notification_id):
     try:
@@ -898,19 +1255,79 @@ def api_coordinator_notification_mark_read(notification_id):
         return jsonify({"error": str(e)}), 500
 
 
+@coordinator_bp.route(
+    "/api/coordinator/notifications/<int:notification_id>/attachment", methods=["GET"]
+)
+@login_required(role="coordinator")
+def api_coordinator_notification_attachment(notification_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        if not _db_column_exists(cursor, "notifications", "attachment_data"):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Attachment not found."}), 404
+        cursor.execute(
+            """
+            SELECT attachment_name, attachment_mime, attachment_data
+            FROM notifications
+            WHERE notification_id = %s
+              AND (recipient_id = %s OR sender_id = %s)
+            LIMIT 1
+            """,
+            (notification_id, session.get("user_id"), session.get("user_id")),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+        if not row or not row.get("attachment_data"):
+            return jsonify({"error": "Attachment not found."}), 404
+
+        filename = secure_filename(row.get("attachment_name") or "attachment") or "attachment"
+        mimetype = row.get("attachment_mime") or "application/octet-stream"
+        return Response(
+            row["attachment_data"],
+            mimetype=mimetype,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @coordinator_bp.route("/api/coordinator/notifications/read-all", methods=["POST"])
 @login_required(role="coordinator")
 def api_coordinator_notifications_mark_all_read():
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("UPDATE notifications SET is_read = TRUE WHERE recipient_id = %s", (session.get("user_id"),))
+        cursor.execute(
+            "UPDATE notifications SET is_read = TRUE WHERE recipient_id = %s",
+            (session.get("user_id"),),
+        )
         db.commit()
         cursor.close()
         db.close()
         return jsonify({"message": "All notifications marked as read."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/notifications/unread-count", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_notifications_unread_count():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM notifications WHERE recipient_id = %s AND is_read = FALSE",
+            (session.get("user_id"),),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+        return jsonify({"unread": int((row or {}).get("cnt") or 0)})
+    except Exception as e:
+        return jsonify({"unread": 0})
 
 
 # ─── Public Important Notice ─────────────────────────────────────────────
@@ -920,15 +1337,13 @@ def api_coordinator_important_notice_get():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT notice_id, title, body, highlight_text, button1_text, button2_text, button3_text, course_scope, is_active, updated_at
             FROM system_notices
             WHERE is_active = TRUE
             ORDER BY updated_at DESC, notice_id DESC
             LIMIT 1
-            """
-        )
+            """)
         notice = cursor.fetchone()
         if notice and notice.get("updated_at") is not None:
             notice["updated_at"] = str(notice["updated_at"])
@@ -953,7 +1368,14 @@ def api_coordinator_important_notice_save():
     allowed_course_scopes = {"introduction", "graduation_project", "both"}
 
     if course_scope not in allowed_course_scopes:
-        return jsonify({"error": "Please choose if this notice is for Project Introduction, Graduation Project, or both."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "Please choose if this notice is for Project Introduction, Graduation Project, or both."
+                }
+            ),
+            400,
+        )
 
     if not title:
         return jsonify({"error": "Please write the notice title."}), 400
@@ -970,7 +1392,16 @@ def api_coordinator_important_notice_save():
                 (title, body, highlight_text, button1_text, button2_text, button3_text, course_scope, is_active, updated_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s)
             """,
-            (title, body, highlight_text, button1_text, button2_text, button3_text, course_scope, session.get("user_id")),
+            (
+                title,
+                body,
+                highlight_text,
+                button1_text,
+                button2_text,
+                button3_text,
+                course_scope,
+                session.get("user_id"),
+            ),
         )
         db.commit()
         cursor.close()
@@ -980,11 +1411,9 @@ def api_coordinator_important_notice_save():
         return jsonify({"error": str(e)}), 500
 
 
-
 # ─── COMP4200 Introduction Timeline ─────────────────────────────────────
 def _ensure_intro_timeline_tables(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS comp4200_timelines (
             timeline_id INT PRIMARY KEY AUTO_INCREMENT,
             semester_id INT NOT NULL UNIQUE,
@@ -997,10 +1426,8 @@ def _ensure_intro_timeline_tables(cursor):
             FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
             FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """
-    )
-    cursor.execute(
-        """
+        """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS comp4200_timeline_items (
             item_id INT PRIMARY KEY AUTO_INCREMENT,
             timeline_id INT NOT NULL,
@@ -1016,8 +1443,7 @@ def _ensure_intro_timeline_tables(cursor):
             INDEX idx_comp4200_timeline_items_due (due_date),
             INDEX idx_comp4200_timeline_items_order (timeline_id, item_order)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """
-    )
+        """)
 
 
 def _get_or_create_intro_timeline(cursor, semester_id, user_id=None):
@@ -1081,10 +1507,14 @@ def api_coordinator_intro_timeline_get():
         cursor = db.cursor(dictionary=True)
         semester = _get_active_semester(cursor)
         if not semester:
-            cursor.close(); db.close()
+            cursor.close()
+            db.close()
             return jsonify({"error": "No active semester found."}), 400
-        payload = _intro_timeline_payload(cursor, semester["semester_id"], session.get("user_id"))
-        cursor.close(); db.close()
+        payload = _intro_timeline_payload(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.close()
+        db.close()
         return jsonify(_json_safe_value(payload))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1107,7 +1537,10 @@ def api_coordinator_intro_timeline_save():
         item_title = (item.get("title") or "").strip()
         due_date = (item.get("due_date") or "").strip()
         if not item_title or not due_date:
-            return jsonify({"error": f"Item #{index} must have a title and due date."}), 400
+            return (
+                jsonify({"error": f"Item #{index} must have a title and due date."}),
+                400,
+            )
         start_date = (item.get("start_date") or "").strip() or None
         description = (item.get("description") or "").strip() or None
         milestone_label = (item.get("milestone_label") or "").strip() or None
@@ -1116,25 +1549,35 @@ def api_coordinator_intro_timeline_save():
                 datetime.strptime(start_date, "%Y-%m-%d")
             datetime.strptime(due_date, "%Y-%m-%d")
         except ValueError:
-            return jsonify({"error": f"Item #{index} has an invalid date. Use YYYY-MM-DD."}), 400
-        clean_items.append({
-            "order": int(item.get("item_order") or index),
-            "title": item_title,
-            "description": description,
-            "start_date": start_date,
-            "due_date": due_date,
-            "milestone_label": milestone_label,
-            "is_deadline": bool(item.get("is_deadline", True)),
-        })
+            return (
+                jsonify(
+                    {"error": f"Item #{index} has an invalid date. Use YYYY-MM-DD."}
+                ),
+                400,
+            )
+        clean_items.append(
+            {
+                "order": int(item.get("item_order") or index),
+                "title": item_title,
+                "description": description,
+                "start_date": start_date,
+                "due_date": due_date,
+                "milestone_label": milestone_label,
+                "is_deadline": bool(item.get("is_deadline", True)),
+            }
+        )
 
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
         semester = _get_active_semester(cursor)
         if not semester:
-            cursor.close(); db.close()
+            cursor.close()
+            db.close()
             return jsonify({"error": "No active semester found."}), 400
-        timeline = _get_or_create_intro_timeline(cursor, semester["semester_id"], session.get("user_id"))
+        timeline = _get_or_create_intro_timeline(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
         cursor.execute(
             """
             UPDATE comp4200_timelines
@@ -1143,7 +1586,10 @@ def api_coordinator_intro_timeline_save():
             """,
             (title, note, session.get("user_id"), timeline["timeline_id"]),
         )
-        cursor.execute("DELETE FROM comp4200_timeline_items WHERE timeline_id = %s", (timeline["timeline_id"],))
+        cursor.execute(
+            "DELETE FROM comp4200_timeline_items WHERE timeline_id = %s",
+            (timeline["timeline_id"],),
+        )
         for item in clean_items:
             cursor.execute(
                 """
@@ -1152,14 +1598,25 @@ def api_coordinator_intro_timeline_save():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
-                    timeline["timeline_id"], item["order"], item["title"], item["description"],
-                    item["start_date"], item["due_date"], item["milestone_label"], item["is_deadline"],
+                    timeline["timeline_id"],
+                    item["order"],
+                    item["title"],
+                    item["description"],
+                    item["start_date"],
+                    item["due_date"],
+                    item["milestone_label"],
+                    item["is_deadline"],
                 ),
             )
         db.commit()
-        payload = _intro_timeline_payload(cursor, semester["semester_id"], session.get("user_id"))
-        cursor.close(); db.close()
-        return jsonify(_json_safe_value({"message": "Timeline saved successfully.", **payload}))
+        payload = _intro_timeline_payload(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.close()
+        db.close()
+        return jsonify(
+            _json_safe_value({"message": "Timeline saved successfully.", **payload})
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1172,13 +1629,25 @@ def api_coordinator_intro_timeline_publish():
         cursor = db.cursor(dictionary=True)
         semester = _get_active_semester(cursor)
         if not semester:
-            cursor.close(); db.close()
+            cursor.close()
+            db.close()
             return jsonify({"error": "No active semester found."}), 400
-        timeline = _get_or_create_intro_timeline(cursor, semester["semester_id"], session.get("user_id"))
-        cursor.execute("SELECT COUNT(*) AS cnt FROM comp4200_timeline_items WHERE timeline_id = %s", (timeline["timeline_id"],))
+        timeline = _get_or_create_intro_timeline(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM comp4200_timeline_items WHERE timeline_id = %s",
+            (timeline["timeline_id"],),
+        )
         if int((cursor.fetchone() or {}).get("cnt") or 0) == 0:
-            cursor.close(); db.close()
-            return jsonify({"error": "Save at least one timeline item before publishing."}), 400
+            cursor.close()
+            db.close()
+            return (
+                jsonify(
+                    {"error": "Save at least one timeline item before publishing."}
+                ),
+                400,
+            )
 
         cursor.execute(
             "UPDATE comp4200_timelines SET is_published = TRUE, published_at = NOW(), created_by = %s WHERE timeline_id = %s",
@@ -1192,7 +1661,7 @@ def api_coordinator_intro_timeline_publish():
         )
         cursor.execute(
             """
-            SELECT item_order, title, due_date, milestone_label
+            SELECT item_order, title, description, start_date, due_date, milestone_label
             FROM comp4200_timeline_items
             WHERE timeline_id = %s AND is_deadline = TRUE
             ORDER BY item_order ASC
@@ -1207,39 +1676,78 @@ def api_coordinator_intro_timeline_publish():
                 INSERT INTO deadlines (semester_id, project_id, deadline_type, deadline_date, description)
                 VALUES (%s, NULL, %s, %s, %s)
                 """,
-                (semester["semester_id"], f"comp4200_timeline_{item['item_order']}", item["due_date"], label),
+                (
+                    semester["semester_id"],
+                    f"comp4200_timeline_{item['item_order']}",
+                    item["due_date"],
+                    label,
+                ),
             )
 
         # Notify all active students when the coordinator posts/publishes.
-        cursor.execute("SELECT user_id FROM users WHERE role = 'student' AND is_active = TRUE")
-        recipients = [r["user_id"] for r in cursor.fetchall() if r.get("user_id") != session.get("user_id")]
-        has_course_scope = _db_column_exists(cursor, "notifications", "course_scope")
+        cursor.execute(
+            "SELECT user_id FROM users WHERE role = 'student' AND is_active = TRUE"
+        )
+        recipients = [
+            r["user_id"]
+            for r in cursor.fetchall()
+            if r.get("user_id") != session.get("user_id")
+        ]
         msg = "The coordinator published the Project Introduction timeline. Open Student Timeline to view all milestones and deadlines."
+        notification_count = 0
         for uid in recipients:
-            if has_course_scope:
-                cursor.execute(
-                    """
-                    INSERT INTO notifications
-                        (recipient_id, sender_id, notification_type, title, message, course_scope, related_project_id, is_read)
-                    VALUES (%s, %s, 'deadline_reminder', 'Project Introduction Timeline Published', %s, 'introduction', NULL, FALSE)
-                    """,
-                    (uid, session.get("user_id"), msg),
+            _insert_notification(
+                cursor,
+                uid,
+                session.get("user_id"),
+                "deadline_reminder",
+                "Project Introduction Timeline Published",
+                msg,
+                None,
+                "introduction",
+            )
+            notification_count += 1
+            for item in items:
+                label = item.get("milestone_label") or item.get("title")
+                open_text = (
+                    f" Opens: {item['start_date']}." if item.get("start_date") else ""
                 )
-            else:
-                cursor.execute(
-                    """
-                    INSERT INTO notifications
-                        (recipient_id, sender_id, notification_type, title, message, related_project_id, is_read)
-                    VALUES (%s, %s, 'deadline_reminder', 'Project Introduction Timeline Published', %s, NULL, FALSE)
-                    """,
-                    (uid, session.get("user_id"), msg),
+                due_text = f" Deadline: {item['due_date']}."
+                details = (item.get("description") or "").strip()
+                item_message = (
+                    f"A timeline submission has been posted: {label}."
+                    f"{open_text}{due_text} Open Student Timeline to view it."
                 )
+                if details:
+                    item_message += f" Details: {details}"
+                _insert_notification(
+                    cursor,
+                    uid,
+                    session.get("user_id"),
+                    "deadline_reminder",
+                    f"Timeline Submission: {label}",
+                    item_message,
+                    None,
+                    "introduction",
+                )
+                notification_count += 1
         db.commit()
-        payload = _intro_timeline_payload(cursor, semester["semester_id"], session.get("user_id"))
-        cursor.close(); db.close()
-        return jsonify(_json_safe_value({"message": f"Timeline published to students and {len(recipients)} notification(s) sent.", **payload}))
+        payload = _intro_timeline_payload(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.close()
+        db.close()
+        return jsonify(
+            _json_safe_value(
+                {
+                    "message": f"Timeline published to students and {notification_count} notification(s) sent.",
+                    **payload,
+                }
+            )
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # ─── Distribution Window ─────────────────────────────────────────────────
 @coordinator_bp.route("/api/coordinator/distribution-window", methods=["GET"])
@@ -1251,7 +1759,12 @@ def api_coordinator_distribution_window():
         semester = _get_active_semester(cursor)
 
         # Auto-close when the deadline passed.
-        if semester and bool(semester.get("distribution_open") or 0) and semester.get("distribution_close_at") and datetime.now() >= semester["distribution_close_at"]:
+        if (
+            semester
+            and bool(semester.get("distribution_open") or 0)
+            and semester.get("distribution_close_at")
+            and datetime.now() >= semester["distribution_close_at"]
+        ):
             cursor.execute(
                 """
                 UPDATE semesters
@@ -1269,15 +1782,19 @@ def api_coordinator_distribution_window():
         if not semester:
             return jsonify({"error": "No active semester found."}), 400
 
-        return jsonify(_json_safe_value({
-            "semester_id": semester["semester_id"],
-            "academic_year": semester["academic_year"],
-            "semester_number": semester["semester_number"],
-            "is_open": _active_distribution_is_open(semester),
-            "opened_at": semester.get("distribution_opened_at"),
-            "closed_at": semester.get("distribution_closed_at"),
-            "close_at": semester.get("distribution_close_at"),
-        }))
+        return jsonify(
+            _json_safe_value(
+                {
+                    "semester_id": semester["semester_id"],
+                    "academic_year": semester["academic_year"],
+                    "semester_number": semester["semester_number"],
+                    "is_open": _active_distribution_is_open(semester),
+                    "opened_at": semester.get("distribution_opened_at"),
+                    "closed_at": semester.get("distribution_closed_at"),
+                    "close_at": semester.get("distribution_close_at"),
+                }
+            )
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1299,17 +1816,32 @@ def api_coordinator_distribution_window_update():
             db.close()
             return jsonify({"error": "No active semester found."}), 400
 
+        was_open = _active_distribution_is_open(semester)
+        notification_count = 0
+
         if is_open:
             if not close_at_raw:
                 cursor.close()
                 db.close()
-                return jsonify({"error": "Please choose an automatic close date/time before opening registration."}), 400
+                return (
+                    jsonify(
+                        {
+                            "error": "Please choose an automatic close date/time before opening registration."
+                        }
+                    ),
+                    400,
+                )
             try:
-                close_at = datetime.strptime(close_at_raw.replace('T', ' '), '%Y-%m-%d %H:%M')
+                close_at = datetime.strptime(
+                    close_at_raw.replace("T", " "), "%Y-%m-%d %H:%M"
+                )
             except ValueError:
                 cursor.close()
                 db.close()
-                return jsonify({"error": "Close date format must be YYYY-MM-DD HH:MM."}), 400
+                return (
+                    jsonify({"error": "Close date format must be YYYY-MM-DD HH:MM."}),
+                    400,
+                )
             if close_at <= datetime.now():
                 cursor.close()
                 db.close()
@@ -1324,9 +1856,38 @@ def api_coordinator_distribution_window_update():
                     distribution_close_at = %s
                 WHERE semester_id = %s
                 """,
-                (close_at.strftime('%Y-%m-%d %H:%M:%S'), semester["semester_id"]),
+                (close_at.strftime("%Y-%m-%d %H:%M:%S"), semester["semester_id"]),
             )
             message = "Registration window opened successfully."
+
+            if not was_open:
+                cursor.execute("""
+                    SELECT user_id
+                    FROM users
+                    WHERE role = 'student' AND is_active = TRUE
+                    """)
+                recipients = [
+                    row["user_id"]
+                    for row in cursor.fetchall()
+                    if row.get("user_id") != session.get("user_id")
+                ]
+                close_text = close_at.strftime("%Y-%m-%d %H:%M")
+                notif_message = (
+                    "Project registration is now open. "
+                    f"Please register your group before {close_text}."
+                )
+                for recipient_id in recipients:
+                    _insert_notification(
+                        cursor,
+                        recipient_id,
+                        session.get("user_id"),
+                        "system",
+                        "Project Registration Open",
+                        notif_message,
+                        None,
+                        "graduation_project",
+                    )
+                notification_count = len(recipients)
         else:
             cursor.execute(
                 """
@@ -1342,7 +1903,9 @@ def api_coordinator_distribution_window_update():
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": message})
+        if notification_count:
+            message = f"{message} {notification_count} student notification(s) sent."
+        return jsonify({"message": message, "notifications_sent": notification_count})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1428,8 +1991,7 @@ def api_coordinator_distribution_data():
         )
         unassigned = cursor.fetchall()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT s.section_id,
                    s.section_name,
                    s.entered_by,
@@ -1444,8 +2006,7 @@ def api_coordinator_distribution_data():
             LEFT JOIN users us ON us.user_id = st.user_id
             GROUP BY s.section_id, s.section_name, s.entered_by, s.created_at, u.full_name
             ORDER BY s.section_id DESC
-            """
-        )
+            """)
         sections = cursor.fetchall()
 
         cursor.close()
@@ -1454,7 +2015,8 @@ def api_coordinator_distribution_data():
         assigned_forms = sum(1 for item in forms if item.get("final_supervisor"))
 
         stats = {
-            "total_registered_students": len(unassigned) + sum(
+            "total_registered_students": len(unassigned)
+            + sum(
                 len((f.get("team_members") or "").split(", "))
                 for f in forms
                 if f.get("team_members")
@@ -1464,13 +2026,15 @@ def api_coordinator_distribution_data():
             "active_groups": len(forms),
         }
 
-        return jsonify({
-            "forms": forms,
-            "unassigned_students": unassigned,
-            "sections": sections,
-            "stats": stats,
-            "professors": fetch_supervisors(),
-        })
+        return jsonify(
+            {
+                "forms": forms,
+                "unassigned_students": unassigned,
+                "sections": sections,
+                "stats": stats,
+                "professors": fetch_supervisors(),
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1501,12 +2065,16 @@ def api_assign_group_supervisor():
         cursor.execute(
             """
             SELECT p.project_id,
+                   p.title,
                    p.supervisor_id,
+                   old_sup.full_name AS old_supervisor_name,
                    COUNT(DISTINCT pm.student_id) AS member_count
             FROM projects p
             LEFT JOIN project_members pm ON pm.project_id = p.project_id
+            LEFT JOIN faculty old_f ON old_f.faculty_id = p.supervisor_id
+            LEFT JOIN users old_sup ON old_sup.user_id = old_f.user_id
             WHERE p.project_id = %s
-            GROUP BY p.project_id, p.supervisor_id
+            GROUP BY p.project_id, p.title, p.supervisor_id, old_sup.full_name
             """,
             (project_id,),
         )
@@ -1537,24 +2105,70 @@ def api_assign_group_supervisor():
         if snapshot["remaining_hours"] < required_hours:
             cursor.close()
             db.close()
-            return jsonify({
-                "error": (
-                    f"This doctor cannot take this graduation project. "
-                    f"Required load: {required_hours:.1f} hour(s), "
-                    f"remaining load: {snapshot['remaining_hours']:.1f} hour(s)."
-                )
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            f"This doctor cannot take this graduation project. "
+                            f"Required load: {required_hours:.1f} hour(s), "
+                            f"remaining load: {snapshot['remaining_hours']:.1f} hour(s)."
+                        )
+                    }
+                ),
+                400,
+            )
 
-        cursor2 = db.cursor()
-        cursor2.execute(
+        cursor.execute(
             "UPDATE projects SET supervisor_id = %s WHERE project_id = %s",
             (supervisor_id, project_id),
         )
+
+        cursor.execute(
+            """
+            SELECT u.full_name
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE f.faculty_id = %s
+            """,
+            (supervisor_id,),
+        )
+        new_supervisor = cursor.fetchone() or {}
+        new_name = new_supervisor.get("full_name") or "your supervisor"
+        old_name = project.get("old_supervisor_name")
+        changed = bool(project.get("supervisor_id"))
+        title = "Supervisor Changed" if changed else "Supervisor Assigned"
+        if changed:
+            message = (
+                f"Your project supervisor has been changed"
+                f"{f' from {old_name}' if old_name else ''} to {new_name}."
+            )
+        else:
+            message = f"{new_name} has been assigned as your project supervisor."
+        if project.get("title"):
+            message += f" Project: {project['title']}."
+
+        sent_count = 0
+        for recipient_id in _project_student_user_ids(cursor, project_id):
+            _insert_notification(
+                cursor,
+                recipient_id,
+                session.get("user_id"),
+                "supervisor_assigned",
+                title,
+                message,
+                project_id,
+                "graduation_project",
+            )
+            sent_count += 1
+
         db.commit()
-        cursor2.close()
         cursor.close()
         db.close()
-        return jsonify({"message": "Supervisor assigned successfully."})
+        return jsonify(
+            {
+                "message": f"Supervisor assigned successfully. {sent_count} student notification(s) sent."
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1600,13 +2214,18 @@ def api_add_section():
         if snapshot["remaining_hours"] < required_hours:
             cursor.close()
             db.close()
-            return jsonify({
-                "error": (
-                    f"This doctor cannot take more introduction students. "
-                    f"Required load: {required_hours:.1f} hour(s), "
-                    f"remaining load: {snapshot['remaining_hours']:.1f} hour(s)."
-                )
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            f"This doctor cannot take more introduction students. "
+                            f"Required load: {required_hours:.1f} hour(s), "
+                            f"remaining load: {snapshot['remaining_hours']:.1f} hour(s)."
+                        )
+                    }
+                ),
+                400,
+            )
 
         placeholders = ",".join(["%s"] * len(student_ids))
         query = f"""
@@ -1634,7 +2253,12 @@ def api_add_section():
         if len(students) != len(student_ids):
             cursor.close()
             db.close()
-            return jsonify({"error": "One or more selected students are already assigned."}), 400
+            return (
+                jsonify(
+                    {"error": "One or more selected students are already assigned."}
+                ),
+                400,
+            )
 
         cursor.execute(
             """
@@ -1658,10 +2282,9 @@ def api_add_section():
         cursor.close()
         db.close()
 
-        return jsonify({
-            "message": "Section created successfully.",
-            "section_id": section_id
-        })
+        return jsonify(
+            {"message": "Section created successfully.", "section_id": section_id}
+        )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1669,8 +2292,7 @@ def api_add_section():
 
 # ─── Coordinator Section Results ─────────────────────────────────────────
 def _ensure_section_results_schema(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS section_completion_status (
             status_id INT PRIMARY KEY AUTO_INCREMENT,
             course_scope ENUM('introduction','graduation_project') NOT NULL,
@@ -1686,8 +2308,7 @@ def _ensure_section_results_schema(cursor):
             INDEX idx_section_completion_scope_status (course_scope, status),
             FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """
-    )
+        """)
 
 
 @coordinator_bp.route("/api/coordinator/section-results", methods=["GET"])
@@ -1702,9 +2323,10 @@ def api_coordinator_section_results():
         semester_id = semester["semester_id"] if semester else None
 
         introduction_sections = []
-        if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
-            cursor.execute(
-                """
+        if _table_exists(cursor, "student_distribution_sections") and _table_exists(
+            cursor, "section_students"
+        ):
+            cursor.execute("""
                 SELECT sec.section_id AS reference_id,
                        sec.section_name,
                        'introduction' AS course_scope,
@@ -1727,8 +2349,7 @@ def api_coordinator_section_results():
                 GROUP BY sec.section_id, sec.section_name, u_sup.full_name,
                          scs.status, scs.notes, scs.marked_at, u_mark.full_name
                 ORDER BY sec.section_id DESC
-                """
-            )
+                """)
             introduction_sections = cursor.fetchall()
 
         grad_where = "WHERE p.semester_id = %s" if semester_id else ""
@@ -1766,11 +2387,15 @@ def api_coordinator_section_results():
 
         cursor.close()
         db.close()
-        return jsonify(_json_safe_value({
-            "semester": semester or {},
-            "introduction_sections": introduction_sections,
-            "graduation_sections": graduation_sections,
-        }))
+        return jsonify(
+            _json_safe_value(
+                {
+                    "semester": semester or {},
+                    "introduction_sections": introduction_sections,
+                    "graduation_sections": graduation_sections,
+                }
+            )
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1785,9 +2410,17 @@ def api_coordinator_mark_section_result():
     notes = (data.get("notes") or "").strip() or None
 
     if course_scope not in {"introduction", "graduation_project"}:
-        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+        return (
+            jsonify(
+                {"error": "course_scope must be introduction or graduation_project."}
+            ),
+            400,
+        )
     if status not in {"pending", "succeeded", "not_succeeded"}:
-        return jsonify({"error": "status must be pending, succeeded, or not_succeeded."}), 400
+        return (
+            jsonify({"error": "status must be pending, succeeded, or not_succeeded."}),
+            400,
+        )
     if not reference_id:
         return jsonify({"error": "reference_id is required."}), 400
 
@@ -1797,9 +2430,14 @@ def api_coordinator_mark_section_result():
         _ensure_section_results_schema(cursor)
 
         if course_scope == "introduction":
-            cursor.execute("SELECT section_id FROM student_distribution_sections WHERE section_id = %s", (reference_id,))
+            cursor.execute(
+                "SELECT section_id FROM student_distribution_sections WHERE section_id = %s",
+                (reference_id,),
+            )
         else:
-            cursor.execute("SELECT project_id FROM projects WHERE project_id = %s", (reference_id,))
+            cursor.execute(
+                "SELECT project_id FROM projects WHERE project_id = %s", (reference_id,)
+            )
         if not cursor.fetchone():
             cursor.close()
             db.close()
@@ -1874,7 +2512,16 @@ def api_export_groups():
 
     return _csv_response(
         "student_groups.csv",
-        ["Group", "Idea Title", "Team Members", "Preferred 1", "Preferred 2", "Preferred 3", "Final Supervisor", "Status"],
+        [
+            "Group",
+            "Idea Title",
+            "Team Members",
+            "Preferred 1",
+            "Preferred 2",
+            "Preferred 3",
+            "Final Supervisor",
+            "Status",
+        ],
         [
             [
                 r["group_name"],
@@ -1896,8 +2543,7 @@ def api_export_groups():
 def api_export_sections():
     db = get_db()
     cursor = db.cursor(dictionary=True)
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT s.section_name, u.full_name AS supervisor_name, s.created_at,
                COALESCE(GROUP_CONCAT(us.full_name ORDER BY us.full_name SEPARATOR ', '), '') AS assigned_students
         FROM student_distribution_sections s
@@ -1908,8 +2554,7 @@ def api_export_sections():
         LEFT JOIN users us ON us.user_id = st.user_id
         GROUP BY s.section_id, s.section_name, u.full_name, s.created_at
         ORDER BY s.section_id DESC
-        """
-    )
+        """)
     rows = cursor.fetchall()
     cursor.close()
     db.close()
@@ -1917,7 +2562,15 @@ def api_export_sections():
     return _csv_response(
         "sections.csv",
         ["Section", "Supervisor", "Students", "Created At"],
-        [[r["section_name"], r["supervisor_name"], r["assigned_students"], r["created_at"]] for r in rows],
+        [
+            [
+                r["section_name"],
+                r["supervisor_name"],
+                r["assigned_students"],
+                r["created_at"],
+            ]
+            for r in rows
+        ],
     )
 
 
@@ -1942,40 +2595,44 @@ def api_faculty_hours_data():
             db.close()
             return jsonify({"error": "No academic year settings row found."}), 400
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT f.faculty_id, u.full_name
             FROM faculty f
             JOIN users u ON u.user_id = f.user_id
             WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
             ORDER BY u.full_name
-            """
-        )
+            """)
         faculty_rows = cursor.fetchall()
         result = []
 
         for row in faculty_rows:
-            snapshot = _faculty_load_snapshot(cursor, row["faculty_id"], academic_year, anchor_semester["semester_id"])
-            result.append({
-                "faculty_id": row["faculty_id"],
-                "full_name": row["full_name"],
-                "graduation_project_hours": snapshot["wanted_hours"],
-                "wanted_hours": snapshot["wanted_hours"],
-                "project_groups": snapshot["project_groups"],
-                "project_students": snapshot["project_students"],
-                "used_hours": snapshot["used_hours"],
-                "remaining_hours": snapshot["remaining_hours"],
-                "status": snapshot["status"],
-            })
+            snapshot = _faculty_load_snapshot(
+                cursor, row["faculty_id"], academic_year, anchor_semester["semester_id"]
+            )
+            result.append(
+                {
+                    "faculty_id": row["faculty_id"],
+                    "full_name": row["full_name"],
+                    "graduation_project_hours": snapshot["wanted_hours"],
+                    "wanted_hours": snapshot["wanted_hours"],
+                    "project_groups": snapshot["project_groups"],
+                    "project_students": snapshot["project_students"],
+                    "used_hours": snapshot["used_hours"],
+                    "remaining_hours": snapshot["remaining_hours"],
+                    "status": snapshot["status"],
+                }
+            )
 
         cursor.close()
         db.close()
 
-        return jsonify({
-            "academic_year": academic_year,
-            "anchor_semester_id": anchor_semester["semester_id"],
-            "faculty": result,
-        })
+        return jsonify(
+            {
+                "academic_year": academic_year,
+                "anchor_semester_id": anchor_semester["semester_id"],
+                "faculty": result,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1986,12 +2643,17 @@ def api_faculty_hours_save():
     try:
         data = request.get_json(silent=True) or {}
         faculty_id = data.get("faculty_id")
-        graduation_project_hours = float(data.get("graduation_project_hours", data.get("wanted_hours", 0)) or 0)
+        graduation_project_hours = float(
+            data.get("graduation_project_hours", data.get("wanted_hours", 0)) or 0
+        )
 
         if not faculty_id:
             return jsonify({"error": "faculty_id is required."}), 400
         if graduation_project_hours < 0:
-            return jsonify({"error": "Graduation project hours cannot be negative."}), 400
+            return (
+                jsonify({"error": "Graduation project hours cannot be negative."}),
+                400,
+            )
 
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -2002,7 +2664,9 @@ def api_faculty_hours_save():
             db.close()
             return jsonify({"error": "No active semester found."}), 400
 
-        anchor_semester = _get_anchor_semester_for_year(cursor, active_semester["academic_year"])
+        anchor_semester = _get_anchor_semester_for_year(
+            cursor, active_semester["academic_year"]
+        )
         if not anchor_semester:
             cursor.close()
             db.close()
@@ -2017,7 +2681,12 @@ def api_faculty_hours_save():
                 graduation_project_hours = VALUES(graduation_project_hours),
                 updated_by = VALUES(updated_by)
             """,
-            (faculty_id, anchor_semester["semester_id"], graduation_project_hours, session.get("user_id")),
+            (
+                faculty_id,
+                anchor_semester["semester_id"],
+                graduation_project_hours,
+                session.get("user_id"),
+            ),
         )
 
         db.commit()
@@ -2072,7 +2741,9 @@ def api_review_projects():
         return jsonify({"error": str(e)}), 500
 
 
-@coordinator_bp.route("/api/coordinator/review-project/<int:project_id>", methods=["POST"])
+@coordinator_bp.route(
+    "/api/coordinator/review-project/<int:project_id>", methods=["POST"]
+)
 @login_required(role="coordinator")
 def api_review_project_decision(project_id):
     data = request.get_json(silent=True) or {}
@@ -2092,7 +2763,9 @@ def api_review_project_decision(project_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+        cursor.execute(
+            "SELECT project_id FROM projects WHERE project_id = %s", (project_id,)
+        )
         if not cursor.fetchone():
             cursor.close()
             db.close()
@@ -2111,7 +2784,12 @@ def api_review_project_decision(project_id):
             )
 
         if _table_exists(cursor, "coordinator_decisions") and session.get("user_id"):
-            decision_value = decision if decision in ("accepted", "rejected", "needs_revision", "send_to_committee") else "needs_revision"
+            decision_value = (
+                decision
+                if decision
+                in ("accepted", "rejected", "needs_revision", "send_to_committee")
+                else "needs_revision"
+            )
             cursor.execute(
                 """
                 INSERT INTO coordinator_decisions (project_id, coordinator_id, decision, notes)
@@ -2136,27 +2814,23 @@ def api_search_meta():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT DISTINCT s.academic_year
             FROM projects p
             JOIN semesters s ON s.semester_id = p.semester_id
             WHERE s.academic_year IS NOT NULL
             ORDER BY s.academic_year DESC
-            """
-        )
+            """)
         years = [row["academic_year"] for row in cursor.fetchall()]
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT DISTINCT u.full_name AS supervisor_name
             FROM projects p
             JOIN faculty f ON f.faculty_id = p.supervisor_id
             JOIN users u ON u.user_id = f.user_id
             WHERE u.full_name IS NOT NULL
             ORDER BY u.full_name
-            """
-        )
+            """)
         supervisors = [row["supervisor_name"] for row in cursor.fetchall()]
 
         cursor.close()
@@ -2291,7 +2965,6 @@ def api_search_projects():
         return jsonify({"error": str(e)}), 500
 
 
-
 # ─── Committee Scheduler Helpers ────────────────────────────────────────
 def _committee_seed_rooms(cursor):
     rooms = [
@@ -2323,8 +2996,7 @@ def _committee_time_add(start_hhmm, minutes_to_add):
 
 
 def _committee_fetch_faculty_pool(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
             f.faculty_id,
             u.full_name,
@@ -2342,8 +3014,7 @@ def _committee_fetch_faculty_pool(cursor):
         WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
         HAVING active_committee_count = 0
         ORDER BY f.specialization, u.full_name
-        """
-    )
+        """)
     rows = cursor.fetchall()
     groups = defaultdict(list)
     for row in rows:
@@ -2438,8 +3109,7 @@ def _committee_fetch_eligible_projects(cursor, semester_id):
 
 
 def _committee_fetch_plan_rows(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
             cp.plan_id,
             cp.committee_name,
@@ -2459,8 +3129,7 @@ def _committee_fetch_plan_rows(cursor):
         GROUP BY cp.plan_id, cp.committee_name, cp.discussion_date, cp.start_time, cp.end_time,
                  cp.status, cp.responsible_faculty_id, dr.room_name, ru.full_name
         ORDER BY cp.discussion_date DESC, cp.start_time ASC, cp.plan_id DESC
-        """
-    )
+        """)
     return cursor.fetchall()
 
 
@@ -2483,14 +3152,21 @@ def _committee_fetch_members_for_plan(cursor, plan_id, responsible_faculty_id=No
     rows = cursor.fetchall()
     result = []
     for row in rows:
-        role = "responsible" if responsible_faculty_id and int(row["faculty_id"]) == int(responsible_faculty_id) else "member"
-        result.append({
-            "faculty_id": row["faculty_id"],
-            "full_name": row["full_name"],
-            "specialization": row["specialization"],
-            "years_experience": row["years_experience"],
-            "role": role,
-        })
+        role = (
+            "responsible"
+            if responsible_faculty_id
+            and int(row["faculty_id"]) == int(responsible_faculty_id)
+            else "member"
+        )
+        result.append(
+            {
+                "faculty_id": row["faculty_id"],
+                "full_name": row["full_name"],
+                "specialization": row["specialization"],
+                "years_experience": row["years_experience"],
+                "role": role,
+            }
+        )
     return result
 
 
@@ -2522,48 +3198,57 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
 
 def _committee_dashboard_payload(cursor):
     active_semester = _get_active_semester(cursor)
-    eligible_projects = _committee_fetch_eligible_projects(cursor, active_semester["semester_id"]) if active_semester else []
+    eligible_projects = (
+        _committee_fetch_eligible_projects(cursor, active_semester["semester_id"])
+        if active_semester
+        else []
+    )
 
     plan_rows = _committee_fetch_plan_rows(cursor)
     plans = []
     for row in plan_rows:
-        plans.append({
-            "plan_id": row["plan_id"],
-            "committee_name": row["committee_name"],
-            "discussion_date": str(row["discussion_date"]),
-            "start_time": row["start_time"],
-            "end_time": row["end_time"],
-            "room_name": row["room_name"] or "—",
-            "status": row["status"],
-            "responsible_faculty_id": row["responsible_faculty_id"],
-            "responsible_name": row["responsible_name"],
-            "projects_count": row["projects_count"],
-            "members": _committee_fetch_members_for_plan(cursor, row["plan_id"], row["responsible_faculty_id"]),
-            "projects": _committee_fetch_projects_for_plan(cursor, row["plan_id"]),
-        })
+        plans.append(
+            {
+                "plan_id": row["plan_id"],
+                "committee_name": row["committee_name"],
+                "discussion_date": str(row["discussion_date"]),
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "room_name": row["room_name"] or "—",
+                "status": row["status"],
+                "responsible_faculty_id": row["responsible_faculty_id"],
+                "responsible_name": row["responsible_name"],
+                "projects_count": row["projects_count"],
+                "members": _committee_fetch_members_for_plan(
+                    cursor, row["plan_id"], row["responsible_faculty_id"]
+                ),
+                "projects": _committee_fetch_projects_for_plan(cursor, row["plan_id"]),
+            }
+        )
 
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
             COUNT(*) AS formed,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS ongoing_count,
             SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_count,
             0 AS average_score
         FROM committee_plans
-        """
-    )
+        """)
     stat_row = cursor.fetchone() or {}
 
-    current_committees = [{
-        "plan_id": p["plan_id"],
-        "committee_name": p["committee_name"],
-        "discussion_date": p["discussion_date"],
-        "start_time": p["start_time"],
-        "room_name": p["room_name"],
-        "status": p["status"],
-        "projects_count": p["projects_count"],
-        "responsible_name": p["responsible_name"],
-    } for p in plans]
+    current_committees = [
+        {
+            "plan_id": p["plan_id"],
+            "committee_name": p["committee_name"],
+            "discussion_date": p["discussion_date"],
+            "start_time": p["start_time"],
+            "room_name": p["room_name"],
+            "status": p["status"],
+            "projects_count": p["projects_count"],
+            "responsible_name": p["responsible_name"],
+        }
+        for p in plans
+    ]
 
     return {
         "eligible_projects": eligible_projects,
@@ -2579,55 +3264,45 @@ def _committee_dashboard_payload(cursor):
 
 
 def _committee_plan_has_academic_year(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT COUNT(*) AS cnt
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'committee_plans'
           AND COLUMN_NAME = 'academic_year'
-        """
-    )
+        """)
     row = cursor.fetchone() or {}
-    return int(row.get('cnt') or 0) > 0
+    return int(row.get("cnt") or 0) > 0
 
 
 # ─── Committee Scheduler APIs ────────────────────────────────────────────
 
 
 def _committee_delete_active_plans(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT DISTINCT cpp.project_id
         FROM committee_plan_projects cpp
         JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
         WHERE cp.status IN ('scheduled', 'in_progress')
-        """
-    )
+        """)
     project_ids = [row["project_id"] for row in cursor.fetchall()]
 
-    cursor.execute(
-        """
+    cursor.execute("""
         DELETE cpm
         FROM committee_plan_members cpm
         JOIN committee_plans cp ON cp.plan_id = cpm.plan_id
         WHERE cp.status IN ('scheduled', 'in_progress')
-        """
-    )
-    cursor.execute(
-        """
+        """)
+    cursor.execute("""
         DELETE cpp
         FROM committee_plan_projects cpp
         JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
         WHERE cp.status IN ('scheduled', 'in_progress')
-        """
-    )
-    cursor.execute(
-        """
+        """)
+    cursor.execute("""
         DELETE FROM committee_plans
         WHERE status IN ('scheduled', 'in_progress')
-        """
-    )
+        """)
 
     if project_ids:
         placeholders = ",".join(["%s"] * len(project_ids))
@@ -2642,7 +3317,14 @@ def _committee_delete_active_plans(cursor):
         )
 
 
-def _committee_generate_internal(db, cursor, discussion_date, start_time, projects_per_committee, clear_existing=False):
+def _committee_generate_internal(
+    db,
+    cursor,
+    discussion_date,
+    start_time,
+    projects_per_committee,
+    clear_existing=False,
+):
     active_semester = _get_active_semester(cursor)
     if not active_semester:
         raise ValueError("No active semester found.")
@@ -2652,22 +3334,24 @@ def _committee_generate_internal(db, cursor, discussion_date, start_time, projec
 
     _committee_seed_rooms(cursor)
 
-    eligible_projects = _committee_fetch_eligible_projects(cursor, active_semester["semester_id"])
+    eligible_projects = _committee_fetch_eligible_projects(
+        cursor, active_semester["semester_id"]
+    )
     if not eligible_projects:
         raise ValueError("No eligible projects available for committee generation.")
 
     faculty_groups = _committee_fetch_faculty_pool(cursor)
     if len([s for s, members in faculty_groups.items() if members]) < 4:
-        raise ValueError("At least 4 different available doctor majors are required to generate committees.")
+        raise ValueError(
+            "At least 4 different available doctor majors are required to generate committees."
+        )
 
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT room_id, room_name
         FROM discussion_rooms
         WHERE is_active = 1
         ORDER BY sort_order ASC, room_name ASC
-        """
-    )
+        """)
     rooms = cursor.fetchall()
     committee_count = math.ceil(len(eligible_projects) / projects_per_committee)
 
@@ -2680,12 +3364,16 @@ def _committee_generate_internal(db, cursor, discussion_date, start_time, projec
         )
 
     if len(rooms) < committee_count:
-        raise ValueError(f"Not enough rooms. Required rooms: {committee_count}, available rooms: {len(rooms)}.")
+        raise ValueError(
+            f"Not enough rooms. Required rooms: {committee_count}, available rooms: {len(rooms)}."
+        )
 
     used_faculty_ids = set()
 
     for idx in range(committee_count):
-        chunk = eligible_projects[idx * projects_per_committee:(idx + 1) * projects_per_committee]
+        chunk = eligible_projects[
+            idx * projects_per_committee : (idx + 1) * projects_per_committee
+        ]
         if not chunk:
             continue
 
@@ -2765,12 +3453,17 @@ def _committee_generate_internal(db, cursor, discussion_date, start_time, projec
 
     payload = _committee_dashboard_payload(cursor)
     return {
-        "message": "Committees were generated successfully. Projects were selected automatically and distributed randomly across committees." if not clear_existing else "Committees were reset and redistributed successfully.",
+        "message": (
+            "Committees were generated successfully. Projects were selected automatically and distributed randomly across committees."
+            if not clear_existing
+            else "Committees were reset and redistributed successfully."
+        ),
         "plans": _json_safe_rows(payload["plans"]),
         "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
         "current_committees": _json_safe_rows(payload["current_committees"]),
         "stats": _json_safe_value(payload["stats"]),
     }
+
 
 @coordinator_bp.route("/api/coordinator/committee-dashboard", methods=["GET"])
 @login_required(role="coordinator")
@@ -2795,12 +3488,26 @@ def api_committee_generate():
     projects_per_committee = int(data.get("projects_per_committee") or 0)
 
     if not discussion_date or not start_time or projects_per_committee <= 0:
-        return jsonify({"error": "discussion_date, start_time, and projects_per_committee are required."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "discussion_date, start_time, and projects_per_committee are required."
+                }
+            ),
+            400,
+        )
 
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        payload = _committee_generate_internal(db, cursor, discussion_date, start_time, projects_per_committee, clear_existing=False)
+        payload = _committee_generate_internal(
+            db,
+            cursor,
+            discussion_date,
+            start_time,
+            projects_per_committee,
+            clear_existing=False,
+        )
         db.commit()
         cursor.close()
         db.close()
@@ -2818,12 +3525,26 @@ def api_committee_reset():
     projects_per_committee = int(data.get("projects_per_committee") or 0)
 
     if not discussion_date or not start_time or projects_per_committee <= 0:
-        return jsonify({"error": "discussion_date, start_time, and projects_per_committee are required."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "discussion_date, start_time, and projects_per_committee are required."
+                }
+            ),
+            400,
+        )
 
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        payload = _committee_generate_internal(db, cursor, discussion_date, start_time, projects_per_committee, clear_existing=True)
+        payload = _committee_generate_internal(
+            db,
+            cursor,
+            discussion_date,
+            start_time,
+            projects_per_committee,
+            clear_existing=True,
+        )
         db.commit()
         cursor.close()
         db.close()
@@ -2832,7 +3553,9 @@ def api_committee_reset():
         return jsonify({"error": str(e)}), 500
 
 
-@coordinator_bp.route("/api/coordinator/committee/<int:plan_id>/responsible", methods=["POST"])
+@coordinator_bp.route(
+    "/api/coordinator/committee/<int:plan_id>/responsible", methods=["POST"]
+)
 @login_required(role="coordinator")
 def api_committee_save_responsible(plan_id):
     data = request.get_json(silent=True) or {}
@@ -2858,7 +3581,12 @@ def api_committee_save_responsible(plan_id):
         if not exists:
             cursor.close()
             db.close()
-            return jsonify({"error": "The selected doctor is not a member of this committee."}), 400
+            return (
+                jsonify(
+                    {"error": "The selected doctor is not a member of this committee."}
+                ),
+                400,
+            )
 
         update_cursor = db.cursor()
         update_cursor.execute(
@@ -2880,11 +3608,13 @@ def api_committee_save_responsible(plan_id):
         cursor.close()
         db.close()
 
-        return jsonify({
-            "message": "Responsible doctor saved successfully.",
-            "plans": _json_safe_rows(payload["plans"]),
-            "current_committees": _json_safe_rows(payload["current_committees"]),
-            "stats": _json_safe_value(payload["stats"]),
-        })
+        return jsonify(
+            {
+                "message": "Responsible doctor saved successfully.",
+                "plans": _json_safe_rows(payload["plans"]),
+                "current_committees": _json_safe_rows(payload["current_committees"]),
+                "stats": _json_safe_value(payload["stats"]),
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -1,6 +1,14 @@
 import hashlib
 import secrets
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, session
+from flask import (
+    Blueprint,
+    jsonify,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+)
 import bcrypt
 from db import get_db
 from auth import login_required
@@ -10,6 +18,7 @@ from routes.assign_rols import assign_rols_bp
 head_bp = Blueprint("head", __name__, url_prefix="/head")
 head_bp.register_blueprint(add_student_bp)
 head_bp.register_blueprint(assign_rols_bp)
+
 
 # ─── Dashboard ──────────────────────────────────────────────
 @head_bp.route("/")
@@ -42,8 +51,7 @@ def supervisors():
 
 # ─── Section Results Approved by Coordinator ─────────────────────────────
 def _ensure_section_results_schema(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS section_completion_status (
             status_id INT PRIMARY KEY AUTO_INCREMENT,
             course_scope ENUM('introduction','graduation_project') NOT NULL,
@@ -59,8 +67,7 @@ def _ensure_section_results_schema(cursor):
             INDEX idx_section_completion_scope_status (course_scope, status),
             FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """
-    )
+        """)
 
 
 @head_bp.route("/section-results")
@@ -77,8 +84,7 @@ def api_head_section_results():
         cursor = db.cursor(dictionary=True)
         _ensure_section_results_schema(cursor)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT sec.section_id AS reference_id,
                    sec.section_name,
                    'introduction' AS course_scope,
@@ -101,12 +107,10 @@ def api_head_section_results():
             GROUP BY sec.section_id, sec.section_name, u_sup.full_name,
                      scs.notes, scs.marked_at, u_mark.full_name
             ORDER BY scs.marked_at DESC, sec.section_id DESC
-            """
-        )
+            """)
         introduction_sections = cursor.fetchall()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT p.project_id AS reference_id,
                    COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS section_name,
                    'graduation_project' AS course_scope,
@@ -130,16 +134,17 @@ def api_head_section_results():
             GROUP BY p.project_id, p.title, p.status, u_sup.full_name,
                      scs.notes, scs.marked_at, u_mark.full_name
             ORDER BY scs.marked_at DESC, p.project_id DESC
-            """
-        )
+            """)
         graduation_sections = cursor.fetchall()
 
         cursor.close()
         db.close()
-        return jsonify({
-            "introduction_sections": introduction_sections,
-            "graduation_sections": graduation_sections,
-        })
+        return jsonify(
+            {
+                "introduction_sections": introduction_sections,
+                "graduation_sections": graduation_sections,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -171,36 +176,38 @@ def ai():
 def profile():
     user_id = session["user_id"]
     try:
-        db     = get_db()
+        db = get_db()
         cursor = db.cursor(dictionary=True)
         cursor.execute(
             "SELECT user_id, university_id, full_name, email, avatar_initials FROM users WHERE user_id = %s",
-            (user_id,)
+            (user_id,),
         )
         user = cursor.fetchone()
         cursor.close()
         db.close()
     except Exception:
         user = None
-    return render_template("head/profile.html", user=user, pwd_error=None, pwd_success=None)
+    return render_template(
+        "head/profile.html", user=user, pwd_error=None, pwd_success=None
+    )
 
 
 # ─── Change Password ─────────────────────────────────────────
 @head_bp.route("/profile/change-password", methods=["POST"])
 @login_required(role="head_of_department")
 def change_password():
-    user_id     = session["user_id"]
+    user_id = session["user_id"]
     current_pwd = request.form.get("current_password", "").strip()
-    new_pwd     = request.form.get("new_password", "").strip()
+    new_pwd = request.form.get("new_password", "").strip()
     confirm_pwd = request.form.get("confirm_password", "").strip()
 
     def get_user():
         try:
-            db     = get_db()
+            db = get_db()
             cursor = db.cursor(dictionary=True)
             cursor.execute(
                 "SELECT user_id, university_id, full_name, email, avatar_initials, password_hash FROM users WHERE user_id = %s",
-                (user_id,)
+                (user_id,),
             )
             u = cursor.fetchone()
             cursor.close()
@@ -212,28 +219,60 @@ def change_password():
     user = get_user()
 
     if not current_pwd or not new_pwd or not confirm_pwd:
-        return render_template("head/profile.html", user=user, pwd_error="Please fill in all fields.", pwd_success=None)
+        return render_template(
+            "head/profile.html",
+            user=user,
+            pwd_error="Please fill in all fields.",
+            pwd_success=None,
+        )
     if len(new_pwd) < 8:
-        return render_template("head/profile.html", user=user, pwd_error="New password must be at least 8 characters.", pwd_success=None)
+        return render_template(
+            "head/profile.html",
+            user=user,
+            pwd_error="New password must be at least 8 characters.",
+            pwd_success=None,
+        )
     if new_pwd != confirm_pwd:
-        return render_template("head/profile.html", user=user, pwd_error="Passwords do not match.", pwd_success=None)
-    if not user or not bcrypt.checkpw(current_pwd.encode(), user["password_hash"].encode()):
-        return render_template("head/profile.html", user=user, pwd_error="Current password is incorrect.", pwd_success=None)
+        return render_template(
+            "head/profile.html",
+            user=user,
+            pwd_error="Passwords do not match.",
+            pwd_success=None,
+        )
+    if not user or not bcrypt.checkpw(
+        current_pwd.encode(), user["password_hash"].encode()
+    ):
+        return render_template(
+            "head/profile.html",
+            user=user,
+            pwd_error="Current password is incorrect.",
+            pwd_success=None,
+        )
 
     try:
         hashed = bcrypt.hashpw(new_pwd.encode(), bcrypt.gensalt()).decode()
-        db     = get_db()
+        db = get_db()
         cursor = db.cursor()
-        cursor.execute("UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed, user_id))
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed, user_id)
+        )
         db.commit()
         cursor.close()
         db.close()
-        return render_template("head/profile.html", user=user, pwd_error=None, pwd_success="Password updated successfully!")
+        return render_template(
+            "head/profile.html",
+            user=user,
+            pwd_error=None,
+            pwd_success="Password updated successfully!",
+        )
     except Exception as e:
-        return render_template("head/profile.html", user=user, pwd_error=f"Error: {e}", pwd_success=None)
+        return render_template(
+            "head/profile.html", user=user, pwd_error=f"Error: {e}", pwd_success=None
+        )
+
+
 # ─── Add student ────────────────────────────────────────────────
-@head_bp.route('/addStudent')
+@head_bp.route("/addStudent")
 @login_required(role="head_of_department")
 def add_student_page():
-    return render_template('/head/addStudent.html')
-
+    return render_template("/head/addStudent.html")
