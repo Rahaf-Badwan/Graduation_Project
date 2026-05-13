@@ -3754,3 +3754,51 @@ CREATE TABLE IF NOT EXISTS section_completion_status (
     INDEX idx_section_completion_scope_status (course_scope, status),
     FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+
+
+
+
+-- ============================================================
+-- APMS Lectures & Deliverables working tables
+-- Run this once in MySQL if you want to create the tables manually.
+-- The Flask APIs also create these tables automatically if missing.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS coordinator_lectures (
+    lecture_id INT PRIMARY KEY AUTO_INCREMENT,
+    semester_id INT NULL,
+    course_scope ENUM('introduction','graduation_project') NOT NULL DEFAULT 'introduction',
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    lecture_date DATE NULL,
+    week_label VARCHAR(80),
+    status ENUM('scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+    created_by INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_coord_lectures_semester_scope (semester_id, course_scope),
+    CONSTRAINT fk_coord_lectures_semester
+        FOREIGN KEY (semester_id) REFERENCES semesters(semester_id)
+        ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS coordinator_deliverables (
+    deliverable_id INT PRIMARY KEY AUTO_INCREMENT,
+    semester_id INT NULL,
+    course_scope ENUM('introduction','graduation_project') NOT NULL DEFAULT 'introduction',
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    due_date DATE NULL,
+    mark_points DECIMAL(5,2) NOT NULL DEFAULT 0,
+    status ENUM('not_open','open','in_progress','completed','closed') NOT NULL DEFAULT 'not_open',
+    created_by INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_coord_deliverables_semester_scope (semester_id, course_scope),
+    CONSTRAINT fk_coord_deliverables_semester
+        FOREIGN KEY (semester_id) REFERENCES semesters(semester_id)
+        ON DELETE SET NULL
+);

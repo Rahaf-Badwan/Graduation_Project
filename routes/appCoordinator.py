@@ -365,6 +365,230 @@ def coordinator_page(page):
     return render_template(template)
 
 
+
+# ─── Coordinator Lectures & Deliverables ─────────────────────────────────
+def _ensure_lecture_tables(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coordinator_lectures (
+            lecture_id INT PRIMARY KEY AUTO_INCREMENT,
+            semester_id INT NULL,
+            course_scope ENUM('introduction','graduation_project') NOT NULL DEFAULT 'introduction',
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            lecture_date DATE NULL,
+            week_label VARCHAR(80),
+            status ENUM('scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+            created_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_coord_lectures_semester_scope (semester_id, course_scope),
+            CONSTRAINT fk_coord_lectures_semester
+                FOREIGN KEY (semester_id) REFERENCES semesters(semester_id)
+                ON DELETE SET NULL
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coordinator_deliverables (
+            deliverable_id INT PRIMARY KEY AUTO_INCREMENT,
+            semester_id INT NULL,
+            course_scope ENUM('introduction','graduation_project') NOT NULL DEFAULT 'introduction',
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            due_date DATE NULL,
+            mark_points DECIMAL(5,2) NOT NULL DEFAULT 0,
+            status ENUM('not_open','open','in_progress','completed','closed') NOT NULL DEFAULT 'not_open',
+            created_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_coord_deliverables_semester_scope (semester_id, course_scope),
+            CONSTRAINT fk_coord_deliverables_semester
+                FOREIGN KEY (semester_id) REFERENCES semesters(semester_id)
+                ON DELETE SET NULL
+        )
+    """)
+
+
+def _date_to_iso(row):
+    if not row:
+        return row
+    for key, value in list(row.items()):
+        if hasattr(value, "isoformat"):
+            row[key] = value.isoformat()
+        elif isinstance(value, float):
+            row[key] = round(value, 2)
+    return row
+
+
+@coordinator_bp.route("/api/coordinator/lectures-data", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_lectures_data():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_lecture_tables(cursor)
+        db.commit()
+
+        semester = _get_active_semester(cursor)
+        semester_id = semester["semester_id"] if semester else None
+
+        result = {
+            "semester": _date_to_iso(semester or {}),
+            "lectures": {"introduction": [], "graduation_project": []},
+            "deliverables": {"introduction": [], "graduation_project": []},
+        }
+
+        if semester_id:
+            cursor.execute("""
+                SELECT lecture_id, semester_id, course_scope, title, description,
+                       lecture_date, week_label, status, created_at, updated_at
+                FROM coordinator_lectures
+                WHERE semester_id = %s
+                ORDER BY course_scope, COALESCE(lecture_date, '9999-12-31'), lecture_id
+            """, (semester_id,))
+        else:
+            cursor.execute("""
+                SELECT lecture_id, semester_id, course_scope, title, description,
+                       lecture_date, week_label, status, created_at, updated_at
+                FROM coordinator_lectures
+                ORDER BY course_scope, COALESCE(lecture_date, '9999-12-31'), lecture_id
+            """)
+        for row in cursor.fetchall():
+            row = _date_to_iso(row)
+            result["lectures"].setdefault(row["course_scope"], []).append(row)
+
+        if semester_id:
+            cursor.execute("""
+                SELECT deliverable_id, semester_id, course_scope, title, description,
+                       due_date, mark_points, status, created_at, updated_at
+                FROM coordinator_deliverables
+                WHERE semester_id = %s
+                ORDER BY course_scope, COALESCE(due_date, '9999-12-31'), deliverable_id
+            """, (semester_id,))
+        else:
+            cursor.execute("""
+                SELECT deliverable_id, semester_id, course_scope, title, description,
+                       due_date, mark_points, status, created_at, updated_at
+                FROM coordinator_deliverables
+                ORDER BY course_scope, COALESCE(due_date, '9999-12-31'), deliverable_id
+            """)
+        for row in cursor.fetchall():
+            row = _date_to_iso(row)
+            row["mark_points"] = float(row.get("mark_points") or 0)
+            result["deliverables"].setdefault(row["course_scope"], []).append(row)
+
+        cursor.close()
+        db.close()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/lectures", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_create_lecture():
+    try:
+        data = request.get_json(silent=True) or {}
+        title = (data.get("title") or "").strip()
+        if not title:
+            return jsonify({"error": "Lecture title is required."}), 400
+        course_scope = data.get("course_scope") if data.get("course_scope") in ("introduction", "graduation_project") else "introduction"
+        status = data.get("status") if data.get("status") in ("scheduled", "completed", "cancelled") else "scheduled"
+        lecture_date = data.get("lecture_date") or None
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_lecture_tables(cursor)
+        semester = _get_active_semester(cursor)
+        semester_id = semester["semester_id"] if semester else None
+
+        cursor.execute("""
+            INSERT INTO coordinator_lectures
+                (semester_id, course_scope, title, description, lecture_date, week_label, status, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            semester_id,
+            course_scope,
+            title,
+            data.get("description") or None,
+            lecture_date,
+            data.get("week_label") or None,
+            status,
+            session.get("user_id"),
+        ))
+        db.commit()
+        lecture_id = cursor.lastrowid
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Lecture saved successfully.", "lecture_id": lecture_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/lectures/<int:lecture_id>/date", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_update_lecture_date(lecture_id):
+    try:
+        data = request.get_json(silent=True) or {}
+        lecture_date = data.get("lecture_date") or None
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_lecture_tables(cursor)
+        cursor.execute("""
+            UPDATE coordinator_lectures
+            SET lecture_date = %s,
+                status = CASE WHEN %s IS NULL THEN status ELSE 'scheduled' END
+            WHERE lecture_id = %s
+        """, (lecture_date, lecture_date, lecture_id))
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Lecture date updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/deliverables", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_create_deliverable():
+    try:
+        data = request.get_json(silent=True) or {}
+        title = (data.get("title") or "").strip()
+        if not title:
+            return jsonify({"error": "Deliverable title is required."}), 400
+        course_scope = data.get("course_scope") if data.get("course_scope") in ("introduction", "graduation_project") else "introduction"
+        status = data.get("status") if data.get("status") in ("not_open", "open", "in_progress", "completed", "closed") else "not_open"
+        due_date = data.get("due_date") or None
+        mark_points = data.get("mark_points") or 0
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_lecture_tables(cursor)
+        semester = _get_active_semester(cursor)
+        semester_id = semester["semester_id"] if semester else None
+
+        cursor.execute("""
+            INSERT INTO coordinator_deliverables
+                (semester_id, course_scope, title, description, due_date, mark_points, status, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            semester_id,
+            course_scope,
+            title,
+            data.get("description") or None,
+            due_date,
+            mark_points,
+            status,
+            session.get("user_id"),
+        ))
+        db.commit()
+        deliverable_id = cursor.lastrowid
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Deliverable saved successfully.", "deliverable_id": deliverable_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ─── Coordinator Notifications / Messaging ───────────────────────────────
 def _notification_row_to_json(row):
     """Convert MySQL notification rows to safe JSON values."""
