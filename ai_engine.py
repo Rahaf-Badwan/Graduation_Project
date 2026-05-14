@@ -1,655 +1,308 @@
 import os
 import re
-import pickle
+import json
+import math
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
 from dotenv import load_dotenv
+from google import genai
+
+
+# ============================================================
+# APMS AI Engine
+#
+# Compatible with current app.py:
+# from ai_engine import ask_apms_ai, search_uploaded_semantic
+#
+# app.py expects ask_apms_ai(question) to return STRING only.
+# ============================================================
+
 load_dotenv()
-from typing import List, Dict, Any
-import time
 
-import faiss
-import numpy as np
-from db import get_db
+BASE_DIR = Path(__file__).resolve().parent
 
-try:
-    from google import genai
-    from google.genai import types as genai_types
-except Exception:
-    genai = None
-    genai_types = None
+ARCHIVED_REPORTS_DIR = BASE_DIR / "static" / "archived_reports"
+INDEX_FILE = BASE_DIR / "static" / "ai_index" / "archive_index.json"
 
-FORMAT_INSTRUCTION = (
-    "\n\nFORMATTING RULES — always follow these:\n"
-    "- Give a complete answer, not a partial one.\n"
-    "- Use bullet points when useful, but do not force short answers.\n"
-    "- Use **bold** to highlight key terms, names, numbers, and conclusions.\n"
-    "- Use relevant emojis naturally (📊 stats, ✅ positives, ⚠️ warnings, 🏆 top results, 📄 files).\n"
-    "- When the user asks for all items, list all items you can find.\n"
-    "- If comparing, use: **Category**: value.\n"
-)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
 
-INDEX_DIR = "faiss_index"
-INDEX_FILE = os.path.join(INDEX_DIR, "docs.index")
-META_FILE = os.path.join(INDEX_DIR, "metadata.pkl")
-AI_HTTP_TIMEOUT_MS = int(os.environ.get("AI_HTTP_TIMEOUT_MS", "25000"))
-AI_PDF_TOP_K = int(os.environ.get("AI_PDF_TOP_K", "12"))
-AI_PDF_CONTEXT_CHARS = int(os.environ.get("AI_PDF_CONTEXT_CHARS", "12000"))
-AI_ALLOW_MODEL_DOWNLOAD = os.environ.get("AI_ALLOW_MODEL_DOWNLOAD", "0").lower() in {"1", "true", "yes"}
+TOP_K = 5
 
-_embed_model = None
-_faiss_index = None
-_chunks = []
-_chunk_meta = []
-_sentence_transformer_cls = None
+# Lower = uses reports more often.
+# Higher = uses Gemini fallback more often.
+MIN_SCORE_TO_USE_REPORTS = float(os.getenv("MIN_SCORE_TO_USE_REPORTS", "0.25"))
+
+_index_cache: Optional[Dict[str, Any]] = None
 
 
-def normalize_arabic(text: str) -> str:
+def get_client():
+    api_key = os.getenv("GOOGLE_API_KEY")
+
+    if not api_key:
+        raise RuntimeError(
+            "GOOGLE_API_KEY is missing. Add it to .env like this:\n"
+            "GOOGLE_API_KEY=YOUR_KEY_HERE"
+        )
+
+    return genai.Client(api_key=api_key)
+
+
+def normalize_text(text: str) -> str:
     if not text:
         return ""
-    text = text.replace("\u0623", "\u0627").replace("\u0625", "\u0627").replace("\u0622", "\u0627")
-    text = text.replace("\u0649", "\u064a").replace("\u0629", "\u0647")
-    text = text.replace("\u0624", "\u0648").replace("\u0626", "\u064a")
-    return text
 
-def _get_gemini_client():
-    api_key = (
-        os.environ.get("GEMINI_API_KEY", "").strip()
-        or os.environ.get("GOOGLE_API_KEY", "").strip()
-    )
-    if not api_key or genai is None:
-        return None
-    if genai_types is None:
-        return genai.Client(api_key=api_key)
-    return genai.Client(
-        api_key=api_key,
-        http_options=genai_types.HttpOptions(timeout=AI_HTTP_TIMEOUT_MS),
-    )
+    text = text.replace("\x00", " ")
+    text = re.sub(r"\s+", " ", text)
+
+    # Arabic light normalization
+    text = text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
+    text = text.replace("ى", "ي").replace("ة", "ه")
+
+    return text.strip()
 
 
-def _generate_content(client, prompt: str):
-    kwargs = {
-        "model": "gemini-2.5-flash",
-        "contents": prompt,
-    }
-    if genai_types is not None:
-        kwargs["config"] = genai_types.GenerateContentConfig(max_output_tokens=1200)
-    return client.models.generate_content(**kwargs)
+def load_index() -> Dict[str, Any]:
+    global _index_cache
 
+    if _index_cache is not None:
+        return _index_cache
 
-def _call_ai(prompt: str) -> str:
-    client = _get_gemini_client()
-    if client is None:
-        return "Please set GEMINI_API_KEY (or GOOGLE_API_KEY) and install google-genai."
-
-    last_error = None
-    for attempt in range(3):
-        try:
-            response = _generate_content(client, prompt)
-            text = getattr(response, "text", "") or ""
-            return text.strip() or "I could not generate a response."
-        except Exception as e:
-            last_error = str(e)
-
-            if "429" in last_error or "RESOURCE_EXHAUSTED" in last_error or "quota" in last_error.lower():
-                return "AI service is temporarily unavailable because the free Gemini quota has been exceeded. Please try again later."
-
-            if "503" in last_error or "UNAVAILABLE" in last_error or "high demand" in last_error.lower():
-                time.sleep(2 * (attempt + 1))
-                continue
-
-            return "AI service error: " + last_error
-
-    return "AI service error: Service is temporarily busy. Please try again in a moment."
-
-
-def _pdf_hits_to_context(pdf_hits, max_chars: int = AI_PDF_CONTEXT_CHARS) -> str:
-    parts = []
-    used = 0
-    for hit in pdf_hits:
-        text = (
-            "[File: "
-            + str(hit["meta"].get("file"))
-            + " | Chunk: "
-            + str(hit["meta"].get("chunk_id"))
-            + "]\n"
-            + (hit.get("text") or "")
+    if not INDEX_FILE.exists():
+        raise RuntimeError(
+            f"AI index not found: {INDEX_FILE}\n"
+            "Run training first:\n"
+            "python train_ai.py"
         )
-        remaining = max_chars - used
-        if remaining <= 0:
-            break
-        if len(text) > remaining:
-            text = text[:remaining].rstrip() + "\n[Context truncated]"
-        parts.append(text)
-        used += len(text)
+
+    with open(INDEX_FILE, "r", encoding="utf-8") as f:
+        _index_cache = json.load(f)
+
+    return _index_cache
+
+
+def embed_text(client, text: str) -> List[float]:
+    text = normalize_text(text)
+
+    result = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=text
+    )
+
+    if hasattr(result, "embeddings") and result.embeddings:
+        return list(result.embeddings[0].values)
+
+    raise RuntimeError("Gemini embedding response was empty.")
+
+
+def cosine_similarity(a: List[float], b: List[float]) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+
+    dot = 0.0
+    norm_a = 0.0
+    norm_b = 0.0
+
+    for x, y in zip(a, b):
+        dot += x * y
+        norm_a += x * x
+        norm_b += y * y
+
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+
+    return dot / (math.sqrt(norm_a) * math.sqrt(norm_b))
+
+
+def search_uploaded_semantic(question: str, top_k: int = TOP_K) -> List[Dict[str, Any]]:
+    """
+    Used by app.py import.
+    Searches inside static/archived_reports using static/ai_index/archive_index.json.
+    """
+    question = normalize_text(question)
+
+    if not question:
+        return []
+
+    index = load_index()
+    chunks = index.get("chunks", [])
+
+    if not chunks:
+        return []
+
+    client = get_client()
+    q_vector = embed_text(client, question)
+
+    scored = []
+
+    for chunk in chunks:
+        score = cosine_similarity(q_vector, chunk.get("embedding", []))
+
+        scored.append({
+            "score": score,
+            "source_file": chunk.get("source_file"),
+            "source_path": chunk.get("source_path"),
+            "chunk_id": chunk.get("chunk_id"),
+            "text": chunk.get("text", "")
+        })
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    return scored[:top_k]
+
+
+def build_context(matches: List[Dict[str, Any]]) -> str:
+    parts = []
+
+    for i, item in enumerate(matches, start=1):
+        parts.append(
+            f"[SOURCE {i}]\n"
+            f"File: {item.get('source_file')}\n"
+            f"Chunk: {item.get('chunk_id')}\n"
+            f"Score: {item.get('score'):.3f}\n"
+            f"Text:\n{item.get('text')}\n"
+        )
+
     return "\n\n".join(parts)
 
 
-def _looks_like_document_question(question: str) -> bool:
-    q = (question or "").lower()
-    doc_keywords = [
-        "project", "projects", "pdf", "pdfs", "file", "files", "uploaded",
-        "report", "reports", "document", "documents", "supervisor", "supervisors",
-        "score", "scores", "grade", "grades", "evaluation", "evaluations",
-        "summary", "summarize", "similar", "committee", "student", "students"
-    ]
-    return any(word in q for word in doc_keywords)
-
-
-def _needs_document_search(question: str) -> bool:
-    if _looks_like_document_question(question):
-        return True
-
-    router_prompt = (
-        "You are a classifier. Answer with ONLY 'YES' or 'NO'.\n"
-        "Does the following question require searching through academic project documents, "
-        "project reports, supervisor data, student grades, evaluations, or university project statistics?\n"
-        "Answer YES only if the question is specifically about:\n"
-        "- Academic projects or their content\n"
-        "- Supervisors and their performance\n"
-        "- Project scores, grades, or evaluations\n"
-        "- Uploaded project PDF files\n"
-        "- Project statistics, comparisons, or summaries\n"
-        "Answer NO for everything else.\n\n"
-        "Question: " + question + "\n"
-        "Answer (YES or NO):"
-    )
-    decision = _call_ai(router_prompt).strip().upper()
-    return decision.startswith("YES")
-
-
-def _get_embed_model():
-    global _embed_model, _sentence_transformer_cls
-    if _embed_model is False:
-        return None
-    if _embed_model is None:
-        try:
-            if _sentence_transformer_cls is None:
-                from sentence_transformers import SentenceTransformer
-                _sentence_transformer_cls = SentenceTransformer
-            _embed_model = _sentence_transformer_cls(
-                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-                local_files_only=not AI_ALLOW_MODEL_DOWNLOAD,
-            )
-        except Exception as e:
-            print(f"[ai_engine] Could not load local embedding model: {e}")
-            _embed_model = False
-            return None
-    return _embed_model
-
-
-def _load_pdf_index():
-    global _faiss_index, _chunks, _chunk_meta
-
-    if _faiss_index is not None:
-        return True
-
-    if not os.path.exists(INDEX_FILE) or not os.path.exists(META_FILE):
-        return False
-
-    _faiss_index = faiss.read_index(INDEX_FILE)
-
-    with open(META_FILE, "rb") as f:
-        store = pickle.load(f)
-
-    _chunks = store.get("chunks", [])
-    _chunk_meta = store.get("metadata", [])
-    return True
-
-
-def _search_pdf_chunks(question: str, top_k: int = 60):
-    if not _load_pdf_index():
-        return []
-
-    model = _get_embed_model()
-    if model is None:
-        return []
-    question = normalize_arabic(question)
-    q_emb = model.encode([question], convert_to_numpy=True)
-    q_emb = np.asarray(q_emb, dtype="float32")
-
-    distances, indices = _faiss_index.search(q_emb, top_k)
-
-    results = []
+def format_archive_sources(matches: List[Dict[str, Any]]) -> str:
+    lines = []
     seen = set()
 
-    for idx in indices[0]:
-        if idx == -1:
-            continue
-        key = (_chunk_meta[idx].get("file"), _chunk_meta[idx].get("chunk_id"))
+    for item in matches:
+        source_file = item.get("source_file") or "unknown file"
+        chunk_id = item.get("chunk_id")
+        score = float(item.get("score") or 0)
+
+        key = (source_file, chunk_id)
+
         if key in seen:
             continue
+
         seen.add(key)
-        results.append({
-            "text": _chunks[idx],
-            "meta": _chunk_meta[idx]
-        })
+        lines.append(f"- {source_file} | chunk {chunk_id} | score {score:.3f}")
 
-    return results
+    return "\n".join(lines)
 
 
-def _list_all_pdf_files():
-    if not _load_pdf_index():
-        return []
+def ask_gemini(prompt: str) -> str:
+    client = get_client()
 
-    files = []
-    seen = set()
-    for meta in _chunk_meta:
-        fname = meta.get("file")
-        if fname and fname not in seen:
-            seen.add(fname)
-            files.append(fname)
-    return files
-
-
-def _extract_all_project_names_from_chunks():
-    if not _load_pdf_index():
-        return "Based on uploaded PDFs: No indexed PDF files were found."
-
-    files = _list_all_pdf_files()
-    if not files:
-        return "Based on uploaded PDFs: No indexed PDF files were found."
-
-    return "Based on uploaded PDFs: The indexed project files are:\n- " + "\n- ".join(files)
-
-
-def _fetch_projects() -> List[Dict[str, Any]]:
-    try:
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT p.project_id, p.title, p.abstract, p.keywords, p.project_type, p.status,
-                   p.final_score, p.submission_date,
-                   u.full_name AS supervisor_name
-            FROM projects p
-            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
-            LEFT JOIN users u ON u.user_id = f.user_id
-            ORDER BY p.project_id DESC
-            """
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        db.close()
-        return rows
-    except Exception as e:
-        print(f"[ai_engine] DB error in _fetch_projects: {e}")
-        return []
-
-
-def _fetch_supervisor_stats() -> List[Dict[str, Any]]:
-    try:
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT u.full_name AS supervisor_name,
-                   COUNT(DISTINCT p.project_id) AS project_count,
-                   ROUND(AVG(p.final_score), 2) AS avg_score
-            FROM faculty f
-            JOIN users u ON u.user_id = f.user_id
-            LEFT JOIN projects p ON p.supervisor_id = f.faculty_id
-            WHERE u.role = 'supervisor'
-            GROUP BY f.faculty_id, u.full_name
-            ORDER BY project_count DESC, u.full_name ASC
-            """
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        db.close()
-        return rows
-    except Exception as e:
-        print(f"[ai_engine] DB error in _fetch_supervisor_stats: {e}")
-        return []
-
-
-def _match_project_name(question: str, projects: List[Dict[str, Any]]) -> Dict[str, Any] | None:
-    q = question.lower()
-    best = None
-    best_score = 0
-
-    for p in projects:
-        title = (p.get("title") or "").lower()
-        score = sum(1 for token in re.findall(r"[a-zA-Z]{3,}", title) if token in q)
-        if title and title in q:
-            score += 10
-        if score > best_score:
-            best_score = score
-            best = p
-
-    return best
-
-
-def _keyword_stats_answer(question: str) -> str | None:
-    q = question.lower()
-    projects = _fetch_projects()
-    supervisors = _fetch_supervisor_stats()
-
-    if "how many" in q and ("supervis" in q or "projects has" in q):
-        for row in supervisors:
-            name = (row.get("supervisor_name") or "").lower()
-            surname = name.split()[-1] if name else ""
-            if name in q or (surname and surname in q):
-                return (
-                    "Based on APMS data: "
-                    + row["supervisor_name"]
-                    + " supervises "
-                    + str(row["project_count"])
-                    + " project(s) with an average score of "
-                    + str(row["avg_score"] or "N/A")
-                    + "."
-                )
-
-    if "top-performing supervisor" in q or "top supervisor" in q or "best supervisor" in q:
-        valid = [s for s in supervisors if s.get("avg_score") is not None]
-        if valid:
-            top = max(valid, key=lambda x: float(x["avg_score"]))
-            return (
-                "Based on APMS data: **"
-                + str(top["supervisor_name"])
-                + "** is the top-performing supervisor with an average score of **"
-                + str(top["avg_score"])
-                + "** across **"
-                + str(top["project_count"])
-                + "** project(s)."
-            )
-
-    if "above 90" in q or "scored above 90" in q or "top projects" in q:
-        winners = [
-            p for p in projects
-            if p.get("final_score") is not None and float(p["final_score"]) >= 90
-        ]
-        if not winners:
-            return "Based on APMS data: No projects scored above 90 in the current dataset."
-
-        return "Based on APMS data: Projects above 90:\n- " + "\n- ".join(
-            p["title"] + " (" + str(p["final_score"]) + ")" for p in winners
-        )
-
-    if "similar" in q:
-        project = _match_project_name(question, projects)
-        if not project:
-            return None
-
-        tokens = set(
-            re.findall(
-                r"[a-zA-Z]{4,}",
-                (project.get("keywords") or "") + " " + (project.get("abstract") or "")
-            )
-        )
-
-        scored = []
-        for candidate in projects:
-            if candidate["project_id"] == project["project_id"]:
-                continue
-            c_tokens = set(
-                re.findall(
-                    r"[a-zA-Z]{4,}",
-                    (candidate.get("keywords") or "") + " " + (candidate.get("abstract") or "")
-                )
-            )
-            overlap = len(tokens & c_tokens)
-            if overlap:
-                scored.append((overlap, candidate))
-
-        scored.sort(key=lambda x: x[0], reverse=True)
-
-        if not scored:
-            return (
-                "Based on APMS data: I found the project "
-                + project["title"]
-                + ", but no similar projects were found."
-            )
-
-        return "Based on APMS data: Closest similar projects:\n- " + "\n- ".join(
-            item[1]["title"] for item in scored
-        )
-
-    return None
-
-
-def _build_context(question: str) -> str:
-    projects = _fetch_projects()[:50]
-    supervisors = _fetch_supervisor_stats()[:25]
-    pdf_hits = _search_pdf_chunks(question, top_k=AI_PDF_TOP_K)
-
-    proj_lines = [
-        "- " + (p["title"] or "") +
-        " | type=" + str(p.get("project_type")) +
-        " | status=" + str(p.get("status")) +
-        " | score=" + str(p.get("final_score")) +
-        " | supervisor=" + str(p.get("supervisor_name"))
-        for p in projects
-    ]
-
-    sup_lines = [
-        "- " + str(s["supervisor_name"]) +
-        " | projects=" + str(s["project_count"]) +
-        " | avg_score=" + str(s.get("avg_score"))
-        for s in supervisors
-    ]
-
-    pdf_context = _pdf_hits_to_context(pdf_hits)
-
-    return (
-        "You are APMS AI assistant for Birzeit University.\n"
-        + FORMAT_INSTRUCTION +
-        "Rules:\n"
-        "1. Prefer answering from uploaded PDF files when relevant chunks are found.\n"
-        "2. If PDFs do not contain the answer, use APMS database records.\n"
-        "3. If the answer is not found in PDFs or APMS data, answer as a normal helpful AI assistant.\n"
-        "4. If the user asks for all items, do your best to list all items found, not just a few.\n"
-        "5. Start answers with: 'Based on uploaded PDFs:', 'Based on APMS data:', or 'General AI answer:'\n\n"
-        "User question: " + question + "\n\n"
-        "Retrieved PDF context:\n"
-        + (pdf_context if pdf_context else "No relevant PDF chunks found.")
-        + "\n\nAPMS database context:\nRecent projects:\n"
-        + "\n".join(proj_lines)
-        + "\n\nSupervisor stats:\n"
-        + "\n".join(sup_lines)
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt
     )
 
+    return getattr(response, "text", "") or "No answer returned from Gemini."
 
-def search_uploaded_semantic(
-    query: str = "",
-    year: str = "",
-    project_type: str = "",
-    supervisor: str = "",
-    status: str = "",
-    score: str = "",
-    top_k: int = 80
-):
-    """
-    Semantic search over uploaded PDFs using the same FAISS/embedding logic as the AI.
-    Returns grouped file-level results with previews.
-    """
-    if not _load_pdf_index():
-        return []
 
-    query = normalize_arabic((query or "").strip())
-    year = (year or "").strip().lower()
-    project_type = (project_type or "").strip().lower()
-    supervisor = (supervisor or "").strip().lower()
-    status = (status or "").strip().lower()
-    score = (score or "").strip().lower()
+def answer_from_archived_reports(question: str, matches: List[Dict[str, Any]]) -> str:
+    context = build_context(matches)
 
-    if not query:
-        grouped = {}
-        for chunk, meta in zip(_chunks, _chunk_meta):
-            file_name = (meta.get("file") or "Unknown file").strip()
-            text = (chunk or "").strip()
+    prompt = f"""
+You are the APMS archived reports assistant.
 
-            if file_name not in grouped:
-                grouped[file_name] = {
-                    "file_name": file_name,
-                    "meta": dict(meta or {}),
-                    "all_text": [],
-                    "preview": text[:300].replace("\n", " ").strip(),
-                    "matched_chunks": 0,
-                }
+Answer the user's question using ONLY the archived report context below.
 
-            grouped[file_name]["all_text"].append(text)
+Rules:
+- Use ONLY the archived report context.
+- If the answer exists in the context, answer clearly.
+- If the answer is not clearly in the context, say the archived reports do not contain enough information.
+- Mention source file names naturally inside the answer if useful.
+- If the question is Arabic, answer in Arabic.
+- If the question is English, answer in English.
+- Do not invent facts outside the archived report context.
 
-        results = list(grouped.values())
-    else:
-        hits = _search_pdf_chunks(query, top_k=top_k)
+Archived report context:
+{context}
 
-        grouped = {}
-        for hit in hits:
-            file_name = (hit["meta"].get("file") or "Unknown file").strip()
-            text = (hit["text"] or "").strip()
+User question:
+{question}
+"""
 
-            if file_name not in grouped:
-                grouped[file_name] = {
-                    "file_name": file_name,
-                    "meta": dict(hit.get("meta") or {}),
-                    "all_text": [],
-                    "preview": text[:300].replace("\n", " ").strip(),
-                    "matched_chunks": 0,
-                }
+    return ask_gemini(prompt)
 
-            grouped[file_name]["all_text"].append(text)
-            grouped[file_name]["matched_chunks"] += 1
 
-        results = list(grouped.values())
+def answer_from_general_gemini(question: str) -> str:
+    prompt = f"""
+You are the APMS assistant.
 
-    type_keywords = {
-        "ai": ["ai", "artificial intelligence", "machine learning", "deep learning"],
-        "web": ["web", "website", "web application"],
-        "mobile": ["mobile", "android", "ios"],
-        "security": ["security", "cybersecurity", "cyber"],
-        "databases": ["database", "databases", "mysql", "sql"],
-        "software_engineering": ["software engineering", "requirements", "system design"],
-        "other": []
-    }
+The user's question does not seem to belong to the archived reports,
+so answer normally using Gemini.
 
-    filtered = []
+Rules:
+- If the question is about APMS, Flask, MySQL, HTML, CSS, JavaScript, Gemini, AI, or the graduation project system, help practically.
+- If the question is Arabic, answer in Arabic.
+- If the question is English, answer in English.
+- Be clear and direct.
 
-    for item in results:
-        full_text = "\n".join(item["all_text"]).lower()
-        file_name_l = item["file_name"].lower()
-        preview_l = item["preview"].lower()
-        meta = item.get("meta") or {}
-        meta_text = " ".join(
-            str(meta.get(key) or "")
-            for key in (
-                "title",
-                "project_type",
-                "status",
-                "academic_year",
-                "supervisor_name",
-                "final_score",
-            )
-        ).lower()
+User question:
+{question}
+"""
 
-        if year and year not in full_text and year not in file_name_l and year not in preview_l and year not in meta_text:
-            continue
-
-        if project_type:
-            keywords = type_keywords.get(project_type, [project_type])
-            if keywords and not any(k in full_text or k in preview_l or k in file_name_l or k in meta_text for k in keywords):
-                continue
-
-        if supervisor and supervisor not in full_text and supervisor not in preview_l and supervisor not in file_name_l and supervisor not in meta_text:
-            continue
-
-        if status:
-            normalized_status = status.replace("_", " ")
-            variants = {status, normalized_status}
-            if not any(
-                f" {v} " in f" {full_text} "
-                or f" {v} " in f" {preview_l} "
-                or f" {v} " in f" {file_name_l} "
-                or f" {v} " in f" {meta_text} "
-                for v in variants
-            ):
-                continue
-
-        if score:
-            score_matches = re.findall(r"\b(?:[1-9]\d(?:\.\d+)?|100(?:\.0+)?)\b", full_text)
-            numeric_scores = [float(x) for x in score_matches]
-            try:
-                if meta.get("final_score") is not None:
-                    numeric_scores.append(float(meta.get("final_score")))
-            except (TypeError, ValueError):
-                pass
-
-            if score == "90_plus" and not any(s >= 90 for s in numeric_scores):
-                continue
-            elif score == "75_89" and not any(75 <= s < 90 for s in numeric_scores):
-                continue
-            elif score == "below_75" and not any(s < 75 for s in numeric_scores):
-                continue
-            elif score == "no_score" and numeric_scores:
-                continue
-
-        filtered.append({
-            "file_name": item["file_name"],
-            "project_id": meta.get("project_id"),
-            "title": meta.get("title") or item["file_name"],
-            "project_type": meta.get("project_type") or "",
-            "status": meta.get("status") or "",
-            "academic_year": meta.get("academic_year") or "",
-            "supervisor_name": meta.get("supervisor_name") or "",
-            "final_score": meta.get("final_score"),
-            "report_url": (
-                f"/archive/report/project/{meta.get('project_id')}"
-                if meta.get("project_id") and meta.get("status") == "archived"
-                else None
-            ),
-            "preview": item["preview"],
-            "matched_chunks": item["matched_chunks"],
-        })
-
-    filtered.sort(key=lambda x: x.get("matched_chunks", 0), reverse=True)
-    return filtered
+    return ask_gemini(prompt)
 
 
 def ask_apms_ai(question: str) -> str:
-    question = normalize_arabic((question or "").strip())
+    """
+    Main function used by current app.py.
+
+    Must return string only because app.py saves it directly as answer.
+    """
+    question = normalize_text(question)
+
     if not question:
-        return "Please type a question first."
+        return "Please write a question."
 
-    q = question.lower()
+    try:
+        matches = search_uploaded_semantic(question, top_k=TOP_K)
+    except Exception as e:
+        answer = answer_from_general_gemini(question)
 
-    direct = _keyword_stats_answer(question)
-    if direct:
-        return direct
-
-    if not _needs_document_search(question):
-        return _call_ai(
-    "You are APMS AI assistant for Birzeit University — a friendly and helpful assistant.\n"
-    "If the user asks in Arabic, answer in Arabic.\n"
-    "Answer the following question naturally and helpfully."
-    + FORMAT_INSTRUCTION +
-    "\nDo NOT mention PDFs or project databases unless directly asked.\n\n"
-    "User: " + question
-)
-
-    if any(x in q for x in ["all files", "all pdfs", "uploaded files", "list all files", "show all files"]):
-        files = _list_all_pdf_files()
-        if files:
-            return "Based on uploaded PDFs: The indexed files are:\n- " + "\n- ".join(files)
-        return "Based on uploaded PDFs: No indexed PDF files were found."
-
-    if any(x in q for x in ["names of projects", "project names", "list all projects", "all projects"]):
-        return _extract_all_project_names_from_chunks()
-
-    pdf_hits = _search_pdf_chunks(question, top_k=AI_PDF_TOP_K)
-    if pdf_hits:
-        pdf_context = _pdf_hits_to_context(pdf_hits)
-
-        result = _call_ai(
-            "You are APMS AI assistant.\n"
-            "Answer the user's question using the uploaded PDF context first.\n"
-            + FORMAT_INSTRUCTION +
-            "If found in PDFs, start with: 'Based on uploaded PDFs:'\n"
-            "If the question asks for a complete answer, give a complete answer.\n"
-            "If multiple files contain relevant information, combine them.\n"
-            "Do not stop after one point if more relevant points exist.\n\n"
-            "User question: " + question + "\n\n"
-            "Retrieved PDF context:\n" + pdf_context
+        return (
+            f"{answer}\n\n"
+            f"---\n"
+            f"Source: Gemini general answer\n"
+            f"Reason: archived reports search was unavailable.\n"
+            f"Details: {e}"
         )
 
-        if result and not result.startswith("AI service error"):
-            return result
+    best_score = float(matches[0]["score"]) if matches else 0.0
+    best_source = matches[0]["source_file"] if matches else "No source"
 
-    return _call_ai(_build_context(question))
+    print("AI best score:", best_score)
+    print("AI best source:", best_source)
+
+    if matches and best_score >= MIN_SCORE_TO_USE_REPORTS:
+        answer = answer_from_archived_reports(question, matches)
+        sources = format_archive_sources(matches)
+
+        return (
+            f"{answer}\n\n"
+            f"---\n"
+            f"Source: Archived reports\n"
+            f"{sources}"
+        )
+
+    answer = answer_from_general_gemini(question)
+
+    return (
+        f"{answer}\n\n"
+        f"---\n"
+        f"Source: Gemini general answer\n"
+        f"Reason: no archived report chunk matched strongly enough.\n"
+        f"Best score: {best_score:.3f}\n"
+        f"Best archived source checked: {best_source}"
+    )
+
+
+if __name__ == "__main__":
+    while True:
+        q = input("\nAsk APMS AI: ").strip()
+
+        if q.lower() in ["exit", "quit", "q"]:
+            break
+
+        print("\nAnswer:\n")
+        print(ask_apms_ai(q))
