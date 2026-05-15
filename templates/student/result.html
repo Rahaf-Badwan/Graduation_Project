@@ -1,0 +1,293 @@
+{% extends 'student/base.html' %}
+
+{% block page_title %}Course Result{% endblock %}
+{% block page_id %}result{% endblock %}
+{% block topbar_title %}Course Result{% endblock %}
+
+{% set status = result.course_status if result else 'pending' %}
+{% set status_label = {'passed': 'Passed', 'failed': 'Failed', 'pending': 'Pending'}.get(status, 'Pending') %}
+{% set status_class = {'passed': 'result-pass', 'failed': 'result-fail', 'pending': 'result-pending'}.get(status,
+'result-pending') %}
+
+{% block content %}
+<div class="page on" id="pg-result">
+  <style>
+    #pg-result .result-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 190px;
+      gap: 18px;
+      padding: 18px;
+      border: 1px solid var(--color-border-tertiary);
+      border-radius: var(--r);
+      background: linear-gradient(135deg, rgba(26, 107, 58, .08), rgba(24, 95, 165, .07));
+      margin-bottom: 12px;
+    }
+
+    #pg-result .result-kicker {
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    #pg-result .result-title {
+      color: var(--color-text-primary);
+      font-size: 20px;
+      font-weight: 750;
+      line-height: 1.3;
+      margin-bottom: 6px;
+    }
+
+    #pg-result .result-meta {
+      color: var(--color-text-secondary);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    #pg-result .score-panel {
+      border-radius: var(--rm);
+      background: #fff;
+      border: 1px solid rgba(26, 107, 58, .15);
+      display: grid;
+      place-items: center;
+      min-height: 150px;
+      text-align: center;
+      padding: 16px;
+    }
+
+    #pg-result .score-value {
+      font-size: 38px;
+      line-height: 1;
+      font-weight: 800;
+      color: var(--color-text-primary);
+    }
+
+    #pg-result .score-label {
+      margin-top: 7px;
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    #pg-result .result-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-top: 10px;
+    }
+
+    #pg-result .result-pass {
+      background: var(--green-light);
+      color: var(--green);
+    }
+
+    #pg-result .result-fail {
+      background: var(--coral-light);
+      color: var(--coral);
+    }
+
+    #pg-result .result-pending {
+      background: var(--amber-light);
+      color: var(--amber);
+    }
+
+    #pg-result .result-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    #pg-result .result-field {
+      background: var(--color-background-secondary);
+      border-radius: var(--rm);
+      padding: 11px 12px;
+      min-width: 0;
+    }
+
+    #pg-result .result-field-label {
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    #pg-result .result-field-value {
+      color: var(--color-text-primary);
+      font-size: 13px;
+      font-weight: 650;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    #pg-result .result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 640px;
+    }
+
+    #pg-result .result-table th,
+    #pg-result .result-table td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--color-border-tertiary);
+      vertical-align: middle;
+    }
+
+    #pg-result .result-table th {
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    #pg-result .history-scroll {
+      overflow-x: auto;
+    }
+
+    #pg-result .empty-state {
+      text-align: center;
+      padding: 54px 20px;
+      color: var(--color-text-secondary);
+    }
+
+    #pg-result .empty-state .material-symbols-outlined {
+      font-size: 42px;
+      color: var(--amber);
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 860px) {
+
+      #pg-result .result-hero,
+      #pg-result .result-grid,
+      #pg-result .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  {% if error %}
+  <div class="card">
+    <div class="empty-state">
+      <span class="material-symbols-outlined">error</span>
+      <div style="font-weight:700;color:var(--color-text-primary);margin-bottom:4px">Result unavailable</div>
+      <div>{{ error }}</div>
+    </div>
+  </div>
+  {% elif not result %}
+  <div class="card">
+    <div class="empty-state">
+      <span class="material-symbols-outlined">pending_actions</span>
+      <div style="font-weight:700;color:var(--color-text-primary);margin-bottom:4px">No result has been published yet
+      </div>
+      <div>Your final course result will appear here after the coordinator publishes it.</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="result-hero">
+    <div>
+      <div class="result-kicker">{{ result.course_code or '—' }}</div>
+      <div class="result-title">{{ result.project_title or 'Course Final Result' }}</div>
+      <div class="result-meta">
+        {{ result.student_name }} · {{ result.university_id }}<br>
+        Academic Year {{ result.academic_year or '—' }} · Semester {{ result.semester_number or '—' }}
+      </div>
+      <div class="result-status {{ status_class }}">
+        <span class="material-symbols-outlined" style="font-size:17px">
+          {% if status == 'passed' %}check_circle{% elif status == 'failed' %}cancel{% else %}schedule{% endif %}
+        </span>
+        {{ status_label }}
+      </div>
+    </div>
+
+    <div class="score-panel">
+      <div>
+        <div class="score-value">
+          {% if result.final_score is not none %}{{ '%.2f'|format(result.final_score) }}{% else %}—{% endif %}
+        </div>
+        <div class="score-label">Final Grade</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Result Details</span></div>
+      <div class="result-grid">
+        <div class="result-field">
+          <div class="result-field-label">Course</div>
+          <div class="result-field-value">{{ result.course_code or '—' }}</div>
+        </div>
+        <div class="result-field">
+          <div class="result-field-label">Semester</div>
+          <div class="result-field-value">{{ result.academic_year or '—' }} · {{ result.semester_number or '—' }}</div>
+        </div>
+        <div class="result-field">
+          <div class="result-field-label">Course Status</div>
+          <div class="result-field-value">{{ status_label }}</div>
+        </div>
+        <div class="result-field">
+          <div class="result-field-label">Exact Grade</div>
+          <div class="result-field-value">
+            {% if result.final_score is not none %}{{ '%.2f'|format(result.final_score) }} / 100{% else %}Not
+            published{% endif %}
+          </div>
+        </div>
+        <div class="result-field">
+          <div class="result-field-label">Supervisor</div>
+          <div class="result-field-value">{{ result.supervisor_name or '—' }}</div>
+        </div>
+        <div class="result-field">
+          <div class="result-field-label">Updated</div>
+          <div class="result-field-value">{{ result.result_updated_at or result.decided_at or '—' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><span class="card-title">Coordinator Notes</span></div>
+      <div class="result-field" style="min-height:126px">
+        <div class="result-field-value" style="font-weight:500;line-height:1.65">
+          {{ result.notes or 'No notes were added for this result.' }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><span class="card-title">Result History</span></div>
+    <div class="history-scroll">
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>Course</th>
+            <th>Semester</th>
+            <th>Project</th>
+            <th>Status</th>
+            <th>Grade</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in history %}
+          <tr>
+            <td>{{ item.course_code or '—' }}</td>
+            <td>{{ item.academic_year or '—' }} · {{ item.semester_number or '—' }}</td>
+            <td>{{ item.project_title or '—' }}</td>
+            <td>{{ {'passed': 'Passed', 'failed': 'Failed', 'pending': 'Pending'}.get(item.course_status, 'Pending') }}
+            </td>
+            <td>{% if item.final_score is not none %}{{ '%.2f'|format(item.final_score) }}{% else %}—{% endif %}</td>
+            <td>{{ item.result_updated_at or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

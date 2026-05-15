@@ -39,10 +39,16 @@
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">reviews</span></span>
       <span class="sb-label">Feedback</span>
     </a>
+   
     <a id="challengesNav" class="sb-item {% if request.path == '/student/challenges' %}on{% endif %}" data-page="challenges"
       href="/student/challenges" style="display:none">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">flag</span></span>
       <span class="sb-label">Challenges &amp; Reflections</span>
+    </a>
+     <a class="sb-item {% if request.path == '/student/result' %}on{% endif %}" data-page="result"
+      href="/student/result">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">workspace_premium</span></span>
+      <span class="sb-label">Course Result</span>
     </a>
     <a class="sb-item {% if request.path == '/student/search' %}on{% endif %}" data-page="search"
       href="/student/search">

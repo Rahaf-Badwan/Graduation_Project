@@ -1037,6 +1037,187 @@ def feedback():
     return render_template("student/feedback.html")
 
 
+@student_bp.route("/result")
+@login_required(role="student")
+def result():
+    user_id = session["user_id"]
+    result_data = None
+    history = []
+    error = None
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT st.student_id, u.full_name, u.university_id
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE st.user_id = %s
+            """,
+            (user_id,),
+        )
+        student = cursor.fetchone()
+        if not student:
+            cursor.close()
+            db.close()
+            return render_template(
+                "student/result.html",
+                result=None,
+                history=[],
+                error="Student record was not found.",
+            )
+
+        cursor.execute(
+            """
+            SELECT
+                scr.result_id,
+                scr.status AS course_status,
+                scr.notes,
+                scr.updated_at AS result_updated_at,
+                s.semester_id,
+                s.academic_year,
+                s.semester_number,
+                s.course_code,
+                s.end_date,
+                (
+                    SELECT p2.project_id
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS project_id,
+                (
+                    SELECT p2.title
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS project_title,
+                (
+                    SELECT p2.status
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS project_status,
+                (
+                    SELECT COALESCE(fd2.final_score, p2.final_score)
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS final_score,
+                (
+                    SELECT fd2.decision
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS final_decision,
+                (
+                    SELECT fd2.decided_at
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS decided_at,
+                (
+                    SELECT sup_u2.full_name
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN faculty sup_f2 ON sup_f2.faculty_id = p2.supervisor_id
+                    LEFT JOIN users sup_u2 ON sup_u2.user_id = sup_f2.user_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS supervisor_name
+            FROM student_course_results scr
+            JOIN semesters s ON s.semester_id = scr.semester_id
+            WHERE scr.student_id = %s
+            ORDER BY s.semester_id DESC
+            LIMIT 1
+            """,
+            (student["student_id"],),
+        )
+        result_data = cursor.fetchone()
+
+        if result_data:
+            result_data["student_name"] = student["full_name"]
+            result_data["university_id"] = student["university_id"]
+            if result_data.get("final_score") is not None:
+                result_data["final_score"] = float(result_data["final_score"])
+
+            cursor.execute(
+                """
+                SELECT
+                    scr.result_id,
+                    scr.status AS course_status,
+                    scr.updated_at AS result_updated_at,
+                    s.academic_year,
+                    s.semester_number,
+                    s.course_code,
+                    (
+                        SELECT p2.title
+                        FROM project_members pm2
+                        JOIN projects p2 ON p2.project_id = pm2.project_id
+                        WHERE pm2.student_id = scr.student_id
+                          AND p2.semester_id = scr.semester_id
+                        ORDER BY p2.project_id DESC
+                        LIMIT 1
+                    ) AS project_title,
+                    (
+                        SELECT COALESCE(fd2.final_score, p2.final_score)
+                        FROM project_members pm2
+                        JOIN projects p2 ON p2.project_id = pm2.project_id
+                        LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                        WHERE pm2.student_id = scr.student_id
+                          AND p2.semester_id = scr.semester_id
+                        ORDER BY p2.project_id DESC
+                        LIMIT 1
+                    ) AS final_score
+                FROM student_course_results scr
+                JOIN semesters s ON s.semester_id = scr.semester_id
+                WHERE scr.student_id = %s
+                ORDER BY s.semester_id DESC
+                """,
+                (student["student_id"],),
+            )
+            history = cursor.fetchall()
+            for item in history:
+                if item.get("final_score") is not None:
+                    item["final_score"] = float(item["final_score"])
+
+        cursor.close()
+        db.close()
+    except Exception as e:
+        error = str(e)
+
+    return render_template(
+        "student/result.html",
+        result=result_data,
+        history=history,
+        error=error,
+    )
+
+
 # ─── Challenges page ────────────────────────────────────────
 @student_bp.route("/challenges")
 @login_required(role="student")

@@ -51,7 +51,10 @@
   <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
   <style>
-    .tb-notif { position: relative; }
+    .tb-notif {
+      position: relative;
+    }
+
     .tb-notif-badge {
       position: absolute;
       top: -5px;
@@ -73,10 +76,10 @@
   <script>
     (function () {
       function updateNotifBadge() {
-        fetch('/student/api/dashboard-data')
+        fetch('/student/api/notifications/unread-count')
           .then(r => r.json())
           .then(d => {
-            var count = d.unread_notifs || 0;
+            var count = d.unread || 0;
             var badge = document.getElementById('notif-badge');
             if (!badge) return;
             if (count > 0) {
@@ -86,7 +89,7 @@
               badge.style.display = 'none';
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
       updateNotifBadge();
       setInterval(updateNotifBadge, 60000);
