@@ -5,6 +5,220 @@
 {% block topbar_title %}Student Dashboard{% endblock %}
 
 {% block content %}
+<style>
+  #pg-dashboard .student-focus-card {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #pg-dashboard .student-focus-card .card-hd {
+    padding: 16px 18px 0;
+  }
+
+  #pg-dashboard .work-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 180px;
+    gap: 18px;
+    padding: 18px;
+    background: linear-gradient(135deg, rgba(26, 107, 58, .08), rgba(24, 95, 165, .07));
+    border-bottom: 1px solid var(--color-border-tertiary);
+  }
+
+  #pg-dashboard .work-kicker {
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    margin-bottom: 6px;
+  }
+
+  #pg-dashboard .work-title {
+    font-size: 19px;
+    line-height: 1.25;
+    color: var(--color-text-primary);
+    margin-bottom: 6px;
+  }
+
+  #pg-dashboard .work-copy {
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 560px;
+  }
+
+  #pg-dashboard .work-actions,
+  #pg-dashboard .work-metrics {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  #pg-dashboard .work-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+
+  #pg-dashboard .work-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: var(--rm);
+    background: rgba(255, 255, 255, .72);
+    color: var(--color-text-primary);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  #pg-dashboard .work-chart {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    justify-self: end;
+    align-self: center;
+  }
+
+  #pg-dashboard .work-chart-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    text-align: center;
+  }
+
+  #pg-dashboard .work-chart-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--color-text-primary);
+    line-height: 1;
+  }
+
+  #pg-dashboard .work-chart-label {
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+  }
+
+  #pg-dashboard .work-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr);
+    gap: 14px;
+    padding: 16px 18px 18px;
+  }
+
+  #pg-dashboard .action-list,
+  #pg-dashboard .snapshot-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #pg-dashboard .action-item {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: var(--rm);
+    background: var(--color-background-primary);
+  }
+
+  #pg-dashboard .action-item.done {
+    background: var(--green-light);
+    border-color: rgba(26, 107, 58, .18);
+  }
+
+  #pg-dashboard .action-item.waiting {
+    background: var(--amber-light);
+    border-color: rgba(186, 117, 23, .22);
+  }
+
+  #pg-dashboard .action-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--rm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-background-secondary);
+    color: var(--color-text-secondary);
+  }
+
+  #pg-dashboard .action-item.done .action-icon {
+    background: var(--green);
+    color: #fff;
+  }
+
+  #pg-dashboard .action-item.waiting .action-icon {
+    background: var(--amber);
+    color: #fff;
+  }
+
+  #pg-dashboard .action-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  #pg-dashboard .action-meta {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--color-text-secondary);
+  }
+
+  #pg-dashboard .action-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    background: var(--color-background-secondary);
+    border-radius: 999px;
+    padding: 4px 8px;
+    white-space: nowrap;
+  }
+
+  #pg-dashboard .snapshot-item {
+    background: var(--color-background-secondary);
+    border-radius: var(--rm);
+    padding: 10px 12px;
+    min-width: 0;
+  }
+
+  #pg-dashboard .snapshot-label {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-bottom: 3px;
+  }
+
+  #pg-dashboard .snapshot-value {
+    font-size: 13px;
+    color: var(--color-text-primary);
+    font-weight: 650;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 980px) {
+    #pg-dashboard .stats-row,
+    #pg-dashboard .two-col,
+    #pg-dashboard .work-body,
+    #pg-dashboard .work-hero {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-dashboard .work-chart {
+      justify-self: start;
+    }
+  }
+</style>
 <div class="page on" id="pg-dashboard">
 
   <div class="stats-row">
@@ -23,64 +237,76 @@
       <div class="stat-label">Team Members</div>
     </div>
     <div class="stat">
-      <div class="stat-num" id="stat-overall" style="color:var(--coral)">—</div>
-      <div class="stat-label">Required Report Completion</div>
+      <div class="stat-num" id="stat-overall" style="color:var(--blue);font-size:16px;line-height:1.15">—</div>
+      <div class="stat-label">Current Focus</div>
     </div>
   </div>
 
   <div class="two-col">
     <div>
-      <div class="card">
+      <div class="card student-focus-card">
         <div class="card-hd">
-          <span class="card-title">Project Information</span>
+          <span class="card-title">Student Work Hub</span>
           <span class="pill p-review" id="pill-status" style="display:none"></span>
         </div>
 
-        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
-          <div style="position:relative;width:140px;height:140px;flex-shrink:0">
-            <canvas id="overallChart" width="140" height="140"></canvas>
-            <div
-              style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
-              <div id="overall-center"
-                style="font-size:22px;font-weight:700;color:var(--color-text-primary);line-height:1">—</div>
-              <div style="font-size:10px;color:var(--color-text-secondary);margin-top:2px">Complete</div>
+        <div class="work-hero">
+          <div>
+            <div class="work-kicker">Next best action</div>
+            <h3 class="work-title" id="next-action-title">Loading...</h3>
+            <p class="work-copy" id="next-action-copy">Checking your project progress and deadlines.</p>
+            <div class="work-metrics">
+              <span class="work-chip">
+                <span class="material-symbols-outlined" style="font-size:16px">description</span>
+                <span id="report-chip">Milestones: checking</span>
+              </span>
+            </div>
+            <div class="work-actions">
+              <a class="btn btn-primary" id="next-action-primary" href="/student/submit">Upload Files</a>
+              <a class="btn btn-outline" id="next-action-secondary" href="/student/timeline">View Timeline</a>
             </div>
           </div>
 
-          <div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px">
-            <div>
-              <div id="project-title"
-                style="font-size:16px;font-weight:700;color:var(--color-text-primary);margin-bottom:4px">Loading...
-              </div>
-              <div id="project-meta" style="font-size:12px;color:var(--color-text-secondary);line-height:1.6"></div>
-            </div>
-
-            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
-              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
-                <div style="font-size:11px;color:var(--color-text-secondary)">Student</div>
-                <div id="student-name"
-                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
-              </div>
-              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
-                <div style="font-size:11px;color:var(--color-text-secondary)">Supervisor</div>
-                <div id="supervisor-name"
-                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
-              </div>
-              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
-                <div style="font-size:11px;color:var(--color-text-secondary)">Project Type</div>
-                <div id="project-type"
-                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
-              </div>
-              <div style="background:var(--color-bg-secondary);border-radius:var(--rm);padding:10px">
-                <div style="font-size:11px;color:var(--color-text-secondary)">Registration Date</div>
-                <div id="registration-date"
-                  style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-top:2px">—</div>
+          <div class="work-chart">
+            <canvas id="overallChart" width="150" height="150"></canvas>
+            <div class="work-chart-center">
+              <div>
+                <div class="work-chart-value" id="overall-center">—</div>
+                <div class="work-chart-label">Semester readiness</div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div class="btn-row" style="margin-top:4px">
-              <button class="btn btn-primary" onclick="window.location.href='/student/status'">View Status</button>
-              <button class="btn btn-outline" onclick="window.location.href='/student/submit'">Upload Files</button>
+        <div class="work-body">
+          <div class="action-list" id="student-action-list">
+            <div class="action-item">
+              <div class="action-icon"><span class="material-symbols-outlined" style="font-size:18px">hourglass_empty</span></div>
+              <div>
+                <div class="action-title">Loading checklist</div>
+                <div class="action-meta">Preparing your current tasks.</div>
+              </div>
+              <span class="action-tag">...</span>
+            </div>
+          </div>
+
+          <div class="snapshot-grid">
+            <div class="snapshot-item">
+              <div class="snapshot-label">Project</div>
+              <div class="snapshot-value" id="project-title">Loading...</div>
+              <div id="project-meta" style="font-size:11px;color:var(--color-text-secondary);line-height:1.45;margin-top:4px"></div>
+            </div>
+            <div class="snapshot-item">
+              <div class="snapshot-label">Supervisor</div>
+              <div class="snapshot-value" id="supervisor-name">—</div>
+            </div>
+            <div class="snapshot-item">
+              <div class="snapshot-label">Milestones Submitted</div>
+              <div class="snapshot-value" id="project-type">—</div>
+            </div>
+            <div class="snapshot-item">
+              <div class="snapshot-label">Registered On</div>
+              <div class="snapshot-value" id="registration-date">—</div>
             </div>
           </div>
         </div>
@@ -116,25 +342,12 @@
       </div>
 
       <div class="card">
-        <div class="card-hd"><span class="card-title">Summary</span></div>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <div
-            style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
-            <span style="font-size:12px;color:var(--color-text-secondary)">Academic Year</span>
-            <span id="academic-year"
-              style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
-          </div>
-          <div
-            style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-tertiary)">
-            <span style="font-size:12px;color:var(--color-text-secondary)">Project Status</span>
-            <span id="project-status"
-              style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;gap:12px">
-            <span style="font-size:12px;color:var(--color-text-secondary)">My Role</span>
-            <span id="student-role"
-              style="font-size:12px;font-weight:600;color:var(--color-text-primary);text-align:right">—</span>
-          </div>
+        <div class="card-hd">
+          <span class="card-title">Recent Notifications</span>
+          <a href="/student/notifs" style="font-size:11px;color:var(--blue);font-weight:600;text-decoration:none">View all</a>
+        </div>
+        <div id="notifications-list">
+          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...</div>
         </div>
       </div>
     </div>
@@ -163,13 +376,44 @@
     return (value || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 
-  function fmtProjectType(value) {
-    if (!value) return '—';
-    return value.split(',').map(v => fmtStatus(v.trim())).join(', ');
-  }
-
   function safeText(value, fallback = '—') {
     return value === null || value === undefined || value === '' ? fallback : value;
+  }
+
+  function escapeHtml(value) {
+    return String(safeText(value, '')).replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[ch]));
+  }
+
+  function setActionLink(id, href, label) {
+    const el = document.getElementById(id);
+    el.href = href;
+    el.textContent = label;
+  }
+
+  function fileUploaded(files, key) {
+    return Boolean(files?.[key]?.uploaded);
+  }
+
+  function renderChecklist(items) {
+    const list = document.getElementById('student-action-list');
+    list.innerHTML = items.map(item => `
+      <div class="action-item ${item.done ? 'done' : item.waiting ? 'waiting' : ''}">
+        <div class="action-icon">
+          <span class="material-symbols-outlined" style="font-size:18px">${item.icon}</span>
+        </div>
+        <div>
+          <div class="action-title">${escapeHtml(item.title)}</div>
+          <div class="action-meta">${escapeHtml(item.meta)}</div>
+        </div>
+        <span class="action-tag">${escapeHtml(item.tag)}</span>
+      </div>
+    `).join('');
   }
 
   const MEMBER_COLORS = [
@@ -179,11 +423,52 @@
     { bg: 'var(--amber-light)', tx: 'var(--amber)' },
   ];
 
+  const NOTIF_CONFIG = {
+    file_uploaded : { icon: 'upload_file',    color: 'var(--blue)',  label: 'File'     },
+    system        : { icon: 'info',           color: 'var(--amber)', label: 'System'   },
+    milestone     : { icon: 'flag',           color: 'var(--green)', label: 'Milestone'},
+  };
+
+  function renderNotifications(notifs) {
+    const list = document.getElementById('notifications-list');
+    if (!notifs.length) {
+      list.innerHTML = '<div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">No notifications yet</div>';
+      return;
+    }
+    list.innerHTML = notifs.map(n => {
+      const cfg = NOTIF_CONFIG[n.notification_type] || { icon: 'notifications', color: 'var(--green)', label: 'Notice' };
+      const unreadDot = !n.is_read
+        ? `<span style="width:7px;height:7px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-left:4px"></span>`
+        : '';
+      return `<div
+        style="display:flex;align-items:center;gap:12px;padding:10px 12px;
+               background:var(--color-background-secondary);border-radius:10px;
+               border-left:3px solid var(--green);margin-bottom:8px;
+               transition:background .18s,box-shadow .18s,transform .12s;cursor:default;"
+        onmouseenter="this.style.background='rgba(26,107,58,.07)';this.style.boxShadow='0 2px 12px rgba(0,0,0,.08)';this.style.transform='translateY(-1px)'"
+        onmouseleave="this.style.background='var(--color-background-secondary)';this.style.boxShadow='none';this.style.transform='translateY(0)'">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(26,107,58,.1);
+                    display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span class="material-symbols-outlined" style="font-size:17px;color:var(--green)">notifications</span>
+        </div>
+        <div style="width:1px;height:30px;background:var(--color-border-tertiary);flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--color-text-primary);
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(n.title)}</div>
+          <div style="font-size:10px;color:var(--color-text-secondary);margin-top:2px;font-weight:500;display:flex;align-items:center;gap:3px">
+            <span class="material-symbols-outlined" style="font-size:11px">person</span>${escapeHtml(n.sender_name)}
+          </div>
+        </div>
+        ${unreadDot}
+      </div>`;
+    }).join('');
+  }
+
   function initCharts() {
     overallChart = new Chart(document.getElementById('overallChart'), {
       type: 'doughnut',
       data: {
-        labels: ['Completed', 'Remaining'],
+        labels: ['Ready signals', 'Open work'],
         datasets: [{ data: [0, 100], backgroundColor: [green, border], borderWidth: 0, hoverOffset: 4 }]
       },
       options: {
@@ -222,14 +507,27 @@
   function updateUI(d) {
     const project = d.project || {};
     const members = d.team_members || [];
+    const files = d.file_status || {};
     const overall = d.progress?.overall ?? 0;
-    const typeLabel = fmtProjectType(project.project_type);
     const statusLabel = fmtStatus(project.status) || '—';
+    const hasProject = Boolean(project.project_id);
+    const milestone = d.milestone_progress || {};
+    const milestoneTotal = Number(milestone.total || 0);
+    const milestoneSubmitted = Number(milestone.submitted || 0);
+    const milestoneLabel = milestoneTotal ? `${milestoneSubmitted} / ${milestoneTotal}` : 'No milestones';
+    const remainingMilestones = milestoneTotal ? Math.max(0, milestoneTotal - milestoneSubmitted) : 0;
+    const finalUploaded = fileUploaded(files, 'final_report') || overall >= 100;
+    const sourceUploaded = fileUploaded(files, 'source_code');
+    const deadlines = d.deadlines || [];
+    const readiness = Number(milestone.overall ?? overall ?? 0);
 
     document.getElementById('stat-student').textContent = safeText(d.student_name);
     document.getElementById('stat-supervisor').textContent = safeText(d.supervisor_name);
     document.getElementById('stat-team').textContent = members.length || '—';
-    document.getElementById('stat-overall').textContent = overall + '%';
+
+    const focusStat = document.getElementById('stat-overall');
+    focusStat.textContent = finalUploaded ? 'Complete' : milestoneTotal ? `${readiness}%` : 'Timeline';
+    focusStat.style.color = finalUploaded ? 'var(--green)' : milestoneTotal ? 'var(--blue)' : 'var(--amber)';
 
     const pill = document.getElementById('pill-status');
     if (project.status) {
@@ -241,18 +539,78 @@
 
     document.getElementById('project-title').textContent = project.project_id ? (project.title || 'Registered Project') : 'No registered project yet';
     document.getElementById('project-meta').textContent = project.project_id
-      ? (project.project_type ? `Type: ${typeLabel} - Academic Year: ${safeText(d.academic_year)}` : `Academic Year: ${safeText(d.academic_year)}`)
+      ? `Academic Year: ${safeText(d.academic_year)}`
       : 'Register your project to see its details here.';
-    document.getElementById('student-name').textContent = safeText(d.student_name);
     document.getElementById('supervisor-name').textContent = safeText(d.supervisor_name);
-    document.getElementById('project-type').textContent = typeLabel;
+    document.getElementById('project-type').textContent = milestoneLabel;
     document.getElementById('registration-date').textContent = safeText(d.registration_date);
-    document.getElementById('academic-year').textContent = safeText(d.academic_year);
-    document.getElementById('project-status').textContent = statusLabel;
-    document.getElementById('student-role').textContent = project.project_id ? (project.is_primary_contact ? 'Primary Contact' : 'Team Member') : '—';
-    document.getElementById('overall-center').textContent = overall + '%';
 
-    overallChart.data.datasets[0].data = [overall, Math.max(0, 100 - overall)];
+    document.getElementById('overall-center').textContent = readiness + '%';
+    document.getElementById('report-chip').textContent = finalUploaded
+      ? 'Milestones: final report submitted'
+      : milestoneTotal
+        ? `Milestones: ${milestoneSubmitted} of ${milestoneTotal} submitted`
+        : 'Milestones: timeline not published yet';
+
+    if (!hasProject) {
+      document.getElementById('next-action-title').textContent = 'Register your project group';
+      document.getElementById('next-action-copy').textContent = 'Start by registering your group and supervisor preference so your dashboard can track the real work.';
+      setActionLink('next-action-primary', '/student/registration', 'Register Project');
+      setActionLink('next-action-secondary', '/student/timeline', 'View Timeline');
+    } else if (finalUploaded) {
+      document.getElementById('next-action-title').textContent = 'Final submission complete';
+      document.getElementById('next-action-copy').textContent = 'The final report is submitted, so semester progress is complete. Keep your files organized for archive and review.';
+      setActionLink('next-action-primary', '/student/timeline', 'View Timeline');
+      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+    } else if (milestoneTotal) {
+      document.getElementById('next-action-title').textContent = 'Continue milestone submissions';
+      document.getElementById('next-action-copy').textContent = `You submitted ${milestoneSubmitted} of ${milestoneTotal} timeline milestones. Each submitted milestone increases this progress until the final report closes it at 100%.`;
+      setActionLink('next-action-primary', '/student/timeline', 'Open Timeline');
+      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+    } else {
+      document.getElementById('next-action-title').textContent = 'Timeline will guide the semester';
+      document.getElementById('next-action-copy').textContent = 'Once the coordinator publishes milestones, this progress will grow with each submission instead of waiting for the final report.';
+      setActionLink('next-action-primary', '/student/timeline', 'View Timeline');
+      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+    }
+
+    renderChecklist([
+      {
+        title: 'Project group registered',
+        meta: hasProject ? `Role: ${project.is_primary_contact ? 'Primary Contact' : 'Team Member'}` : 'Registration is needed before submissions can be tracked.',
+        tag: hasProject ? 'Done' : 'Needed',
+        icon: hasProject ? 'check' : 'group_add',
+        done: hasProject,
+        waiting: !hasProject
+      },
+      {
+        title: 'Timeline submissions',
+        meta: milestoneTotal ? `${milestoneSubmitted} submitted from ${milestoneTotal} published milestones.` : 'Waiting for the coordinator to publish timeline milestones.',
+        tag: milestoneTotal ? `${readiness}%` : 'Waiting',
+        icon: milestoneTotal && milestoneSubmitted >= milestoneTotal ? 'task_alt' : 'flag',
+        done: milestoneTotal > 0 && milestoneSubmitted >= milestoneTotal,
+        waiting: milestoneTotal > 0 && milestoneSubmitted < milestoneTotal
+      },
+      {
+        title: 'Final report package',
+        meta: finalUploaded ? safeText(files.final_report?.uploaded_at, 'Uploaded') : 'End-of-semester item. Prepare material gradually, submit when the window opens.',
+        tag: finalUploaded ? 'Submitted' : 'Later',
+        icon: finalUploaded ? 'check' : 'calendar_month',
+        done: finalUploaded,
+        waiting: false
+      },
+      {
+        title: 'Source code package',
+        meta: sourceUploaded ? safeText(files.source_code?.file_name, 'Uploaded') : 'Keep it organized as the project grows; upload when your team has a stable package.',
+        tag: sourceUploaded ? 'Uploaded' : 'Recommended',
+        icon: sourceUploaded ? 'check' : 'code',
+        done: sourceUploaded
+      }
+    ]);
+
+    renderNotifications((d.notifications || []).slice(0, 3));
+
+    overallChart.data.datasets[0].data = [readiness, Math.max(0, 100 - readiness)];
     overallChart.update();
 
     const typeDistribution = d.project_type_distribution || [];
@@ -275,10 +633,10 @@
         members.map((m, i) => {
           const col = MEMBER_COLORS[i % MEMBER_COLORS.length];
           return `<div style="display:flex;align-items:center;gap:10px">
-            <div class="fb-avatar" style="background:${col.bg};color:${col.tx};width:32px;height:32px;font-size:11px">${safeText(m.initials, '??')}</div>
+            <div class="fb-avatar" style="background:${col.bg};color:${col.tx};width:32px;height:32px;font-size:11px">${escapeHtml(safeText(m.initials, '??'))}</div>
             <div>
-              <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${safeText(m.full_name)}</div>
-              <div style="font-size:11px;color:var(--color-text-secondary)">${safeText(m.university_id)}${m.is_me ? ' · You' : ''}</div>
+              <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${escapeHtml(safeText(m.full_name))}</div>
+              <div style="font-size:11px;color:var(--color-text-secondary)">${escapeHtml(safeText(m.university_id))}${m.is_me ? ' · You' : ''}</div>
             </div>
           </div>`;
         }).join('') + `</div>`;
@@ -287,7 +645,6 @@
     }
 
     const deadlinesList = document.getElementById('deadlines-list');
-    const deadlines = d.deadlines || [];
     if (deadlines.length) {
       deadlinesList.innerHTML = deadlines.map(dl => {
         const isTimeline = dl.deadline_type === 'timeline';
@@ -311,20 +668,20 @@
         const cardId = 'dl-card-' + Math.random().toString(36).slice(2);
         return `<div id="${cardId}"
           style="display:flex;align-items:center;gap:12px;padding:10px 12px;
-                 background:var(--color-bg-secondary);border-radius:10px;
+                 background:var(--color-background-secondary);border-radius:10px;
                  border-left:3px solid ${color};margin-bottom:8px;
                  transition:background .18s,box-shadow .18s,transform .12s;
                  cursor:default;"
           onmouseenter="this.style.background='${isTimeline ? 'rgba(26,107,58,.07)' : 'rgba(186,117,23,.07)'}';this.style.boxShadow='0 2px 12px rgba(0,0,0,.08)';this.style.transform='translateY(-1px)'"
-          onmouseleave="this.style.background='var(--color-bg-secondary)';this.style.boxShadow='none';this.style.transform='translateY(0)'">
+          onmouseleave="this.style.background='var(--color-background-secondary)';this.style.boxShadow='none';this.style.transform='translateY(0)'">
           <div style="display:flex;flex-direction:column;align-items:center;min-width:36px;flex-shrink:0">
-            <span style="font-size:16px;font-weight:800;color:${color};line-height:1">${dayNum}</span>
-            <span style="font-size:9px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:1px">${dayMon}</span>
+            <span style="font-size:16px;font-weight:800;color:${color};line-height:1">${escapeHtml(dayNum)}</span>
+            <span style="font-size:9px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:1px">${escapeHtml(dayMon)}</span>
           </div>
           <div style="width:1px;height:30px;background:var(--color-border-tertiary);flex-shrink:0"></div>
           <div style="flex:1;min-width:0">
             <div style="font-size:12px;font-weight:600;color:var(--color-text-primary);
-                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${safeText(dl.label)}</div>
+                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(safeText(dl.label))}</div>
             ${subLabel}
           </div>
           ${actionBtn}
