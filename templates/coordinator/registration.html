@@ -10,7 +10,7 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 16px
+    margin-bottom: 16px;
   }
 
   .reg-main-tab {
@@ -20,50 +20,93 @@
     padding: 10px 14px;
     border-radius: 999px;
     font-weight: 900;
-    cursor: pointer
+    cursor: pointer;
   }
 
   .reg-main-tab.on {
     background: #2e7d42;
     color: #fff;
-    border-color: #2e7d42
+    border-color: #2e7d42;
   }
 
   .reg-tab-pane {
-    display: none
+    display: none;
   }
 
   .reg-tab-pane.active {
-    display: block
+    display: block;
   }
 
   .reg-split {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
-    align-items: start
+    align-items: start;
+  }
+
+  .reg-message {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .reg-message.ok {
+    display: block;
+    color: #027a48;
+    background: #ecfdf3;
+    border: 1px solid #abefc6;
+  }
+
+  .reg-message.error {
+    display: block;
+    color: #b42318;
+    background: #fef3f2;
+    border: 1px solid #fecdca;
+  }
+
+  .reg-message.loading {
+    display: block;
+    color: #344054;
+    background: #f9fafb;
+    border: 1px solid #eaecf0;
   }
 
   @media(max-width:980px) {
     .reg-split {
-      grid-template-columns: 1fr
+      grid-template-columns: 1fr;
     }
   }
 </style>
 
 <div class="page page-single on" id="pg-registration">
   <div class="reg-main-tabs">
-    <button class="reg-main-tab on" type="button" data-reg-tab="submissions">Student submissions schedule</button>
-    <button class="reg-main-tab" type="button" data-reg-tab="unassigned">Unassigned Students & Create Section</button>
-    <button class="reg-main-tab" type="button" data-reg-tab="window">Distribution Window Control</button>
+    <button class="reg-main-tab on" type="button" data-reg-tab="submissions">
+      Student submissions schedule
+    </button>
+
+    <button class="reg-main-tab" type="button" data-reg-tab="unassigned">
+      Unassigned Students & Create Section
+    </button>
+
+    <button class="reg-main-tab" type="button" data-reg-tab="window">
+      Distribution Window Control
+    </button>
   </div>
 
   <section class="reg-tab-pane active" id="reg-tab-submissions">
     <div class="card">
       <div class="card-hd">
         <span class="card-title">Student submissions schedule</span>
-        <button class="card-action" type="button"
-          onclick="window.location.href='/api/coordinator/export-groups'">Download Excel ↓</button>
+
+        <button
+          class="card-action"
+          type="button"
+          onclick="window.location.href='/api/coordinator/export-groups'">
+          Download Excel ↓
+        </button>
       </div>
 
       <div class="u-cebcb327">
@@ -84,6 +127,7 @@
               <th>Status</th>
             </tr>
           </thead>
+
           <tbody id="distributionFormsBody">
             <tr>
               <td colspan="7">Loading...</td>
@@ -97,7 +141,10 @@
   <section class="reg-tab-pane" id="reg-tab-unassigned">
     <div class="reg-split">
       <div class="card">
-        <div class="card-hd"><span class="card-title">Unassigned Students</span></div>
+        <div class="card-hd">
+          <span class="card-title">Unassigned Students</span>
+        </div>
+
         <div class="u-e284fbe5">
           Students who do not have a group yet are shown here as checkboxes. Select up to 3 students, choose a
           supervisor, then create a section for them.
@@ -113,9 +160,14 @@
       </div>
 
       <div class="card">
-        <div class="card-hd"><span class="card-title">Create Section for Unassigned Students</span></div>
-        <div class="u-cebcb327">Choose a section name, choose a supervisor, and create a section using the checked
-          students from the left panel.</div>
+        <div class="card-hd">
+          <span class="card-title">Create Section for Unassigned Students</span>
+        </div>
+
+        <div class="u-cebcb327">
+          Choose a unique section name, choose a supervisor, and create a section using the checked
+          students from the left panel.
+        </div>
 
         <div class="form-grid" style="margin-bottom:12px">
           <div class="field-wrap">
@@ -132,13 +184,22 @@
         </div>
 
         <div class="btn-row u-92d17336">
-          <button class="btn btn-primary u-9bd93d36" type="button" onclick="addSectionEntry()">+ Create Section From
-            Selected Students</button>
-          <button class="btn btn-outline u-9bd93d36" type="button"
-            onclick="window.location.href='/api/coordinator/export-sections'">Export Excel</button>
+          <button
+            class="btn btn-primary u-9bd93d36"
+            type="button"
+            onclick="createSectionNoDuplicate()">
+            + Create Section From Selected Students
+          </button>
+
+          <button
+            class="btn btn-outline u-9bd93d36"
+            type="button"
+            onclick="window.location.href='/api/coordinator/export-sections'">
+            Export Excel
+          </button>
         </div>
 
-        <div id="sectionMsg" style="margin-top:12px;font-size:12px"></div>
+        <div id="sectionMsg" class="reg-message"></div>
 
         <div class="u-e47f6ecd" id="sectionsList" style="margin-top:12px">
           <div>Loading...</div>
@@ -180,6 +241,128 @@
 </div>
 
 <script>
+  function normalizeSectionName(value) {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  }
+
+  function setSectionMessage(message, type) {
+    const msg = document.getElementById('sectionMsg');
+    if (!msg) return;
+
+    msg.textContent = message || '';
+    msg.className = 'reg-message';
+
+    if (type) {
+      msg.classList.add(type);
+    }
+  }
+
+  function getExistingSectionNames() {
+    const names = new Set();
+    const sectionsList = document.getElementById('sectionsList');
+
+    if (!sectionsList) {
+      return names;
+    }
+
+    /*
+      This checks visible section names rendered inside sectionsList.
+      It supports many possible HTML shapes from app.js:
+      - data-section-name
+      - .section-name
+      - .section-title
+      - first strong/b element
+      - text before supervisor/students info
+    */
+    sectionsList.querySelectorAll('[data-section-name]').forEach(function (el) {
+      const name = normalizeSectionName(el.getAttribute('data-section-name'));
+      if (name) names.add(name);
+    });
+
+    sectionsList.querySelectorAll('.section-name, .section-title').forEach(function (el) {
+      const name = normalizeSectionName(el.textContent);
+      if (name) names.add(name);
+    });
+
+    sectionsList.querySelectorAll('strong, b').forEach(function (el) {
+      const text = normalizeSectionName(el.textContent);
+      if (text && text.includes('section')) {
+        names.add(text);
+      }
+    });
+
+    return names;
+  }
+
+  function isSectionNameAlreadyUsed(sectionName) {
+    const wanted = normalizeSectionName(sectionName);
+
+    if (!wanted) {
+      return false;
+    }
+
+    const existingNames = getExistingSectionNames();
+
+    if (existingNames.has(wanted)) {
+      return true;
+    }
+
+    /*
+      Fallback check:
+      If sectionsList text contains the exact section name.
+      This helps when app.js renders sections without special classes.
+    */
+    const sectionsList = document.getElementById('sectionsList');
+    const allText = normalizeSectionName(sectionsList ? sectionsList.textContent : '');
+
+    return allText.includes(wanted);
+  }
+
+  async function createSectionNoDuplicate() {
+    const input = document.getElementById('sectionName');
+    const sectionName = input ? input.value.trim() : '';
+
+    if (!sectionName) {
+      setSectionMessage('Please write a section name.', 'error');
+      return;
+    }
+
+    if (isSectionNameAlreadyUsed(sectionName)) {
+      setSectionMessage('This section name already exists. Please choose another name.', 'error');
+      if (input) input.focus();
+      return;
+    }
+
+    if (typeof addSectionEntry !== 'function') {
+      setSectionMessage('Create section function is not loaded.', 'error');
+      return;
+    }
+
+    setSectionMessage('Creating section...', 'loading');
+
+    try {
+      const result = addSectionEntry();
+
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
+
+      setTimeout(function () {
+        const stillRepeated = isSectionNameAlreadyUsed(sectionName);
+        if (stillRepeated) {
+          setSectionMessage('Section created successfully.', 'ok');
+        } else {
+          setSectionMessage('', '');
+        }
+      }, 600);
+    } catch (error) {
+      setSectionMessage(error.message || 'Failed to create section.', 'error');
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.reg-main-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -194,7 +377,9 @@
         });
 
         const selected = document.getElementById('reg-tab-' + tab);
-        if (selected) selected.classList.add('active');
+        if (selected) {
+          selected.classList.add('active');
+        }
 
         window.scrollTo(0, 0);
       });
