@@ -33,7 +33,7 @@
             </div>
             <div class="tb-notif" onclick="window.location.href='/student/notifs'" title="Notifications">
               <span class="material-symbols-outlined icon-inline">notifications</span>
-              <div class="tb-notif-dot"></div>
+              <div class="tb-notif-badge" id="notif-badge" style="display:none"></div>
             </div>
             <div class="tb-logo">APMS</div>
           </div>
@@ -50,6 +50,48 @@
 
   <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
+  <style>
+    .tb-notif { position: relative; }
+    .tb-notif-badge {
+      position: absolute;
+      top: -5px;
+      right: -6px;
+      min-width: 17px;
+      height: 17px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background: #e02b2b;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 17px;
+      text-align: center;
+      pointer-events: none;
+      border: 2px solid var(--color-background-primary, #fff);
+    }
+  </style>
+  <script>
+    (function () {
+      function updateNotifBadge() {
+        fetch('/student/api/dashboard-data')
+          .then(r => r.json())
+          .then(d => {
+            var count = d.unread_notifs || 0;
+            var badge = document.getElementById('notif-badge');
+            if (!badge) return;
+            if (count > 0) {
+              badge.textContent = count > 99 ? '99+' : count;
+              badge.style.display = '';
+            } else {
+              badge.style.display = 'none';
+            }
+          })
+          .catch(() => {});
+      }
+      updateNotifBadge();
+      setInterval(updateNotifBadge, 60000);
+    })();
+  </script>
   <script>
     (function () {
       fetch('/student/api/topbar-info')

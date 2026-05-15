@@ -183,6 +183,14 @@ def api_dashboard_data():
         "unread_notifs": 0,
         "team_members": [],
         "project_type_distribution": [],
+        "milestone_progress": {
+            "submitted": 0,
+            "total": 0,
+            "final_report_uploaded": False,
+            "last_submission": "",
+            "last_submission_title": "",
+            "overall": 0,
+        },
         "weekly_progress": [None] * 12,
         "weekly_expected": [],
     }
@@ -358,9 +366,6 @@ def api_dashboard_data():
                 "label": file_type.replace("_", " ").title(),
             }
 
-        if not file_status["final_report"]["uploaded"]:
-            result["project"]["project_type"] = ""
-
         result["progress"]["final_report"] = file_progress["final_report"]
         result["progress"]["source_code"] = file_progress["source_code"]
         result["progress"]["presentation"] = file_progress["presentation"]
@@ -373,6 +378,126 @@ def api_dashboard_data():
             else 0
         )
         result["file_status"] = file_status
+
+        # 6. Semester progress: each published timeline item counts equally,
+        # and the final report is the last step that moves progress to 100%.
+        milestone_total = 0
+        milestone_submitted = 0
+        last_milestone_submission = ""
+        last_milestone_title = ""
+        try:
+            if _student_intro_timeline_tables_ready(cursor):
+                cursor.execute(
+                    """
+                    SELECT timeline_id
+                    FROM   comp4200_timelines
+                    WHERE  is_published = TRUE
+                    ORDER  BY (semester_id = %s) DESC,
+                              semester_id DESC,
+                              timeline_id DESC
+                    LIMIT  1
+                    """,
+                    (semester_id,),
+                )
+                timeline_row = cursor.fetchone()
+                timeline_id = (timeline_row or {}).get("timeline_id")
+
+                if timeline_id:
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*) AS total
+                        FROM   comp4200_timeline_items
+                        WHERE  timeline_id = %s
+                        """,
+                        (timeline_id,),
+                    )
+                    milestone_total = int((cursor.fetchone() or {}).get("total") or 0)
+
+                    cursor.execute("""
+                        SELECT COUNT(*) AS tbl_exists
+                        FROM INFORMATION_SCHEMA.TABLES
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'milestone_submissions'
+                    """)
+                    if (cursor.fetchone() or {}).get("tbl_exists"):
+                        cursor.execute(
+                            """
+                            SELECT COUNT(DISTINCT ms.item_id) AS submitted
+                            FROM   milestone_submissions ms
+                            JOIN   comp4200_timeline_items ti
+                                   ON ti.item_id = ms.item_id
+                            WHERE  ti.timeline_id = %s
+                              AND (
+                                    ms.project_id = %s
+                                 OR ms.student_id = %s
+                                 OR EXISTS (
+                                      SELECT 1
+                                      FROM   project_members pm_team
+                                      WHERE  pm_team.project_id = %s
+                                        AND  pm_team.student_id = ms.student_id
+                                    )
+                              )
+                            """,
+                            (timeline_id, project_id, student_id, project_id),
+                        )
+                        milestone_submitted = int(
+                            (cursor.fetchone() or {}).get("submitted") or 0
+                        )
+
+                        cursor.execute(
+                            """
+                            SELECT ms.submitted_at, ti.title
+                            FROM   milestone_submissions ms
+                            JOIN   comp4200_timeline_items ti
+                                   ON ti.item_id = ms.item_id
+                            WHERE  ti.timeline_id = %s
+                              AND (
+                                    ms.project_id = %s
+                                 OR ms.student_id = %s
+                                 OR EXISTS (
+                                      SELECT 1
+                                      FROM   project_members pm_team
+                                      WHERE  pm_team.project_id = %s
+                                        AND  pm_team.student_id = ms.student_id
+                                    )
+                              )
+                            ORDER  BY ms.submitted_at DESC
+                            LIMIT  1
+                            """,
+                            (timeline_id, project_id, student_id, project_id),
+                        )
+                        last_row = cursor.fetchone() or {}
+                        last_milestone_submission = _fmt_date(
+                            last_row.get("submitted_at")
+                        )
+                        last_milestone_title = last_row.get("title") or ""
+        except Exception:
+            milestone_total = 0
+            milestone_submitted = 0
+
+        final_report_uploaded = bool(file_status["final_report"]["uploaded"])
+        total_steps = milestone_total + 1
+        completed_steps = min(milestone_submitted, milestone_total) + (
+            1 if final_report_uploaded else 0
+        )
+        semester_overall = (
+            (
+                100
+                if final_report_uploaded
+                else round((completed_steps / total_steps) * 100)
+            )
+            if total_steps
+            else 0
+        )
+        result["milestone_progress"] = {
+            "submitted": min(milestone_submitted, milestone_total),
+            "total": milestone_total,
+            "final_report_uploaded": final_report_uploaded,
+            "last_submission": last_milestone_submission,
+            "last_submission_title": last_milestone_title,
+            "overall": semester_overall,
+        }
+        result["progress"]["overall"] = semester_overall
 
         # 7. Deadlines — من جدول deadlines + timeline items
         cursor.execute(
@@ -467,10 +592,12 @@ def api_dashboard_data():
         # 8. آخر 5 إشعارات
         cursor.execute(
             """
-            SELECT title, message, notification_type, created_at, is_read
-            FROM   notifications
-            WHERE  recipient_id = %s
-            ORDER  BY created_at DESC LIMIT 5
+            SELECT n.title, n.message, n.notification_type, n.created_at, n.is_read,
+                   sender.full_name AS sender_name
+            FROM   notifications n
+            LEFT JOIN users sender ON sender.user_id = n.sender_id
+            WHERE  n.recipient_id = %s
+            ORDER  BY n.created_at DESC LIMIT 5
             """,
             (user_id,),
         )
@@ -480,6 +607,7 @@ def api_dashboard_data():
                 "title": n["title"],
                 "notification_type": n["notification_type"],
                 "is_read": bool(n["is_read"]),
+                "sender_name": n["sender_name"] or "System",
             }
             for n in notifs
         ]
@@ -990,6 +1118,23 @@ def api_challenges_add():
         db.commit()
         new_id = cursor.lastrowid
 
+        # notify the rest of the team
+        type_label = {
+            "technical": "Technical Challenge",
+            "administrative": "Administrative Challenge",
+            "reflection": "Reflection",
+        }.get(ch_type, "Challenge")
+        _notify_project_team(
+            cursor,
+            project_id=info["project_id"],
+            sender_id=user_id,
+            title=f"New {type_label} Added",
+            message=f'A team member added a new {type_label.lower()}: "{title}"',
+            notification_type="system",
+            exclude_user_id=user_id,
+        )
+        db.commit()
+
         # return the inserted row with full_name
         cursor.execute(
             """
@@ -1058,6 +1203,29 @@ def api_challenges_update(challenge_id):
             (ch_type, title, details, solution, challenge_id),
         )
         db.commit()
+
+        # notify the rest of the team about the update
+        type_label = {
+            "technical": "Technical Challenge",
+            "administrative": "Administrative Challenge",
+            "reflection": "Reflection",
+        }.get(ch_type, "Challenge")
+        cursor.execute(
+            "SELECT project_id FROM challenges_reflections WHERE challenge_id = %s",
+            (challenge_id,),
+        )
+        proj = cursor.fetchone()
+        if proj:
+            _notify_project_team(
+                cursor,
+                project_id=proj["project_id"],
+                sender_id=user_id,
+                title=f"{type_label} Updated",
+                message=f'A team member updated a {type_label.lower()}: "{title}"',
+                notification_type="system",
+                exclude_user_id=user_id,
+            )
+            db.commit()
 
         # return updated row
         cursor.execute(
