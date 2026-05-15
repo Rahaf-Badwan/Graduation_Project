@@ -215,6 +215,7 @@
     }
 
     @media (max-width: 760px) {
+
       #pg-exams .exam-form-grid,
       #pg-exams .grad-final-row {
         grid-template-columns: 1fr;
@@ -228,20 +229,12 @@
   </style>
 
   <div class="exam-tabs" role="tablist" aria-label="Exam timeline tabs">
-    <button
-      class="exam-tab on"
-      type="button"
-      role="tab"
-      aria-selected="true"
+    <button class="exam-tab on" type="button" role="tab" aria-selected="true"
       onclick="showExamSection('introTimeline', this)">
       COMP4200 Timeline
     </button>
 
-    <button
-      class="exam-tab"
-      type="button"
-      role="tab"
-      aria-selected="false"
+    <button class="exam-tab" type="button" role="tab" aria-selected="false"
       onclick="showExamSection('gradTimeline', this)">
       COMP4300 Timeline
     </button>
@@ -256,7 +249,8 @@
         <div>
           <span class="card-title">Project Introduction Timeline Builder</span>
           <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
-            Design the COMP4200 student timeline here. After publishing, students will see it in their Student Timeline page and receive a notification.
+            Design the COMP4200 student timeline here. After publishing, students will see it in their Student Timeline
+            page and receive a notification.
           </div>
         </div>
 
@@ -265,7 +259,8 @@
 
       <div class="exam-info-box">
         Use this tab for <b>Project Introduction</b> milestones, submissions, and deadlines.
-        The student submission link opens on the <b>Open submission</b> date and closes after the <b>Close / Deadline</b> date.
+        The student submission link opens on the <b>Open submission</b> date and closes after the <b>Close /
+          Deadline</b> date.
       </div>
 
       <form id="introTimelineForm" onsubmit="return false;">
@@ -283,10 +278,7 @@
 
         <div class="exam-field" style="margin-bottom:12px;">
           <label for="timelineNote">Note to students</label>
-          <textarea
-            id="timelineNote"
-            class="exam-textarea"
-            rows="3"
+          <textarea id="timelineNote" class="exam-textarea" rows="3"
             placeholder="Example: Please follow the timeline and check with your supervisor weekly."></textarea>
         </div>
 
@@ -294,7 +286,8 @@
           <button class="btn btn-outline" type="button" onclick="addTimelineRow()">+ Add Milestone</button>
           <button class="btn btn-outline" type="button" onclick="loadDefaultTimeline()">Load COMP4200 Sample</button>
           <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(false)">Save Draft</button>
-          <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(true)">Save & Publish to Students</button>
+          <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(true)">Save & Publish to
+            Students</button>
         </div>
 
         <div class="timeline-table-wrap">
@@ -304,9 +297,9 @@
                 <th style="width:52px">#</th>
                 <th style="width:180px">Title</th>
                 <th style="width:260px">Description</th>
-                <th style="width:125px">Open submission</th>
+                <th style="width:175px">Open submission</th>
                 <th style="width:175px">Close / Deadline</th>
-                <th style="width:160px">Milestone / Submission</th>
+                <th style="width:200px">Label / Recipient</th>
                 <th style="width:90px">Deadline?</th>
                 <th style="width:80px">Action</th>
               </tr>
@@ -336,18 +329,15 @@
 
       <div class="exam-info-box">
         This tab is only for <b>COMP4300 Graduation Project</b> final submission.
-        Students can submit starting from the <b>Start Date / Time</b> and the submission closes after the <b>Final Deadline</b>.
+        Students can submit starting from the <b>Start Date / Time</b> and the submission closes after the <b>Final
+          Deadline</b>.
       </div>
 
       <form id="gradFinalForm" onsubmit="return false;">
         <div class="exam-form-grid">
           <div class="exam-field">
             <label for="gradTitle">Title</label>
-            <input
-              id="gradTitle"
-              class="exam-input"
-              type="text"
-              value="Graduation Project Final Submission">
+            <input id="gradTitle" class="exam-input" type="text" value="Graduation Project Final Submission">
           </div>
 
           <div class="exam-field">
@@ -371,9 +361,7 @@
 
           <div class="exam-field" style="margin-top:12px;">
             <label for="gradNote">Note to students</label>
-            <textarea
-              id="gradNote"
-              class="exam-textarea"
+            <textarea id="gradNote" class="exam-textarea"
               placeholder="Example: Upload the final report, source code, presentation, and all required files before the deadline."></textarea>
           </div>
         </div>
@@ -442,91 +430,104 @@
       description: 'Agree on weekly supervisor appointments, define the main project idea, and agree on the initial scope.',
       start_date: '2025-09-29',
       due_date: '2025-10-20',
-      milestone_label: 'Milestone 1'
+      milestone_label: 'Milestone 1',
+      submitted_to: 'supervisor'
     },
     {
       title: 'Related work summary',
       description: 'Identify relevant articles, previous work, and similar apps. Submit a summary report to the supervisor.',
       start_date: '2025-10-21',
       due_date: '2025-11-01',
-      milestone_label: 'Summary report (to supervisor)'
+      milestone_label: 'Summary report',
+      submitted_to: 'supervisor'
     },
     {
       title: 'Finalize features and proposal start',
       description: 'Finalize main features and scope, then start writing the project proposal.',
       start_date: '2025-11-01',
       due_date: '2025-11-07',
-      milestone_label: 'Proposed Idea (to supervisor)'
+      milestone_label: 'Proposed Idea',
+      submitted_to: 'supervisor'
     },
     {
       title: 'Tools and software selection',
       description: 'Identify development tools/software, explain their advantages, and how they will be used.',
       start_date: '2025-11-07',
       due_date: '2025-11-13',
-      milestone_label: 'Tools section'
+      milestone_label: 'Tools section',
+      submitted_to: 'supervisor'
     },
     {
       title: 'Detailed proposal submission',
       description: 'Submit the project proposal to the supervisor and electronic copy to the course coordinator using the template.',
       start_date: '2025-11-13',
       due_date: '2025-11-20',
-      milestone_label: 'Detailed Proposal (to Course Coordinator)'
+      milestone_label: 'Detailed Proposal',
+      submitted_to: 'coordinator'
     },
     {
       title: 'Learn implementation tools',
       description: 'Learn the software and tools needed for the project implementation.',
       start_date: '2025-11-20',
       due_date: '2025-11-28',
-      milestone_label: 'Learning tools'
+      milestone_label: 'Learning tools',
+      submitted_to: 'supervisor'
     },
     {
       title: 'System requirements',
       description: 'Specify functional and non-functional requirements, use case descriptions, and use case diagram.',
       start_date: '2025-11-21',
       due_date: '2025-12-03',
-      milestone_label: 'Requirements'
+      milestone_label: 'Requirements',
+      submitted_to: 'supervisor'
     },
     {
       title: 'System analysis',
       description: 'Provide conceptual system models including class diagrams, sequence diagrams, and state chart diagrams.',
       start_date: '2025-12-03',
       due_date: '2025-12-13',
-      milestone_label: 'Analysis models'
+      milestone_label: 'Analysis models',
+      submitted_to: 'supervisor'
     },
     {
       title: 'System design',
       description: 'Describe high-level architecture, subsystems, and deployment diagram.',
       start_date: '2025-12-14',
       due_date: '2025-12-31',
-      milestone_label: 'Design'
+      milestone_label: 'Design',
+      submitted_to: 'supervisor'
     },
     {
       title: 'Progress report writing',
       description: 'Start writing and finalizing the COMP4200 progress report.',
       start_date: '2026-01-01',
       due_date: '2026-01-12',
-      milestone_label: 'Progress report'
+      milestone_label: 'Progress report',
+      submitted_to: 'coordinator'
     },
     {
       title: 'Turnitin report',
       description: 'Generate the Turnitin report.',
       start_date: '2026-01-12',
       due_date: '2026-01-14',
-      milestone_label: 'Turnitin Report'
+      milestone_label: 'Turnitin Report',
+      submitted_to: 'supervisor'
     },
     {
       title: 'Supervisor report review',
       description: 'Review the report with your supervisor.',
       start_date: '2026-01-14',
       due_date: '2026-01-22',
-      milestone_label: 'Supervisor Review'
+      milestone_label: 'Supervisor Review',
+      submitted_to: 'supervisor'
     },
     {
       title: 'Final report submission',
       description: 'Submit the final report to the department.',
       start_date: '',
       due_date: '2026-01-22',
-      milestone_label: 'Graduation Report'
+      milestone_label: 'Graduation Report',
+      submitted_to: 'coordinator'
     }
   ];
 
@@ -577,8 +578,8 @@
         <td>
           <input
             class="tl-start timeline-small-input"
-            type="date"
-            value="${escAttr(rowItem.start_date)}">
+            type="datetime-local"
+            value="${escAttr(toDatetimeLocal(rowItem.start_date))}">
         </td>
 
         <td>
@@ -592,7 +593,12 @@
           <input
             class="tl-label timeline-small-input"
             value="${escAttr(rowItem.milestone_label)}"
-            placeholder="Optional">
+            placeholder="Label (optional)"
+            style="margin-bottom:4px">
+          <select class="tl-submitted-to timeline-small-input" style="font-size:12px">
+            <option value="supervisor" ${(rowItem.submitted_to || 'supervisor') === 'supervisor' ? 'selected' : ''}>→ Supervisor</option>
+            <option value="coordinator" ${(rowItem.submitted_to || '') === 'coordinator' ? 'selected' : ''}>→ Course Coordinator</option>
+          </select>
         </td>
 
         <td style="text-align:center">
@@ -654,6 +660,7 @@
       start_date: row.querySelector('.tl-start').value,
       due_date: row.querySelector('.tl-due').value,
       milestone_label: row.querySelector('.tl-label').value.trim(),
+      submitted_to: row.querySelector('.tl-submitted-to').value,
       is_deadline: row.querySelector('.tl-deadline').checked
     }));
     return onlyChecked ? all.filter(item => item.is_deadline) : all;

@@ -722,9 +722,7 @@ def _student_dashboard_milestone_progress(
     overall = (
         100
         if final_report_uploaded
-        else round((completed_steps / total_steps) * 100)
-        if total_steps
-        else 0
+        else round((completed_steps / total_steps) * 100) if total_steps else 0
     )
 
     return {
@@ -809,7 +807,7 @@ def api_student_intro_timeline():
             )
         cursor.execute(
             """
-            SELECT item_id, item_order, title, description, start_date, due_date, due_time, milestone_label, is_deadline
+            SELECT item_id, item_order, title, description, start_date, start_time, due_date, due_time, milestone_label, submitted_to, is_deadline
             FROM comp4200_timeline_items
             WHERE timeline_id = %s AND COALESCE(is_archived, FALSE) = FALSE AND is_deadline = TRUE
             ORDER BY item_order ASC, due_date ASC, item_id ASC
@@ -820,6 +818,9 @@ def api_student_intro_timeline():
         for item in items:
             item["is_deadline"] = bool(item.get("is_deadline"))
             # Combine date+time for frontend datetime-local display
+            s_date = str(item.get("start_date") or "")
+            s_time = (item.get("start_time") or "").strip()
+            item["start_date"] = f"{s_date}T{s_time}" if s_date and s_time else s_date
             due_date_str = str(item.get("due_date") or "")
             due_time_str = (item.get("due_time") or "").strip()
             if due_date_str and due_time_str:
@@ -919,9 +920,7 @@ def submit():
             proj_title = project["title"] or ""
             proj_abstract = project["abstract"] or ""
             proj_keywords = project["keywords"] or ""
-            proj_type = project["project_type"] or ""
-            if isinstance(proj_type, set):
-                proj_type = ",".join(sorted(proj_type))
+            proj_type = ""  # student must choose manually
         elif active_semester_id:
             # ما في مشروع بالسمستر الجديد → جيب السوبرفايزر والفريق من آخر مشروع قديم
             cursor.execute(
@@ -946,9 +945,7 @@ def submit():
                 supervisor_name = prev["supervisor_name"]
                 academic_year = prev["academic_year"]
                 proj_title = prev["title"] or ""
-                proj_type = prev["project_type"] or ""
-                if isinstance(proj_type, set):
-                    proj_type = ",".join(sorted(proj_type))
+                proj_type = ""  # student must choose manually
                 # جيب الفريق من مشروع COMP4200 القديم — هم نفسهم
                 cursor.execute(
                     """
@@ -1071,9 +1068,66 @@ def _get_student_project(user_id):
 # ─── Helper: check if submission window is still open ───────
 def _is_submission_open(cursor, semester_id, project_id):
     """Returns True if the file_submission deadline hasn't passed yet.
-    If no deadline is configured, submission is considered open."""
-    from datetime import date
+    Also returns True if there is an active 'final report/submission'
+    timeline milestone (timeline controls the window in that case).
+    If no deadline configured at all, submission is considered open."""
+    from datetime import date, datetime as _dt
 
+    # ── Check if an active final-report timeline milestone exists ──
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN ('comp4200_timelines','comp4200_timeline_items')
+        """)
+        if int((cursor.fetchone() or {}).get("cnt") or 0) >= 2:
+            now = _dt.now()
+            cursor.execute("""
+                SELECT ti.due_date, ti.due_time, ti.start_date, ti.start_time
+                FROM comp4200_timeline_items ti
+                JOIN comp4200_timelines t ON t.timeline_id = ti.timeline_id
+                WHERE t.is_published = TRUE
+                  AND ti.is_deadline = TRUE
+                  AND COALESCE(ti.is_archived, FALSE) = FALSE
+                  AND (LOWER(ti.title) LIKE '%final report%'
+                    OR LOWER(ti.title) LIKE '%final submission%')
+            """)
+            for item in cursor.fetchall():
+                # Build start datetime
+                s_d = item.get("start_date")
+                s_t = (item.get("start_time") or "").strip()
+                if s_d and s_t:
+                    try:
+                        start_dt = _dt.strptime(f"{s_d} {s_t}", "%Y-%m-%d %H:%M")
+                    except:
+                        start_dt = _dt(s_d.year, s_d.month, s_d.day, 0, 0)
+                elif s_d:
+                    start_dt = _dt(s_d.year, s_d.month, s_d.day, 0, 0)
+                else:
+                    start_dt = None
+                # Build due datetime
+                d_d = item.get("due_date")
+                d_t = (item.get("due_time") or "").strip()
+                if d_d and d_t:
+                    try:
+                        due_dt = _dt.strptime(f"{d_d} {d_t}", "%Y-%m-%d %H:%M")
+                    except:
+                        due_dt = _dt(d_d.year, d_d.month, d_d.day, 23, 59)
+                elif d_d:
+                    due_dt = _dt(d_d.year, d_d.month, d_d.day, 23, 59)
+                else:
+                    due_dt = None
+                # Window open?
+                if start_dt and now < start_dt:
+                    continue
+                if due_dt and now > due_dt:
+                    continue
+                return True  # active final milestone → allow upload
+    except Exception:
+        pass
+
+    # ── Fall back to deadlines table ───────────────────────────────
     cursor.execute(
         """
         SELECT MIN(deadline_date) AS deadline
@@ -2244,15 +2298,23 @@ def api_milestone_submit():
         """)
 
         # Migration: add snapshot columns if not exist (use existing dictionary cursor)
-        for _col, _col_def in [("item_title", "VARCHAR(255) NULL"), ("item_label", "VARCHAR(180) NULL")]:
+        for _col, _col_def in [
+            ("item_title", "VARCHAR(255) NULL"),
+            ("item_label", "VARCHAR(180) NULL"),
+        ]:
             try:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='milestone_submissions' AND COLUMN_NAME=%s
-                """, (_col,))
+                """,
+                    (_col,),
+                )
                 _row = cursor.fetchone() or {}
                 if not int(_row.get("cnt") or 0):
-                    cursor.execute(f"ALTER TABLE milestone_submissions ADD COLUMN {_col} {_col_def}")
+                    cursor.execute(
+                        f"ALTER TABLE milestone_submissions ADD COLUMN {_col} {_col_def}"
+                    )
             except Exception:
                 pass
         # ── جيب بيانات الطالب ─────────────────────────────────────
@@ -2267,7 +2329,7 @@ def api_milestone_submit():
         # ── جيب بيانات الـ milestone item ─────────────────────────
         cursor.execute(
             """
-            SELECT item_id, title, milestone_label, start_date, due_date, due_time, is_archived
+            SELECT item_id, title, milestone_label, submitted_to, start_date, start_time, due_date, due_time, is_archived
             FROM comp4200_timeline_items
             WHERE item_id = %s
             """,
@@ -2283,22 +2345,46 @@ def api_milestone_submit():
 
         now = _datetime.now()
         today = _date.today()
-        start = _as_date(item.get("start_date"))
+
+        # Build start datetime with time if available
+        start_date_val = _as_date(item.get("start_date"))
+        start_time_str = (item.get("start_time") or "").strip()
+        if start_date_val and start_time_str:
+            try:
+                start_dt = _datetime.strptime(
+                    f"{start_date_val} {start_time_str}", "%Y-%m-%d %H:%M"
+                )
+            except ValueError:
+                start_dt = _datetime(
+                    start_date_val.year, start_date_val.month, start_date_val.day, 0, 0
+                )
+        elif start_date_val:
+            start_dt = _datetime(
+                start_date_val.year, start_date_val.month, start_date_val.day, 0, 0
+            )
+        else:
+            start_dt = None
 
         # Build due datetime: combine due_date + due_time if available
         due_date_val = _as_date(item.get("due_date"))
         due_time_str = (item.get("due_time") or "").strip()
         if due_date_val and due_time_str:
             try:
-                due_dt = _datetime.strptime(f"{due_date_val} {due_time_str}", "%Y-%m-%d %H:%M")
+                due_dt = _datetime.strptime(
+                    f"{due_date_val} {due_time_str}", "%Y-%m-%d %H:%M"
+                )
             except ValueError:
-                due_dt = _datetime(due_date_val.year, due_date_val.month, due_date_val.day, 23, 59)
+                due_dt = _datetime(
+                    due_date_val.year, due_date_val.month, due_date_val.day, 23, 59
+                )
         elif due_date_val:
-            due_dt = _datetime(due_date_val.year, due_date_val.month, due_date_val.day, 23, 59)
+            due_dt = _datetime(
+                due_date_val.year, due_date_val.month, due_date_val.day, 23, 59
+            )
         else:
             due_dt = None
 
-        if start and today < start:
+        if start_dt and now < start_dt:
             cursor.close()
             db.close()
             return jsonify({"error": "The submission window has not opened yet."}), 403
@@ -2306,16 +2392,19 @@ def api_milestone_submit():
         if due_dt and now > due_dt:
             cursor.close()
             db.close()
-            return jsonify({"error": "The submission window has closed. No more uploads are allowed."}), 403
+            return (
+                jsonify(
+                    {
+                        "error": "The submission window has closed. No more uploads are allowed."
+                    }
+                ),
+                403,
+            )
 
-        # ── حدد submitted_to من milestone_label ───────────────────
-        label_lower = (item.get("milestone_label") or "").lower()
-        if "coordinator" in label_lower:
-            submitted_to = "coordinator"
-        elif "supervisor" in label_lower:
+        # ── submitted_to مخزن مباشرة في الـ item ─────────────────
+        submitted_to = (item.get("submitted_to") or "supervisor").strip().lower()
+        if submitted_to not in ("supervisor", "coordinator", "both"):
             submitted_to = "supervisor"
-        else:
-            submitted_to = "supervisor"  # default
 
         # ── جيب project_id الحالي للطالب (optional) ───────────────
         cursor.execute(
@@ -2671,6 +2760,91 @@ def api_student_registration_check():
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@student_bp.route("/api/final-submission-window", methods=["GET"])
+@login_required(role="student")
+def api_final_submission_window():
+    """
+    Returns whether a 'final report/submission' milestone is currently active
+    (published, is_deadline=TRUE, not archived, within start→due datetime window).
+    Used by the sidebar to show/hide the Submit Project link.
+    """
+    try:
+        from datetime import datetime as _dt
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # Check if timeline tables exist
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN ('comp4200_timelines', 'comp4200_timeline_items')
+        """)
+        if int((cursor.fetchone() or {}).get("cnt") or 0) < 2:
+            cursor.close()
+            db.close()
+            return jsonify({"is_active": False, "item_id": None})
+
+        now = _dt.now()
+        cursor.execute("""
+            SELECT ti.item_id, ti.title, ti.due_date, ti.due_time, ti.start_date, ti.start_time
+            FROM comp4200_timeline_items ti
+            JOIN comp4200_timelines t ON t.timeline_id = ti.timeline_id
+            WHERE t.is_published = TRUE
+              AND ti.is_deadline = TRUE
+              AND COALESCE(ti.is_archived, FALSE) = FALSE
+              AND (LOWER(ti.title) LIKE '%final report%'
+                OR LOWER(ti.title) LIKE '%final submission%')
+            ORDER BY ti.item_id ASC
+        """)
+        items = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        active_item = None
+        for item in items:
+            # Build start datetime
+            s_date = item.get("start_date")
+            s_time = (item.get("start_time") or "").strip()
+            if s_date and s_time:
+                try:
+                    start_dt = _dt.strptime(f"{s_date} {s_time}", "%Y-%m-%d %H:%M")
+                except ValueError:
+                    start_dt = _dt(s_date.year, s_date.month, s_date.day, 0, 0)
+            elif s_date:
+                start_dt = _dt(s_date.year, s_date.month, s_date.day, 0, 0)
+            else:
+                start_dt = None
+
+            # Build due datetime
+            d_date = item.get("due_date")
+            d_time = (item.get("due_time") or "").strip()
+            if d_date and d_time:
+                try:
+                    due_dt = _dt.strptime(f"{d_date} {d_time}", "%Y-%m-%d %H:%M")
+                except ValueError:
+                    due_dt = _dt(d_date.year, d_date.month, d_date.day, 23, 59)
+            elif d_date:
+                due_dt = _dt(d_date.year, d_date.month, d_date.day, 23, 59)
+            else:
+                due_dt = None
+
+            # Check window
+            if start_dt and now < start_dt:
+                continue  # not opened yet
+            if due_dt and now > due_dt:
+                continue  # closed
+            active_item = item
+            break
+
+        if active_item:
+            return jsonify({"is_active": True, "item_id": active_item["item_id"]})
+        return jsonify({"is_active": False, "item_id": None})
+
+    except Exception as e:
+        return jsonify({"is_active": False, "item_id": None, "error": str(e)})
 
 
 @student_bp.route("/api/distribution-window-status", methods=["GET"])

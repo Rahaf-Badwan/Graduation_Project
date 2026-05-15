@@ -909,9 +909,11 @@ def api_coordinator_submission_files():
                 SELECT pf.file_id, pf.project_id, pf.file_type, pf.file_name,
                        pf.file_path, pf.file_size_mb, pf.uploaded_at,
                        pf.file_data IS NOT NULL AS has_file_data,
-                       p.title AS project_title,
+                       p.title AS project_title, p.project_type,
                        s.course_code,
-                       COALESCE(u.full_name, primary_user.full_name, '') AS submitted_by
+                       ANY_VALUE(COALESCE(u.full_name, primary_user.full_name, '')) AS submitted_by,
+                       ANY_VALUE(sup_u.full_name) AS supervisor_name,
+                       GROUP_CONCAT(DISTINCT tm_u.full_name ORDER BY tm_u.full_name SEPARATOR ', ') AS team_members
                 FROM project_files pf
                 JOIN projects p ON p.project_id = pf.project_id
                 JOIN semesters s ON s.semester_id = p.semester_id
@@ -923,7 +925,15 @@ def api_coordinator_submission_files():
                        ON primary_st.student_id = primary_pm.student_id
                 LEFT JOIN users primary_user
                        ON primary_user.user_id = primary_st.user_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
+                LEFT JOIN project_members tm_pm ON tm_pm.project_id = p.project_id
+                LEFT JOIN students tm_st ON tm_st.student_id = tm_pm.student_id
+                LEFT JOIN users tm_u ON tm_u.user_id = tm_st.user_id
                 {where}
+                GROUP BY pf.file_id, pf.project_id, pf.file_type, pf.file_name,
+                         pf.file_path, pf.file_size_mb, pf.uploaded_at,
+                         p.title, p.project_type, s.course_code
                 ORDER BY pf.uploaded_at DESC, pf.file_id DESC
                 """,
                 tuple(params),
@@ -936,12 +946,16 @@ def api_coordinator_submission_files():
                         "source": "project",
                         "source_id": row.get("file_id"),
                         "project_id": row.get("project_id"),
+                        "file_type": (row.get("file_type") or "project_file"),
                         "submission_title": (row.get("file_type") or "project_file")
                         .replace("_", " ")
                         .title(),
                         "course_scope": course_code,
                         "course_label": _course_label_for_code(course_code),
                         "project_title": row.get("project_title") or "Untitled Project",
+                        "project_type": row.get("project_type") or "",
+                        "supervisor_name": row.get("supervisor_name") or "",
+                        "team_members": row.get("team_members") or "",
                         "submitted_by": row.get("submitted_by") or "Unknown student",
                         "file_name": row.get("file_name") or "Open file",
                         "file_path": row.get("file_path") or "",
@@ -1135,7 +1149,9 @@ def api_coordinator_download_project_file(file_id):
         return jsonify({"error": str(e)}), 500
 
 
-@coordinator_bp.route("/api/coordinator/milestone-submissions/<int:submission_id>/download")
+@coordinator_bp.route(
+    "/api/coordinator/milestone-submissions/<int:submission_id>/download"
+)
 @login_required(role="coordinator")
 def api_coordinator_download_milestone_submission(submission_id):
     try:
@@ -1168,7 +1184,9 @@ def api_coordinator_download_milestone_submission(submission_id):
         return jsonify({"error": str(e)}), 500
 
 
-@coordinator_bp.route("/api/coordinator/deliverable-submissions/<int:submission_id>/download")
+@coordinator_bp.route(
+    "/api/coordinator/deliverable-submissions/<int:submission_id>/download"
+)
 @login_required(role="coordinator")
 def api_coordinator_download_deliverable_submission(submission_id):
     try:
@@ -1497,8 +1515,7 @@ def api_coordinator_notifications_sent():
 @login_required(role="coordinator")
 def api_coordinator_notifications_send():
     is_multipart = bool(
-        request.content_type
-        and request.content_type.startswith("multipart/form-data")
+        request.content_type and request.content_type.startswith("multipart/form-data")
     )
     if is_multipart:
         data = request.form
@@ -1646,7 +1663,9 @@ def api_coordinator_notification_attachment(notification_id):
         if not row or not row.get("attachment_data"):
             return jsonify({"error": "Attachment not found."}), 404
 
-        filename = secure_filename(row.get("attachment_name") or "attachment") or "attachment"
+        filename = (
+            secure_filename(row.get("attachment_name") or "attachment") or "attachment"
+        )
         mimetype = row.get("attachment_mime") or "application/octet-stream"
         return Response(
             row["attachment_data"],
@@ -1800,11 +1819,14 @@ def _ensure_intro_timeline_tables(cursor):
             title VARCHAR(180) NOT NULL,
             description TEXT NULL,
             start_date DATE NULL,
+            start_time VARCHAR(5) NULL,
             due_date DATE NULL,
             due_time VARCHAR(5) NULL,
             milestone_label VARCHAR(180) NULL,
-            is_deadline BOOLEAN NOT NULL DEFAULT TRUE,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            is_deadline  BOOLEAN NOT NULL DEFAULT TRUE,
+            is_archived  BOOLEAN NOT NULL DEFAULT FALSE,
+            submitted_to VARCHAR(20) NOT NULL DEFAULT 'supervisor',
+            created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (timeline_id) REFERENCES comp4200_timelines(timeline_id) ON DELETE CASCADE,
             INDEX idx_comp4200_timeline_items_due (due_date),
             INDEX idx_comp4200_timeline_items_order (timeline_id, item_order)
@@ -1814,6 +1836,16 @@ def _ensure_intro_timeline_tables(cursor):
     if not _db_column_exists(cursor, "comp4200_timeline_items", "due_time"):
         cursor.execute(
             "ALTER TABLE comp4200_timeline_items ADD COLUMN due_time VARCHAR(5) NULL AFTER due_date"
+        )
+    # Migration: add start_time if not exists
+    if not _db_column_exists(cursor, "comp4200_timeline_items", "start_time"):
+        cursor.execute(
+            "ALTER TABLE comp4200_timeline_items ADD COLUMN start_time VARCHAR(5) NULL AFTER start_date"
+        )
+    # Migration: add submitted_to if not exists
+    if not _db_column_exists(cursor, "comp4200_timeline_items", "submitted_to"):
+        cursor.execute(
+            "ALTER TABLE comp4200_timeline_items ADD COLUMN submitted_to VARCHAR(20) NOT NULL DEFAULT 'supervisor' AFTER is_archived"
         )
     # Migration: allow due_date to be NULL (incomplete draft items)
     try:
@@ -1868,7 +1900,7 @@ def _intro_timeline_payload(cursor, semester_id, user_id=None, students_only=Fal
         return {"timeline": None, "items": []}
     cursor.execute(
         """
-        SELECT item_id, item_order, title, description, start_date, due_date, due_time, milestone_label, is_deadline
+        SELECT item_id, item_order, title, description, start_date, start_time, due_date, due_time, milestone_label, submitted_to, is_deadline
         FROM comp4200_timeline_items
         WHERE timeline_id = %s
         ORDER BY item_order ASC, due_date ASC, item_id ASC
@@ -1885,6 +1917,12 @@ def _intro_timeline_payload(cursor, semester_id, user_id=None, students_only=Fal
             item["due_date"] = f"{due_date}T{due_time}"
         else:
             item["due_date"] = due_date
+        start_date_v = str(item.get("start_date") or "")
+        start_time_v = (item.get("start_time") or "").strip()
+        if start_date_v and start_time_v:
+            item["start_date"] = f"{start_date_v}T{start_time_v}"
+        else:
+            item["start_date"] = start_date_v
     timeline["is_published"] = bool(timeline.get("is_published"))
     return {"timeline": timeline, "items": items}
 
@@ -1942,8 +1980,11 @@ def api_coordinator_intro_timeline_save():
             parts = due_date.split("T", 1)
             due_date = parts[0]
             due_time = parts[1][:5] if len(parts) > 1 else None
+        start_time = None
         if start_date and "T" in start_date:
-            start_date = start_date.split("T")[0]
+            _sp = start_date.split("T", 1)
+            start_date = _sp[0]
+            start_time = _sp[1][:5] if len(_sp) > 1 else None
         try:
             if start_date:
                 datetime.strptime(start_date, "%Y-%m-%d")
@@ -1962,10 +2003,12 @@ def api_coordinator_intro_timeline_save():
                 "title": item_title,
                 "description": description,
                 "start_date": start_date,
+                "start_time": start_time,
                 "due_date": due_date or None,
                 "due_time": due_time,
                 "milestone_label": milestone_label,
                 "is_deadline": is_deadline,
+                "submitted_to": item.get("submitted_to") or "supervisor",
             }
         )
 
@@ -2035,14 +2078,22 @@ def api_coordinator_intro_timeline_save():
                     """
                     UPDATE comp4200_timeline_items
                     SET item_order = %s, title = %s, description = %s,
-                        start_date = %s, due_date = %s, due_time = %s,
-                        milestone_label = %s, is_deadline = %s, is_archived = FALSE
+                        start_date = %s, start_time = %s, due_date = %s, due_time = %s,
+                        milestone_label = %s, submitted_to = %s,
+                        is_deadline = %s, is_archived = FALSE
                     WHERE item_id = %s
                     """,
                     (
-                        item["order"], item["title"], item["description"],
-                        item["start_date"], item["due_date"], item.get("due_time"),
-                        item["milestone_label"], item["is_deadline"],
+                        item["order"],
+                        item["title"],
+                        item["description"],
+                        item["start_date"],
+                        item.get("start_time"),
+                        item["due_date"],
+                        item.get("due_time"),
+                        item["milestone_label"],
+                        item.get("submitted_to", "supervisor"),
+                        item["is_deadline"],
                         existing[item["order"]],
                     ),
                 )
@@ -2052,13 +2103,21 @@ def api_coordinator_intro_timeline_save():
                     """
                     INSERT INTO comp4200_timeline_items
                         (timeline_id, item_order, title, description, start_date,
-                         due_date, due_time, milestone_label, is_deadline, is_archived)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
+                         start_time, due_date, due_time, milestone_label, submitted_to, is_deadline, is_archived)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
                     """,
                     (
-                        tid, item["order"], item["title"], item["description"],
-                        item["start_date"], item["due_date"], item.get("due_time"),
-                        item["milestone_label"], item["is_deadline"],
+                        tid,
+                        item["order"],
+                        item["title"],
+                        item["description"],
+                        item["start_date"],
+                        item.get("start_time"),
+                        item["due_date"],
+                        item.get("due_time"),
+                        item["milestone_label"],
+                        item.get("submitted_to", "supervisor"),
+                        item["is_deadline"],
                     ),
                 )
         db.commit()
@@ -2667,7 +2726,11 @@ def api_add_section():
             cursor.close()
             db.close()
             return (
-                jsonify({"error": "This section name already exists. Please choose another name."}),
+                jsonify(
+                    {
+                        "error": "This section name already exists. Please choose another name."
+                    }
+                ),
                 400,
             )
 
@@ -3234,7 +3297,9 @@ def api_review_projects():
         return jsonify({"error": str(e)}), 500
 
 
-@coordinator_bp.route("/api/coordinator/project-files/<int:project_id>", methods=["GET"])
+@coordinator_bp.route(
+    "/api/coordinator/project-files/<int:project_id>", methods=["GET"]
+)
 @login_required(role="coordinator")
 def api_coordinator_project_files(project_id):
     try:
@@ -3282,10 +3347,7 @@ def api_coordinator_project_files(project_id):
             )
 
             file_path = (
-                row.get("file_path")
-                or row.get("path")
-                or row.get("stored_path")
-                or ""
+                row.get("file_path") or row.get("path") or row.get("stored_path") or ""
             )
 
             files.append(
@@ -3293,7 +3355,9 @@ def api_coordinator_project_files(project_id):
                     "file_id": file_id,
                     "file_name": file_name,
                     "file_path": file_path,
-                    "uploaded_at": str(row.get("uploaded_at") or row.get("created_at") or ""),
+                    "uploaded_at": str(
+                        row.get("uploaded_at") or row.get("created_at") or ""
+                    ),
                 }
             )
 

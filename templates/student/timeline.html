@@ -6,6 +6,16 @@
 
 {% block content %}
 <div class="page on" id="pg-timeline">
+  <div id="regLockOverlay" style="display:none;text-align:center;padding:60px 20px">
+    <div style="font-size:48px;margin-bottom:16px">🔒</div>
+    <div style="font-size:18px;font-weight:700;color:#344054;margin-bottom:8px">Registration Required</div>
+    <div style="font-size:14px;color:#667085;max-width:380px;margin:0 auto 20px">
+      This page is available after your supervisor is assigned and the coordinator approves your team.
+    </div>
+    <a href="/student/registration" class="btn btn-primary" style="text-decoration:none">Go to Registration</a>
+  </div>
+
+<div id="regPageContent">
   <style>
     :root {
       --timeline-green-soft: rgba(22, 163, 74, .10);
@@ -410,6 +420,20 @@
   </div>
 </div>
 
+</div><!-- /regPageContent --><script>
+  (function () {
+    fetch('/student/api/registration-check')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.registered) {
+          var ov = document.getElementById('regLockOverlay');
+          var ct = document.getElementById('regPageContent');
+          if (ov) ov.style.display = '';
+          if (ct) ct.style.display = 'none';
+        }
+      }).catch(() => {});
+  })();
+</script>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -431,7 +455,7 @@
     if (dateText.includes('T')) {
       // Show date + time
       return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-           + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     }
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   }
@@ -468,6 +492,8 @@
 
   /* ── submission tracker: item_id → last submission info ──── */
   let submissionsMap = {};
+  let finalProjectStatus = { submitted: false, submitted_by_me: false, submitted_by: '' };
+
   async function loadMySubmissions() {
     try {
       const res = await fetch('/student/api/milestone-submissions');
@@ -476,6 +502,22 @@
       (data.submissions || []).forEach(s => {
         if (!submissionsMap[s.item_id]) submissionsMap[s.item_id] = s;
       });
+    } catch (_) { }
+  }
+
+  async function loadFinalProjectStatus() {
+    try {
+      const res = await fetch('/student/api/submit-info');
+      const data = await res.json();
+      const files = data.files || [];
+      const report = files.find(f => f.file_type === 'final_report' && f.upload_status === 'uploaded');
+      if (report) {
+        finalProjectStatus.submitted = true;
+        // Check if submitted by me via project status
+        const project = data.project || {};
+        finalProjectStatus.submitted_by_me = bool(project.status);
+        finalProjectStatus.submitted_by_me = true; // same team so can update
+      }
     } catch (_) { }
   }
 
@@ -586,7 +628,7 @@
     const empty = document.getElementById('timelineEmpty');
     const list = document.getElementById('timelineList');
 
-    await loadMySubmissions();
+    await Promise.all([loadMySubmissions(), loadFinalProjectStatus()]);
 
     try {
       const res = await fetch('/student/api/intro-timeline');
@@ -620,10 +662,13 @@
         const isOpen = win.state === 'open';
         const prev = submissionsMap[item.item_id];
 
-        /* determine submitted_to from milestone_label */
-        const lbl = (item.milestone_label || '').toLowerCase();
-        const subTo = lbl.includes('coordinator') ? 'coordinator' : 'supervisor';
+        /* Use submitted_to field directly from DB */
+        const subTo = (item.submitted_to || 'supervisor') === 'coordinator' ? 'coordinator' : 'supervisor';
         const subToLabel = subTo === 'coordinator' ? 'Course Coordinator' : 'Supervisor';
+
+        /* Detect final report milestones → redirect to Submit Project page */
+        const titleLower = (item.title || '').toLowerCase();
+        const isFinalReport = titleLower.includes('final report') || titleLower.includes('final submission');
 
         /* منطق الزر:
              - ما في تسليم + مفتوح          → Upload
@@ -631,38 +676,55 @@
              - زميل سلم  أو مغلق            → Submitted (disabled)  */
         const isMineAndOpen = prev && prev.submitted_by_me && isOpen;
 
-        const actionBtn = isMineAndOpen
-          ? `<button class="timeline-submit-link"
-             data-item-id="${item.item_id}"
-             data-title="${safeText(item.title || '')}"
-             data-sub-to="${subTo}"
-             onclick="openUploadModal(Number(this.dataset.itemId), this.dataset.title, this.dataset.subTo)"
-             style="border:none;cursor:pointer;background:linear-gradient(135deg,#0369a1,#0284c7);">
-             <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">edit</span>
-             Update Submission
-           </button>`
-          : prev
-            ? `<button class="timeline-submit-link disabled" disabled>Submitted</button>`
-            : isOpen
-              ? `<button class="timeline-submit-link"
-             data-item-id="${item.item_id}"
-             data-title="${safeText(item.title || '')}"
-             data-sub-to="${subTo}"
-             onclick="openUploadModal(Number(this.dataset.itemId), this.dataset.title, this.dataset.subTo)"
-             style="border:none;cursor:pointer">
-             <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">upload_file</span>
-             ${win.button}
-           </button>`
-              : `<button class="timeline-submit-link disabled" disabled>${win.button}</button>`;
+        /* Final report → go to submit project page; others → upload modal */
+        const finalLink = (label, icon, style = '') =>
+          `<a href="/student/submit?milestone_id=${item.item_id}" class="timeline-submit-link"
+               style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;${style}">
+               <span class="material-symbols-outlined" style="font-size:15px">${icon}</span>${label}
+             </a>`;
 
-        const submittedBadge = prev
+        const regularBtn = (label, icon, style = '') =>
+          `<button class="timeline-submit-link"
+               data-item-id="${item.item_id}"
+               data-title="${safeText(item.title || '')}"
+               data-sub-to="${subTo}"
+               onclick="openUploadModal(Number(this.dataset.itemId), this.dataset.title, this.dataset.subTo)"
+               style="border:none;cursor:pointer;${style}">
+               <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">${icon}</span>${label}
+             </button>`;
+
+        let actionBtn;
+        if (isFinalReport) {
+          if (!isOpen) {
+            actionBtn = `<button class="timeline-submit-link disabled" disabled>${win.button}</button>`;
+          } else if (finalProjectStatus.submitted) {
+            actionBtn = finalLink('Update Submission', 'edit', 'background:linear-gradient(135deg,#0369a1,#0284c7);');
+          } else {
+            actionBtn = finalLink('Submit Final Project', 'upload_file');
+          }
+        } else {
+          if (isMineAndOpen) {
+            actionBtn = regularBtn('Update Submission', 'edit', 'background:linear-gradient(135deg,#0369a1,#0284c7);');
+          } else if (prev) {
+            actionBtn = `<button class="timeline-submit-link disabled" disabled>Submitted</button>`;
+          } else if (isOpen) {
+            actionBtn = regularBtn(win.button, 'upload_file');
+          } else {
+            actionBtn = `<button class="timeline-submit-link disabled" disabled>${win.button}</button>`;
+          }
+        }
+
+        const showBadge = isFinalReport ? finalProjectStatus.submitted : !!prev;
+        const badgeText = isFinalReport
+          ? '✓ Submitted'
+          : (prev && prev.submitted_by_me ? '✓ Submitted by you' : '✓ Submitted by ' + safeText((prev || {}).submitted_by || 'teammate'));
+        const badgeColor = 'var(--green)';
+        const badgeBg = '#e8f5ee';
+        const submittedBadge = showBadge
           ? `<span id="submitted-badge-${item.item_id}"
-               style="font-size:11px;font-weight:700;
-                      color:${prev.submitted_by_me ? 'var(--green)' : '#0369a1'};
-                      background:${prev.submitted_by_me ? '#e8f5ee' : '#e0f2fe'};
-                      border-radius:6px;padding:3px 8px;display:inline-block;margin-top:4px">
-               ✓ ${prev.submitted_by_me ? 'Submitted by you' : 'Submitted by ' + safeText(prev.submitted_by || 'teammate')}
-             </span>`
+               style="font-size:11px;font-weight:700;color:${badgeColor};
+                      background:${badgeBg};border-radius:6px;padding:3px 8px;
+                      display:inline-block;margin-top:4px">${badgeText}</span>`
           : `<span id="submitted-badge-${item.item_id}" style="display:none;font-size:11px;font-weight:700;
                color:var(--green);background:#e8f5ee;border-radius:6px;padding:3px 8px;
                margin-top:4px">✓ Submitted by you</span>`;
