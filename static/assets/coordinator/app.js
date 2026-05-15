@@ -956,6 +956,37 @@ function renderDashboardProgress(stats) {
 }
 
 
+function showLectureSection(scope, btn) {
+  document.querySelectorAll('#pg-lectures .lecture-section').forEach(section => {
+    section.classList.remove('active');
+  });
+
+  let sectionId = 'introLectures';
+
+  if (scope === 'graduation_project') {
+    sectionId = 'gradLectures';
+  }
+
+  if (scope === 'submission_files') {
+    sectionId = 'submissionFilesLectures';
+    loadSubmissionFiles();
+  }
+
+  const selected = document.getElementById(sectionId);
+
+  if (selected) {
+    selected.classList.add('active');
+  }
+
+  document.querySelectorAll('#pg-lectures .lecture-tab').forEach(tab => {
+    const isActive = tab === btn;
+    tab.classList.toggle('on', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+
+  setTimeout(resetLectureScroll, 0);
+}
+
 
 async function readApiJson(res) {
   const contentType = (res.headers.get('content-type') || '').toLowerCase();

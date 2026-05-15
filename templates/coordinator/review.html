@@ -98,7 +98,6 @@
       padding: 0;
     }
 
-    /* مهم: استخدمنا .tab.review-tab عشان نغلب ستايل .tab العام */
     #pg-review .tab.review-tab {
       border: 1px solid #d7e3dc !important;
       background: #ffffff !important;
@@ -167,17 +166,193 @@
       font-size: 13px;
     }
 
-    #pg-review #reviewProjectsBox {
-      margin-top: 0;
+    #pg-review .review-project-card {
+      background: #fff;
+      border: 1px solid #e6ece8;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
     }
 
-    #pg-review .card {
-      margin-top: 0 !important;
+    #pg-review .review-project-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    #pg-review .review-project-title {
+      font-size: 16px;
+      font-weight: 900;
+      color: #173b24;
+      margin-bottom: 4px;
+    }
+
+    #pg-review .review-project-meta {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.5;
+    }
+
+    #pg-review .review-project-abstract {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 12px;
+      color: #475467;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    #pg-review .review-project-tags {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    #pg-review .review-chip {
+      background: #e8f3eb;
+      color: #2e7d42;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    #pg-review .review-files-btn {
+      border: 1px solid #ccebd5;
+      background: #fff;
+      color: #2e7d42;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    #pg-review .review-files-btn:hover {
+      background: #f3f7f4;
+    }
+
+    #pg-review .review-files-box {
+      border: 1px solid #e7eee9;
+      background: #fbfdfb;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    #pg-review .review-file-link {
+      display: inline-flex;
+      margin: 4px 8px 4px 0;
+      padding: 7px 10px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #d7e3dc;
+      color: #245c33;
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    #pg-review .review-file-link:hover {
+      background: #f3f7f4;
+    }
+
+    #pg-review .review-file-empty {
+      color: #667085;
+      font-size: 12px;
+    }
+
+    #pg-review .review-notes-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 800;
+      color: #344054;
+      margin-bottom: 6px;
+    }
+
+    #pg-review .review-notes {
+      width: 100%;
+      min-height: 72px;
+      resize: vertical;
+      border: 1px solid #d8e2dc;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+
+    #pg-review .review-notes:focus {
+      border-color: #2e7d42;
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
+    }
+
+    #pg-review .review-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    #pg-review .review-no-files-warning {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #fffaeb;
+      border: 1px solid #fedf89;
+      color: #b54708;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    #pg-review .btn {
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    #pg-review .btn-primary {
+      background: #2e7d42;
+      color: #fff;
+      border-color: #2e7d42;
+    }
+
+    #pg-review .btn-primary:hover {
+      background: #256b36;
+      border-color: #256b36;
+    }
+
+    #pg-review .btn-outline {
+      background: #fff;
+      color: #2e7d42;
+      border-color: #ccebd5;
+    }
+
+    #pg-review .btn-outline:hover {
+      background: #f3f7f4;
+    }
+
+    #pg-review .btn-danger {
+      background: #a33a17;
+      color: #fff;
+      border-color: #a33a17;
+    }
+
+    #pg-review .btn-danger:hover {
+      background: #8f3214;
+      border-color: #8f3214;
     }
 
     #pg-review .pill {
       border-radius: 999px;
       font-weight: 800;
+      white-space: nowrap;
     }
 
     @media (max-width: 620px) {
@@ -188,6 +363,10 @@
 
       #pg-review .review-refresh-btn {
         width: 100%;
+      }
+
+      #pg-review .review-project-head {
+        flex-direction: column;
       }
     }
   </style>
@@ -210,34 +389,42 @@
       <div class="review-info-box">
         Review real projects from the database. You can <b>accept</b>, <b>reject</b>,
         <b>request revision</b>, or send a project to <b>committee evaluation</b>.
+        Projects without uploaded files cannot be reviewed.
       </div>
 
       <div class="review-tabs" role="tablist" aria-label="Review project filters">
-        <button class="tab review-tab on" type="button" onclick="setReviewActiveTab(this); filterReviewProjects('all', this)">
+        <button class="tab review-tab on" type="button"
+          onclick="setReviewActiveTab(this); filterReviewProjects('all', this)">
           All
         </button>
 
-        <button class="tab review-tab" type="button" onclick="setReviewActiveTab(this); filterReviewProjects('submitted', this)">
+        <button class="tab review-tab" type="button"
+          onclick="setReviewActiveTab(this); filterReviewProjects('submitted', this)">
           New
         </button>
 
-        <button class="tab review-tab" type="button" onclick="setReviewActiveTab(this); filterReviewProjects('under_review', this)">
+        <button class="tab review-tab" type="button"
+          onclick="setReviewActiveTab(this); filterReviewProjects('under_review', this)">
           In Review
         </button>
 
-        <button class="tab review-tab" type="button" onclick="setReviewActiveTab(this); filterReviewProjects('needs_revision', this)">
+        <button class="tab review-tab" type="button"
+          onclick="setReviewActiveTab(this); filterReviewProjects('needs_revision', this)">
           Needs Revision
         </button>
 
-        <button class="tab review-tab" type="button" onclick="setReviewActiveTab(this); filterReviewProjects('committee_evaluation', this)">
+        <button class="tab review-tab" type="button"
+          onclick="setReviewActiveTab(this); filterReviewProjects('committee_evaluation', this)">
           Committee
         </button>
 
-        <button class="tab review-tab" type="button" onclick="setReviewActiveTab(this); filterReviewProjects('accepted', this)">
+        <button class="tab review-tab" type="button"
+          onclick="setReviewActiveTab(this); filterReviewProjects('accepted', this)">
           Accepted
         </button>
 
-        <button class="tab review-tab" type="button" onclick="setReviewActiveTab(this); filterReviewProjects('rejected', this)">
+        <button class="tab review-tab" type="button"
+          onclick="setReviewActiveTab(this); filterReviewProjects('rejected', this)">
           Rejected
         </button>
       </div>
@@ -250,11 +437,17 @@
     </div>
   </div>
 </div>
+</div>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
   if ('scrollRestoration' in history) {
     history.scrollRestoration = 'manual';
   }
+
+  let reviewProjectsData = [];
+  let currentReviewFilter = 'all';
 
   function resetReviewScroll() {
     window.scrollTo(0, 0);
@@ -263,9 +456,7 @@
 
     ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-review'].forEach(selector => {
       const el = document.querySelector(selector);
-      if (el) {
-        el.scrollTop = 0;
-      }
+      if (el) el.scrollTop = 0;
     });
   }
 
@@ -274,18 +465,327 @@
       tab.classList.remove('on');
     });
 
-    if (btn) {
-      btn.classList.add('on');
+    if (btn) btn.classList.add('on');
+  }
+
+  function setReviewMessage(message, type) {
+    const msg = document.getElementById('reviewMsg');
+    if (!msg) return;
+
+    msg.textContent = message || '';
+    msg.className = 'review-message';
+
+    if (type) msg.classList.add(type);
+  }
+
+  function reviewEscape(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  function reviewStatusLabel(status) {
+    const labels = {
+      submitted: 'New',
+      under_review: 'In Review',
+      needs_revision: 'Needs Revision',
+      committee_evaluation: 'Committee',
+      accepted: 'Accepted',
+      archived: 'Archived',
+      rejected: 'Rejected'
+    };
+
+    return labels[status] || status || 'Unknown';
+  }
+
+  function reviewStatusClass(status) {
+    if (status === 'accepted' || status === 'archived') return 'p-accepted';
+    if (status === 'rejected') return 'p-rejected';
+    if (status === 'committee_evaluation' || status === 'under_review') return 'p-review';
+    if (status === 'needs_revision') return 'p-pending';
+    return 'p-pending';
+  }
+
+  function updateReviewSidebarBadge(count) {
+    const badge = document.getElementById('reviewPendingBadge');
+    if (!badge) return;
+
+    const n = Number(count || 0);
+    badge.textContent = n;
+    badge.style.display = n > 0 ? 'inline-flex' : 'none';
+  }
+
+  function buildFileHref(file) {
+    const directUrl = file.file_url || file.url || file.download_url;
+    if (directUrl) return directUrl;
+
+    const path = String(file.file_path || file.path || file.stored_path || '');
+    if (!path) return '#';
+
+    const cleanPath = path.replaceAll('\\', '/');
+
+    if (cleanPath.startsWith('/static/')) {
+      return cleanPath;
     }
 
-    setTimeout(resetReviewScroll, 0);
+    return `/static/${cleanPath.replace(/^static\//, '')}`;
+  }
+
+  async function loadProjectFiles(projectId) {
+    const box = document.getElementById(`projectFilesBox-${projectId}`);
+    const btn = document.getElementById(`projectFilesBtn-${projectId}`);
+
+    if (!box) return;
+
+    if (box.dataset.loaded === '1') {
+      const hidden = box.style.display === 'none';
+      box.style.display = hidden ? 'block' : 'none';
+
+      if (btn) {
+        btn.textContent = hidden ? 'Hide Files' : btn.dataset.originalText;
+      }
+
+      return;
+    }
+
+    box.style.display = 'block';
+    box.innerHTML = '<div class="review-file-empty">Loading files...</div>';
+
+    try {
+      const res = await fetch(`/api/coordinator/project-files/${projectId}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to load files.');
+      }
+
+      const files = data.files || [];
+
+      if (!files.length) {
+        box.innerHTML = '<div class="review-file-empty">No files found.</div>';
+        return;
+      }
+
+      box.dataset.loaded = '1';
+
+      box.innerHTML = files.map(file => {
+        const name = reviewEscape(
+          file.file_name ||
+          file.filename ||
+          file.original_filename ||
+          file.stored_name ||
+          'File'
+        );
+
+        const href = buildFileHref(file);
+
+        return `
+          <a class="review-file-link" href="${reviewEscape(href)}" target="_blank">
+            📎 ${name}
+          </a>
+        `;
+      }).join('');
+
+      if (btn) {
+        btn.dataset.originalText = btn.dataset.originalText || btn.textContent;
+        btn.textContent = 'Hide Files';
+      }
+    } catch (err) {
+      box.innerHTML = `<div class="review-file-empty">${reviewEscape(err.message)}</div>`;
+    }
+  }
+
+  function renderReviewProjects() {
+    const box = document.getElementById('reviewProjectsBox');
+    if (!box) return;
+
+    const rows = currentReviewFilter === 'all'
+      ? reviewProjectsData
+      : reviewProjectsData.filter(project => project.status === currentReviewFilter);
+
+    if (!rows.length) {
+      box.innerHTML = '<div class="review-empty">No projects in this filter.</div>';
+      return;
+    }
+
+    box.innerHTML = rows.map(project => {
+      const filesCount = Number(project.files_count || 0);
+      const hasFiles = filesCount > 0;
+
+      return `
+        <div class="review-project-card">
+          <div class="review-project-head">
+            <div>
+              <div class="review-project-title">
+                ${reviewEscape(project.title || 'Untitled Project')}
+              </div>
+
+              <div class="review-project-meta">
+                ${reviewEscape(project.team_members || 'No team members')}
+                ${project.supervisor_name ? ' · Dr. ' + reviewEscape(project.supervisor_name) : ''}
+              </div>
+            </div>
+
+            <span class="pill ${reviewStatusClass(project.status)}">
+              ${reviewStatusLabel(project.status)}
+            </span>
+          </div>
+
+          <div class="review-project-abstract">
+            ${reviewEscape(project.abstract || 'No abstract provided.')}
+          </div>
+
+          <div class="review-project-tags">
+            ${project.project_type ? `<span class="review-chip">${reviewEscape(project.project_type)}</span>` : ''}
+
+            ${
+              hasFiles
+                ? `
+                  <button
+                    class="review-files-btn"
+                    id="projectFilesBtn-${project.project_id}"
+                    type="button"
+                    data-original-text="Files: ${filesCount}"
+                    onclick="loadProjectFiles(${project.project_id})">
+                    Files: ${filesCount}
+                  </button>
+                `
+                : ''
+            }
+          </div>
+
+          ${
+            hasFiles
+              ? `<div class="review-files-box" id="projectFilesBox-${project.project_id}" style="display:none"></div>`
+              : ''
+          }
+
+          <label class="review-notes-label">Reviewer Notes</label>
+
+          <textarea
+            class="review-notes"
+            id="reviewNotes-${project.project_id}"
+            placeholder="Add notes...">${reviewEscape(project.coordinator_notes || '')}</textarea>
+
+          ${
+            hasFiles
+              ? `
+                <div class="review-actions">
+                  <button class="btn btn-primary" type="button" onclick="submitReviewDecision(${project.project_id}, 'accepted')">
+                    ✓ Accept
+                  </button>
+
+                  <button class="btn btn-danger" type="button" onclick="submitReviewDecision(${project.project_id}, 'rejected')">
+                    X Reject
+                  </button>
+
+                  <button class="btn btn-outline" type="button" onclick="submitReviewDecision(${project.project_id}, 'needs_revision')">
+                    Request Revision
+                  </button>
+
+                  <button class="btn btn-outline" type="button" onclick="submitReviewDecision(${project.project_id}, 'send_to_committee')">
+                    Send to Committee
+                  </button>
+                </div>
+              `
+              : `
+                <div class="review-no-files-warning">
+                  This project has no uploaded files. Review actions are disabled until students upload at least one file.
+                </div>
+              `
+          }
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function loadReviewProjects() {
+    const box = document.getElementById('reviewProjectsBox');
+    setReviewMessage('', '');
+
+    if (box) {
+      box.innerHTML = '<div class="review-empty">Loading projects...</div>';
+    }
+
+    try {
+      const res = await fetch('/api/coordinator/review-projects');
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to load review projects.');
+      }
+
+      reviewProjectsData = data.projects || [];
+
+      const dynamicCount = data.review_badge_count ?? reviewProjectsData.filter(project =>
+        ['submitted', 'under_review', 'needs_revision'].includes(project.status)
+      ).length;
+
+      updateReviewSidebarBadge(dynamicCount);
+      renderReviewProjects();
+    } catch (err) {
+      if (box) {
+        box.innerHTML = `<div class="review-empty">${reviewEscape(err.message)}</div>`;
+      }
+
+      setReviewMessage(err.message, 'error');
+    }
+  }
+
+  function filterReviewProjects(status, btn) {
+    currentReviewFilter = status || 'all';
+    setReviewActiveTab(btn);
+    renderReviewProjects();
+  }
+
+  async function submitReviewDecision(projectId, decision) {
+    const project = reviewProjectsData.find(item => Number(item.project_id) === Number(projectId));
+
+    if (project && Number(project.files_count || 0) === 0) {
+      alert('This project has no uploaded files. You cannot review it until at least one file is uploaded.');
+      return;
+    }
+
+    const notesEl = document.getElementById(`reviewNotes-${projectId}`);
+    const notes = notesEl ? notesEl.value.trim() : '';
+
+    try {
+      const res = await fetch(`/api/coordinator/review-project/${projectId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          decision,
+          notes
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to save decision.');
+      }
+
+      setReviewMessage(data.message || 'Review decision saved successfully.', 'ok');
+      await loadReviewProjects();
+    } catch (err) {
+      alert(err.message);
+      setReviewMessage(err.message, 'error');
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     const firstTab = document.querySelector('#pg-review .review-tab');
+
     if (firstTab) {
       setReviewActiveTab(firstTab);
     }
+
+    loadReviewProjects();
 
     setTimeout(resetReviewScroll, 0);
     setTimeout(resetReviewScroll, 100);

@@ -264,6 +264,77 @@
     white-space: nowrap;
   }
 
+  #pg-lectures .submission-filter-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 18px 14px 18px;
+  }
+
+  #pg-lectures .submission-filter-btn {
+    border: 1px solid #d7e3dc;
+    background: #fff;
+    color: #2d5137;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  #pg-lectures .submission-filter-btn.on {
+    background: #2e7d42;
+    border-color: #2e7d42;
+    color: #fff;
+  }
+
+  #pg-lectures .submission-file-card {
+    border: 1px solid #e7eee9;
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
+  }
+
+  #pg-lectures .submission-file-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  #pg-lectures .submission-file-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #173b24;
+  }
+
+  #pg-lectures .submission-file-meta {
+    font-size: 12px;
+    color: #667085;
+    line-height: 1.6;
+  }
+
+  #pg-lectures .submission-file-link {
+    display: inline-flex;
+    margin-top: 10px;
+    padding: 8px 11px;
+    border-radius: 10px;
+    background: #f3f7f4;
+    border: 1px solid #d7e3dc;
+    color: #245c33;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  #pg-lectures .submission-file-link:hover {
+    background: #e8f3eb;
+  }
+
   @media(max-width:900px) {
     #pg-lectures .lecture-grid,
     #pg-lectures .form-grid {
@@ -291,6 +362,10 @@
 
     <button class="lecture-tab" type="button" role="tab" aria-selected="false" onclick="showLectureSection('graduation_project', this)">
       Graduation Projects
+    </button>
+
+    <button class="lecture-tab" type="button" role="tab" aria-selected="false" onclick="showLectureSection('submission_files', this)">
+      Submission Files
     </button>
   </div>
 
@@ -367,8 +442,39 @@
       </div>
     </div>
   </div>
-</div>
 
+  <div id="submissionFilesLectures" class="lecture-section" data-scope="submission_files">
+    <div class="course-head">
+      <span class="course-badge">▣ Submission Files</span>
+      <span class="course-ar">ملفات التسليم</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Students Submitted Files</span>
+        <button class="card-action" type="button" onclick="loadSubmissionFiles()">Refresh</button>
+      </div>
+
+      <div class="lecture-note">
+        This tab shows submitted files such as reports and final submissions.
+        Example: <b>Report One — COMP4200</b>, submitted by the student name with the uploaded file.
+      </div>
+
+      <div class="submission-filter-row">
+        <button class="submission-filter-btn on" type="button" onclick="filterSubmissionFiles('all', this)">All</button>
+        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4200', this)">COMP4200</button>
+        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4300', this)">COMP4300</button>
+      </div>
+
+      <div id="submissionFilesList" style="padding:0 18px 18px 18px">
+        <div class="empty-box">Loading submitted files...</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
   const scopeLabels = {
     introduction: 'Project Introduction',
@@ -386,6 +492,9 @@
     }
   };
 
+  let submissionFilesState = [];
+  let currentSubmissionFilter = 'all';
+
   function resetLectureScroll() {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
@@ -402,7 +511,17 @@
       section.classList.remove('active');
     });
 
-    const sectionId = scope === 'introduction' ? 'introLectures' : 'gradLectures';
+    let sectionId = 'introLectures';
+
+    if (scope === 'graduation_project') {
+      sectionId = 'gradLectures';
+    }
+
+    if (scope === 'submission_files') {
+      sectionId = 'submissionFilesLectures';
+      loadSubmissionFiles();
+    }
+
     const selected = document.getElementById(sectionId);
 
     if (selected) {
@@ -728,8 +847,106 @@
     await loadLecturesData();
   }
 
+  function buildSubmissionFileHref(file) {
+    if (file.download_url) {
+      return file.download_url;
+    }
+
+    const path = String(file.file_path || '');
+
+    if (!path) return '#';
+
+    const cleanPath = path.replaceAll('\\', '/');
+
+    if (cleanPath.startsWith('/static/')) return cleanPath;
+    if (cleanPath.startsWith('static/')) return '/' + cleanPath;
+
+    return `/static/${cleanPath}`;
+  }
+
+  function filterSubmissionFiles(scope, btn) {
+    currentSubmissionFilter = scope || 'all';
+
+    document.querySelectorAll('#pg-lectures .submission-filter-btn').forEach(button => {
+      button.classList.remove('on');
+    });
+
+    if (btn) btn.classList.add('on');
+
+    renderSubmissionFiles();
+  }
+
+  function renderSubmissionFiles() {
+    const box = document.getElementById('submissionFilesList');
+
+    if (!box) return;
+
+    const rows = currentSubmissionFilter === 'all'
+      ? submissionFilesState
+      : submissionFilesState.filter(file => file.course_scope === currentSubmissionFilter);
+
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty-box">No submitted files found.</div>';
+      return;
+    }
+
+    box.innerHTML = rows.map(file => {
+      const href = buildSubmissionFileHref(file);
+      const title = `${safe(file.submission_title || 'Submission')} — ${safe(file.course_scope || 'Course')}`;
+
+      return `
+        <div class="submission-file-card">
+          <div class="submission-file-head">
+            <div>
+              <div class="submission-file-title">${title}</div>
+
+              <div class="submission-file-meta">
+                Project: <b>${safe(file.project_title || 'Untitled Project')}</b>
+              </div>
+
+              <div class="submission-file-meta">
+                Submitted by: <b>${safe(file.submitted_by || 'Unknown student')}</b>
+              </div>
+
+              <div class="submission-file-meta">
+                Uploaded at: ${safe(file.uploaded_at || '—')}
+              </div>
+            </div>
+
+            <span class="pill p-review">${safe(file.course_label || file.course_scope || 'Submission')}</span>
+          </div>
+
+          <a class="submission-file-link" href="${safe(href)}" target="_blank">
+            📎 ${safe(file.file_name || 'Open file')}
+          </a>
+        </div>
+      `;
+    }).join('');
+  }
+
+  
+
+  async function loadSubmissionFiles() {
+    const box = document.getElementById('submissionFilesList');
+
+    if (box) {
+      box.innerHTML = '<div class="empty-box">Loading submitted files...</div>';
+    }
+
+    try {
+      const data = await apiFetch('/api/coordinator/submission-files');
+      submissionFilesState = data.files || [];
+      renderSubmissionFiles();
+    } catch (err) {
+      if (box) {
+        box.innerHTML = `<div class="empty-box">Submission files error: ${safe(err.message)}</div>`;
+      }
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     loadLecturesData();
+    loadSubmissionFiles();
 
     const firstTab = document.querySelector('#pg-lectures .lecture-tab');
     showLectureSection('introduction', firstTab);

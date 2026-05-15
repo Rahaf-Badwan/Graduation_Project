@@ -2178,6 +2178,7 @@ def api_assign_group_supervisor():
 def api_add_section():
     data = request.get_json(silent=True) or {}
     section_name = (data.get("section_name") or "").strip()
+    section_name = " ".join(section_name.split())
     supervisor_id = data.get("supervisor_id")
     student_ids = data.get("student_ids") or []
 
@@ -2199,6 +2200,23 @@ def api_add_section():
             cursor.close()
             db.close()
             return jsonify({"error": "No active semester found."}), 400
+
+        cursor.execute(
+            """
+            SELECT section_id
+            FROM student_distribution_sections
+            WHERE LOWER(TRIM(section_name)) = LOWER(TRIM(%s))
+            LIMIT 1
+            """,
+            (section_name,),
+        )
+        if cursor.fetchone():
+            cursor.close()
+            db.close()
+            return (
+                jsonify({"error": "This section name already exists. Please choose another name."}),
+                400,
+            )
 
         anchor = _get_anchor_semester_for_year(cursor, semester["academic_year"])
         anchor_semester_id = anchor["semester_id"] if anchor else None
@@ -2734,9 +2752,82 @@ def api_review_projects():
             (semester["semester_id"],),
         )
         projects = cursor.fetchall()
+
+        review_badge_count = sum(
+            1
+            for project in projects
+            if project.get("status") in ("submitted", "under_review", "needs_revision")
+        )
+
         cursor.close()
         db.close()
-        return jsonify(_json_safe_value({"projects": projects}))
+        return jsonify(
+            _json_safe_value(
+                {
+                    "projects": projects,
+                    "review_badge_count": review_badge_count,
+                }
+            )
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/project-files/<int:project_id>", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_project_files(project_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        if not _table_exists(cursor, "project_files"):
+            cursor.close()
+            db.close()
+            return jsonify({"files": []})
+
+        cursor.execute(
+            """
+            SELECT *
+            FROM project_files
+            WHERE project_id = %s
+            ORDER BY file_id DESC
+            """,
+            (project_id,),
+        )
+        rows = cursor.fetchall()
+
+        cursor.close()
+        db.close()
+
+        files = []
+        for row in rows:
+            file_id = row.get("file_id")
+            file_name = (
+                row.get("file_name")
+                or row.get("filename")
+                or row.get("original_filename")
+                or row.get("stored_name")
+                or f"File {file_id}"
+            )
+
+            file_path = (
+                row.get("file_path")
+                or row.get("path")
+                or row.get("stored_path")
+                or ""
+            )
+
+            files.append(
+                {
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "file_path": file_path,
+                    "uploaded_at": str(row.get("uploaded_at") or row.get("created_at") or ""),
+                }
+            )
+
+        return jsonify({"files": files})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

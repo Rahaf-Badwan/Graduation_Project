@@ -3802,3 +3802,33 @@ CREATE TABLE IF NOT EXISTS coordinator_deliverables (
         FOREIGN KEY (semester_id) REFERENCES semesters(semester_id)
         ON DELETE SET NULL
 );
+
+
+CREATE TABLE IF NOT EXISTS coordinator_deliverable_submissions (
+    submission_id INT PRIMARY KEY AUTO_INCREMENT,
+    deliverable_id INT NOT NULL,
+    project_id INT NULL,
+    student_id INT NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(600) NULL,
+    file_data LONGBLOB NULL,
+    file_mime VARCHAR(120) NULL,
+    file_size_mb DECIMAL(7,2) NULL,
+    submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('submitted','late','reviewed') NOT NULL DEFAULT 'submitted',
+    notes TEXT NULL,
+
+    UNIQUE KEY uq_deliverable_student (deliverable_id, student_id),
+
+    FOREIGN KEY (deliverable_id)
+        REFERENCES coordinator_deliverables(deliverable_id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (project_id)
+        REFERENCES projects(project_id)
+        ON DELETE SET NULL,
+
+    FOREIGN KEY (student_id)
+        REFERENCES students(student_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
