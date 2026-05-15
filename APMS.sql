@@ -16,6 +16,13 @@ SET FOREIGN_KEY_CHECKS = 0;
 SET NAMES utf8mb4;
 
 -- Drop all tables if they exist (safe re-run)
+DROP TABLE IF EXISTS milestone_submissions;
+DROP TABLE IF EXISTS comp4200_timeline_items;
+DROP TABLE IF EXISTS comp4200_timelines;
+DROP TABLE IF EXISTS coordinator_deliverable_submissions;
+DROP TABLE IF EXISTS coordinator_deliverables;
+DROP TABLE IF EXISTS coordinator_lectures;
+DROP TABLE IF EXISTS section_completion_status;
 DROP TABLE IF EXISTS ai_conversations;
 DROP TABLE IF EXISTS challenges_reflections;
 DROP TABLE IF EXISTS supervisor_assignments;
@@ -3688,6 +3695,7 @@ CREATE TABLE IF NOT EXISTS comp4200_timeline_items (
     description     TEXT NULL,
     start_date      DATE NULL,
     due_date        DATE NOT NULL,
+    due_time        VARCHAR(5) NULL,
     milestone_label VARCHAR(180) NULL,
     is_deadline     BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -3718,6 +3726,7 @@ CREATE TABLE IF NOT EXISTS comp4200_timeline_items (
     description     TEXT NULL,
     start_date      DATE NULL,
     due_date        DATE NOT NULL,
+    due_time        VARCHAR(5) NULL,
     milestone_label VARCHAR(180) NULL,
     is_deadline     BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

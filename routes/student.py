@@ -298,6 +298,12 @@ def api_dashboard_data():
         )
         project = cursor.fetchone()
         if not project:
+            milestone = _student_dashboard_milestone_progress(
+                cursor, student_id, project_id=None, final_report_uploaded=False
+            )
+            result["milestone_progress"] = milestone
+            result["progress"]["overall"] = milestone["overall"]
+            result["deadlines"] = _student_intro_timeline_deadlines(cursor)
             return jsonify(_json_safe(result))
 
         project_id = project["project_id"]
@@ -379,125 +385,14 @@ def api_dashboard_data():
         )
         result["file_status"] = file_status
 
-        # 6. Semester progress: each published timeline item counts equally,
-        # and the final report is the last step that moves progress to 100%.
-        milestone_total = 0
-        milestone_submitted = 0
-        last_milestone_submission = ""
-        last_milestone_title = ""
-        try:
-            if _student_intro_timeline_tables_ready(cursor):
-                cursor.execute(
-                    """
-                    SELECT timeline_id
-                    FROM   comp4200_timelines
-                    WHERE  is_published = TRUE
-                    ORDER  BY (semester_id = %s) DESC,
-                              semester_id DESC,
-                              timeline_id DESC
-                    LIMIT  1
-                    """,
-                    (semester_id,),
-                )
-                timeline_row = cursor.fetchone()
-                timeline_id = (timeline_row or {}).get("timeline_id")
-
-                if timeline_id:
-                    cursor.execute(
-                        """
-                        SELECT COUNT(*) AS total
-                        FROM   comp4200_timeline_items
-                        WHERE  timeline_id = %s
-                        """,
-                        (timeline_id,),
-                    )
-                    milestone_total = int((cursor.fetchone() or {}).get("total") or 0)
-
-                    cursor.execute("""
-                        SELECT COUNT(*) AS tbl_exists
-                        FROM INFORMATION_SCHEMA.TABLES
-                        WHERE TABLE_SCHEMA = DATABASE()
-                          AND TABLE_NAME = 'milestone_submissions'
-                    """)
-                    if (cursor.fetchone() or {}).get("tbl_exists"):
-                        cursor.execute(
-                            """
-                            SELECT COUNT(DISTINCT ms.item_id) AS submitted
-                            FROM   milestone_submissions ms
-                            JOIN   comp4200_timeline_items ti
-                                   ON ti.item_id = ms.item_id
-                            WHERE  ti.timeline_id = %s
-                              AND (
-                                    ms.project_id = %s
-                                 OR ms.student_id = %s
-                                 OR EXISTS (
-                                      SELECT 1
-                                      FROM   project_members pm_team
-                                      WHERE  pm_team.project_id = %s
-                                        AND  pm_team.student_id = ms.student_id
-                                    )
-                              )
-                            """,
-                            (timeline_id, project_id, student_id, project_id),
-                        )
-                        milestone_submitted = int(
-                            (cursor.fetchone() or {}).get("submitted") or 0
-                        )
-
-                        cursor.execute(
-                            """
-                            SELECT ms.submitted_at, ti.title
-                            FROM   milestone_submissions ms
-                            JOIN   comp4200_timeline_items ti
-                                   ON ti.item_id = ms.item_id
-                            WHERE  ti.timeline_id = %s
-                              AND (
-                                    ms.project_id = %s
-                                 OR ms.student_id = %s
-                                 OR EXISTS (
-                                      SELECT 1
-                                      FROM   project_members pm_team
-                                      WHERE  pm_team.project_id = %s
-                                        AND  pm_team.student_id = ms.student_id
-                                    )
-                              )
-                            ORDER  BY ms.submitted_at DESC
-                            LIMIT  1
-                            """,
-                            (timeline_id, project_id, student_id, project_id),
-                        )
-                        last_row = cursor.fetchone() or {}
-                        last_milestone_submission = _fmt_date(
-                            last_row.get("submitted_at")
-                        )
-                        last_milestone_title = last_row.get("title") or ""
-        except Exception:
-            milestone_total = 0
-            milestone_submitted = 0
-
         final_report_uploaded = bool(file_status["final_report"]["uploaded"])
-        total_steps = milestone_total + 1
-        completed_steps = min(milestone_submitted, milestone_total) + (
-            1 if final_report_uploaded else 0
+        result["milestone_progress"] = _student_dashboard_milestone_progress(
+            cursor,
+            student_id,
+            project_id=project_id,
+            final_report_uploaded=final_report_uploaded,
         )
-        semester_overall = (
-            (
-                100
-                if final_report_uploaded
-                else round((completed_steps / total_steps) * 100)
-            )
-            if total_steps
-            else 0
-        )
-        result["milestone_progress"] = {
-            "submitted": min(milestone_submitted, milestone_total),
-            "total": milestone_total,
-            "final_report_uploaded": final_report_uploaded,
-            "last_submission": last_milestone_submission,
-            "last_submission_title": last_milestone_title,
-            "overall": semester_overall,
-        }
-        result["progress"]["overall"] = semester_overall
+        result["progress"]["overall"] = result["milestone_progress"]["overall"]
 
         # 7. Deadlines — من جدول deadlines + timeline items
         cursor.execute(
@@ -532,6 +427,8 @@ def api_dashboard_data():
                 FROM   comp4200_timeline_items ti
                 JOIN   comp4200_timelines t ON t.timeline_id = ti.timeline_id
                 WHERE  t.is_published = TRUE
+                  AND  ti.is_deadline = TRUE
+                  AND  COALESCE(ti.is_archived, FALSE) = FALSE
                   AND  ti.due_date   >= CURDATE()
                 ORDER  BY ti.due_date ASC
                 """)
@@ -577,6 +474,8 @@ def api_dashboard_data():
                     FROM   comp4200_timeline_items ti
                     JOIN   comp4200_timelines t ON t.timeline_id = ti.timeline_id
                     WHERE  t.is_published = TRUE
+                      AND  ti.is_deadline = TRUE
+                      AND  COALESCE(ti.is_archived, FALSE) = FALSE
                       AND  ti.due_date   >= CURDATE()
                     """)
                 tnr = cursor.fetchone()
@@ -712,6 +611,162 @@ def _student_active_semester(cursor):
     return cursor.fetchone()
 
 
+def _student_published_intro_timeline(cursor):
+    if not _student_intro_timeline_tables_ready(cursor):
+        return None
+
+    semester = _student_active_semester(cursor)
+    if not semester:
+        return None
+
+    cursor.execute(
+        """
+        SELECT timeline_id, semester_id, title, note, is_published, published_at, updated_at
+        FROM comp4200_timelines
+        WHERE semester_id = %s AND is_published = TRUE
+        LIMIT 1
+        """,
+        (semester["semester_id"],),
+    )
+    return cursor.fetchone()
+
+
+def _student_dashboard_milestone_progress(
+    cursor, student_id, project_id=None, final_report_uploaded=False
+):
+    milestone_total = 0
+    milestone_submitted = 0
+    last_milestone_submission = ""
+    last_milestone_title = ""
+
+    try:
+        timeline = _student_published_intro_timeline(cursor)
+        timeline_id = (timeline or {}).get("timeline_id")
+        if timeline_id:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM comp4200_timeline_items
+                WHERE timeline_id = %s
+                  AND is_deadline = TRUE
+                  AND COALESCE(is_archived, FALSE) = FALSE
+                """,
+                (timeline_id,),
+            )
+            milestone_total = int((cursor.fetchone() or {}).get("total") or 0)
+
+            cursor.execute("""
+                SELECT COUNT(*) AS tbl_exists
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'milestone_submissions'
+            """)
+            if (cursor.fetchone() or {}).get("tbl_exists"):
+                if project_id:
+                    submit_where = """
+                          AND (
+                                ms.project_id = %s
+                             OR ms.student_id = %s
+                             OR EXISTS (
+                                  SELECT 1
+                                  FROM project_members pm_team
+                                  WHERE pm_team.project_id = %s
+                                    AND pm_team.student_id = ms.student_id
+                                )
+                          )
+                    """
+                    submit_params = (project_id, student_id, project_id)
+                else:
+                    submit_where = " AND ms.student_id = %s"
+                    submit_params = (student_id,)
+
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(DISTINCT ms.item_id) AS submitted
+                    FROM milestone_submissions ms
+                    JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                    WHERE ti.timeline_id = %s
+                    {submit_where}
+                    """,
+                    (timeline_id, *submit_params),
+                )
+                milestone_submitted = int(
+                    (cursor.fetchone() or {}).get("submitted") or 0
+                )
+
+                cursor.execute(
+                    f"""
+                    SELECT ms.submitted_at, ti.title
+                    FROM milestone_submissions ms
+                    JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                    WHERE ti.timeline_id = %s
+                    {submit_where}
+                    ORDER BY ms.submitted_at DESC
+                    LIMIT 1
+                    """,
+                    (timeline_id, *submit_params),
+                )
+                last_row = cursor.fetchone() or {}
+                last_milestone_submission = _fmt_date(last_row.get("submitted_at"))
+                last_milestone_title = last_row.get("title") or ""
+    except Exception:
+        milestone_total = 0
+        milestone_submitted = 0
+        last_milestone_submission = ""
+        last_milestone_title = ""
+
+    total_steps = milestone_total + 1
+    completed_steps = min(milestone_submitted, milestone_total) + (
+        1 if final_report_uploaded else 0
+    )
+    overall = (
+        100
+        if final_report_uploaded
+        else round((completed_steps / total_steps) * 100)
+        if total_steps
+        else 0
+    )
+
+    return {
+        "submitted": min(milestone_submitted, milestone_total),
+        "total": milestone_total,
+        "final_report_uploaded": final_report_uploaded,
+        "last_submission": last_milestone_submission,
+        "last_submission_title": last_milestone_title,
+        "overall": overall,
+    }
+
+
+def _student_intro_timeline_deadlines(cursor, limit=5):
+    timeline = _student_published_intro_timeline(cursor)
+    timeline_id = (timeline or {}).get("timeline_id")
+    if not timeline_id:
+        return []
+
+    cursor.execute(
+        """
+        SELECT title, due_date
+        FROM comp4200_timeline_items
+        WHERE timeline_id = %s
+          AND is_deadline = TRUE
+          AND COALESCE(is_archived, FALSE) = FALSE
+          AND due_date >= CURDATE()
+        ORDER BY due_date ASC, item_order ASC, item_id ASC
+        LIMIT %s
+        """,
+        (timeline_id, limit),
+    )
+    return [
+        {
+            "label": row.get("title") or "Timeline milestone",
+            "date_str": _fmt_short(row.get("due_date")),
+            "deadline_type": "timeline",
+            "_sort": _as_date(row.get("due_date")),
+        }
+        for row in cursor.fetchall()
+    ]
+
+
 @student_bp.route("/timeline")
 @login_required(role="student")
 def timeline():
@@ -741,16 +796,7 @@ def api_student_intro_timeline():
             return jsonify(
                 {"timeline": None, "items": [], "message": "No active semester found."}
             )
-        cursor.execute(
-            """
-            SELECT timeline_id, semester_id, title, note, is_published, published_at, updated_at
-            FROM comp4200_timelines
-            WHERE semester_id = %s AND is_published = TRUE
-            LIMIT 1
-            """,
-            (semester["semester_id"],),
-        )
-        timeline = cursor.fetchone()
+        timeline = _student_published_intro_timeline(cursor)
         if not timeline:
             cursor.close()
             db.close()
@@ -763,9 +809,9 @@ def api_student_intro_timeline():
             )
         cursor.execute(
             """
-            SELECT item_id, item_order, title, description, start_date, due_date, milestone_label, is_deadline
+            SELECT item_id, item_order, title, description, start_date, due_date, due_time, milestone_label, is_deadline
             FROM comp4200_timeline_items
-            WHERE timeline_id = %s
+            WHERE timeline_id = %s AND COALESCE(is_archived, FALSE) = FALSE AND is_deadline = TRUE
             ORDER BY item_order ASC, due_date ASC, item_id ASC
             """,
             (timeline["timeline_id"],),
@@ -773,6 +819,13 @@ def api_student_intro_timeline():
         items = cursor.fetchall()
         for item in items:
             item["is_deadline"] = bool(item.get("is_deadline"))
+            # Combine date+time for frontend datetime-local display
+            due_date_str = str(item.get("due_date") or "")
+            due_time_str = (item.get("due_time") or "").strip()
+            if due_date_str and due_time_str:
+                item["due_date"] = f"{due_date_str}T{due_time_str}"
+            else:
+                item["due_date"] = due_date_str
         timeline["is_published"] = bool(timeline.get("is_published"))
         cursor.close()
         db.close()
@@ -2174,6 +2227,8 @@ def api_milestone_submit():
                 submitted_to   ENUM('supervisor','coordinator','both')
                                NOT NULL DEFAULT 'supervisor',
                 submitted_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                item_title     VARCHAR(255) NULL,
+                item_label     VARCHAR(180) NULL,
                 INDEX idx_ms_item    (item_id),
                 INDEX idx_ms_student (student_id),
                 FOREIGN KEY (item_id)
@@ -2188,6 +2243,18 @@ def api_milestone_submit():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
+        # Migration: add snapshot columns if not exist (use existing dictionary cursor)
+        for _col, _col_def in [("item_title", "VARCHAR(255) NULL"), ("item_label", "VARCHAR(180) NULL")]:
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='milestone_submissions' AND COLUMN_NAME=%s
+                """, (_col,))
+                _row = cursor.fetchone() or {}
+                if not int(_row.get("cnt") or 0):
+                    cursor.execute(f"ALTER TABLE milestone_submissions ADD COLUMN {_col} {_col_def}")
+            except Exception:
+                pass
         # ── جيب بيانات الطالب ─────────────────────────────────────
         cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
         st_row = cursor.fetchone()
@@ -2199,7 +2266,11 @@ def api_milestone_submit():
 
         # ── جيب بيانات الـ milestone item ─────────────────────────
         cursor.execute(
-            "SELECT item_id, title, milestone_label FROM comp4200_timeline_items WHERE item_id = %s",
+            """
+            SELECT item_id, title, milestone_label, start_date, due_date, due_time, is_archived
+            FROM comp4200_timeline_items
+            WHERE item_id = %s
+            """,
             (int(item_id),),
         )
         item = cursor.fetchone()
@@ -2207,6 +2278,35 @@ def api_milestone_submit():
             cursor.close()
             db.close()
             return jsonify({"error": "Timeline item not found."}), 404
+
+        from datetime import date as _date, datetime as _datetime
+
+        now = _datetime.now()
+        today = _date.today()
+        start = _as_date(item.get("start_date"))
+
+        # Build due datetime: combine due_date + due_time if available
+        due_date_val = _as_date(item.get("due_date"))
+        due_time_str = (item.get("due_time") or "").strip()
+        if due_date_val and due_time_str:
+            try:
+                due_dt = _datetime.strptime(f"{due_date_val} {due_time_str}", "%Y-%m-%d %H:%M")
+            except ValueError:
+                due_dt = _datetime(due_date_val.year, due_date_val.month, due_date_val.day, 23, 59)
+        elif due_date_val:
+            due_dt = _datetime(due_date_val.year, due_date_val.month, due_date_val.day, 23, 59)
+        else:
+            due_dt = None
+
+        if start and today < start:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "The submission window has not opened yet."}), 403
+
+        if due_dt and now > due_dt:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "The submission window has closed. No more uploads are allowed."}), 403
 
         # ── حدد submitted_to من milestone_label ───────────────────
         label_lower = (item.get("milestone_label") or "").lower()
@@ -2285,10 +2385,7 @@ def api_milestone_submit():
                 )
 
             # نفس الطالب → تحقق إن الـ deadline ما فات
-            from datetime import date as _date
-
-            due = _as_date(item.get("due_date"))
-            if due and due < _date.today():
+            if due_dt and _datetime.now() > due_dt:
                 cursor.close()
                 db.close()
                 return (
@@ -2317,8 +2414,9 @@ def api_milestone_submit():
             """
             INSERT INTO milestone_submissions
                 (item_id, student_id, project_id, file_name,
-                 file_data, file_mime, file_size_mb, submitted_to)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                 file_data, file_mime, file_size_mb, submitted_to,
+                 item_title, item_label)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 int(item_id),
@@ -2329,6 +2427,8 @@ def api_milestone_submit():
                 mime_type,
                 size_mb,
                 submitted_to,
+                item.get("title") or "",
+                item.get("milestone_label") or "",
             ),
         )
         if project_id:

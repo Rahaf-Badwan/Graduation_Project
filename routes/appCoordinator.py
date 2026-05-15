@@ -844,6 +844,369 @@ def api_coordinator_create_deliverable():
         return jsonify({"error": str(e)}), 500
 
 
+# ─── Coordinator Submission Files ────────────────────────────────────────
+def _course_label_for_code(course_code):
+    if course_code == "COMP4300":
+        return "Graduation Project"
+    if course_code == "COMP4200":
+        return "Project Introduction"
+    return course_code or "Course"
+
+
+def _submission_datetime_value(row, *keys):
+    for key in keys:
+        value = row.get(key)
+        if value:
+            return value
+    return None
+
+
+def _format_submission_datetime(value):
+    if not value:
+        return ""
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d %H:%M")
+    return str(value)
+
+
+def _download_static_path(file_path):
+    clean_path = (file_path or "").replace("\\", "/").lstrip("/")
+    if clean_path.startswith("static/"):
+        clean_path = clean_path[len("static/") :]
+    return redirect(url_for("static", filename=clean_path))
+
+
+@coordinator_bp.route("/api/coordinator/submission-files", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_submission_files():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester(cursor)
+        academic_year = semester.get("academic_year") if semester else None
+
+        files = []
+
+        if _table_exists(cursor, "project_files"):
+            params = []
+            where = """
+                WHERE pf.upload_status = 'uploaded'
+                  AND EXISTS (
+                      SELECT 1
+                      FROM deadlines d
+                      WHERE d.semester_id = s.semester_id
+                        AND d.deadline_type = 'file_submission'
+                        AND (d.project_id IS NULL OR d.project_id = p.project_id)
+                        AND d.deadline_date < CURDATE()
+                  )
+            """
+            if academic_year:
+                where += " AND s.academic_year = %s"
+                params.append(academic_year)
+
+            cursor.execute(
+                f"""
+                SELECT pf.file_id, pf.project_id, pf.file_type, pf.file_name,
+                       pf.file_path, pf.file_size_mb, pf.uploaded_at,
+                       pf.file_data IS NOT NULL AS has_file_data,
+                       p.title AS project_title,
+                       s.course_code,
+                       COALESCE(u.full_name, primary_user.full_name, '') AS submitted_by
+                FROM project_files pf
+                JOIN projects p ON p.project_id = pf.project_id
+                JOIN semesters s ON s.semester_id = p.semester_id
+                LEFT JOIN users u ON u.user_id = pf.uploaded_by
+                LEFT JOIN project_members primary_pm
+                       ON primary_pm.project_id = p.project_id
+                      AND primary_pm.is_primary_contact = TRUE
+                LEFT JOIN students primary_st
+                       ON primary_st.student_id = primary_pm.student_id
+                LEFT JOIN users primary_user
+                       ON primary_user.user_id = primary_st.user_id
+                {where}
+                ORDER BY pf.uploaded_at DESC, pf.file_id DESC
+                """,
+                tuple(params),
+            )
+            for row in cursor.fetchall():
+                course_code = row.get("course_code") or "COMP4300"
+                uploaded_at = _submission_datetime_value(row, "uploaded_at")
+                files.append(
+                    {
+                        "source": "project",
+                        "source_id": row.get("file_id"),
+                        "project_id": row.get("project_id"),
+                        "submission_title": (row.get("file_type") or "project_file")
+                        .replace("_", " ")
+                        .title(),
+                        "course_scope": course_code,
+                        "course_label": _course_label_for_code(course_code),
+                        "project_title": row.get("project_title") or "Untitled Project",
+                        "submitted_by": row.get("submitted_by") or "Unknown student",
+                        "file_name": row.get("file_name") or "Open file",
+                        "file_path": row.get("file_path") or "",
+                        "file_size_mb": float(row.get("file_size_mb") or 0),
+                        "uploaded_at": _format_submission_datetime(uploaded_at),
+                        "sort_at": uploaded_at,
+                        "download_url": (
+                            f"/api/coordinator/project-files/{row.get('file_id')}/download"
+                            if row.get("has_file_data")
+                            else ""
+                        ),
+                    }
+                )
+
+        if _table_exists(cursor, "milestone_submissions"):
+            params = []
+            where = """WHERE ms.submitted_to IN ('coordinator', 'both')
+              AND (
+                ti.due_date IS NULL
+                OR (ti.due_time IS NOT NULL AND STR_TO_DATE(CONCAT(ti.due_date,' ',ti.due_time),'%Y-%m-%d %H:%i') <= NOW())
+                OR (ti.due_time IS NULL AND ti.due_date < CURDATE())
+              )"""
+            if academic_year:
+                where += " AND s.academic_year = %s"
+                params.append(academic_year)
+
+            cursor.execute(
+                f"""
+                SELECT ms.submission_id, ms.item_id, ms.project_id, ms.file_name,
+                       ms.file_size_mb, ms.submitted_to, ms.submitted_at,
+                       ti.due_date,
+                       ti.title AS milestone_title,
+                       ti.milestone_label,
+                       p.title AS project_title,
+                       u.full_name AS submitted_by,
+                       ms.file_data IS NOT NULL AS has_file_data
+                FROM milestone_submissions ms
+                JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
+                JOIN semesters s ON s.semester_id = tl.semester_id
+                JOIN students st ON st.student_id = ms.student_id
+                JOIN users u ON u.user_id = st.user_id
+                LEFT JOIN projects p ON p.project_id = ms.project_id
+                {where}
+                ORDER BY ms.submitted_at DESC, ms.submission_id DESC
+                """,
+                tuple(params),
+            )
+            for row in cursor.fetchall():
+                uploaded_at = _submission_datetime_value(row, "submitted_at")
+                title = row.get("milestone_label") or row.get("milestone_title")
+                files.append(
+                    {
+                        "source": "timeline",
+                        "source_id": row.get("submission_id"),
+                        "project_id": row.get("project_id"),
+                        "submission_title": title or "Timeline Submission",
+                        "course_scope": "COMP4200",
+                        "course_label": "Project Introduction",
+                        "project_title": row.get("project_title")
+                        or "Project Introduction Timeline",
+                        "submitted_by": row.get("submitted_by") or "Unknown student",
+                        "file_name": row.get("file_name") or "Open file",
+                        "file_path": "",
+                        "file_size_mb": float(row.get("file_size_mb") or 0),
+                        "uploaded_at": _format_submission_datetime(uploaded_at),
+                        "sort_at": uploaded_at,
+                        "submitted_to": row.get("submitted_to") or "supervisor",
+                        "download_url": (
+                            f"/api/coordinator/milestone-submissions/{row.get('submission_id')}/download"
+                            if row.get("has_file_data")
+                            else ""
+                        ),
+                    }
+                )
+
+        if _table_exists(cursor, "coordinator_deliverable_submissions"):
+            params = []
+            where = "WHERE cd.due_date IS NOT NULL AND cd.due_date < CURDATE()"
+            if academic_year:
+                where += " AND s.academic_year = %s"
+                params.append(academic_year)
+
+            cursor.execute(
+                f"""
+                SELECT cds.submission_id, cds.project_id, cds.file_name, cds.file_path,
+                       cds.file_size_mb, cds.submitted_at,
+                       cds.file_data IS NOT NULL AS has_file_data,
+                       cd.title AS deliverable_title,
+                       cd.course_scope,
+                       p.title AS project_title,
+                       u.full_name AS submitted_by
+                FROM coordinator_deliverable_submissions cds
+                JOIN coordinator_deliverables cd
+                  ON cd.deliverable_id = cds.deliverable_id
+                LEFT JOIN semesters s ON s.semester_id = cd.semester_id
+                JOIN students st ON st.student_id = cds.student_id
+                JOIN users u ON u.user_id = st.user_id
+                LEFT JOIN projects p ON p.project_id = cds.project_id
+                {where}
+                ORDER BY cds.submitted_at DESC, cds.submission_id DESC
+                """,
+                tuple(params),
+            )
+            for row in cursor.fetchall():
+                uploaded_at = _submission_datetime_value(row, "submitted_at")
+                course_code = (
+                    "COMP4300"
+                    if row.get("course_scope") == "graduation_project"
+                    else "COMP4200"
+                )
+                files.append(
+                    {
+                        "source": "deliverable",
+                        "source_id": row.get("submission_id"),
+                        "project_id": row.get("project_id"),
+                        "submission_title": row.get("deliverable_title")
+                        or "Deliverable Submission",
+                        "course_scope": course_code,
+                        "course_label": _course_label_for_code(course_code),
+                        "project_title": row.get("project_title")
+                        or _course_label_for_code(course_code),
+                        "submitted_by": row.get("submitted_by") or "Unknown student",
+                        "file_name": row.get("file_name") or "Open file",
+                        "file_path": row.get("file_path") or "",
+                        "file_size_mb": float(row.get("file_size_mb") or 0),
+                        "uploaded_at": _format_submission_datetime(uploaded_at),
+                        "sort_at": uploaded_at,
+                        "download_url": (
+                            f"/api/coordinator/deliverable-submissions/{row.get('submission_id')}/download"
+                            if row.get("has_file_data")
+                            else ""
+                        ),
+                    }
+                )
+
+        cursor.close()
+        db.close()
+
+        files.sort(key=lambda item: item.get("sort_at") or datetime.min, reverse=True)
+        for item in files:
+            item.pop("sort_at", None)
+
+        return jsonify({"files": _json_safe_value(files)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/project-files/<int:file_id>/download")
+@login_required(role="coordinator")
+def api_coordinator_download_project_file(file_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT pf.file_name, pf.file_path, pf.file_data, pf.file_mime
+            FROM project_files pf
+            JOIN projects p ON p.project_id = pf.project_id
+            JOIN semesters s ON s.semester_id = p.semester_id
+            WHERE pf.file_id = %s
+              AND EXISTS (
+                  SELECT 1
+                  FROM deadlines d
+                  WHERE d.semester_id = s.semester_id
+                    AND d.deadline_type = 'file_submission'
+                    AND (d.project_id IS NULL OR d.project_id = p.project_id)
+                    AND d.deadline_date < CURDATE()
+              )
+            """,
+            (file_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if not row:
+            return jsonify({"error": "File not found."}), 404
+        if row.get("file_data"):
+            return Response(
+                bytes(row["file_data"]),
+                mimetype=row.get("file_mime") or "application/octet-stream",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{row.get("file_name") or "project-file"}"'
+                },
+            )
+        if row.get("file_path"):
+            return _download_static_path(row.get("file_path"))
+        return jsonify({"error": "File content not found."}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/milestone-submissions/<int:submission_id>/download")
+@login_required(role="coordinator")
+def api_coordinator_download_milestone_submission(submission_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT ms.file_name, ms.file_data, ms.file_mime
+            FROM milestone_submissions ms
+            JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+            WHERE ms.submission_id = %s
+              AND ms.submitted_to IN ('coordinator', 'both')
+            """,
+            (submission_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if not row or not row.get("file_data"):
+            return jsonify({"error": "File not found."}), 404
+        return Response(
+            bytes(row["file_data"]),
+            mimetype=row.get("file_mime") or "application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{row.get("file_name") or "timeline-submission"}"'
+            },
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/deliverable-submissions/<int:submission_id>/download")
+@login_required(role="coordinator")
+def api_coordinator_download_deliverable_submission(submission_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT cds.file_name, cds.file_path, cds.file_data, cds.file_mime
+            FROM coordinator_deliverable_submissions cds
+            JOIN coordinator_deliverables cd
+              ON cd.deliverable_id = cds.deliverable_id
+            WHERE cds.submission_id = %s
+              AND cd.due_date IS NOT NULL
+              AND cd.due_date < CURDATE()
+            """,
+            (submission_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if not row:
+            return jsonify({"error": "File not found."}), 404
+        if row.get("file_data"):
+            return Response(
+                bytes(row["file_data"]),
+                mimetype=row.get("file_mime") or "application/octet-stream",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{row.get("file_name") or "deliverable-submission"}"'
+                },
+            )
+        if row.get("file_path"):
+            return _download_static_path(row.get("file_path"))
+        return jsonify({"error": "File content not found."}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ─── Coordinator Notifications / Messaging ───────────────────────────────
 def _ensure_notification_attachment_columns(cursor):
     """Add attachment columns to notifications when the database has not been migrated yet."""
@@ -1313,8 +1676,10 @@ def api_coordinator_notifications_mark_all_read():
 
 
 @coordinator_bp.route("/api/coordinator/notifications/unread-count", methods=["GET"])
-@login_required(role="coordinator")
 def api_coordinator_notifications_unread_count():
+    if "user_id" not in session or session.get("role") != "coordinator":
+        return jsonify({"unread": 0})
+
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -1435,7 +1800,8 @@ def _ensure_intro_timeline_tables(cursor):
             title VARCHAR(180) NOT NULL,
             description TEXT NULL,
             start_date DATE NULL,
-            due_date DATE NOT NULL,
+            due_date DATE NULL,
+            due_time VARCHAR(5) NULL,
             milestone_label VARCHAR(180) NULL,
             is_deadline BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1444,6 +1810,23 @@ def _ensure_intro_timeline_tables(cursor):
             INDEX idx_comp4200_timeline_items_order (timeline_id, item_order)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+    # Migration: add due_time if not exists
+    if not _db_column_exists(cursor, "comp4200_timeline_items", "due_time"):
+        cursor.execute(
+            "ALTER TABLE comp4200_timeline_items ADD COLUMN due_time VARCHAR(5) NULL AFTER due_date"
+        )
+    # Migration: allow due_date to be NULL (incomplete draft items)
+    try:
+        cursor.execute(
+            "ALTER TABLE comp4200_timeline_items MODIFY COLUMN due_date DATE NULL"
+        )
+    except Exception:
+        pass
+    # Migration: add is_archived if not exists
+    if not _db_column_exists(cursor, "comp4200_timeline_items", "is_archived"):
+        cursor.execute(
+            "ALTER TABLE comp4200_timeline_items ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE AFTER is_deadline"
+        )
 
 
 def _get_or_create_intro_timeline(cursor, semester_id, user_id=None):
@@ -1485,7 +1868,7 @@ def _intro_timeline_payload(cursor, semester_id, user_id=None, students_only=Fal
         return {"timeline": None, "items": []}
     cursor.execute(
         """
-        SELECT item_id, item_order, title, description, start_date, due_date, milestone_label, is_deadline
+        SELECT item_id, item_order, title, description, start_date, due_date, due_time, milestone_label, is_deadline
         FROM comp4200_timeline_items
         WHERE timeline_id = %s
         ORDER BY item_order ASC, due_date ASC, item_id ASC
@@ -1495,6 +1878,13 @@ def _intro_timeline_payload(cursor, semester_id, user_id=None, students_only=Fal
     items = cursor.fetchall()
     for item in items:
         item["is_deadline"] = bool(item.get("is_deadline"))
+        # Recombine date+time into datetime-local format for the frontend
+        due_date = str(item.get("due_date") or "")
+        due_time = (item.get("due_time") or "").strip()
+        if due_date and due_time:
+            item["due_date"] = f"{due_date}T{due_time}"
+        else:
+            item["due_date"] = due_date
     timeline["is_published"] = bool(timeline.get("is_published"))
     return {"timeline": timeline, "items": items}
 
@@ -1536,18 +1926,29 @@ def api_coordinator_intro_timeline_save():
     for index, item in enumerate(items, start=1):
         item_title = (item.get("title") or "").strip()
         due_date = (item.get("due_date") or "").strip()
-        if not item_title or not due_date:
+        is_deadline = bool(item.get("is_deadline", True))
+        # Only require title (due_date is optional for unchecked draft items)
+        if not item_title:
             return (
-                jsonify({"error": f"Item #{index} must have a title and due date."}),
+                jsonify({"error": f"Item #{index} must have a title."}),
                 400,
             )
         start_date = (item.get("start_date") or "").strip() or None
         description = (item.get("description") or "").strip() or None
         milestone_label = (item.get("milestone_label") or "").strip() or None
+        # Accept both YYYY-MM-DD and YYYY-MM-DDTHH:MM (datetime-local format)
+        due_time = None
+        if due_date and "T" in due_date:
+            parts = due_date.split("T", 1)
+            due_date = parts[0]
+            due_time = parts[1][:5] if len(parts) > 1 else None
+        if start_date and "T" in start_date:
+            start_date = start_date.split("T")[0]
         try:
             if start_date:
                 datetime.strptime(start_date, "%Y-%m-%d")
-            datetime.strptime(due_date, "%Y-%m-%d")
+            if due_date:
+                datetime.strptime(due_date, "%Y-%m-%d")
         except ValueError:
             return (
                 jsonify(
@@ -1561,9 +1962,10 @@ def api_coordinator_intro_timeline_save():
                 "title": item_title,
                 "description": description,
                 "start_date": start_date,
-                "due_date": due_date,
+                "due_date": due_date or None,
+                "due_time": due_time,
                 "milestone_label": milestone_label,
-                "is_deadline": bool(item.get("is_deadline", True)),
+                "is_deadline": is_deadline,
             }
         )
 
@@ -1586,28 +1988,79 @@ def api_coordinator_intro_timeline_save():
             """,
             (title, note, session.get("user_id"), timeline["timeline_id"]),
         )
+        # ── Smart upsert: UPDATE existing items (keeps item_id → submissions stay linked)
+        #                INSERT truly new items
+        #                Archive removed items that have submissions, delete the rest
+        tid = timeline["timeline_id"]
+
+        # Get current non-archived items keyed by item_order
         cursor.execute(
-            "DELETE FROM comp4200_timeline_items WHERE timeline_id = %s",
-            (timeline["timeline_id"],),
+            """
+            SELECT item_id, item_order
+            FROM comp4200_timeline_items
+            WHERE timeline_id = %s AND COALESCE(is_archived, FALSE) = FALSE
+            """,
+            (tid,),
         )
+        existing = {row["item_order"]: row["item_id"] for row in cursor.fetchall()}
+        new_orders = {item["order"] for item in clean_items}
+
+        # Archive or delete items removed from the list
+        for old_order, old_id in existing.items():
+            if old_order not in new_orders:
+                if _table_exists(cursor, "milestone_submissions"):
+                    cursor.execute(
+                        "SELECT COUNT(*) AS cnt FROM milestone_submissions WHERE item_id = %s",
+                        (old_id,),
+                    )
+                    has_subs = int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+                else:
+                    has_subs = False
+                if has_subs:
+                    cursor.execute(
+                        "UPDATE comp4200_timeline_items SET is_archived = TRUE WHERE item_id = %s",
+                        (old_id,),
+                    )
+                else:
+                    cursor.execute(
+                        "DELETE FROM comp4200_timeline_items WHERE item_id = %s",
+                        (old_id,),
+                    )
+
+        # Upsert each item
         for item in clean_items:
-            cursor.execute(
-                """
-                INSERT INTO comp4200_timeline_items
-                    (timeline_id, item_order, title, description, start_date, due_date, milestone_label, is_deadline)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    timeline["timeline_id"],
-                    item["order"],
-                    item["title"],
-                    item["description"],
-                    item["start_date"],
-                    item["due_date"],
-                    item["milestone_label"],
-                    item["is_deadline"],
-                ),
-            )
+            if item["order"] in existing:
+                # UPDATE in-place — item_id stays the same, submissions stay linked
+                cursor.execute(
+                    """
+                    UPDATE comp4200_timeline_items
+                    SET item_order = %s, title = %s, description = %s,
+                        start_date = %s, due_date = %s, due_time = %s,
+                        milestone_label = %s, is_deadline = %s, is_archived = FALSE
+                    WHERE item_id = %s
+                    """,
+                    (
+                        item["order"], item["title"], item["description"],
+                        item["start_date"], item["due_date"], item.get("due_time"),
+                        item["milestone_label"], item["is_deadline"],
+                        existing[item["order"]],
+                    ),
+                )
+            else:
+                # INSERT new item
+                cursor.execute(
+                    """
+                    INSERT INTO comp4200_timeline_items
+                        (timeline_id, item_order, title, description, start_date,
+                         due_date, due_time, milestone_label, is_deadline, is_archived)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE)
+                    """,
+                    (
+                        tid, item["order"], item["title"], item["description"],
+                        item["start_date"], item["due_date"], item.get("due_time"),
+                        item["milestone_label"], item["is_deadline"],
+                    ),
+                )
         db.commit()
         payload = _intro_timeline_payload(
             cursor, semester["semester_id"], session.get("user_id")
@@ -2743,6 +3196,14 @@ def api_review_projects():
             LEFT JOIN students st ON st.student_id = pm.student_id
             LEFT JOIN users stu ON stu.user_id = st.user_id
             LEFT JOIN project_files pf ON pf.project_id = p.project_id
+             AND EXISTS (
+                  SELECT 1
+                  FROM deadlines d
+                  WHERE d.semester_id = p.semester_id
+                    AND d.deadline_type = 'file_submission'
+                    AND (d.project_id IS NULL OR d.project_id = p.project_id)
+                    AND d.deadline_date < CURDATE()
+             )
             WHERE p.semester_id = %s
               AND p.status IN ('submitted','under_review','needs_revision','committee_evaluation','accepted','rejected')
             GROUP BY p.project_id, p.title, p.abstract, p.keywords, p.project_type, p.status,
@@ -2787,10 +3248,20 @@ def api_coordinator_project_files(project_id):
 
         cursor.execute(
             """
-            SELECT *
-            FROM project_files
-            WHERE project_id = %s
-            ORDER BY file_id DESC
+            SELECT pf.*
+            FROM project_files pf
+            JOIN projects p ON p.project_id = pf.project_id
+            JOIN semesters s ON s.semester_id = p.semester_id
+            WHERE pf.project_id = %s
+              AND EXISTS (
+                  SELECT 1
+                  FROM deadlines d
+                  WHERE d.semester_id = s.semester_id
+                    AND d.deadline_type = 'file_submission'
+                    AND (d.project_id IS NULL OR d.project_id = p.project_id)
+                    AND d.deadline_date < CURDATE()
+              )
+            ORDER BY pf.file_id DESC
             """,
             (project_id,),
         )

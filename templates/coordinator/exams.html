@@ -305,7 +305,7 @@
                 <th style="width:180px">Title</th>
                 <th style="width:260px">Description</th>
                 <th style="width:125px">Open submission</th>
-                <th style="width:125px">Close / Deadline</th>
+                <th style="width:175px">Close / Deadline</th>
                 <th style="width:160px">Milestone / Submission</th>
                 <th style="width:90px">Deadline?</th>
                 <th style="width:80px">Action</th>
@@ -538,6 +538,14 @@
       .replaceAll('>', '&gt;');
   }
 
+  function toDatetimeLocal(value) {
+    if (!value) return '';
+    // Already full datetime → keep as-is (preserves whatever coordinator set)
+    if (value.includes('T')) return value;
+    // Date-only from old data → return empty so coordinator sets it manually
+    return '';
+  }
+
   function timelineRowTemplate(item, index) {
     const rowItem = item || {};
 
@@ -576,8 +584,8 @@
         <td>
           <input
             class="tl-due timeline-small-input"
-            type="date"
-            value="${escAttr(rowItem.due_date)}">
+            type="datetime-local"
+            value="${escAttr(toDatetimeLocal(rowItem.due_date))}">
         </td>
 
         <td>
@@ -637,8 +645,9 @@
     setTimeout(resetExamScroll, 0);
   }
 
-  function collectTimelineItems() {
-    return Array.from(document.querySelectorAll('#timelineRows tr')).map((row, idx) => ({
+  function collectTimelineItems(onlyChecked) {
+    const rows = Array.from(document.querySelectorAll('#timelineRows tr'));
+    const all = rows.map((row, idx) => ({
       item_order: Number(row.querySelector('.tl-order').value || idx + 1),
       title: row.querySelector('.tl-title').value.trim(),
       description: row.querySelector('.tl-desc').value.trim(),
@@ -647,6 +656,7 @@
       milestone_label: row.querySelector('.tl-label').value.trim(),
       is_deadline: row.querySelector('.tl-deadline').checked
     }));
+    return onlyChecked ? all.filter(item => item.is_deadline) : all;
   }
 
   async function timelineFetch(url, options) {
@@ -700,43 +710,66 @@
       document.getElementById('timelineNote').value =
         data.timeline?.note || '';
 
-      renderTimelineRows(
-        data.items && data.items.length ? data.items : defaultIntroTimeline
-      );
+      renderTimelineRows(data.items || []);
 
       updateTimelineMeta(data.timeline);
     } catch (err) {
       const meta = document.getElementById('timelineMeta');
       if (meta) meta.textContent = err.message;
 
-      renderTimelineRows(defaultIntroTimeline);
+      renderTimelineRows([]);
     }
   }
 
   async function saveIntroTimeline(publishAfter) {
     try {
-      const payload = {
-        title: document.getElementById('timelineTitle').value.trim(),
-        note: document.getElementById('timelineNote').value.trim(),
-        items: collectTimelineItems()
+      const title = document.getElementById('timelineTitle').value.trim();
+      const note = document.getElementById('timelineNote').value.trim();
+
+      // Draft: save ALL rows; Publish: send only checked rows
+      const draftPayload = {
+        title,
+        note,
+        items: collectTimelineItems(false)
       };
 
       const saved = await timelineFetch('/api/coordinator/intro-timeline', {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(draftPayload)
       });
 
       if (publishAfter) {
+        const checkedItems = collectTimelineItems(true);
+
+        if (checkedItems.length === 0) {
+          alert('No items selected. Please check at least one item to publish.');
+          return;
+        }
+
+        // Validate: checked items must have a due date
+        const missingDate = checkedItems.filter(it => !it.due_date);
+        if (missingDate.length > 0) {
+          const nums = missingDate.map(it => it.item_order).join(', ');
+          alert(`Please set a Close / Deadline date for checked item(s): #${nums}`);
+          return;
+        }
+
+        const publishPayload = {
+          title,
+          note,
+          items: checkedItems
+        };
+
         const published = await timelineFetch('/api/coordinator/intro-timeline/publish', {
           method: 'POST',
-          body: JSON.stringify({})
+          body: JSON.stringify(publishPayload)
         });
 
         updateTimelineMeta(published.timeline);
-        alert(published.message || 'Timeline published.');
+        alert(published.message || `Timeline published (${checkedItems.length} item(s) sent to students).`);
       } else {
         updateTimelineMeta(saved.timeline);
-        alert(saved.message || 'Timeline saved.');
+        alert(saved.message || 'Timeline saved as draft.');
       }
     } catch (err) {
       alert(err.message);

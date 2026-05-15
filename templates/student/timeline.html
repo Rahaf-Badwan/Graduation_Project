@@ -418,34 +418,51 @@
   function safeText(value, fallback = '') {
     return String(value || fallback).replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   }
+  function _parseDt(dateText) {
+    if (!dateText) return null;
+    // Handle both YYYY-MM-DD and YYYY-MM-DDTHH:MM
+    const d = dateText.includes('T') ? new Date(dateText) : new Date(dateText + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
   function formatDate(dateText) {
     if (!dateText) return '—';
-    const d = new Date(dateText + 'T00:00:00');
-    if (Number.isNaN(d.getTime())) return dateText;
+    const d = _parseDt(dateText);
+    if (!d) return dateText;
+    if (dateText.includes('T')) {
+      // Show date + time
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+           + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   }
   function dateOnly(dateText) {
     if (!dateText) return null;
-    const d = new Date(dateText + 'T00:00:00');
-    if (Number.isNaN(d.getTime())) return null;
-    d.setHours(0, 0, 0, 0);
-    return d;
+    const d = _parseDt(dateText);
+    if (!d) return null;
+    const copy = new Date(d); copy.setHours(0, 0, 0, 0);
+    return copy;
   }
   function daysLeft(dateText) {
     if (!dateText) return '';
+    const now = new Date();
+    const due = _parseDt(dateText); if (!due) return '';
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const due = dateOnly(dateText); if (!due) return '';
-    const diff = Math.ceil((due - today) / 86400000);
-    if (diff < 0) return 'Finished';
+    const dueDay = new Date(due); dueDay.setHours(0, 0, 0, 0);
+    if (due < now) return 'Finished';
+    const diff = Math.ceil((dueDay - today) / 86400000);
     if (diff === 0) return 'Due today';
     return diff + ' day' + (diff === 1 ? '' : 's') + ' left';
   }
   function submissionWindow(item) {
+    const now = new Date();
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const start = dateOnly(item.start_date);
-    const due = dateOnly(item.due_date);
+    // Parse due as full datetime (with time if available)
+    const due = item.due_date
+      ? (item.due_date.includes('T') ? new Date(item.due_date) : new Date(item.due_date + 'T23:59:59'))
+      : null;
     if (start && today < start) return { state: 'locked', label: 'Not open yet', message: 'Opens ' + formatDate(item.start_date), button: 'Locked', className: 'timeline-locked' };
-    if (due && today > due) return { state: 'closed', label: 'Closed', message: 'Closed after ' + formatDate(item.due_date), button: 'Closed', className: 'timeline-closed' };
+    if (due && now > due) return { state: 'closed', label: 'Closed', message: 'Closed after ' + formatDate(item.due_date), button: 'Closed', className: 'timeline-closed' };
     return { state: 'open', label: 'Open now', message: daysLeft(item.due_date), button: 'Upload Submission', className: 'timeline-open' };
   }
 

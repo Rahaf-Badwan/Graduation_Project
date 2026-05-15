@@ -297,6 +297,51 @@
     box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
   }
 
+  #pg-lectures .submission-folder {
+    border: 1px solid #dfe9e3;
+    background: #fff;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
+  }
+
+  #pg-lectures .submission-folder-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 13px 16px;
+    background: #f7fbf8;
+    border-bottom: 1px solid #e7eee9;
+  }
+
+  #pg-lectures .submission-folder-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #173b24;
+  }
+
+  #pg-lectures .submission-folder-meta {
+    font-size: 12px;
+    color: #667085;
+    margin-top: 3px;
+  }
+
+  #pg-lectures .submission-file-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 13px 16px;
+    border-bottom: 1px solid #eef3f0;
+  }
+
+  #pg-lectures .submission-file-row:last-child {
+    border-bottom: 0;
+  }
+
   #pg-lectures .submission-file-head {
     display: flex;
     justify-content: space-between;
@@ -876,6 +921,62 @@
     renderSubmissionFiles();
   }
 
+  function renderGroupedSubmissionFiles(rows) {
+    const groups = rows.reduce((acc, file) => {
+      const key = [
+        file.course_scope || 'Course',
+        file.submission_title || 'Submission',
+        file.source || 'submission'
+      ].join('::');
+
+      if (!acc[key]) {
+        acc[key] = {
+          title: file.submission_title || 'Submission',
+          course: file.course_scope || 'Course',
+          label: file.course_label || file.course_scope || 'Submission',
+          files: []
+        };
+      }
+
+      acc[key].files.push(file);
+      return acc;
+    }, {});
+
+    return Object.values(groups).map(group => `
+      <section class="submission-folder">
+        <div class="submission-folder-head">
+          <div>
+            <div class="submission-folder-title">${safe(group.title)} - ${safe(group.course)}</div>
+            <div class="submission-folder-meta">${group.files.length} submitted file${group.files.length === 1 ? '' : 's'} after the deadline closed.</div>
+          </div>
+          <span class="pill p-review">${safe(group.label)}</span>
+        </div>
+
+        ${group.files.map(file => {
+          const href = buildSubmissionFileHref(file);
+          const sizeLabel = Number(file.file_size_mb || 0) > 0
+            ? ` - ${safe(Number(file.file_size_mb).toFixed(2))} MB`
+            : '';
+          const linkText = href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file');
+
+          return `
+            <div class="submission-file-row">
+              <div>
+                <div class="submission-file-title">${safe(file.project_title || 'Untitled Project')}</div>
+                <div class="submission-file-meta">Submitted by: <b>${safe(file.submitted_by || 'Unknown student')}</b></div>
+                <div class="submission-file-meta">Uploaded at: ${safe(file.uploaded_at || '-')}${sizeLabel}</div>
+              </div>
+
+              <a class="submission-file-link" href="${safe(href)}" target="_blank">
+                ${linkText}
+              </a>
+            </div>
+          `;
+        }).join('')}
+      </section>
+    `).join('');
+  }
+
   function renderSubmissionFiles() {
     const box = document.getElementById('submissionFilesList');
 
@@ -890,8 +991,23 @@
       return;
     }
 
+    box.innerHTML = renderGroupedSubmissionFiles(rows);
+    return;
+
     box.innerHTML = rows.map(file => {
       const href = buildSubmissionFileHref(file);
+      const sourceLabel = file.source === 'timeline'
+        ? 'Timeline submission'
+        : file.source === 'deliverable'
+          ? 'Deliverable submission'
+          : 'Project submitted';
+      const targetLabel = file.submitted_to
+        ? ` - ${safe(niceStatus(file.submitted_to))}`
+        : '';
+      const sizeLabel = Number(file.file_size_mb || 0) > 0
+        ? ` Â· ${safe(Number(file.file_size_mb).toFixed(2))} MB`
+        : '';
+      const linkText = href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file');
       const title = `${safe(file.submission_title || 'Submission')} — ${safe(file.course_scope || 'Course')}`;
 
       return `
@@ -911,13 +1027,17 @@
               <div class="submission-file-meta">
                 Uploaded at: ${safe(file.uploaded_at || '—')}
               </div>
+
+              <div class="submission-file-meta">
+                Details: <b>${safe(sourceLabel)}</b>${targetLabel}${sizeLabel}
+              </div>
             </div>
 
             <span class="pill p-review">${safe(file.course_label || file.course_scope || 'Submission')}</span>
           </div>
 
           <a class="submission-file-link" href="${safe(href)}" target="_blank">
-            📎 ${safe(file.file_name || 'Open file')}
+            ${linkText}
           </a>
         </div>
       `;
