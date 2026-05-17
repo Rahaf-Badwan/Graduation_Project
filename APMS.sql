@@ -3069,8 +3069,21 @@ WHERE NOT EXISTS (
     WHERE dr.room_name = rooms.room_name
 );
 
+
+CREATE TABLE IF NOT EXISTS announcements (
+    announcement_id  INT           PRIMARY KEY AUTO_INCREMENT,
+    message          TEXT          NOT NULL,
+    activation_url   VARCHAR(500)  NOT NULL  DEFAULT '/activate',
+    created_by       INT           NOT NULL  COMMENT 'head_of_department user_id',
+    expires_at       DATE          NOT NULL,
+    is_active        BOOLEAN       NOT NULL  DEFAULT TRUE,
+    created_at       TIMESTAMP     NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
+select * from users;
 -- ============================================================
 --  END OF REPAIR APPENDIX
 -- ============================================================

@@ -42,9 +42,11 @@ def get_course(course_code):
                          COUNT(p.project_id) AS project_count
                     FROM faculty f
                     JOIN users u ON u.user_id = f.user_id
-                    JOIN projects p ON p.supervisor_id = f.faculty_id
-                    JOIN semesters s ON s.semester_id = p.semester_id
-                        AND s.course_code = %s
+                    LEFT JOIN projects p 
+                            ON p.supervisor_id = f.faculty_id
+                            AND p.semester_id IN(
+                                SELECT semester_id FROM semesters WHERE course_code = %s
+                   )
                     GROUP BY f.faculty_id, u.full_name, f.specialization
                          """, (course_code,))
     doctors = cursor.fetchall()
@@ -76,6 +78,8 @@ def assign_coordinator():
         last_assigned = existing["assigned_at"]
         days_diff = (now - last_assigned).days
         if days_diff > 20 :
+            cursor.close()
+            conn.close()
             return jsonify({"error": "Cannot change coordinator after 20 days "})
         
     #update coordinator
@@ -91,6 +95,7 @@ def assign_coordinator():
                    (faculty_id, semester_id, assigned_by)
                    VALUES (%s, %s, %s)
                    """, (faculty_id, semester_id, assigned_by))
+    conn.commit()
     cursor.close()
     conn.close()
     return jsonify({"success": True})

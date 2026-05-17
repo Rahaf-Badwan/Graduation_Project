@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activate Account — APMS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='login_style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+</head>
+<body>
+
+<div class="hero" style="min-height:100vh; display:flex; align-items:center; justify-content:center; ; padding:24px;">
+  <div style="width:100%; max-width:440px;">
+
+    <div class="card" style="padding:0; overflow:hidden; background:#fff; border-radius:12px; box-shadow:0 2px 16px rgba(0,0,0,0.07);">
+      
+      <!-- card-hd -->
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:0.5px solid #e5e7eb;">
+        <span style="font-size:14px; font-weight:600; color:#2d6a38;" id="card-title">Activate Account</span>
+        <div style="display:flex; gap:6px;">
+          <div style="height:4px; width:32px; border-radius:99px; background:#2d6a38; transition:background 0.3s;" id="pill-1"></div>
+          <div style="height:4px; width:32px; border-radius:99px; background:#e5e7eb; transition:background 0.3s;" id="pill-2"></div>
+        </div>
+      </div>
+
+      <div style="padding:20px;">
+
+        <!-- Phase 1 -->
+        <div id="phase-verify">
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Full Name</div>
+            <input id="fullName" type="text"
+              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID</div>
+            <input id="universityId" type="text" maxlength="7" autocomplete="off" placeholder="7-digit-number"
+              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
+            <input id="email" type="email" autocomplete="off" placeholder="student@students.birzeit.edu" 
+              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+          </div>
+          <div style="margin-top:18px;">
+            <button id="verifyBtn" onclick="verifyStudent()" style="
+              width:100%; padding:9px; background:#2d6a38; color:#fff;
+              border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
+              Verify Identity ↗
+            </button>
+          </div>
+          <div id="verify-feedback" style="display:none; margin-top:12px;"></div>
+        </div>
+
+        <!-- Phase 2a -->
+        <div id="phase-password" style="display:none;">
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
+            <input id="password" type="password" placeholder="At least 8 characters" oninput="updateStrength()"
+              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            <div style="height:3px; background:#e5e7eb; border-radius:99px; margin-top:6px; overflow:hidden;">
+              <div id="strength-bar" style="height:100%; border-radius:99px; width:0%; transition:width 0.3s, background 0.3s;"></div>
+            </div>
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Confirm Password</div>
+            <input id="confirmPassword" type="password" placeholder="Re-enter your password"
+              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+          </div>
+          <div style="display:flex; gap:8px; margin-top:18px;">
+            <button id="setPassBtn" onclick="setPassword()" style="
+              flex:1; padding:9px; background:#2d6a38; color:#fff;
+              border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
+              Activate Account ↗
+            </button>
+            <button onclick="resetToStep1()" style="
+              flex:1; padding:9px; background:transparent; color:#2d6a38;
+              border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
+              Back
+            </button>
+          </div>
+          <div id="pass-feedback" style="display:none; margin-top:12px;"></div>
+        </div>
+
+        <!--  Not Found -->
+        <div id="phase-not-found" style="display:none; text-align:center; padding:12px 0 4px;">
+          <div style="font-size:36px; margin-bottom:10px;"><span class="material-symbols-outlined" style="font-size:36px; color:#f59e0b; margin-bottom:10px; display:block;">warning</span></div>
+          <div style="font-size:14px; font-weight:600; color:#2d6a38; margin-bottom:6px;">Account Not Found</div>
+          <div style="font-size:13px; color:#6b7280; line-height:1.6;">
+            Your details don't match any registered student.<br>
+            Please contact your <strong>Head of Department</strong> to register your account first.
+          </div>
+          <div style="margin-top:20px;">
+            <button onclick="resetToStep1()" style="
+              width:100%; padding:9px; background:transparent; color:#2d6a38;
+              border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
+              Try Again
+            </button>
+          </div>
+        </div>
+
+        <!--  Success -->
+        <div id="phase-success" style="display:none; text-align:center; padding:12px 0 4px;">
+          <div style="font-size:36px; margin-bottom:10px;"><span class="material-symbols-outlined" style="font-size:36px; color:#10b981; margin-bottom:10px; display:block;">check_circle</span></div>
+          <div style="font-size:14px; font-weight:600; color:#065f46; margin-bottom:6px;">Account Activated!</div>
+          <div style="font-size:13px; color:#6b7280; line-height:1.6;">
+            Your account is now active. You can log in using your university ID and the password you just set.
+          </div>
+          <a href="/login" style="display:inline-block; margin-top:16px; font-size:13px; font-weight:500; color:#2d6a38; text-decoration:none;">
+            Go to Login →
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/assets/js/activate_student.js"></script>
+</body>
+</html>

@@ -6,18 +6,16 @@
 
 {% block content %}
 <div class="page on" id="pg-add-student">
-
   <div class="two-col" style="align-items:start">
+
     <div>
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Add Student</span>
-          
         </div>
-        
         <div class="field-wrap">
           <div class="field-label">Full Name</div>
-              <input id="fullName" class="field-input" type="text" placeholder="Student full name">
+          <input id="fullName" class="field-input" type="text" placeholder="Student full name">
         </div>
 
         <div class="field-wrap">
@@ -27,7 +25,7 @@
 
         <div class="field-wrap">
             <div class="field-label">Email</div>
-                <input id="email" class="field-input" type="email" placeholder="student@students.birzeit.edu">
+            <input id="email" class="field-input" type="email" placeholder="student@students.birzeit.edu">
             </div>
 
         <div class="field-wrap">
@@ -46,17 +44,78 @@
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Activate Students</span>
-          <div class="tabs">
-            <button class="tab active" onclick="selectTab('COMP4200', this)">COMP4200</button>
-            <button class="tab" onclick="selectTab('COMP4300', this)">COMP4300</button>
+          <div style="display: flex; align-items: center; gap:10px;">
+            <button class="btn btn-outline" onclick="openAnnModal()"
+              style="font-size:12px; padding:5px 12px; display: flex; align-items: center; gap:5px;">
+              <span class="material-symbols-outlined icon-inline">campaign</span>
+              Write Announcement
+            </button>
+            <div class="tabs">
+              <button class="tab active" onclick="selectTab('COMP4200', this)">COMP4200</button>
+              <button class="tab" onclick="selectTab('COMP4300', this)">COMP4300</button>
+            </div>
           </div>
         </div>
-        <div id="studentList">
-          
+        <div id="studentList"></div>
+      </div>
+     </div>
+    </div>
+  </div>
+    <div class="ann-overlay" id="ann-overlay" onclick="closeAnnModal(event)">
+      <div class="ann-modal">
+        <div class="ann-modal-hd">
+          <span class="material-symbols-outlined icon-inline">campaign</span>
+          <span style="font-size: 13px; font-weight: 700;">Write Announcement</span>
+          <button class="ann-close-btn" onclick="document.getElementById('ann-overlay').classList.remove('open')">
+            <span class="material-symbols-outlined icon-inline">close</span>
+          </button>
+        </div>
+
+        <div class="ann-model-body">
+           <!--information about the announcement -->
+          <div id="ann-current-info" style="display:none;
+            padding:10px 12px; margin-bottom:14px;
+            background: var(--color-background-success);
+            border: 0.5px solid var(--color-border-success);
+            border-radius: 8px; font-size: 12px;
+            color: var(--color-text-success);
+            line-height: 1.6;">
+          </div>
+
+          <!-- the link -->
+          <div class="ann-link-box">
+            <span style="flex:1; word-break:break-all;">
+              <span class="material-symbols-outlined icon-inline">link_2</span>
+              <span id="ann-modal-link"></span>
+            </span>
+            <button class="btn btn-outline"
+              style="padding:3px 10px; font-size: 11px; flex-shrink: 0;"
+              onclick="copyLink()">Copy</button>
+          </div>
+          <!--message-->
+          <div class="field-wrap">
+            <div class="field-label">Message</div>
+            <textarea id="ann-msg" class="field-textarea" style="min-height:80px;"
+              placeholder="e.g. Account activation is now open. Click the link to set your password."></textarea>
+          </div>
+
+          <!-- duration-->
+          <div class="field-wrap">
+            <div class="field-label">Duration (days)</div>
+              <input id="ann-days" class="field-input" type="number"
+                value="20" min="1" max="90" style="max-width: 110px;" >
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="createAnnModal()">
+              Publish &#x2197;
+            </button>
+            <button class="btn btn-outline" onclick="document.getElementById('ann-overlay').classList.remove('open')">Cancel</button>
+          </div>
+
+          <div id="ann-feedback" style="display: none; margin-top: 12px;"></div>
         </div>
       </div>
     </div>
-  </div>
-</div>
 <script src="/static/assets/head/add_students.js"></script>
 {% endblock %}

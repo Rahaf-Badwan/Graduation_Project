@@ -110,6 +110,15 @@ function loadCourse(courseCode){
 // assign coordinator
 function assignCoordinator(facultyId){
   let semesterId = document.getElementById("semesterSelect").value;
+  let btn = document.querySelector(".btn-primary");
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Assigning...'
+
+  const resetBtn = () => {
+    btn.disabled = false;
+    btn.innerHTML = `Confirm New Coordinator &#x2197;`;
+  };
 
   fetch(API_BASE + '/api/assign-coordinator', {
     method: "POST",
@@ -120,17 +129,44 @@ function assignCoordinator(facultyId){
   })
   .then(res => res.json())
   .then(data => {
+    setTimeout(() =>{
     if(data.error){
-      alert(data.error);
+      showToast(data.error, "error");
     }else{
-      alert("Coordinator Assigned successfully");
+      showToast("Coordinator assigned successfully!", "success");
       loadCourse(currentCourse);
     }
-  });
+      resetBtn();
+    }, 1500); 
+  })
+  .catch(() => showToast("Something want wrong.", "error"))
+ 
 }
+
+
 function updateCoordinatorUI(coordinator){
   document.getElementById("coordinator").innerText = 
   coordinator ? coordinator.full_name : "None";
 
+}
+
+function showToast(message,  type = "success"){
+  document.querySelector(".toast")?.remove();
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+  <span class="toast-icone">${type === "success" 
+    ? '<span class="material-symbols-outlined">check</span>' 
+    : '<span class="material-symbols-outlined">close</span>'}
+  </span>
+  <span>${message}</span>
+  `;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add("hide");
+    setTimeout(() => toast.remove(), 400);
+  }, 3000);
 }
 

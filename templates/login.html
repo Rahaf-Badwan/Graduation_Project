@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>APMS — Sign In</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='login_style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <style>
     .error-msg {
       background: #fff0f0;
@@ -115,6 +116,51 @@
           <button type="button">⬆ Project Upload Guide</button>
           <button type="button">⚙ Roles &amp; Permissions</button>
         </div>
+
+        <div id="activation-banner" style="display:none; margin-top:16px;">
+          <div style = "
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 14px 16px;
+            backdrop-filter: blur(4px);
+            ">
+            <div style="display:flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap:7px">
+                <span class="material-symbols-outlined" style="font-size: 17px; color:#fff;">campaign</span>
+                <span style="font-size: 13px; font-weight: 700; color:#fff;">Activation Notice</span>
+              </div>
+              <span id="ann-days-badge" style="
+                font-size: 11px; font-weight: 600;
+                padding: 2px 9px; border-radius: 20px;
+                background: rgba(255, 255, 255, 0.15);
+                color:#fff;
+                border: 0.5px solid rgba(255, 255, 255, 0.3);
+              "></span>
+            </div>
+            <p id="ann-message-text" style="
+                font-size: 12px; color: rgba(255, 255, 255, 0.88);
+                line-height: 1.6; margin: 0 0 12px 0;
+            "></p>
+
+            <a href="/activate" style="
+                display: inline-flex; 
+                align-items: center; 
+                gap: 6px;
+                padding: 7px 14px;
+                background: #fff;
+                color: #111827;
+                border-radius: 7px;
+                font-size: 12px; 
+                font-weight: 700;
+                text-decoration: none;
+                transition: opacity 0.2s;
+            "onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+            <span class="material-symbols-outlined" style="font-size:15px;">login</span>
+            Activate My Account
+            </a>
+          </div>
+        </div>
       </div>
 
       <div class="login-card">
@@ -156,7 +202,7 @@
         <div class="card-project">
           <p>
             Project: APMS — COMP4200<br>
-            Amna Abu Muslim · Rahaf Badwan · Tima Abd<br>
+            Amna Abu Muslim · Rahaf Badwan · Taima Abed<br>
             Supervisor: Dr. Naima Harbawi
           </p>
         </div>
@@ -175,6 +221,25 @@
       input.type = isHidden ? 'text' : 'password';
       btn.textContent = isHidden ? '\uD83D\uDE48' : '\uD83D\uDC41';
     }
+
+    (async function() {
+      try{
+        var res = await fetch('/head/api/announcements/active');
+        var data = await res.json();
+
+        if(!data.announcement) return;
+
+        var ann = data.announcement;
+        var banner = document.getElementById('activation-banner');
+        var badge = document.getElementById('ann-days-badge');
+        var msgEl = document.getElementById('ann-message-text');
+
+        var d = ann.days_left;
+        badge.textContent = '' + d + ' day' + (d !== 1 ? 's' : '') + ' left';
+        msgEl.textContent = ann.message;
+        banner.style.display = 'block';
+      }catch(e){}
+    })();
   </script>
 </body>
 

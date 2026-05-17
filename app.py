@@ -15,8 +15,8 @@ from routes.student import student_bp
 from routes.head import head_bp
 from routes.appCoordinator import coordinator_bp
 from ai_engine import ask_apms_ai, search_uploaded_semantic
-
-
+from activate_student import activate_bp
+from announcements import announcements_bp
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
@@ -34,8 +34,8 @@ mail = Mail(app)
 app.register_blueprint(student_bp)
 app.register_blueprint(head_bp)
 app.register_blueprint(coordinator_bp)
-
-
+app.register_blueprint(activate_bp)
+app.register_blueprint(announcements_bp, url_prefix='/head')
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def fetch_supervisors():
     db = get_db()
@@ -95,7 +95,7 @@ def login_page():
     return render_template("login.html")
 
 
-@app.route("/login", methods=["POST"])
+@app.route("/login", methods=["POST", "GET"])
 def login():
     uid = request.form.get("university_id", "").strip()
     pwd = request.form.get("password", "").strip()
