@@ -7,12 +7,26 @@
 {% block content %}
 <div class="page on" id="pg-registration">
 
+  <div id="closedBanner" style="display:none">
+    <div class="card" style="border-left:4px solid var(--orange,#f59e0b);margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
+        <span class="material-symbols-outlined icon-inline"
+          style="font-size:28px;color:var(--orange,#f59e0b)">lock</span>
+        <div>
+          <div style="font-weight:700;font-size:15px;color:var(--orange,#f59e0b)">Registration is closed</div>
+          <div id="closedDetails" style="font-size:13px;color:var(--color-text-secondary);margin-top:2px">The
+            coordinator has not opened registration yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Already Registered Banner (hidden by default) ──────── -->
   <div id="alreadyBanner" style="display:none">
     <div class="card" style="border-left:4px solid var(--green,#22c55e);margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
         <span class="material-symbols-outlined icon-inline"
-              style="font-size:28px;color:var(--green,#22c55e)">check_circle</span>
+          style="font-size:28px;color:var(--green,#22c55e)">check_circle</span>
         <div>
           <div style="font-weight:600;font-size:15px;color:var(--green,#22c55e)">
             Already Registered
@@ -55,13 +69,11 @@
             <div id="membersContainer">
               <!-- Member rows injected by JS -->
             </div>
-            <button class="btn btn-outline" id="addMemberBtn" type="button"
-                    style="margin-top:8px;font-size:13px">
+            <button class="btn btn-outline" id="addMemberBtn" type="button" style="margin-top:8px;font-size:13px">
               <span class="material-symbols-outlined icon-inline" style="font-size:16px">add</span>
               Add Member
             </button>
-            <div id="membersHint"
-                 style="font-size:12px;color:var(--color-text-secondary);margin-top:6px">
+            <div id="membersHint" style="font-size:12px;color:var(--color-text-secondary);margin-top:6px">
               Maximum 3 members (including yourself).
             </div>
           </div>
@@ -95,8 +107,7 @@
           </div>
 
           <!-- Error & Submit -->
-          <div id="formError"
-               style="display:none;color:var(--red,#e05);font-size:13px;
+          <div id="formError" style="display:none;color:var(--red,#e05);font-size:13px;
                       background:rgba(220,50,50,.07);border-radius:7px;
                       padding:10px 14px;margin-bottom:14px"></div>
 
@@ -117,27 +128,28 @@
           <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.7">
             <div style="display:flex;gap:8px;margin-bottom:10px">
               <span class="material-symbols-outlined icon-inline"
-                    style="font-size:18px;color:var(--color-primary)">group</span>
+                style="font-size:18px;color:var(--color-primary)">group</span>
               <span>Groups must have <b>2 or 3</b> students.</span>
             </div>
             <div style="display:flex;gap:8px;margin-bottom:10px">
               <span class="material-symbols-outlined icon-inline"
-                    style="font-size:18px;color:var(--color-primary)">badge</span>
+                style="font-size:18px;color:var(--color-primary)">badge</span>
               <span>Enter each member's <b>full name</b> and <b>university ID</b>.</span>
             </div>
             <div style="display:flex;gap:8px;margin-bottom:10px">
               <span class="material-symbols-outlined icon-inline"
-                    style="font-size:18px;color:var(--color-primary)">person_search</span>
+                style="font-size:18px;color:var(--color-primary)">person_search</span>
               <span>You may list up to <b>3 preferred supervisors</b> in order of preference.</span>
             </div>
             <div style="display:flex;gap:8px;margin-bottom:10px">
               <span class="material-symbols-outlined icon-inline"
-                    style="font-size:18px;color:var(--orange,#f59e0b)">warning</span>
-              <span>Each student can only be registered <b>once per semester</b>. If a teammate already submitted, you will see a notification.</span>
+                style="font-size:18px;color:var(--orange,#f59e0b)">warning</span>
+              <span>Each student can only be registered <b>once per semester</b>. If a teammate already submitted, you
+                will see a notification.</span>
             </div>
             <div style="display:flex;gap:8px">
               <span class="material-symbols-outlined icon-inline"
-                    style="font-size:18px;color:var(--green,#22c55e)">check_circle</span>
+                style="font-size:18px;color:var(--green,#22c55e)">check_circle</span>
               <span>After submission, the coordinator will review and assign your final supervisor.</span>
             </div>
           </div>
@@ -159,14 +171,13 @@
   <div id="successScreen" style="display:none">
     <div class="card" style="text-align:center;padding:48px 24px">
       <span class="material-symbols-outlined icon-inline"
-            style="font-size:56px;color:var(--green,#22c55e)">check_circle</span>
+        style="font-size:56px;color:var(--green,#22c55e)">check_circle</span>
       <div style="font-size:20px;font-weight:700;margin:16px 0 8px">Registration Submitted!</div>
       <div style="font-size:14px;color:var(--color-text-secondary);max-width:480px;margin:0 auto 24px">
         Your group has been registered successfully. The coordinator will review your submission
         and assign a supervisor.
       </div>
-      <div id="successDetails"
-           style="background:var(--color-surface-2,#f8fafc);border-radius:10px;
+      <div id="successDetails" style="background:var(--color-surface-2,#f8fafc);border-radius:10px;
                   padding:16px;text-align:left;font-size:13px;max-width:480px;margin:0 auto">
       </div>
     </div>
@@ -181,13 +192,16 @@
     align-items: center;
     margin-bottom: 10px;
   }
+
   .member-row .field-input {
     flex: 1;
   }
+
   .member-row .uid-input {
     width: 140px;
     flex: none;
   }
+
   .member-row .remove-btn {
     background: none;
     border: none;
@@ -199,9 +213,11 @@
     border-radius: 4px;
     transition: background .15s;
   }
+
   .member-row .remove-btn:hover {
-    background: rgba(220,50,50,.08);
+    background: rgba(220, 50, 50, .08);
   }
+
   .member-row .member-tag {
     font-size: 11px;
     color: var(--color-text-secondary);
@@ -210,49 +226,51 @@
 </style>
 
 <script>
-(function () {
-  const MY_UID  = "{{ session.university_id }}";
-  const MY_NAME = "{{ session.full_name }}";
-  const MAX_MEMBERS = 3;
+  (function () {
+    const MY_UID = "{{ session.university_id }}";
+    const MY_NAME = "{{ session.full_name }}";
+    const MAX_MEMBERS = 3;
 
-  let supervisors  = [];
-  let members      = [];   // [{name, uid}]
+    let supervisors = [];
+    let members = [];   // [{name, uid}]
 
-  /* ─ DOM refs ─────────────────────────────────────── */
-  const membersContainer = document.getElementById("membersContainer");
-  const addMemberBtn     = document.getElementById("addMemberBtn");
-  const membersHint      = document.getElementById("membersHint");
-  const prefSelects      = document.querySelectorAll(".pref-select");
-  const submitBtn        = document.getElementById("submitRegBtn");
-  const formError        = document.getElementById("formError");
-  const alreadyBanner    = document.getElementById("alreadyBanner");
-  const alreadyDetails   = document.getElementById("alreadyDetails");
-  const statusContent    = document.getElementById("statusContent");
-  const formSection      = document.getElementById("formSection");
-  const successScreen    = document.getElementById("successScreen");
-  const successDetails   = document.getElementById("successDetails");
+    /* ─ DOM refs ─────────────────────────────────────── */
+    const membersContainer = document.getElementById("membersContainer");
+    const addMemberBtn = document.getElementById("addMemberBtn");
+    const membersHint = document.getElementById("membersHint");
+    const prefSelects = document.querySelectorAll(".pref-select");
+    const submitBtn = document.getElementById("submitRegBtn");
+    const formError = document.getElementById("formError");
+    const alreadyBanner = document.getElementById("alreadyBanner");
+    const alreadyDetails = document.getElementById("alreadyDetails");
+    const closedBanner = document.getElementById("closedBanner");
+    const closedDetails = document.getElementById("closedDetails");
+    const statusContent = document.getElementById("statusContent");
+    const formSection = document.getElementById("formSection");
+    const successScreen = document.getElementById("successScreen");
+    const successDetails = document.getElementById("successDetails");
 
-  /* ─ Helpers ──────────────────────────────────────── */
-  function esc(s) {
-    return String(s || "")
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-  function showError(msg) {
-    formError.innerHTML     = esc(msg);
-    formError.style.display = "";
-    formError.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-  function hideError() { formError.style.display = "none"; }
+    /* ─ Helpers ──────────────────────────────────────── */
+    function esc(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function showError(msg) {
+      formError.innerHTML = esc(msg);
+      formError.style.display = "";
+      formError.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+    function hideError() { formError.style.display = "none"; }
 
-  /* ─ Build member rows ────────────────────────────── */
-  function renderMembers() {
-    membersContainer.innerHTML = "";
-    members.forEach((m, i) => {
-      const row = document.createElement("div");
-      row.className = "member-row";
-      const isMe = (m.uid === MY_UID);
-      row.innerHTML = `
+    /* ─ Build member rows ────────────────────────────── */
+    function renderMembers() {
+      membersContainer.innerHTML = "";
+      members.forEach((m, i) => {
+        const row = document.createElement("div");
+        row.className = "member-row";
+        const isMe = (m.uid === MY_UID);
+        row.innerHTML = `
         <span class="member-tag">${i + 1}.</span>
         <input class="field-input member-name"
                placeholder="Full Name"
@@ -263,100 +281,114 @@
                value="${esc(m.uid)}"
                ${isMe ? "readonly style='background:var(--color-surface-2,#f5f7fa)'" : ""} />
         ${isMe
-          ? `<span style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap">(you)</span>`
-          : `<button class="remove-btn" type="button" data-idx="${i}" title="Remove member">
+            ? `<span style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap">(you)</span>`
+            : `<button class="remove-btn" type="button" data-idx="${i}" title="Remove member">
                <span class="material-symbols-outlined icon-inline" style="font-size:18px">close</span>
              </button>`
-        }
+          }
       `;
-      membersContainer.appendChild(row);
-    });
-
-    // Sync inputs to members array on change
-    membersContainer.querySelectorAll(".member-name").forEach((inp, i) => {
-      inp.addEventListener("input", () => { members[i].name = inp.value; });
-    });
-    membersContainer.querySelectorAll(".member-uid").forEach((inp, i) => {
-      inp.addEventListener("input", () => { members[i].uid = inp.value.trim(); });
-    });
-    membersContainer.querySelectorAll(".remove-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const idx = +btn.dataset.idx;
-        members.splice(idx, 1);
-        renderMembers();
-        updateAddBtn();
+        membersContainer.appendChild(row);
       });
-    });
 
-    updateAddBtn();
-  }
-
-  function updateAddBtn() {
-    addMemberBtn.style.display = members.length >= MAX_MEMBERS ? "none" : "";
-    membersHint.textContent = members.length >= MAX_MEMBERS
-      ? "Maximum 3 members reached."
-      : `You can add ${MAX_MEMBERS - members.length} more member(s).`;
-  }
-
-  addMemberBtn.addEventListener("click", () => {
-    if (members.length >= MAX_MEMBERS) return;
-    members.push({ name: "", uid: "" });
-    renderMembers();
-  });
-
-  /* ─ Load supervisors ─────────────────────────────── */
-  async function loadSupervisors() {
-    try {
-      const res  = await fetch("/api/student/supervisors");
-      const data = await res.json();
-      supervisors = data.supervisors || [];
-      renderPrefSelects();
-    } catch { /* silently fail – supervisors stay empty */ }
-  }
-
-  /* ─ Rebuild all 3 dropdowns excluding already-chosen values ─ */
-  function renderPrefSelects() {
-    const chosen = Array.from(prefSelects).map(s => s.value);
-
-    prefSelects.forEach((sel, i) => {
-      const current = chosen[i];
-      sel.innerHTML = '<option value="">— No preference —</option>';
-
-      supervisors.forEach(sv => {
-        const id = String(sv.faculty_id);
-        const usedElsewhere = chosen.some((v, j) => j !== i && v === id);
-        if (usedElsewhere) return;
-        const opt = document.createElement("option");
-        opt.value       = id;
-        opt.textContent = sv.full_name;
-        if (id === current) opt.selected = true;
-        sel.appendChild(opt);
+      // Sync inputs to members array on change
+      membersContainer.querySelectorAll(".member-name").forEach((inp, i) => {
+        inp.addEventListener("input", () => { members[i].name = inp.value; });
       });
+      membersContainer.querySelectorAll(".member-uid").forEach((inp, i) => {
+        inp.addEventListener("input", () => { members[i].uid = inp.value.trim(); });
+      });
+      membersContainer.querySelectorAll(".remove-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = +btn.dataset.idx;
+          members.splice(idx, 1);
+          renderMembers();
+          updateAddBtn();
+        });
+      });
+
+      updateAddBtn();
+    }
+
+    function updateAddBtn() {
+      addMemberBtn.style.display = members.length >= MAX_MEMBERS ? "none" : "";
+      membersHint.textContent = members.length >= MAX_MEMBERS
+        ? "Maximum 3 members reached."
+        : `You can add ${MAX_MEMBERS - members.length} more member(s).`;
+    }
+
+    addMemberBtn.addEventListener("click", () => {
+      if (members.length >= MAX_MEMBERS) return;
+      members.push({ name: "", uid: "" });
+      renderMembers();
     });
-  }
 
-  prefSelects.forEach(sel => {
-    sel.addEventListener("change", renderPrefSelects);
-  });
+    /* ─ Load supervisors ─────────────────────────────── */
+    async function loadSupervisors() {
+      try {
+        const res = await fetch("/student/api/supervisors");
+        const data = await res.json();
+        supervisors = data.supervisors || [];
+        renderPrefSelects();
+      } catch { /* silently fail – supervisors stay empty */ }
+    }
 
-  /* ─ Check registration status ───────────────────── */
-  async function checkStatus() {
-    try {
-      const res  = await fetch("/api/student/registration-check");
-      const data = await res.json();
+    /* ─ Rebuild all 3 dropdowns excluding already-chosen values ─ */
+    function renderPrefSelects() {
+      const chosen = Array.from(prefSelects).map(s => s.value);
 
-      if (data.registered && data.project) {
-        const p = data.project;
-        // Show already-registered banner
-        alreadyBanner.style.display = "";
-        alreadyDetails.innerHTML =
-          `Registered for: <b>${esc(p.title)}</b> &nbsp;·&nbsp; `
-          + `Team: <b>${esc(p.team_members)}</b> &nbsp;·&nbsp; `
-          + `Status: <span class="pill p-${p.status}">${esc(p.status.replace("_"," "))}</span>`;
+      prefSelects.forEach((sel, i) => {
+        const current = chosen[i];
+        sel.innerHTML = '<option value="">— No preference —</option>';
 
-        // Status card
-        statusContent.innerHTML =
-          `<div style="color:var(--green,#22c55e);font-weight:600;margin-bottom:6px">
+        supervisors.forEach(sv => {
+          const id = String(sv.faculty_id);
+          const usedElsewhere = chosen.some((v, j) => j !== i && v === id);
+          if (usedElsewhere) return;
+          const opt = document.createElement("option");
+          opt.value = id;
+          opt.textContent = sv.full_name;
+          if (id === current) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      });
+    }
+
+    prefSelects.forEach(sel => {
+      sel.addEventListener("change", renderPrefSelects);
+    });
+
+    /* ─ Check registration status ───────────────────── */
+    async function checkStatus() {
+      try {
+        const res = await fetch("/student/api/registration-check");
+        const data = await res.json();
+
+        const isOpen = !!data.distribution_open;
+
+        if (!isOpen && !(data.registered && data.project)) {
+          closedBanner.style.display = "";
+          formSection.style.display = "none";
+          const deadlineText = data.deadline ? ` Registration closed at: ${esc(data.deadline)}.` : "";
+          closedDetails.innerHTML = `The coordinator will open it when registration starts.${deadlineText}`;
+          statusContent.innerHTML = `<div style="color:var(--orange,#f59e0b);font-weight:600">Registration Closed</div>`;
+          return;
+        }
+
+        closedBanner.style.display = "none";
+        formSection.style.display = "";
+
+        if (data.registered && data.project) {
+          const p = data.project;
+          // Show already-registered banner
+          alreadyBanner.style.display = "";
+          alreadyDetails.innerHTML =
+            `Registered for: <b>${esc(p.title)}</b> &nbsp;·&nbsp; `
+            + `Team: <b>${esc(p.team_members)}</b> &nbsp;·&nbsp; `
+            + `Status: <span class="pill p-${p.status}">${esc(p.status.replace("_", " "))}</span>`;
+
+          // Status card
+          statusContent.innerHTML =
+            `<div style="color:var(--green,#22c55e);font-weight:600;margin-bottom:6px">
              ✓ Registered
            </div>
            <div><b>Project:</b> ${esc(p.title)}</div>
@@ -365,116 +397,116 @@
              ${[p.preferred_1, p.preferred_2, p.preferred_3].filter(Boolean).map(esc).join(" &gt; ")}
            </div>` : ""}`;
 
-        // Disable the form
-        submitBtn.disabled      = true;
-        submitBtn.textContent   = "Already Registered";
-        addMemberBtn.style.display = "none";
-        document.getElementById("regTitle").readOnly = true;
-        prefSelects.forEach(s => s.disabled = true);
-      } else {
-        statusContent.innerHTML =
-          `<div style="color:var(--orange,#f59e0b);font-weight:600">Not Yet Registered</div>
+          // Disable the form
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Already Registered";
+          addMemberBtn.style.display = "none";
+          document.getElementById("regTitle").readOnly = true;
+          prefSelects.forEach(s => s.disabled = true);
+        } else {
+          statusContent.innerHTML =
+            `<div style="color:var(--orange,#f59e0b);font-weight:600">Not Yet Registered</div>
            <div style="margin-top:4px">Fill the form and submit your group.</div>`;
+        }
+      } catch {
+        statusContent.textContent = "Could not load status.";
       }
-    } catch {
-      statusContent.textContent = "Could not load status.";
-    }
-  }
-
-  /* ─ Submit ───────────────────────────────────────── */
-  submitBtn.addEventListener("click", async () => {
-    hideError();
-
-    const title = document.getElementById("regTitle").value.trim();
-    if (!title) return showError("Project title is required.");
-
-    // Collect current values from inputs
-    const nameInputs = membersContainer.querySelectorAll(".member-name");
-    const uidInputs  = membersContainer.querySelectorAll(".member-uid");
-    nameInputs.forEach((inp, i) => { if (members[i]) members[i].name = inp.value.trim(); });
-    uidInputs.forEach( (inp, i) => { if (members[i]) members[i].uid  = inp.value.trim(); });
-
-    const validMembers = members.filter(m => m.name && m.uid);
-    if (validMembers.length < 2) {
-      return showError("Please add at least 2 team members with name and university ID.");
-    }
-    if (validMembers.length > 3) {
-      return showError("Maximum 3 team members allowed.");
     }
 
-    // Validate all UIDs filled
-    const incomplete = members.find(m => (m.name && !m.uid) || (!m.name && m.uid));
-    if (incomplete) return showError("Each team member must have both a name and a university ID.");
+    /* ─ Submit ───────────────────────────────────────── */
+    submitBtn.addEventListener("click", async () => {
+      hideError();
 
-    const preferredIds = Array.from(prefSelects).map(s => s.value).filter(Boolean);
+      const title = document.getElementById("regTitle").value.trim();
+      if (!title) return showError("Project title is required.");
 
-    submitBtn.disabled    = true;
-    submitBtn.textContent = "Submitting…";
+      // Collect current values from inputs
+      const nameInputs = membersContainer.querySelectorAll(".member-name");
+      const uidInputs = membersContainer.querySelectorAll(".member-uid");
+      nameInputs.forEach((inp, i) => { if (members[i]) members[i].name = inp.value.trim(); });
+      uidInputs.forEach((inp, i) => { if (members[i]) members[i].uid = inp.value.trim(); });
 
-    try {
-      const res = await fetch("/api/student/distribution-submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          member_ids: validMembers.map(m => m.uid),
-          member_names: validMembers.map(m => m.name),
-          preferred_supervisors: preferredIds,
-        }),
-      });
-      const data = await res.json();
-
-      if (data.already_registered) {
-        showError("⚠️ " + data.error + "\n\nThis group appears to have already been registered. Please refresh the page.");
-        submitBtn.disabled    = false;
-        submitBtn.textContent = "Register Group";
-        return;
+      const validMembers = members.filter(m => m.name && m.uid);
+      if (validMembers.length < 2) {
+        return showError("Please add at least 2 team members with name and university ID.");
+      }
+      if (validMembers.length > 3) {
+        return showError("Maximum 3 team members allowed.");
       }
 
-      if (!res.ok) {
-        showError(data.error || "Submission failed. Please try again.");
-        submitBtn.disabled    = false;
-        submitBtn.textContent = "Register Group";
-        return;
-      }
+      // Validate all UIDs filled
+      const incomplete = members.find(m => (m.name && !m.uid) || (!m.name && m.uid));
+      if (incomplete) return showError("Each team member must have both a name and a university ID.");
 
-      // ── Success ──
-      const prefNames = Array.from(prefSelects)
-        .map(s => s.options[s.selectedIndex]?.text)
-        .filter(t => t && t !== "— No preference —");
+      const preferredIds = Array.from(prefSelects).map(s => s.value).filter(Boolean);
 
-      formSection.style.display  = "none";
-      successScreen.style.display = "";
-      successDetails.innerHTML = `
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitting…";
+
+      try {
+        const res = await fetch("/student/api/distribution-submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            member_ids: validMembers.map(m => m.uid),
+            member_names: validMembers.map(m => m.name),
+            preferred_supervisors: preferredIds,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.already_registered) {
+          showError("⚠️ " + data.error + "\n\nThis group appears to have already been registered. Please refresh the page.");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Register Group";
+          return;
+        }
+
+        if (!res.ok) {
+          showError(data.error || "Submission failed. Please try again.");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Register Group";
+          return;
+        }
+
+        // ── Success ──
+        const prefNames = Array.from(prefSelects)
+          .map(s => s.options[s.selectedIndex]?.text)
+          .filter(t => t && t !== "— No preference —");
+
+        formSection.style.display = "none";
+        successScreen.style.display = "";
+        successDetails.innerHTML = `
         <div style="margin-bottom:10px"><b>Project:</b> ${esc(title)}</div>
         <div style="margin-bottom:10px"><b>Team Members:</b><br>
           ${validMembers.map((m, i) =>
-            `${i+1}. ${esc(m.name)} &nbsp;<span style="color:var(--color-text-secondary)">(${esc(m.uid)})</span>`
-          ).join("<br>")}
+          `${i + 1}. ${esc(m.name)} &nbsp;<span style="color:var(--color-text-secondary)">(${esc(m.uid)})</span>`
+        ).join("<br>")}
         </div>
         ${prefNames.length
-          ? `<div><b>Preferred Supervisors:</b><br>
-               ${prefNames.map((n, i) => `${i+1}. ${esc(n)}`).join("<br>")}
+            ? `<div><b>Preferred Supervisors:</b><br>
+               ${prefNames.map((n, i) => `${i + 1}. ${esc(n)}`).join("<br>")}
              </div>`
-          : ""}
+            : ""}
       `;
 
-    } catch (err) {
-      showError("Network error. Please check your connection and try again.");
-      submitBtn.disabled    = false;
-      submitBtn.textContent = "Register Group";
+      } catch (err) {
+        showError("Network error. Please check your connection and try again.");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Register Group";
+      }
+    });
+
+    /* ─ Init ─────────────────────────────────────────── */
+    async function init() {
+      // Seed with current user
+      members = [{ name: MY_NAME, uid: MY_UID }];
+      renderMembers();
+      await Promise.all([loadSupervisors(), checkStatus()]);
     }
-  });
 
-  /* ─ Init ─────────────────────────────────────────── */
-  async function init() {
-    // Seed with current user
-    members = [{ name: MY_NAME, uid: MY_UID }];
-    renderMembers();
-    await Promise.all([loadSupervisors(), checkStatus()]);
-  }
-
-  init();
-})();
+    init();
+  })();
 </script>
 {% endblock %}

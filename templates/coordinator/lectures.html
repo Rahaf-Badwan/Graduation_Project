@@ -5,275 +5,1174 @@
 {% block topbar_title %}Lectures &amp; Deliverables{% endblock %}
 
 {% block content %}
+<style>
+  html,
+  body {
+    scroll-behavior: auto !important;
+  }
+
+  #pg-lectures {
+    padding: 20px 22px 90px !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    display: block !important;
+  }
+
+  #pg-lectures .lecture-tabs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 0 16px 0;
+    padding: 0;
+  }
+
+  #pg-lectures .lecture-tab {
+    border: 1px solid #d7e3dc;
+    background: #fff;
+    color: #2d5137;
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.18s ease;
+  }
+
+  #pg-lectures .lecture-tab:hover {
+    background: #f3f7f4;
+  }
+
+  #pg-lectures .lecture-tab.on {
+    background: #2e7d42;
+    border-color: #2e7d42;
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+  }
+
+  #pg-lectures .lecture-section {
+    display: none;
+  }
+
+  #pg-lectures .lecture-section.active {
+    display: block;
+  }
+
+  #pg-lectures .course-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  #pg-lectures .course-badge {
+    background: #2e7d42;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  #pg-lectures .course-ar {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+  }
+
+  #pg-lectures .lecture-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  #pg-lectures .card {
+    margin-top: 0 !important;
+    background: #fff;
+    border: 1px solid #e6ece8;
+    border-radius: 18px;
+    box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
+    overflow: hidden;
+  }
+
+  #pg-lectures .card-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 16px 18px;
+    border-bottom: 1px solid #edf2ef;
+  }
+
+  #pg-lectures .card-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: #173b24;
+  }
+
+  #pg-lectures .card-action {
+    border: 1px solid #d7e3dc;
+    background: #f3f7f4;
+    color: #245c33;
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.18s ease;
+  }
+
+  #pg-lectures .card-action:hover {
+    background: #e8f3eb;
+    border-color: #b9d7c2;
+  }
+
+  #pg-lectures .lecture-note {
+    border-left: 5px solid #2e7d42;
+    background: #f7fbf8;
+    border-radius: 14px;
+    padding: 13px 14px;
+    color: #344054;
+    line-height: 1.55;
+    font-size: 13px;
+    margin: 14px 18px;
+  }
+
+  #pg-lectures .mini-form {
+    display: none;
+    border: 1px solid #e7eee9;
+    border-radius: 14px;
+    padding: 14px;
+    margin: 0 18px 14px 18px;
+    background: #fbfdfb;
+  }
+
+  #pg-lectures .mini-form.on {
+    display: block;
+  }
+
+  #pg-lectures .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  #pg-lectures label {
+    font-size: 12px;
+    font-weight: 800;
+    color: #344054;
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  #pg-lectures input,
+  #pg-lectures select,
+  #pg-lectures textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d8e2dc;
+    border-radius: 12px;
+    background: #fff;
+    font: inherit;
+    outline: none;
+  }
+
+  #pg-lectures input:focus,
+  #pg-lectures select:focus,
+  #pg-lectures textarea:focus {
+    border-color: #2e7d42;
+    box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
+  }
+
+  #pg-lectures textarea {
+    resize: vertical;
+  }
+
+  #pg-lectures .empty-box {
+    border: 1px dashed #cddbd2;
+    border-radius: 14px;
+    padding: 18px;
+    color: #667085;
+    background: #fbfdfb;
+    font-size: 13px;
+    text-align: center;
+    margin: 0 18px 18px 18px;
+  }
+
+  #pg-lectures .lec-card,
+  #pg-lectures .deliv-row {
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    gap: 12px;
+    align-items: flex-start;
+    border: 1px solid #e7eee9;
+    background: #fff;
+    border-radius: 16px;
+    padding: 13px 14px;
+    margin: 0 18px 12px 18px;
+  }
+
+  #pg-lectures .lec-num,
+  #pg-lectures .deliv-token {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #ecfdf3;
+    color: #2e7d42;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+  }
+
+  #pg-lectures .lecture-item-title {
+    font-weight: 900;
+    color: #173b24;
+    margin-bottom: 4px;
+  }
+
+  #pg-lectures .lecture-item-meta {
+    font-size: 12px;
+    color: #667085;
+    line-height: 1.5;
+  }
+
+  #pg-lectures .lecture-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  #pg-lectures .lecture-date-input {
+    max-width: 160px;
+    padding: 8px 10px;
+  }
+
+  #pg-lectures .lecture-small-btn {
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  #pg-lectures .pill {
+    border-radius: 999px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  #pg-lectures .submission-filter-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 18px 14px 18px;
+  }
+
+  #pg-lectures .submission-filter-btn {
+    border: 1px solid #d7e3dc;
+    background: #fff;
+    color: #2d5137;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  #pg-lectures .submission-filter-btn.on {
+    background: #2e7d42;
+    border-color: #2e7d42;
+    color: #fff;
+  }
+
+  #pg-lectures .submission-file-card {
+    border: 1px solid #e7eee9;
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
+  }
+
+  #pg-lectures .submission-folder {
+    border: 1px solid #dfe9e3;
+    background: #fff;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
+  }
+
+  #pg-lectures .submission-folder-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 13px 16px;
+    background: #f7fbf8;
+    border-bottom: 1px solid #e7eee9;
+  }
+
+  #pg-lectures .submission-folder-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #173b24;
+  }
+
+  #pg-lectures .submission-folder-meta {
+    font-size: 12px;
+    color: #667085;
+    margin-top: 3px;
+  }
+
+  #pg-lectures .submission-file-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 13px 16px;
+    border-bottom: 1px solid #eef3f0;
+  }
+
+  #pg-lectures .submission-file-row:last-child {
+    border-bottom: 0;
+  }
+
+  #pg-lectures .submission-file-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  #pg-lectures .submission-file-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #173b24;
+  }
+
+  #pg-lectures .submission-file-meta {
+    font-size: 12px;
+    color: #667085;
+    line-height: 1.6;
+  }
+
+  #pg-lectures .submission-file-link {
+    display: inline-flex;
+    margin-top: 10px;
+    padding: 8px 11px;
+    border-radius: 10px;
+    background: #f3f7f4;
+    border: 1px solid #d7e3dc;
+    color: #245c33;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  #pg-lectures .submission-file-link:hover {
+    background: #e8f3eb;
+  }
+
+  @media(max-width:900px) {
+    #pg-lectures .lecture-grid,
+    #pg-lectures .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-lectures .lecture-tab {
+      width: 100%;
+      text-align: center;
+    }
+
+    #pg-lectures .lec-card,
+    #pg-lectures .deliv-row {
+      grid-template-columns: 42px 1fr;
+    }
+  }
+</style>
+
 <div class="page page-single on" id="pg-lectures">
 
-<div class="tab-bar" style="margin-bottom:16px;">
-<button class="tab on" type="button" onclick="showLectureSection('introLectures',this)">Project Introduction</button>
-<button class="tab" type="button" onclick="showLectureSection('gradLectures',this)">Graduation Projects</button>
-</div>
+  <div class="lecture-tabs" role="tablist" aria-label="Lectures and Deliverables tabs">
+    <button class="lecture-tab on" type="button" role="tab" aria-selected="true" onclick="showLectureSection('introduction', this)">
+      Project Introduction
+    </button>
 
-<div id="introLectures">
+    <button class="lecture-tab" type="button" role="tab" aria-selected="false" onclick="showLectureSection('graduation_project', this)">
+      Graduation Projects
+    </button>
 
-<div>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-<span style="background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">◑ Project Introduction — COMP4200</span>
-<span style="font-size:11px;color:var(--color-text-secondary);">مقدمة المشاريع</span>
-</div>
+    <button class="lecture-tab" type="button" role="tab" aria-selected="false" onclick="showLectureSection('submission_files', this)">
+      Submission Files
+    </button>
+  </div>
 
-<div class="card">
-<div class="card-hd">
-<span class="card-title">Coordinator Lectures</span>
-<button class="card-action" type="button">+ Add Lecture</button>
-</div>
-<div class="u-3fa92238">Attendance recorded per lecture — students receive attendance marks.</div>
+  <div id="introLectures" class="lecture-section active" data-scope="introduction">
+    <div class="course-head">
+      <span class="course-badge">◑ Project Introduction — COMP4200</span>
+      <span class="course-ar">مقدمة المشاريع</span>
+    </div>
 
-<div class="lec-card">
-<div class="lec-num u-7dd75b5a">1</div>
-<div class="u-d5e8c5f3">
-<div class="u-d331ec29">Introductory Lecture</div>
-<div class="u-c8be14a8">System overview, requirements, submission steps · Week 1</div>
-<div class="u-dfe4d359">
-<span class="pill p-accepted">Completed</span>
-<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">84 / 98</b></span>
-<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
-</div>
-</div>
-</div>
+    <div class="lecture-grid">
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Coordinator Lectures</span>
+          <button class="card-action" type="button" onclick="toggleLectureForm('introduction')">+ Add Lecture</button>
+        </div>
 
-<div class="lec-card">
-<div class="lec-num u-2fa90a93">2</div>
-<div class="u-d5e8c5f3">
-<div class="u-d331ec29">Formatting & Best Practices</div>
-<div class="u-c8be14a8">Standards, examples from previous projects · Mid-semester</div>
-<div class="u-dfe4d359">
-<span class="pill p-accepted">Completed</span>
-<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">79 / 98</b></span>
-<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
-</div>
-</div>
-</div>
+        <div class="lecture-note">
+          Add lecture dates and publish the semester lecture plan.
+        </div>
 
-<div class="lec-card u-6e83efb5">
-<div class="lec-num u-7073bc52">3</div>
-<div class="u-d5e8c5f3">
-<div class="u-d331ec29">Turnitin Upload & Similarity</div>
-<div class="u-c8be14a8">Uploading reports, checking similarity, citing sources · Near end</div>
-<div class="u-dfe4d359">
-<span class="pill p-pending">Scheduled</span>
-<input class="field-input u-9d6b4ff1" type="date" />
-<button class="btn btn-primary u-70a7ba83" type="button">Confirm Date</button>
-</div>
-</div>
-</div>
-</div>
+        <div id="lectureForm-introduction" class="mini-form"></div>
+        <div id="lectureList-introduction"></div>
+      </div>
 
-<div class="card">
-<div class="card-hd">
-<span class="card-title">Deliverables — Project Introduction</span>
-<button class="card-action" type="button">+ Add Deliverable</button>
-</div>
-<div class="u-cebcb327">On-time submission carries marks — monitored by the coordinator</div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Deliverables — Project Introduction</span>
+          <button class="card-action" type="button" onclick="toggleDeliverableForm('introduction')">+ Add Deliverable</button>
+        </div>
 
-<div class="deliv-row">
-<div class="u-844ebab6">T1</div>
-<div class="u-d5e8c5f3">
-<div class="u-2e61148f">Project Title + Initial Idea</div>
-<div class="u-7d16b22c">Week 3 · Commitment mark: 5 pts</div>
-</div>
-<div class="u-244a7f30">
-<span class="pill p-accepted">Completed</span>
-<div class="u-e19e0a67">89 / 98 submitted</div>
-</div>
-</div>
+        <div class="lecture-note">
+          On-time submission carries marks — monitored by the coordinator.
+        </div>
 
-<div class="deliv-row">
-<div class="u-64d7500e">T2</div>
-<div class="u-d5e8c5f3">
-<div class="u-2e61148f">Chapter One Outline</div>
-<div class="u-7d16b22c">Week 7 · Commitment mark: 10 pts</div>
-</div>
-<div class="u-244a7f30">
-<span class="pill p-review">In Progress</span>
-<div class="u-e19e0a67">61 / 98 submitted</div>
-</div>
-</div>
+        <div id="deliverableForm-introduction" class="mini-form"></div>
+        <div id="deliverableList-introduction"></div>
+      </div>
+    </div>
+  </div>
 
-<div class="deliv-row u-5677897e">
-<div class="u-2d2d4f55">T3</div>
-<div class="u-d5e8c5f3">
-<div class="u-2e61148f">Final Report + Turnitin Upload</div>
-<div class="u-7d16b22c">2 weeks before semester end · 15 pts</div>
-</div>
-<div class="u-244a7f30">
-<span class="pill p-draft">Not Open Yet</span>
-</div>
-</div>
-</div>
+  <div id="gradLectures" class="lecture-section" data-scope="graduation_project">
+    <div class="course-head">
+      <span class="course-badge">✦ Graduation Projects — COMP4300</span>
+      <span class="course-ar">مشاريع التخرج</span>
+    </div>
 
-<div class="card">
-<div class="card-hd"><span class="card-title">Attendance — Project Introduction</span></div>
-<div class="u-77c8140b">
-<table class="reg-table">
-<thead>
-<tr><th>Student</th><th>Lec 1</th><th>Lec 2</th><th>Lec 3</th><th>Total</th></tr>
-</thead>
-<tbody>
-<tr><td>Rahaf Badwan</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
-<tr><td>Salma Al-Khatib</td><td class="u-cfb6c12e">✓</td><td class="u-bc7c441e">✗</td><td class="u-5def8408">—</td><td><b>1/3</b></td></tr>
-<tr><td>Khaled Mansour</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
-<tr><td>Ahmad Al-Arouri</td><td class="u-bc7c441e">✗</td><td class="u-bc7c441e">✗</td><td class="u-5def8408">—</td><td><b class="u-bc7c441e">0/3 ⚑</b></td></tr>
-</tbody>
-</table>
-</div>
-</div>
+    <div class="lecture-grid">
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Coordinator Lectures</span>
+          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add Lecture</button>
+        </div>
 
-</div>
-</div>
+        <div class="lecture-note">
+          Add lecture dates and publish the semester lecture plan.
+        </div>
 
-<div id="gradLectures" style="display:none;">
+        <div id="lectureForm-graduation_project" class="mini-form"></div>
+        <div id="lectureList-graduation_project"></div>
+      </div>
 
-<div>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-<span style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;">✦ Graduation Projects — COMP4201</span>
-<span style="font-size:11px;color:var(--color-text-secondary);">مشاريع التخرج</span>
-</div>
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Deliverables — Graduation Projects</span>
+          <button class="card-action" type="button" onclick="toggleDeliverableForm('graduation_project')">+ Add Deliverable</button>
+        </div>
 
-<div class="card">
-<div class="card-hd">
-<span class="card-title">Coordinator Lectures</span>
-<button class="card-action" type="button">+ Add Lecture</button>
-</div>
-<div class="u-3fa92238">Attendance recorded per lecture — students receive attendance marks.</div>
+        <div class="lecture-note">
+          On-time submission carries marks — monitored by the coordinator.
+        </div>
 
-<div class="lec-card">
-<div class="lec-num u-7dd75b5a">1</div>
-<div class="u-d5e8c5f3">
-<div class="u-d331ec29">Graduation Project Guidelines</div>
-<div class="u-c8be14a8">Full project requirements, milestones, committee process · Week 1</div>
-<div class="u-dfe4d359">
-<span class="pill p-accepted">Completed</span>
-<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">72 / 81</b></span>
-<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
-</div>
-</div>
-</div>
+        <div id="deliverableForm-graduation_project" class="mini-form"></div>
+        <div id="deliverableList-graduation_project"></div>
+      </div>
+    </div>
+  </div>
 
-<div class="lec-card">
-<div class="lec-num u-2fa90a93">2</div>
-<div class="u-d5e8c5f3">
-<div class="u-d331ec29">Report Writing Standards</div>
-<div class="u-c8be14a8">Structure, chapter breakdown, referencing · Mid-semester</div>
-<div class="u-dfe4d359">
-<span class="pill p-accepted">Completed</span>
-<span class="u-7d16b22c">Attendees: <b class="u-eada1e7e">68 / 81</b></span>
-<button class="btn btn-outline u-70a7ba83" type="button">View Attendance</button>
-</div>
-</div>
-</div>
+  <div id="submissionFilesLectures" class="lecture-section" data-scope="submission_files">
+    <div class="course-head">
+      <span class="course-badge">▣ Submission Files</span>
+      <span class="course-ar">ملفات التسليم</span>
+    </div>
 
-<div class="lec-card u-6e83efb5">
-<div class="lec-num u-7073bc52">3</div>
-<div class="u-d5e8c5f3">
-<div class="u-d331ec29">Discussion Preparation & Presentation</div>
-<div class="u-c8be14a8">How to present to committee, Q&amp;A tips, grading breakdown · Near end</div>
-<div class="u-dfe4d359">
-<span class="pill p-pending">Scheduled</span>
-<input class="field-input u-9d6b4ff1" type="date" />
-<button class="btn btn-primary u-70a7ba83" type="button">Confirm Date</button>
-</div>
-</div>
-</div>
-</div>
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Students Submitted Files</span>
+        <button class="card-action" type="button" onclick="loadSubmissionFiles()">Refresh</button>
+      </div>
 
-<div class="card">
-<div class="card-hd">
-<span class="card-title">Deliverables — Graduation Projects</span>
-<button class="card-action" type="button">+ Add Deliverable</button>
-</div>
-<div class="u-cebcb327">On-time submission carries marks — monitored by the coordinator</div>
+      <div class="lecture-note">
+        This tab shows submitted files such as reports and final submissions.
+        Example: <b>Report One — COMP4200</b>, submitted by the student name with the uploaded file.
+      </div>
 
-<div class="deliv-row">
-<div class="u-844ebab6">T1</div>
-<div class="u-d5e8c5f3">
-<div class="u-2e61148f">Project Proposal + Supervisor Approval</div>
-<div class="u-7d16b22c">Week 2 · Commitment mark: 5 pts</div>
-</div>
-<div class="u-244a7f30">
-<span class="pill p-accepted">Completed</span>
-<div class="u-e19e0a67">78 / 81 submitted</div>
-</div>
-</div>
+      <div class="submission-filter-row">
+        <button class="submission-filter-btn on" type="button" onclick="filterSubmissionFiles('all', this)">All</button>
+        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4200', this)">COMP4200</button>
+        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4300', this)">COMP4300</button>
+      </div>
 
-<div class="deliv-row">
-<div class="u-64d7500e">T2</div>
-<div class="u-d5e8c5f3">
-<div class="u-2e61148f">Progress Report (Chapters 1–3)</div>
-<div class="u-7d16b22c">Week 8 · Commitment mark: 10 pts</div>
+      <div id="submissionFilesList" style="padding:0 18px 18px 18px">
+        <div class="empty-box">Loading submitted files...</div>
+      </div>
+    </div>
+  </div>
 </div>
-<div class="u-244a7f30">
-<span class="pill p-review">In Progress</span>
-<div class="u-e19e0a67">55 / 81 submitted</div>
-</div>
-</div>
+{% endblock %}
 
-<div class="deliv-row">
-<div class="u-2d2d4f55">T3</div>
-<div class="u-d5e8c5f3">
-<div class="u-2e61148f">Final Report + Turnitin Upload</div>
-<div class="u-7d16b22c">2 weeks before semester end · 15 pts</div>
-</div>
-<div class="u-244a7f30">
-<span class="pill p-draft">Not Open Yet</span>
-</div>
-</div>
-
-<div class="deliv-row u-5677897e">
-<div class="u-844ebab6">T4</div>
-<div class="u-d5e8c5f3">
-<div class="u-2e61148f">Committee Discussion Scheduling</div>
-<div class="u-7d16b22c">End of semester · Coordinator arranges slots</div>
-</div>
-<div class="u-244a7f30">
-<span class="pill p-draft">Not Open Yet</span>
-</div>
-</div>
-</div>
-
-<div class="card">
-<div class="card-hd"><span class="card-title">Attendance — Graduation Projects</span></div>
-<div class="u-77c8140b">
-<table class="reg-table">
-<thead>
-<tr><th>Group</th><th>Lec 1</th><th>Lec 2</th><th>Lec 3</th><th>Total</th></tr>
-</thead>
-<tbody>
-<tr><td>G01 — Rahaf Badwan &amp; team</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
-<tr><td>G02 — Salma Al-Khatib &amp; team</td><td class="u-cfb6c12e">✓</td><td class="u-bc7c441e">✗</td><td class="u-5def8408">—</td><td><b>1/3</b></td></tr>
-<tr><td>G03 — Khaled Mansour &amp; team</td><td class="u-cfb6c12e">✓</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>2/3</b></td></tr>
-<tr><td>G04 — Maryam Al-Jayousi</td><td class="u-bc7c441e">✗</td><td class="u-cfb6c12e">✓</td><td class="u-5def8408">—</td><td><b>1/3</b></td></tr>
-</tbody>
-</table>
-</div>
-</div>
-
-</div>
-</div>
-
-</div>
-
+{% block extra_scripts %}
 <script>
-function showLectureSection(id,btn){
-document.getElementById('introLectures').style.display='none';
-document.getElementById('gradLectures').style.display='none';
+  const scopeLabels = {
+    introduction: 'Project Introduction',
+    graduation_project: 'Graduation Projects'
+  };
 
-document.getElementById(id).style.display='block';
+  let lecturesState = {
+    lectures: {
+      introduction: [],
+      graduation_project: []
+    },
+    deliverables: {
+      introduction: [],
+      graduation_project: []
+    }
+  };
 
-document.querySelectorAll('#pg-lectures > .tab-bar .tab').forEach(tab=>{
-tab.classList.remove('on');
-});
+  let submissionFilesState = [];
+  let currentSubmissionFilter = 'all';
 
-btn.classList.add('on');
-}
+  function resetLectureScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-lectures'].forEach(selector => {
+      const el = document.querySelector(selector);
+      if (el) el.scrollTop = 0;
+    });
+  }
+
+  function showLectureSection(scope, btn) {
+    document.querySelectorAll('#pg-lectures .lecture-section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    let sectionId = 'introLectures';
+
+    if (scope === 'graduation_project') {
+      sectionId = 'gradLectures';
+    }
+
+    if (scope === 'submission_files') {
+      sectionId = 'submissionFilesLectures';
+      loadSubmissionFiles();
+    }
+
+    const selected = document.getElementById(sectionId);
+
+    if (selected) {
+      selected.classList.add('active');
+    }
+
+    document.querySelectorAll('#pg-lectures .lecture-tab').forEach(tab => {
+      const isActive = tab === btn;
+      tab.classList.toggle('on', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    setTimeout(resetLectureScroll, 0);
+  }
+
+  function pillClass(status) {
+    if (status === 'completed') return 'p-accepted';
+    if (status === 'cancelled' || status === 'closed') return 'p-rejected';
+    if (status === 'in_progress' || status === 'open') return 'p-review';
+    return 'p-pending';
+  }
+
+  function niceStatus(status) {
+    return String(status || 'scheduled')
+      .replaceAll('_', ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function safe(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+  }
+
+  function lectureFormHtml(scope) {
+    return `
+      <div class="form-grid">
+        <div>
+          <label>Lecture Title</label>
+          <input id="lecTitle-${scope}" placeholder="Example: Turnitin Upload & Similarity">
+        </div>
+
+        <div>
+          <label>Lecture Date</label>
+          <input id="lecDate-${scope}" type="date">
+        </div>
+
+        <div>
+          <label>Week Label</label>
+          <input id="lecWeek-${scope}" placeholder="Example: Week 3">
+        </div>
+
+        <div>
+          <label>Status</label>
+          <select id="lecStatus-${scope}">
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+
+        <div style="grid-column:1/-1">
+          <label>Description</label>
+          <textarea id="lecDesc-${scope}" rows="2" placeholder="What will be covered in this lecture?"></textarea>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" type="button" onclick="saveLecture('${scope}')">Save Lecture</button>
+        <button class="btn btn-outline" type="button" onclick="toggleLectureForm('${scope}')">Cancel</button>
+      </div>
+    `;
+  }
+
+  function deliverableFormHtml(scope) {
+    return `
+      <div class="form-grid">
+        <div>
+          <label>Deliverable Title</label>
+          <input id="delTitle-${scope}" placeholder="Example: Final Report + Turnitin">
+        </div>
+
+        <div>
+          <label>Due Date</label>
+          <input id="delDue-${scope}" type="date">
+        </div>
+
+        <div>
+          <label>Mark Points</label>
+          <input id="delMark-${scope}" type="number" min="0" value="5">
+        </div>
+
+        <div>
+          <label>Status</label>
+          <select id="delStatus-${scope}">
+            <option value="not_open">Not Open Yet</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+
+        <div style="grid-column:1/-1">
+          <label>Description</label>
+          <textarea id="delDesc-${scope}" rows="2" placeholder="Submission details"></textarea>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" type="button" onclick="saveDeliverable('${scope}')">Save Deliverable</button>
+        <button class="btn btn-outline" type="button" onclick="toggleDeliverableForm('${scope}')">Cancel</button>
+      </div>
+    `;
+  }
+
+  function toggleLectureForm(scope) {
+    const box = document.getElementById(`lectureForm-${scope}`);
+    if (!box) return;
+
+    if (!box.innerHTML.trim()) {
+      box.innerHTML = lectureFormHtml(scope);
+    }
+
+    box.classList.toggle('on');
+  }
+
+  function toggleDeliverableForm(scope) {
+    const box = document.getElementById(`deliverableForm-${scope}`);
+    if (!box) return;
+
+    if (!box.innerHTML.trim()) {
+      box.innerHTML = deliverableFormHtml(scope);
+    }
+
+    box.classList.toggle('on');
+  }
+
+  function renderLectures(scope) {
+    const list = document.getElementById(`lectureList-${scope}`);
+    const rows = lecturesState.lectures[scope] || [];
+
+    if (!list) return;
+
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-box">No lectures yet. Click + Add Lecture to create one.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map((lecture, index) => `
+      <div class="lec-card">
+        <div class="lec-num">${index + 1}</div>
+
+        <div>
+          <div class="lecture-item-title">${safe(lecture.title)}</div>
+
+          <div class="lecture-item-meta">
+            ${safe(lecture.description || '')}
+            ${lecture.week_label ? ' · ' + safe(lecture.week_label) : ''}
+            ${lecture.lecture_date ? ' · ' + safe(lecture.lecture_date) : ''}
+          </div>
+
+          <div class="lecture-actions">
+            <span class="pill ${pillClass(lecture.status)}">${niceStatus(lecture.status)}</span>
+
+            <input
+              class="field-input lecture-date-input"
+              type="date"
+              value="${safe(lecture.lecture_date || '')}"
+              id="lecDateUpdate-${lecture.lecture_id}">
+
+            <button
+              class="btn btn-primary lecture-small-btn"
+              type="button"
+              onclick="updateLectureDate(${lecture.lecture_id})">
+              Confirm Date
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderDeliverables(scope) {
+    const list = document.getElementById(`deliverableList-${scope}`);
+    const rows = lecturesState.deliverables[scope] || [];
+
+    if (!list) return;
+
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-box">No deliverables yet. Click + Add Deliverable to create one.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map((deliverable, index) => `
+      <div class="deliv-row">
+        <div class="deliv-token">T${index + 1}</div>
+
+        <div>
+          <div class="lecture-item-title">${safe(deliverable.title)}</div>
+
+          <div class="lecture-item-meta">
+            ${deliverable.due_date ? safe(deliverable.due_date) : 'No due date'}
+            · Commitment mark: ${safe(deliverable.mark_points || 0)} pts
+          </div>
+
+          <div class="lecture-item-meta">
+            ${safe(deliverable.description || '')}
+          </div>
+        </div>
+
+        <div>
+          <span class="pill ${pillClass(deliverable.status === 'open' ? 'in_progress' : deliverable.status)}">
+            ${niceStatus(deliverable.status)}
+          </span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderAll() {
+    ['introduction', 'graduation_project'].forEach(scope => {
+      renderLectures(scope);
+      renderDeliverables(scope);
+    });
+  }
+
+  async function apiFetch(url, options) {
+    const res = await fetch(
+      url,
+      Object.assign(
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        },
+        options || {}
+      )
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Request failed');
+    }
+
+    return data;
+  }
+
+  async function loadLecturesData() {
+    try {
+      lecturesState = await apiFetch('/api/coordinator/lectures-data');
+      renderAll();
+    } catch (err) {
+      alert('Lectures page error: ' + err.message);
+    }
+  }
+
+  async function saveLecture(scope) {
+    const payload = {
+      course_scope: scope,
+      title: document.getElementById(`lecTitle-${scope}`).value.trim(),
+      description: document.getElementById(`lecDesc-${scope}`).value.trim(),
+      lecture_date: document.getElementById(`lecDate-${scope}`).value,
+      week_label: document.getElementById(`lecWeek-${scope}`).value.trim(),
+      status: document.getElementById(`lecStatus-${scope}`).value
+    };
+
+    if (!payload.title) {
+      alert('Lecture title is required.');
+      return;
+    }
+
+    await apiFetch('/api/coordinator/lectures', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById(`lectureForm-${scope}`).classList.remove('on');
+    document.getElementById(`lectureForm-${scope}`).innerHTML = '';
+
+    await loadLecturesData();
+  }
+
+  async function saveDeliverable(scope) {
+    const payload = {
+      course_scope: scope,
+      title: document.getElementById(`delTitle-${scope}`).value.trim(),
+      description: document.getElementById(`delDesc-${scope}`).value.trim(),
+      due_date: document.getElementById(`delDue-${scope}`).value,
+      mark_points: Number(document.getElementById(`delMark-${scope}`).value || 0),
+      status: document.getElementById(`delStatus-${scope}`).value
+    };
+
+    if (!payload.title) {
+      alert('Deliverable title is required.');
+      return;
+    }
+
+    await apiFetch('/api/coordinator/deliverables', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById(`deliverableForm-${scope}`).classList.remove('on');
+    document.getElementById(`deliverableForm-${scope}`).innerHTML = '';
+
+    await loadLecturesData();
+  }
+
+  async function updateLectureDate(lectureId) {
+    const dateInput = document.getElementById(`lecDateUpdate-${lectureId}`);
+
+    await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, {
+      method: 'POST',
+      body: JSON.stringify({
+        lecture_date: dateInput.value
+      })
+    });
+
+    await loadLecturesData();
+  }
+
+  function buildSubmissionFileHref(file) {
+    if (file.download_url) {
+      return file.download_url;
+    }
+
+    const path = String(file.file_path || '');
+
+    if (!path) return '#';
+
+    const cleanPath = path.replaceAll('\\', '/');
+
+    if (cleanPath.startsWith('/static/')) return cleanPath;
+    if (cleanPath.startsWith('static/')) return '/' + cleanPath;
+
+    return `/static/${cleanPath}`;
+  }
+
+  function filterSubmissionFiles(scope, btn) {
+    currentSubmissionFilter = scope || 'all';
+
+    document.querySelectorAll('#pg-lectures .submission-filter-btn').forEach(button => {
+      button.classList.remove('on');
+    });
+
+    if (btn) btn.classList.add('on');
+
+    renderSubmissionFiles();
+  }
+
+  function renderGroupedSubmissionFiles(rows) {
+    // Separate project files vs timeline/deliverable
+    const projectGroups = {};  // keyed by project_id
+    const otherGroups  = {};   // keyed by course::title::source
+
+    rows.forEach(file => {
+      if (file.source === 'project' && file.project_id) {
+        if (!projectGroups[file.project_id]) {
+          projectGroups[file.project_id] = {
+            project_id:     file.project_id,
+            project_title:  file.project_title  || 'Untitled Project',
+            project_type:   file.project_type   || '',
+            supervisor_name:file.supervisor_name || '',
+            team_members:   file.team_members    || '',
+            course_scope:   file.course_scope    || '',
+            course_label:   file.course_label    || file.course_scope || 'Project',
+            submitted_by:   file.submitted_by    || '',
+            uploaded_at:    file.uploaded_at     || '',
+            files: []
+          };
+        }
+        projectGroups[file.project_id].files.push(file);
+      } else {
+        const key = [file.course_scope||'Course', file.submission_title||'Submission', file.source||'submission'].join('::');
+        if (!otherGroups[key]) otherGroups[key] = {
+          title: file.submission_title || 'Submission',
+          course: file.course_scope || 'Course',
+          label: file.course_label  || file.course_scope || 'Submission',
+          files: []
+        };
+        otherGroups[key].files.push(file);
+      }
+    });
+
+    // ── Build inner project card (expandable) ─────────────
+    function buildProjectCard(g) {
+      const pid = 'proj-' + g.project_id;
+      const typeLabel = g.project_type
+        ? `<span style="font-size:11px;background:#f0f4f1;border:1px solid #d0ddd4;
+                        border-radius:6px;padding:2px 8px;color:#2e7d42">
+             ${safe(g.project_type.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}
+           </span>` : '';
+
+      const filesHtml = g.files.map(f => {
+        const href = buildSubmissionFileHref(f);
+        const sz   = Number(f.file_size_mb||0) > 0 ? ' · ' + Number(f.file_size_mb).toFixed(2) + ' MB' : '';
+        const icon = f.file_type==='final_report'?'📄':f.file_type==='source_code'?'💾':f.file_type==='presentation'?'📊':'📁';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;
+                             padding:8px 0;border-top:1px solid #eef1ee">
+          <div style="font-size:13px;color:#344054">
+            ${icon} <b>${safe((f.file_type||'file').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}</b>
+            <span style="color:#888;font-size:11px">${sz}</span>
+          </div>
+          <a class="submission-file-link" href="${safe(href)}" target="_blank"
+             style="font-size:12px;padding:4px 10px" onclick="event.stopPropagation()">
+            ${href==='#'?'Unavailable':safe(f.file_name||'Download')}
+          </a>
+        </div>`;
+      }).join('');
+
+      return `
+        <div style="border:1px solid #e7eee9;border-radius:10px;margin-bottom:8px;overflow:hidden">
+          <div style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+                      background:#fafcfa"
+               onclick="var b=document.getElementById('${pid}');
+                        b.style.display=b.style.display==='none'?'block':'none';
+                        this.querySelector('.pa').textContent=b.style.display==='none'?'▸':'▾'">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="pa" style="color:#2e7d42;font-size:13px">▸</span>
+              <span style="font-weight:700;font-size:14px">${safe(g.project_title)}</span>
+              ${typeLabel}
+            </div>
+            <span style="font-size:12px;color:#667085">${g.files.length} file${g.files.length===1?'':'s'} · ${safe(g.submitted_by)}</span>
+          </div>
+          <div id="${pid}" style="display:none;padding:0 14px 10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;
+                        margin:8px 0;font-size:12px;color:#344054;
+                        background:#f7fbf8;border-radius:8px;padding:8px 12px">
+              ${g.supervisor_name ? `<div>🎓 <b>Supervisor:</b> ${safe(g.supervisor_name)}</div>` : ''}
+              ${g.team_members    ? `<div style="grid-column:1/-1">👥 <b>Team:</b> ${safe(g.team_members)}</div>` : ''}
+              ${g.uploaded_at     ? `<div>🕐 <b>Submitted:</b> ${safe(g.uploaded_at)}</div>` : ''}
+            </div>
+            ${filesHtml}
+          </div>
+        </div>`;
+    }
+
+    // ── Group projects by course → one big outer folder per course ──
+    const byCourseFolders = {};
+    Object.values(projectGroups).forEach(g => {
+      const course = g.course_scope || 'Other';
+      if (!byCourseFolders[course]) byCourseFolders[course] = {
+        label: g.course_label || course,
+        projects: []
+      };
+      byCourseFolders[course].projects.push(g);
+    });
+
+    const outerFolders = Object.entries(byCourseFolders).map(([course, cg]) => {
+      const uid   = 'cf-' + course.replace(/\W/g,'');
+      const total = cg.projects.length;
+      const inner = cg.projects.map(buildProjectCard).join('');
+
+      return `
+        <section class="submission-folder" style="cursor:default">
+          <div class="submission-folder-head" style="cursor:pointer;user-select:none"
+               onclick="var b=document.getElementById('${uid}');
+                        b.style.display=b.style.display==='none'?'block':'none';
+                        this.querySelector('.ca').textContent=b.style.display==='none'?'▸':'▾'">
+            <div>
+              <div class="submission-folder-title" style="display:flex;align-items:center;gap:8px">
+                <span class="ca" style="color:#2e7d42;font-size:16px">▾</span>
+                Final Submissions — ${safe(course)}
+              </div>
+              <div class="submission-folder-meta">${total} project${total===1?'':'s'} submitted</div>
+            </div>
+            <span class="pill p-review">${safe(cg.label)}</span>
+          </div>
+          <div id="${uid}">${inner}</div>
+        </section>`;
+    }).join('');
+
+    // ── Timeline / deliverable groups (unchanged style) ──
+    const otherCards = Object.values(otherGroups).map(group => `
+      <section class="submission-folder">
+        <div class="submission-folder-head">
+          <div>
+            <div class="submission-folder-title">${safe(group.title)} — ${safe(group.course)}</div>
+            <div class="submission-folder-meta">${group.files.length} submitted file${group.files.length===1?'':'s'}</div>
+          </div>
+          <span class="pill p-review">${safe(group.label)}</span>
+        </div>
+        ${group.files.map(file => {
+          const href = buildSubmissionFileHref(file);
+          const sz   = Number(file.file_size_mb||0)>0 ? ` - ${Number(file.file_size_mb).toFixed(2)} MB` : '';
+          return `<div class="submission-file-row">
+            <div>
+              <div class="submission-file-title">${safe(file.project_title||'Untitled Project')}</div>
+              <div class="submission-file-meta">Submitted by: <b>${safe(file.submitted_by||'Unknown')}</b></div>
+              <div class="submission-file-meta">Uploaded at: ${safe(file.uploaded_at||'-')}${sz}</div>
+            </div>
+            <a class="submission-file-link" href="${safe(href)}" target="_blank">
+              ${href==='#'?'File unavailable':safe(file.file_name||'Open file')}
+            </a>
+          </div>`;
+        }).join('')}
+      </section>`).join('');
+
+    return outerFolders + otherCards;
+  }
+
+
+  function renderSubmissionFiles() {
+    const box = document.getElementById('submissionFilesList');
+
+    if (!box) return;
+
+    const rows = currentSubmissionFilter === 'all'
+      ? submissionFilesState
+      : submissionFilesState.filter(file => file.course_scope === currentSubmissionFilter);
+
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty-box">No submitted files found.</div>';
+      return;
+    }
+
+    box.innerHTML = renderGroupedSubmissionFiles(rows);
+    return;
+
+    box.innerHTML = rows.map(file => {
+      const href = buildSubmissionFileHref(file);
+      const sourceLabel = file.source === 'timeline'
+        ? 'Timeline submission'
+        : file.source === 'deliverable'
+          ? 'Deliverable submission'
+          : 'Project submitted';
+      const targetLabel = file.submitted_to
+        ? ` - ${safe(niceStatus(file.submitted_to))}`
+        : '';
+      const sizeLabel = Number(file.file_size_mb || 0) > 0
+        ? ` Â· ${safe(Number(file.file_size_mb).toFixed(2))} MB`
+        : '';
+      const linkText = href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file');
+      const title = `${safe(file.submission_title || 'Submission')} — ${safe(file.course_scope || 'Course')}`;
+
+      return `
+        <div class="submission-file-card">
+          <div class="submission-file-head">
+            <div>
+              <div class="submission-file-title">${title}</div>
+
+              <div class="submission-file-meta">
+                Project: <b>${safe(file.project_title || 'Untitled Project')}</b>
+              </div>
+
+              <div class="submission-file-meta">
+                Submitted by: <b>${safe(file.submitted_by || 'Unknown student')}</b>
+              </div>
+
+              <div class="submission-file-meta">
+                Uploaded at: ${safe(file.uploaded_at || '—')}
+              </div>
+
+              <div class="submission-file-meta">
+                Details: <b>${safe(sourceLabel)}</b>${targetLabel}${sizeLabel}
+              </div>
+            </div>
+
+            <span class="pill p-review">${safe(file.course_label || file.course_scope || 'Submission')}</span>
+          </div>
+
+          <a class="submission-file-link" href="${safe(href)}" target="_blank">
+            ${linkText}
+          </a>
+        </div>
+      `;
+    }).join('');
+  }
+
+  
+
+  async function loadSubmissionFiles() {
+    const box = document.getElementById('submissionFilesList');
+
+    if (box) {
+      box.innerHTML = '<div class="empty-box">Loading submitted files...</div>';
+    }
+
+    try {
+      const data = await apiFetch('/api/coordinator/submission-files');
+      submissionFilesState = data.files || [];
+      renderSubmissionFiles();
+    } catch (err) {
+      if (box) {
+        box.innerHTML = `<div class="empty-box">Submission files error: ${safe(err.message)}</div>`;
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    loadLecturesData();
+    loadSubmissionFiles();
+
+    const firstTab = document.querySelector('#pg-lectures .lecture-tab');
+    showLectureSection('introduction', firstTab);
+
+    setTimeout(resetLectureScroll, 0);
+    setTimeout(resetLectureScroll, 100);
+  });
+
+  window.addEventListener('load', function () {
+    setTimeout(resetLectureScroll, 0);
+  });
 </script>
-
 {% endblock %}

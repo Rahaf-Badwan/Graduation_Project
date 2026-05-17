@@ -112,7 +112,7 @@ async function submitDistributionProject() {
     member_ids: Array.from(document.querySelectorAll('.member-id')).map(i => i.value.trim()).filter(Boolean),
   };
   try {
-    const res = await fetch('/api/student/distribution-submit', {
+    const res = await fetch('/student/api/distribution-submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

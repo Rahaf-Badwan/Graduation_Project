@@ -5,106 +5,413 @@
 {% block topbar_title %}Create Evaluation Committee{% endblock %}
 
 {% block content %}
+<style>
+  html,
+  body {
+    scroll-behavior: auto !important;
+  }
+
+  #pg-committee {
+    display: block !important;
+    min-height: auto !important;
+    height: auto !important;
+    padding: 20px 22px 90px !important;
+    margin: 0 !important;
+  }
+
+  #pg-committee .committee-page-wrap {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  #pg-committee .tab-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 16px 0;
+    padding: 0;
+  }
+
+  #pg-committee .tab {
+    border: 1px solid #d7e3dc;
+    background: #fff;
+    color: #2d5137;
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.18s ease;
+  }
+
+  #pg-committee .tab:hover {
+    background: #f3f7f4;
+  }
+
+  #pg-committee .tab.on {
+    background: #2e7d42;
+    color: #fff;
+    border-color: #2e7d42;
+    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+  }
+
+  #pg-committee .committee-section {
+    display: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  #pg-committee .committee-section.active {
+    display: block;
+  }
+
+  #pg-committee .committee-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  #pg-committee .committee-info-box {
+    border-left: 5px solid #2e7d42;
+    background: #f7fbf8;
+    border-radius: 14px;
+    padding: 13px 14px;
+    color: #344054;
+    line-height: 1.55;
+    font-size: 13px;
+  }
+
+  #pg-committee .committee-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  #pg-committee .committee-rule-box {
+    border: 1px solid #e7eee9;
+    background: #fbfdfb;
+    border-radius: 14px;
+    padding: 14px;
+    color: #344054;
+    line-height: 1.8;
+    font-size: 14px;
+  }
+
+  #pg-committee .committee-empty {
+    padding: 22px;
+    border: 1px dashed #cddbd2;
+    border-radius: 14px;
+    color: #667085;
+    text-align: center;
+    background: #fbfdfb;
+  }
+
+  #pg-committee .card {
+    margin-top: 0 !important;
+  }
+
+  #pg-committee .committee-actions-card {
+    margin-top: 14px;
+  }
+
+  @media (max-width: 980px) {
+    #pg-committee .committee-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-committee .committee-mini-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 620px) {
+    #pg-committee .committee-mini-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-committee .tab {
+      width: 100%;
+      text-align: center;
+    }
+  }
+</style>
+
 <div class="page page-single on" id="pg-committee">
-  <div class="two-col u-d1e999ac">
-    <div>
+  <div class="committee-page-wrap">
+
+    <div class="tab-bar">
+      <button class="tab on" type="button" onclick="showCommitteeSection('committeeGenerator', this)">
+        Auto Generator
+      </button>
+
+      <button class="tab" type="button" onclick="showCommitteeSection('committeeEligible', this)">
+        Eligible Projects
+      </button>
+
+      <button class="tab" type="button" onclick="showCommitteeSection('committeeGenerated', this)">
+        Generated Committees
+      </button>
+
+      <button class="tab" type="button" onclick="showCommitteeSection('committeeCurrent', this)">
+        Current Committees
+      </button>
+
+
+    </div>
+
+    <!-- =========================================================
+         TAB 1: AUTO GENERATOR
+    ========================================================== -->
+    <div id="committeeGenerator" class="committee-section active">
+      <div class="committee-grid">
+        <div>
+          <div class="card">
+            <div class="card-hd">
+              <span class="card-title">Auto Committee Generator</span>
+            </div>
+
+            <div class="committee-info-box" style="margin-bottom:12px">
+              ◈ The system automatically picks <b>eligible projects</b>, distributes them
+              <b>randomly</b> across committees, assigns <b>4 doctors with different majors</b>
+              to each committee, chooses a <b>room</b>, and creates discussion slots of
+              <b>30 minutes</b> with a <b>10 minute break</b>.
+            </div>
+
+            <div class="form-grid">
+              <div class="field-wrap">
+                <div class="field-label">Discussion Date <span class="req">*</span></div>
+                <input class="field-input" id="committeeDate" type="date" />
+              </div>
+
+              <div class="field-wrap">
+                <div class="field-label">Start Time <span class="req">*</span></div>
+                <input class="field-input" id="committeeStartTime" type="time" value="09:00" />
+              </div>
+            </div>
+
+            <div class="field-wrap" style="margin-top:12px">
+              <div class="field-label">Projects Per Committee <span class="req">*</span></div>
+              <input class="field-input" id="projectsPerCommittee" type="number" min="1" value="2" />
+            </div>
+
+            <div class="btn-row" style="margin-top:14px">
+              <button class="btn btn-primary" type="button" onclick="generateCommittees()">
+                Generate Committees Randomly
+              </button>
+
+              <button class="btn btn-outline" type="button" onclick="resetAndRedistributeCommittees()">
+                Reset & Redistribute Committees
+              </button>
+            </div>
+
+            <div id="committeeMsg" style="margin-top:12px;font-size:13px"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-hd">
+              <span class="card-title">Quick Rules</span>
+            </div>
+
+            <div class="committee-rule-box">
+              ✓ Each committee has <b>4 doctors</b><br />
+              ✓ Doctors should have <b>different majors</b><br />
+              ✓ Projects are selected <b>randomly</b><br />
+              ✓ Each discussion is <b>30 minutes</b><br />
+              ✓ There is a <b>10 minute break</b> between discussions
+            </div>
+          </div>
+
+          <div class="card committee-actions-card">
+            <div class="card-hd">
+              <span class="card-title">Generation Notes</span>
+            </div>
+
+            <div class="committee-info-box">
+              Use this tab when you want the system to create a new committee plan.
+              After generating, open the <b>Generated Committees</b> tab to review the result.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =========================================================
+         TAB 2: ELIGIBLE PROJECTS
+    ========================================================== -->
+    <div id="committeeEligible" class="committee-section">
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Auto Committee Generator</span>
+          <span class="card-title">Eligible Projects</span>
         </div>
 
-        <div class="u-0ffd9126" style="margin-bottom:12px">
-          ◈ The system automatically picks <b>eligible projects</b>, distributes them <b>randomly</b> across committees,
-          assigns <b>4 doctors with different majors</b> to each committee, chooses a <b>room</b>, and creates
-          discussion slots of <b>30 minutes</b> with a <b>10 minute break</b>.
+        <div class="committee-info-box" style="margin-bottom:12px">
+          These are the projects that are ready to be assigned to evaluation committees.
         </div>
 
-        <div class="form-grid">
-          <div class="field-wrap">
-            <div class="field-label">Discussion Date <span class="req">*</span></div>
-            <input class="field-input" id="committeeDate" type="date" />
-          </div>
-
-          <div class="field-wrap">
-            <div class="field-label">Start Time <span class="req">*</span></div>
-            <input class="field-input" id="committeeStartTime" type="time" value="09:00" />
-          </div>
-        </div>
-
-        <div class="field-wrap" style="margin-top:12px">
-          <div class="field-label">Projects Per Committee <span class="req">*</span></div>
-          <input class="field-input" id="projectsPerCommittee" type="number" min="1" value="2" />
-        </div>
-
-        <div class="btn-row" style="margin-top:14px">
-          <button class="btn btn-primary" type="button" onclick="generateCommittees()">Generate Committees
-            Randomly</button>
-          <button class="btn btn-outline" type="button" onclick="resetAndRedistributeCommittees()">
-            Reset & Redistribute Committees
-          </button>
-
-        </div>
-
-        <div id="committeeMsg" style="margin-top:12px;font-size:13px"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Eligible Projects</span></div>
         <div class="u-e47f6ecd" id="eligibleProjectsBox">
-          <div>Loading...</div>
+          <div class="committee-empty">Loading eligible projects...</div>
         </div>
       </div>
+    </div>
 
+    <!-- =========================================================
+         TAB 3: GENERATED COMMITTEES
+    ========================================================== -->
+    <div id="committeeGenerated" class="committee-section">
       <div class="card">
-        <div class="card-hd"><span class="card-title">Generated Committees</span></div>
+        <div class="card-hd">
+          <span class="card-title">Generated Committees</span>
+        </div>
+
+        <div class="committee-info-box" style="margin-bottom:12px">
+          Review the generated committees here after clicking <b>Generate Committees Randomly</b>.
+        </div>
+
         <div id="committeePlansBox">
-          <div>Loading...</div>
+          <div class="committee-empty">Loading generated committees...</div>
         </div>
       </div>
     </div>
 
-    <div>
+    <!-- =========================================================
+         TAB 4: CURRENT COMMITTEES
+    ========================================================== -->
+    <div id="committeeCurrent" class="committee-section">
       <div class="card">
-        <div class="card-hd"><span class="card-title">Current Committees</span></div>
+        <div class="card-hd">
+          <span class="card-title">Current Committees</span>
+        </div>
+
+        <div class="committee-info-box" style="margin-bottom:12px">
+          These are the committees currently saved in the system.
+        </div>
+
         <div class="u-a10c5e0d" id="currentCommitteesBox">
-          <div>Loading...</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Committee Statistics</span></div>
-        <div class="u-e1357c22">
-          <div class="stat">
-            <div class="stat-num u-8351a61a" id="statCommitteesFormed">0</div>
-            <div class="stat-label">Committees Formed</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num u-33340b68" id="statAverageScores">0</div>
-            <div class="stat-label">Average Scores</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num u-a28c35c7" id="statOngoing">0</div>
-            <div class="stat-label">Ongoing Now</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num u-c0077588" id="statScheduled">0</div>
-            <div class="stat-label">Scheduled</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Rules</span></div>
-        <div class="u-510af369">
-          ✓ Each committee has <b>4 doctors</b><br />
-          ✓ Each doctor in the same committee has a <b>different major</b><br />
-          ✓ Projects are selected and distributed <b>randomly</b><br />
-          ✓ The coordinator chooses the <b>responsible doctor</b> for each committee<br />
-          ✓ Each committee gets a <b>room</b><br />
-          ✓ Each project discussion is <b>30 minutes</b> + <b>10 minute break</b>
+          <div class="committee-empty">Loading current committees...</div>
         </div>
       </div>
     </div>
+
+    <!-- =========================================================
+         TAB 5: RULES & STATISTICS
+    ========================================================== -->
+    <div id="committeeRulesStats" class="committee-section">
+      <div class="committee-grid">
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-title">Committee Statistics</span>
+          </div>
+
+          <div class="committee-mini-grid">
+            <div class="stat">
+              <div class="stat-num u-8351a61a" id="statCommitteesFormed">0</div>
+              <div class="stat-label">Committees Formed</div>
+            </div>
+
+            <div class="stat">
+              <div class="stat-num u-33340b68" id="statAverageScores">0</div>
+              <div class="stat-label">Average Scores</div>
+            </div>
+
+            <div class="stat">
+              <div class="stat-num u-a28c35c7" id="statOngoing">0</div>
+              <div class="stat-label">Ongoing Now</div>
+            </div>
+
+            <div class="stat">
+              <div class="stat-num u-c0077588" id="statScheduled">0</div>
+              <div class="stat-label">Scheduled</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-title">Rules</span>
+          </div>
+
+          <div class="committee-rule-box">
+            ✓ Each committee has <b>4 doctors</b><br />
+            ✓ Each doctor in the same committee has a <b>different major</b><br />
+            ✓ Projects are selected and distributed <b>randomly</b><br />
+            ✓ The coordinator chooses the <b>responsible doctor</b> for each committee<br />
+            ✓ Each committee gets a <b>room</b><br />
+            ✓ Each project discussion is <b>30 minutes</b> + <b>10 minute break</b>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
+
+<script>
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+
+  function resetCommitteeScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+
+    const possibleScrollers = [
+      '.content-area',
+      '.main-content',
+      '.main',
+      '.page-content',
+      '.shell',
+      '#pg-committee'
+    ];
+
+    possibleScrollers.forEach(selector => {
+      const el = document.querySelector(selector);
+      if (el) {
+        el.scrollTop = 0;
+      }
+    });
+  }
+
+  function showCommitteeSection(id, btn) {
+    document.querySelectorAll('#pg-committee .committee-section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    const selected = document.getElementById(id);
+    if (selected) {
+      selected.classList.add('active');
+    }
+
+    document.querySelectorAll('#pg-committee .tab-bar .tab').forEach(tab => {
+      tab.classList.remove('on');
+    });
+
+    if (btn) {
+      btn.classList.add('on');
+    }
+
+    setTimeout(resetCommitteeScroll, 0);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const firstTab = document.querySelector('#pg-committee .tab-bar .tab');
+    showCommitteeSection('committeeGenerator', firstTab);
+
+    setTimeout(resetCommitteeScroll, 0);
+    setTimeout(resetCommitteeScroll, 100);
+    setTimeout(resetCommitteeScroll, 300);
+  });
+
+  window.addEventListener('load', function () {
+    setTimeout(resetCommitteeScroll, 0);
+    setTimeout(resetCommitteeScroll, 100);
+  });
+</script>
 {% endblock %}

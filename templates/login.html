@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>APMS — Sign In</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='login_style.css') }}">
@@ -97,8 +98,22 @@
       <div class="notice">
         <div class="notice-title">
           <div class="notice-dot"></div>
-          Important Notice — APMS System
+          {{ public_notice.title if public_notice else 'Important Notice — APMS System' }}
         </div>
+        {% if public_notice and public_notice.course_scope %}
+        <div
+          style="display:inline-block;margin:6px 0 8px;padding:4px 9px;border-radius:999px;background:#eef6f0;color:#26733b;font-size:12px;font-weight:800;">
+          {% if public_notice.course_scope == 'introduction' %}Project Introduction{% elif public_notice.course_scope ==
+          'graduation_project' %}Graduation Project{% else %}Project Introduction + Graduation Project{% endif %}
+        </div>
+        {% endif %}
+
+        {% if public_notice %}
+        <p style="white-space:pre-line;">{{ public_notice.body }}</p>
+        {% if public_notice.highlight_text %}
+        <p><span class="dhl">{{ public_notice.highlight_text }}</span></p>
+        {% endif %}
+        {% else %}
         <p>
           The new graduation project lifecycle management system
           (<span class="hl">APMS</span>) has been launched for Semester 1 of 2025/2026.
@@ -110,11 +125,15 @@
           Supervisors: Please log in to review and approve your assigned projects.
           The coordinator can form evaluation committees directly from the control panel.
         </p>
-    
+        {% endif %}
+
         <div class="notice-btns">
-          <button type="button">ⓘ How does the system work?</button>
-          <button type="button">⬆ Project Upload Guide</button>
-          <button type="button">⚙ Roles &amp; Permissions</button>
+          <button type="button">{{ public_notice.button1_text if public_notice and public_notice.button1_text else 'ⓘ
+            How does the system work?' }}</button>
+          <button type="button">{{ public_notice.button2_text if public_notice and public_notice.button2_text else '⬆
+            Project Upload Guide' }}</button>
+          <button type="button">{{ public_notice.button3_text if public_notice and public_notice.button3_text else '⚙
+            Roles & Permissions' }}</button>
         </div>
 
         <div id="activation-banner" style="display:none; margin-top:16px;">
@@ -196,14 +215,13 @@
         <div class="card-links">
           <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
           <span class="card-divider">·</span>
-          <a href="#">New Registration</a>
         </div>
 
         <div class="card-project">
           <p>
-            Project: APMS — COMP4200<br>
-            Amna Abu Muslim · Rahaf Badwan · Taima Abed<br>
-            Supervisor: Dr. Naima Harbawi
+            APMS <br>
+            Amnaeh Abu Musallam · Rahaf Badwan · Taima Abed<br>
+            Supervisor: Dr. Naimeh Hirbawi
           </p>
         </div>
       </div>

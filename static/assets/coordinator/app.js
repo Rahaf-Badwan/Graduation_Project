@@ -89,7 +89,7 @@ async function askAI() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: q })
     });
-    const data = await res.json();
+    const data = await readApiJson(res);
     appendChatMessage(data.answer || data.error || 'No answer returned.', 'bot');
   } catch (e) {
     appendChatMessage('Could not connect to the AI service.', 'bot');
@@ -173,11 +173,12 @@ async function loadDistributionWindow() {
   const statusMeta = document.getElementById('windowStatusMeta');
   const btn = document.getElementById('toggleWindowBtn');
   const msg = document.getElementById('windowMsg');
+  const closeInput = document.getElementById('registrationCloseAt');
   if (!statusText || !statusMeta || !btn) return;
 
   try {
-    const res = await fetch('/api/coordinator/distribution-window');
-    const data = await res.json();
+    const res = await fetch('/api/coordinator/distribution-window', { credentials: 'same-origin' });
+    const data = await readJsonResponse(res);
     if (!res.ok) throw new Error(data.error || 'Failed to load window status.');
 
     distributionWindowOpen = !!data.is_open;
@@ -185,7 +186,12 @@ async function loadDistributionWindow() {
 
     const openedAt = data.opened_at ? `Opened at: ${data.opened_at}` : '';
     const closedAt = data.closed_at ? `Closed at: ${data.closed_at}` : '';
-    statusMeta.textContent = distributionWindowOpen ? openedAt : closedAt;
+    const closeAt = data.close_at ? `Auto close at: ${data.close_at}` : '';
+    statusMeta.textContent = [distributionWindowOpen ? openedAt : closedAt, closeAt].filter(Boolean).join(' | ');
+
+    if (closeInput && data.close_at) {
+      closeInput.value = String(data.close_at).replace(' ', 'T').slice(0, 16);
+    }
 
     btn.textContent = distributionWindowOpen ? 'Close Registration' : 'Open Registration';
     btn.className = distributionWindowOpen ? 'btn btn-outline' : 'btn btn-primary';
@@ -201,25 +207,47 @@ async function loadDistributionWindow() {
 async function toggleDistributionWindow() {
   const btn = document.getElementById('toggleWindowBtn');
   const msg = document.getElementById('windowMsg');
+  const closeInput = document.getElementById('registrationCloseAt');
   if (!btn) return;
+
+  const opening = !distributionWindowOpen;
+  const closeAt = closeInput ? closeInput.value : '';
+
+  if (opening && !closeAt) {
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.textContent = 'Please choose an automatic close date before opening registration.';
+    }
+    alert('Please choose an automatic close date before opening registration.');
+    return;
+  }
 
   try {
     btn.disabled = true;
-    if (msg) msg.textContent = 'Saving...';
+    if (msg) {
+      msg.style.color = '#444';
+      msg.textContent = 'Saving...';
+    }
 
     const res = await fetch('/api/coordinator/distribution-window', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_open: !distributionWindowOpen })
+      body: JSON.stringify({ is_open: opening, close_at: closeAt })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to update registration window.');
 
-    if (msg) msg.textContent = data.message || 'Updated successfully.';
+    if (msg) {
+      msg.style.color = 'green';
+      msg.textContent = data.message || 'Updated successfully.';
+    }
     await loadDistributionWindow();
   } catch (err) {
-    if (msg) msg.textContent = err.message || 'Something went wrong.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.textContent = err.message || 'Something went wrong.';
+    }
   } finally {
     btn.disabled = false;
   }
@@ -346,7 +374,7 @@ async function loadDistributionData() {
 
   try {
     const res = await fetch('/api/coordinator/distribution-data');
-    const data = await res.json();
+    const data = await readApiJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to load distribution data.');
 
     professorsCache = data.professors || [];
@@ -406,7 +434,7 @@ async function assignGroupSupervisor(projectId) {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to assign supervisor.');
@@ -484,7 +512,7 @@ async function addSectionEntry() {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to add section.');
@@ -686,8 +714,8 @@ async function loadCommitteeDashboard() {
   if (!document.getElementById('pg-committee')) return;
 
   try {
-    const res = await fetch('/api/coordinator/committee-dashboard');
-    const data = await res.json();
+    const res = await fetch('/api/coordinator/committee-dashboard', { credentials: 'same-origin' });
+    const data = await readJsonResponse(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to load committee dashboard.');
@@ -738,7 +766,7 @@ async function generateCommittees() {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to generate committees.');
@@ -770,7 +798,7 @@ async function saveResponsibleDoctor(planId) {
       body: JSON.stringify({ faculty_id: facultyId })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to save the responsible doctor.');
@@ -817,7 +845,7 @@ async function resetAndRedistributeCommittees() {
       })
     });
 
-    const data = await res.json();
+    const data = await readApiJson(res);
 
     if (!res.ok) {
       throw new Error(data.error || 'Failed to reset and redistribute committees.');
@@ -831,11 +859,333 @@ async function resetAndRedistributeCommittees() {
     alert(err.message || 'Failed to reset and redistribute committees.');
   }
 }
+
+
+
+async function readJsonResponse(res) {
+  const contentType = res.headers.get('content-type') || '';
+  const text = await res.text();
+  if (!contentType.includes('application/json')) {
+    if (text.toLowerCase().includes('<!doctype') || text.toLowerCase().includes('<html')) {
+      throw new Error('The server returned an HTML page instead of JSON. Log in again as coordinator, then refresh. If you are already logged in, check the Flask terminal for the real error.');
+    }
+    throw new Error(text || 'The server did not return JSON.');
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error('Invalid JSON returned by the server.');
+  }
+}
+
+/* =========================
+   DASHBOARD
+========================= */
+function dashSet(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value ?? 0;
+}
+
+function renderDashList(id, rows, labelKey, valueKey) {
+  const box = document.getElementById(id);
+  if (!box) return;
+  if (!rows || !rows.length) {
+    box.innerHTML = '<div>No data found.</div>';
+    return;
+  }
+  const total = rows.reduce((sum, row) => sum + (parseInt(row[valueKey] ?? row.count ?? 0, 10) || 0), 0) || 1;
+  box.innerHTML = rows.map(row => {
+    const label = row[labelKey] || row.status || row.project_type || 'Unknown';
+    const count = parseInt(row[valueKey] ?? row.count ?? 0, 10) || 0;
+    const percent = Math.round((count / total) * 100);
+    return `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:6px">
+          <span>${escapeHtml(label)}</span><b>${count}</b>
+        </div>
+        <div style="height:8px;background:#edf2f7;border-radius:999px;overflow:hidden">
+          <div style="height:100%;width:${percent}%;background:#0f6e56;border-radius:999px"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDashboardLatest(projects) {
+  const box = document.getElementById('dashLatestProjects');
+  if (!box) return;
+  if (!projects || !projects.length) {
+    box.innerHTML = '<div>No projects found.</div>';
+    return;
+  }
+  box.innerHTML = projects.map(project => `
+    <div class="review-card new-proj">
+      <div class="u-e8f8c28c">
+        <div class="u-2e61148f">${escapeHtml(project.title || 'Untitled Project')}</div>
+        ${statusBadge(project.status)}
+      </div>
+      <div class="u-6aa10742">
+        ${escapeHtml(project.team_members || 'No team members')} · ${escapeHtml(project.supervisor_name || 'No supervisor yet')}
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline u-d59a4528" data-go="review" type="button">Detailed Review</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDashboardProgress(stats) {
+  const box = document.getElementById('dashWorkflowProgress');
+  if (!box) return;
+  const total = Math.max(parseInt(stats.total_projects || 0, 10), 1);
+  const items = [
+    ['Submitted / Review', stats.awaiting_review || 0],
+    ['Committee Evaluation', stats.under_evaluation || 0],
+    ['Accepted / Archived', stats.accepted || 0],
+    ['Rejected', stats.rejected || 0],
+  ];
+  box.innerHTML = items.map(([label, count]) => {
+    const percent = Math.round((count / total) * 100);
+    return `
+      <div class="prog-wrap">
+        <div class="prog-label"><span>${escapeHtml(label)}</span><span class="u-44265a69">${percent}%</span></div>
+        <div class="prog-bg"><div class="prog-fill" style="width:${percent}%"></div></div>
+      </div>
+    `;
+  }).join('');
+}
+
+
+function showLectureSection(scope, btn) {
+  document.querySelectorAll('#pg-lectures .lecture-section').forEach(section => {
+    section.classList.remove('active');
+  });
+
+  let sectionId = 'introLectures';
+
+  if (scope === 'graduation_project') {
+    sectionId = 'gradLectures';
+  }
+
+  if (scope === 'submission_files') {
+    sectionId = 'submissionFilesLectures';
+    loadSubmissionFiles();
+  }
+
+  const selected = document.getElementById(sectionId);
+
+  if (selected) {
+    selected.classList.add('active');
+  }
+
+  document.querySelectorAll('#pg-lectures .lecture-tab').forEach(tab => {
+    const isActive = tab === btn;
+    tab.classList.toggle('on', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+
+  setTimeout(resetLectureScroll, 0);
+}
+
+
+async function readApiJson(res) {
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  const bodyText = await res.text();
+
+  if (!contentType.includes('application/json')) {
+    if (bodyText.trim().startsWith('<')) {
+      throw new Error('The server returned an HTML page instead of JSON. This means the API route is missing, you are not logged in as coordinator, or Flask has an error. Check the Flask terminal.');
+    }
+    throw new Error(bodyText || 'The server did not return JSON.');
+  }
+
+  try {
+    return JSON.parse(bodyText || '{}');
+  } catch (e) {
+    throw new Error('Invalid JSON returned from server. Check the Flask terminal.');
+  }
+}
+
+async function loadDashboardData() {
+  if (!document.getElementById('pg-dashboard')) return;
+  try {
+    const res = await fetch('/api/coordinator/dashboard-data', { credentials: 'same-origin' });
+    const data = await readJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || 'Failed to load dashboard.');
+    const stats = data.stats || {};
+    dashSet('dashTotalProjects', stats.total_projects || 0);
+    dashSet('dashAwaitingReview', stats.awaiting_review || 0);
+    dashSet('dashUnderEvaluation', stats.under_evaluation || 0);
+    dashSet('dashAccepted', stats.accepted || 0);
+    dashSet('dashRejected', stats.rejected || 0);
+    dashSet('dashCommitteesCount', stats.committees || 0);
+    const status = document.getElementById('dashDistributionStatus');
+    if (status) status.textContent = data.distribution_open ? 'Open' : 'Closed';
+    renderDashboardLatest(data.latest_projects || []);
+    renderDashboardProgress(stats);
+    renderDashList('dashStatusDistribution', data.by_status || [], 'status', 'count');
+    renderDashList('dashTypeDistribution', data.by_type || [], 'project_type', 'count');
+  } catch (err) {
+    const box = document.getElementById('dashLatestProjects');
+    if (box) box.innerHTML = `<div>${escapeHtml(err.message)}</div>`;
+  }
+}
+
+/* =========================
+   REVIEW PROJECTS
+========================= */
+let reviewProjectsCache = [];
+let reviewFilter = 'all';
+
+function reviewBadge(status) {
+  const s = normalizeText(status);
+  if (s === 'accepted') return '<span class="pill p-accepted">Accepted</span>';
+  if (s === 'rejected') return '<span class="pill p-pending">Rejected</span>';
+  if (s === 'committee_evaluation') return '<span class="pill p-review">Committee</span>';
+  if (s === 'needs_revision') return '<span class="pill p-pending">Needs Revision</span>';
+  if (s === 'under_review') return '<span class="pill p-review">In Review</span>';
+  return '<span class="pill p-new">New</span>';
+}
+
+function filterReviewProjects(status, btn) {
+  reviewFilter = status;
+  document.querySelectorAll('#pg-review .tab-bar .tab').forEach(tab => tab.classList.remove('on'));
+  if (btn) btn.classList.add('on');
+  renderReviewProjects();
+}
+
+function renderReviewProjects() {
+  const box = document.getElementById('reviewProjectsBox');
+  if (!box) return;
+  const rows = reviewFilter === 'all'
+    ? reviewProjectsCache
+    : reviewProjectsCache.filter(project => normalizeText(project.status) === normalizeText(reviewFilter));
+
+  if (!rows.length) {
+    box.innerHTML = '<div>No projects in this filter.</div>';
+    return;
+  }
+
+  box.innerHTML = rows.map(project => `
+    <div class="eval-proj-card u-540daf2c" style="margin-bottom:14px">
+      <div class="u-3670a192">
+        <div>
+          <div class="u-4b40f770">${escapeHtml(project.title || 'Untitled Project')}</div>
+          <div class="u-7d16b22c">${escapeHtml(project.team_members || 'No team members')} · ${escapeHtml(project.supervisor_name || 'No supervisor yet')}</div>
+        </div>
+        ${reviewBadge(project.status)}
+      </div>
+      <div class="u-63e9554f">${escapeHtml(project.abstract || 'No abstract provided.')}</div>
+      <div class="u-1c86650a">
+        <span class="u-9ca6aa56">${escapeHtml(project.project_type || 'other')}</span>
+        <span class="u-d5dc922a">Files: ${escapeHtml(project.files_count || 0)}</span>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Reviewer Notes</div>
+        <textarea class="field-textarea u-f9368ae0" id="reviewNotes_${project.project_id}" placeholder="Add notes...">${escapeHtml(project.coordinator_notes || '')}</textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-success" type="button" onclick="saveReviewDecision(${project.project_id}, 'accepted')">✓ Accept</button>
+        <button class="btn btn-danger" type="button" onclick="saveReviewDecision(${project.project_id}, 'rejected')">✗ Reject</button>
+        <button class="btn btn-outline" type="button" onclick="saveReviewDecision(${project.project_id}, 'needs_revision')">Request Revision</button>
+        <button class="btn btn-primary" type="button" onclick="saveReviewDecision(${project.project_id}, 'send_to_committee')">Send to Committee</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadReviewProjects() {
+  if (!document.getElementById('pg-review')) return;
+  const msg = document.getElementById('reviewMsg');
+  try {
+    if (msg) msg.textContent = 'Loading...';
+    const res = await fetch('/api/coordinator/review-projects');
+    const data = await readApiJson(res);
+    if (!res.ok) throw new Error(data.error || 'Failed to load projects.');
+    reviewProjectsCache = data.projects || [];
+    if (msg) msg.textContent = '';
+    renderReviewProjects();
+  } catch (err) {
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.textContent = err.message;
+    }
+    const box = document.getElementById('reviewProjectsBox');
+    if (box) box.innerHTML = `<div>${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function saveReviewDecision(projectId, decision) {
+  const notes = document.getElementById(`reviewNotes_${projectId}`)?.value || '';
+  const msg = document.getElementById('reviewMsg');
+  try {
+    if (msg) {
+      msg.style.color = '#444';
+      msg.textContent = 'Saving decision...';
+    }
+    const res = await fetch(`/api/coordinator/review-project/${projectId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision, notes })
+    });
+    const data = await readApiJson(res);
+    if (!res.ok) throw new Error(data.error || 'Failed to save decision.');
+    if (msg) {
+      msg.style.color = 'green';
+      msg.textContent = data.message || 'Saved successfully.';
+    }
+    await loadReviewProjects();
+  } catch (err) {
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.textContent = err.message;
+    }
+    alert(err.message);
+  }
+}
+
+
+/* =========================
+   DASHBOARD / INTERNAL PAGE BUTTONS
+   Fix for buttons that use data-go="review", data-go="registration", data-go="committee", etc.
+========================= */
+function bindCoordinatorPageButtons() {
+  document.querySelectorAll('[data-go]').forEach(btn => {
+    if (btn.dataset.navBound === '1') return;
+    btn.dataset.navBound = '1';
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = (btn.dataset.go || '').trim();
+      if (!page) return;
+
+      const urls = {
+        dashboard: '/coordinator/dashboard',
+        registration: '/coordinator/registration',
+        hours: '/coordinator/hours',
+        review: '/coordinator/review',
+        committee: '/coordinator/committee',
+        evaluation: '/coordinator/evaluation',
+        lectures: '/coordinator/lectures',
+        search: '/coordinator/search',
+        notifs: '/coordinator/notifs',
+        ai: '/coordinator/ai',
+        profile: '/coordinator/profile'
+      };
+
+      window.location.href = urls[page] || `/coordinator/${encodeURIComponent(page)}`;
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   applySidebarState();
   bindSidebarHover();
   bindTabs();
+  bindCoordinatorPageButtons();
   bindAI();
   initRegistrationPage();
   initCommitteePage();
+  loadDashboardData();
+  loadReviewProjects();
 });

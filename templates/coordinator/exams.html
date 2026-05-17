@@ -7,185 +7,908 @@
 {% block content %}
 <div class="page page-single on" id="pg-exams">
 
-<div class="tab-bar" style="margin-bottom:16px;">
-  <button class="tab on" type="button" onclick="showExamSection('examProfessors',this)">Professors Distribution</button>
-  <button class="tab" type="button" onclick="showExamSection('examSummary',this)">Summary & Timetable</button>
-</div>
+  <style>
+    html,
+    body {
+      scroll-behavior: auto !important;
+    }
 
-<div id="examProfessors">
+    #pg-exams {
+      display: block !important;
+      min-height: auto !important;
+      height: auto !important;
+      padding: 20px 22px 90px !important;
+      margin: 0 !important;
+    }
 
-<div>
-<div class="card">
-<div class="card-hd"><span class="card-title">Professors Eligible for Examination — End of Semester</span></div>
+    #pg-exams .exam-tabs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 0 0 16px 0;
+      padding: 0;
+    }
 
-<div class="u-343f9d13">
-ℹ Priority is given to the supervisor who has <b>Project Introduction</b> hours because they are paid
-for them. Each professor who taught X introductions examines X groups = <b>2X sessions</b> (Each project
-has two presentations). The fixed-staff professor takes more.
-</div>
+    #pg-exams .exam-tab {
+      border: 1px solid #d7e3dc;
+      background: #fff;
+      color: #2d5137;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
 
-<div class="exam-assign-row fixed">
-<div class="u-d5e8c5f3">
-<div class="u-75ff8128">
-<span class="u-2e61148f">Dr. Naemeh Harbawi</span>
-<span class="pill p-fixed u-49f06467">Fixed Staff</span>
-</div>
-<div class="u-7d16b22c">3 project introductions → examines 3 groups → <b>6 exam sessions</b></div>
-</div>
-<div class="u-244a7f30">
-<div class="u-fed8e3e4">6</div>
-<div class="u-76f8b3cc">Session</div>
-</div>
-</div>
+    #pg-exams .exam-tab:hover {
+      background: #f3f7f4;
+    }
 
-<div class="exam-assign-row fixed">
-<div class="u-d5e8c5f3">
-<div class="u-75ff8128">
-<span class="u-2e61148f">Dr. Mahmoud Salem</span>
-<span class="pill p-fixed u-49f06467">Fixed Staff</span>
-</div>
-<div class="u-7d16b22c">4 project introductions → examines 4 groups → <b>8 exam sessions</b></div>
-</div>
-<div class="u-244a7f30">
-<div class="u-fed8e3e4">8</div>
-<div class="u-76f8b3cc">Session</div>
-</div>
-</div>
+    #pg-exams .exam-tab.on {
+      background: #2e7d42;
+      border-color: #2e7d42;
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+    }
 
-<div class="exam-assign-row temp">
-<div class="u-d5e8c5f3">
-<div class="u-75ff8128">
-<span class="u-2e61148f">Dr. Lina Haddad</span>
-<span class="pill p-temp u-49f06467">Non-Fixed Staff</span>
-</div>
-<div class="u-7d16b22c">2 project introductions → examines 2 groups → <b>4 exam sessions</b></div>
-</div>
-<div class="u-244a7f30">
-<div class="u-03500f46">4</div>
-<div class="u-76f8b3cc">Session</div>
-</div>
-</div>
+    #pg-exams .exam-section {
+      display: none;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
 
-<div class="exam-assign-row temp">
-<div class="u-d5e8c5f3">
-<div class="u-75ff8128">
-<span class="u-2e61148f">Dr. Samer Darwish</span>
-<span class="pill p-temp u-49f06467">Non-Fixed Staff</span>
-</div>
-<div class="u-7d16b22c">No project introduction hours this semester — can be assigned to unassigned students</div>
-</div>
-<div class="u-244a7f30">
-<div class="u-f1f603ff">0</div>
-<div class="u-76f8b3cc">Session</div>
-</div>
-</div>
+    #pg-exams .exam-section.active {
+      display: block !important;
+    }
 
-<div class="u-49e72f9b">
-<div class="btn-row">
-<button class="btn btn-primary"
-data-prompt="The coordinator redistributed final examinations among professors based on their hours in APMS ↗"
-type="button">Confirm Distribution ↗</button>
-<button class="btn btn-outline" type="button">Auto Recalculate</button>
-</div>
-</div>
+    #pg-exams .card {
+      margin-top: 0 !important;
+    }
 
-</div>
-</div>
+    #pg-exams .exam-info-box {
+      border-left: 5px solid #2e7d42;
+      background: #f7fbf8;
+      border-radius: 14px;
+      padding: 13px 14px;
+      color: #344054;
+      line-height: 1.55;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
 
-</div>
+    #pg-exams .exam-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
 
-<div id="examSummary" style="display:none;">
+    #pg-exams .exam-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
 
-<div>
-<div class="card">
-<div class="card-hd"><span class="card-title">Exam Distribution Summary</span></div>
+    #pg-exams .exam-field label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #344054;
+    }
 
-<div class="u-8f905a06">
-<div class="stat">
-<div class="stat-num u-c293fd73">28</div>
-<div class="stat-label">Fixed-Staff Professor</div>
-</div>
+    #pg-exams .exam-input,
+    #pg-exams .exam-textarea {
+      width: 100%;
+      border: 1px solid #d8e2dc;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #fff;
+      outline: none;
+    }
 
-<div class="stat">
-<div class="stat-num u-a9721929">10</div>
-<div class="stat-label">Non-Fixed Professor</div>
-</div>
+    #pg-exams .exam-input:focus,
+    #pg-exams .exam-textarea:focus {
+      border-color: #2e7d42;
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
+    }
 
-<div class="stat">
-<div class="stat-num u-cfb6c12e">62</div>
-<div class="stat-label">Total Exam Sessions</div>
-</div>
+    #pg-exams .exam-textarea {
+      min-height: 100px;
+      resize: vertical;
+      line-height: 1.5;
+    }
 
-<div class="stat">
-<div class="stat-num u-90f01645">31</div>
-<div class="stat-label">Projects Discussed</div>
-</div>
-</div>
+    #pg-exams .exam-status-box {
+      padding: 10px 12px;
+      border: 1px solid #d8e2dc;
+      border-radius: 12px;
+      background: #fbfdfb;
+      font-size: 12px;
+      color: #667085;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+    }
 
-<div class="u-9c8abd96">Distribution Status</div>
+    #pg-exams .timeline-table-wrap {
+      overflow: auto;
+      border: 1px solid #d8e2dc;
+      border-radius: 14px;
+      background: #fff;
+    }
 
-<div class="prog-wrap">
-<div class="prog-label"><span>Assigned to Professors</span><span class="u-44265a69">74%</span></div>
-<div class="prog-bg">
-<div class="prog-fill u-7c06bad9"></div>
-</div>
-</div>
+    #pg-exams .timeline-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+      background: #fff;
+    }
 
-<div class="prog-wrap">
-<div class="prog-label"><span>Waiting for Assignment</span><span class="u-44265a69">26%</span></div>
-<div class="prog-bg">
-<div class="prog-fill u-34aec660"></div>
-</div>
-</div>
+    #pg-exams .timeline-table thead tr {
+      background: #f7fbf8;
+      font-size: 12px;
+      color: #667085;
+      text-align: left;
+    }
 
-</div>
+    #pg-exams .timeline-table th,
+    #pg-exams .timeline-table td {
+      padding: 10px;
+      border-top: 1px solid #e7eee9;
+    }
 
-<div class="card">
-<div class="card-hd"><span class="card-title">Scheduled Examination Timetable</span></div>
+    #pg-exams .timeline-small-input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #d8e2dc;
+      border-radius: 8px;
+      background: #fff;
+      outline: none;
+    }
 
-<div class="u-e47f6ecd">
+    #pg-exams .timeline-small-input:focus {
+      border-color: #2e7d42;
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.10);
+    }
 
-<div class="u-19a0032b">
-<div class="u-213dde1e">APMS Project — 20 Feb · 10:00 AM</div>
-<div class="u-ebacd908">Examiner: Dr. Naemeh Harbawi + Dr. Mahmoud Salem</div>
-</div>
+    #pg-exams .timeline-order {
+      width: 52px;
+    }
 
-<div class="u-2ac773d4">
-<div class="u-475b0685">AI Disease System — 21 Feb · 2:00 PM</div>
-<div class="u-569d1fff">Examiner: Dr. Mahmoud Salem + Dr. Lina Haddad</div>
-</div>
+    #pg-exams .grad-final-box {
+      border: 1px solid #e7eee9;
+      background: #fbfdfb;
+      border-radius: 16px;
+      padding: 14px;
+      margin-top: 14px;
+    }
 
-<div class="u-4a542d7b">
-<div class="u-a694d8f3">Learning Platform — 22 Feb · Time TBD</div>
-<div class="u-03d43b2e">Examiner: Dr. Lina Haddad + waiting for a second assignment</div>
-</div>
+    #pg-exams .grad-final-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
 
-</div>
+    #pg-exams .exam-msg {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
 
-<div class="u-271dbd4e">
-⚑ Note: If the supervisor does not have project introduction hours, they may still examine students, but it is not counted toward paid hours.
-</div>
+    #pg-exams .exam-msg.ok {
+      display: block;
+      color: #027a48;
+      background: #ecfdf3;
+      border: 1px solid #abefc6;
+    }
 
-</div>
-</div>
+    #pg-exams .exam-msg.error {
+      display: block;
+      color: #b42318;
+      background: #fef3f2;
+      border: 1px solid #fecdca;
+    }
 
-</div>
+    @media (max-width: 760px) {
+
+      #pg-exams .exam-form-grid,
+      #pg-exams .grad-final-row {
+        grid-template-columns: 1fr;
+      }
+
+      #pg-exams .exam-tab {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+
+  <div class="exam-tabs" role="tablist" aria-label="Exam timeline tabs">
+    <button class="exam-tab on" type="button" role="tab" aria-selected="true"
+      onclick="showExamSection('introTimeline', this)">
+      COMP4200 Timeline
+    </button>
+
+    <button class="exam-tab" type="button" role="tab" aria-selected="false"
+      onclick="showExamSection('gradTimeline', this)">
+      COMP4300 Timeline
+    </button>
+  </div>
+
+  <!-- =========================================================
+       TAB 1: COMP4200 Timeline
+  ========================================================== -->
+  <div id="introTimeline" class="exam-section active" role="tabpanel">
+    <div class="card">
+      <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+          <span class="card-title">Project Introduction Timeline Builder</span>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+            Design the COMP4200 student timeline here. After publishing, students will see it in their Student Timeline
+            page and receive a notification.
+          </div>
+        </div>
+
+        <span class="pill p-review" id="timelinePublishState">Draft</span>
+      </div>
+
+      <div class="exam-info-box">
+        Use this tab for <b>Project Introduction</b> milestones, submissions, and deadlines.
+        The student submission link opens on the <b>Open submission</b> date and closes after the <b>Close /
+          Deadline</b> date.
+      </div>
+
+      <form id="introTimelineForm" onsubmit="return false;">
+        <div class="exam-form-grid">
+          <div class="exam-field">
+            <label for="timelineTitle">Timeline Title</label>
+            <input id="timelineTitle" class="exam-input" type="text" value="Project Introduction Timeline">
+          </div>
+
+          <div class="exam-field">
+            <label>Status</label>
+            <div id="timelineMeta" class="exam-status-box">Loading...</div>
+          </div>
+        </div>
+
+        <div class="exam-field" style="margin-bottom:12px;">
+          <label for="timelineNote">Note to students</label>
+          <textarea id="timelineNote" class="exam-textarea" rows="3"
+            placeholder="Example: Please follow the timeline and check with your supervisor weekly."></textarea>
+        </div>
+
+        <div class="btn-row" style="margin-bottom:14px;flex-wrap:wrap">
+          <button class="btn btn-outline" type="button" onclick="addTimelineRow()">+ Add Milestone</button>
+          <button class="btn btn-outline" type="button" onclick="loadDefaultTimeline()">Load COMP4200 Sample</button>
+          <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(false)">Save Draft</button>
+          <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(true)">Save & Publish to
+            Students</button>
+        </div>
+
+        <div class="timeline-table-wrap">
+          <table class="timeline-table">
+            <thead>
+              <tr>
+                <th style="width:52px">#</th>
+                <th style="width:180px">Title</th>
+                <th style="width:260px">Description</th>
+                <th style="width:175px">Open submission</th>
+                <th style="width:175px">Close / Deadline</th>
+                <th style="width:200px">Label / Recipient</th>
+                <th style="width:90px">Deadline?</th>
+                <th style="width:80px">Action</th>
+              </tr>
+            </thead>
+            <tbody id="timelineRows"></tbody>
+          </table>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       TAB 2: COMP4300 Timeline
+  ========================================================== -->
+  <div id="gradTimeline" class="exam-section" role="tabpanel">
+    <div class="card">
+      <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+          <span class="card-title">Graduation Project Final Submission</span>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+            Set the opening time and final deadline for COMP4300 final project submission.
+          </div>
+        </div>
+
+        <span class="pill p-review" id="gradPublishState">Draft</span>
+      </div>
+
+      <div class="exam-info-box">
+        This tab is only for <b>COMP4300 Graduation Project</b> final submission.
+        Students can submit starting from the <b>Start Date / Time</b> and the submission closes after the <b>Final
+          Deadline</b>.
+      </div>
+
+      <form id="gradFinalForm" onsubmit="return false;">
+        <div class="exam-form-grid">
+          <div class="exam-field">
+            <label for="gradTitle">Title</label>
+            <input id="gradTitle" class="exam-input" type="text" value="Graduation Project Final Submission">
+          </div>
+
+          <div class="exam-field">
+            <label>Status</label>
+            <div id="gradTimelineMeta" class="exam-status-box">Not published yet</div>
+          </div>
+        </div>
+
+        <div class="grad-final-box">
+          <div class="grad-final-row">
+            <div class="exam-field">
+              <label for="gradStartAt">Start Date / Time</label>
+              <input id="gradStartAt" class="exam-input" type="datetime-local">
+            </div>
+
+            <div class="exam-field">
+              <label for="gradDeadlineAt">Final Deadline</label>
+              <input id="gradDeadlineAt" class="exam-input" type="datetime-local">
+            </div>
+          </div>
+
+          <div class="exam-field" style="margin-top:12px;">
+            <label for="gradNote">Note to students</label>
+            <textarea id="gradNote" class="exam-textarea"
+              placeholder="Example: Upload the final report, source code, presentation, and all required files before the deadline."></textarea>
+          </div>
+        </div>
+
+        <div class="btn-row" style="margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-primary" type="button" onclick="saveGradTimeline(false)">
+            Save Draft
+          </button>
+
+          <button class="btn btn-primary" type="button" onclick="saveGradTimeline(true)">
+            Save & Publish to Students
+          </button>
+
+          <button class="btn btn-outline" type="button" onclick="clearGradTimeline()">
+            Clear
+          </button>
+        </div>
+
+        <div id="gradTimelineMsg" class="exam-msg"></div>
+      </form>
+    </div>
+  </div>
 
 </div>
 
 <script>
-function showExamSection(id,btn){
-document.getElementById('examProfessors').style.display='none';
-document.getElementById('examSummary').style.display='none';
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
 
-document.getElementById(id).style.display='block';
+  function resetExamScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
 
-document.querySelectorAll('#pg-exams > .tab-bar .tab').forEach(tab=>{
-tab.classList.remove('on');
-});
+    ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-exams'].forEach(selector => {
+      const el = document.querySelector(selector);
+      if (el) {
+        el.scrollTop = 0;
+      }
+    });
+  }
 
-btn.classList.add('on');
-}
+  function showExamSection(id, btn) {
+    document.querySelectorAll('#pg-exams .exam-section').forEach(section => {
+      section.classList.remove('active');
+    });
+
+    const selected = document.getElementById(id);
+    if (selected) {
+      selected.classList.add('active');
+    }
+
+    document.querySelectorAll('#pg-exams .exam-tab').forEach(tab => {
+      const isActive = tab === btn;
+      tab.classList.toggle('on', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    setTimeout(resetExamScroll, 0);
+  }
+
+  const defaultIntroTimeline = [
+    {
+      title: 'Project idea and scope',
+      description: 'Agree on weekly supervisor appointments, define the main project idea, and agree on the initial scope.',
+      start_date: '2025-09-29',
+      due_date: '2025-10-20',
+      milestone_label: 'Milestone 1',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'Related work summary',
+      description: 'Identify relevant articles, previous work, and similar apps. Submit a summary report to the supervisor.',
+      start_date: '2025-10-21',
+      due_date: '2025-11-01',
+      milestone_label: 'Summary report',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'Finalize features and proposal start',
+      description: 'Finalize main features and scope, then start writing the project proposal.',
+      start_date: '2025-11-01',
+      due_date: '2025-11-07',
+      milestone_label: 'Proposed Idea',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'Tools and software selection',
+      description: 'Identify development tools/software, explain their advantages, and how they will be used.',
+      start_date: '2025-11-07',
+      due_date: '2025-11-13',
+      milestone_label: 'Tools section',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'Detailed proposal submission',
+      description: 'Submit the project proposal to the supervisor and electronic copy to the course coordinator using the template.',
+      start_date: '2025-11-13',
+      due_date: '2025-11-20',
+      milestone_label: 'Detailed Proposal',
+      submitted_to: 'coordinator'
+    },
+    {
+      title: 'Learn implementation tools',
+      description: 'Learn the software and tools needed for the project implementation.',
+      start_date: '2025-11-20',
+      due_date: '2025-11-28',
+      milestone_label: 'Learning tools',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'System requirements',
+      description: 'Specify functional and non-functional requirements, use case descriptions, and use case diagram.',
+      start_date: '2025-11-21',
+      due_date: '2025-12-03',
+      milestone_label: 'Requirements',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'System analysis',
+      description: 'Provide conceptual system models including class diagrams, sequence diagrams, and state chart diagrams.',
+      start_date: '2025-12-03',
+      due_date: '2025-12-13',
+      milestone_label: 'Analysis models',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'System design',
+      description: 'Describe high-level architecture, subsystems, and deployment diagram.',
+      start_date: '2025-12-14',
+      due_date: '2025-12-31',
+      milestone_label: 'Design',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'Progress report writing',
+      description: 'Start writing and finalizing the COMP4200 progress report.',
+      start_date: '2026-01-01',
+      due_date: '2026-01-12',
+      milestone_label: 'Progress report',
+      submitted_to: 'coordinator'
+    },
+    {
+      title: 'Turnitin report',
+      description: 'Generate the Turnitin report.',
+      start_date: '2026-01-12',
+      due_date: '2026-01-14',
+      milestone_label: 'Turnitin Report',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'Supervisor report review',
+      description: 'Review the report with your supervisor.',
+      start_date: '2026-01-14',
+      due_date: '2026-01-22',
+      milestone_label: 'Supervisor Review',
+      submitted_to: 'supervisor'
+    },
+    {
+      title: 'Final report submission',
+      description: 'Submit the final report to the department.',
+      start_date: '',
+      due_date: '2026-01-22',
+      milestone_label: 'Graduation Report',
+      submitted_to: 'coordinator'
+    }
+  ];
+
+  function escAttr(value) {
+    return String(value || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('"', '&quot;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+  }
+
+  function toDatetimeLocal(value) {
+    if (!value) return '';
+    // Already full datetime → keep as-is (preserves whatever coordinator set)
+    if (value.includes('T')) return value;
+    // Date-only from old data → return empty so coordinator sets it manually
+    return '';
+  }
+
+  function timelineRowTemplate(item, index) {
+    const rowItem = item || {};
+
+    return `
+      <tr data-row="timeline">
+        <td>
+          <input
+            class="tl-order timeline-small-input timeline-order"
+            type="number"
+            min="1"
+            value="${escAttr(rowItem.item_order || index + 1)}">
+        </td>
+
+        <td>
+          <input
+            class="tl-title timeline-small-input"
+            value="${escAttr(rowItem.title)}"
+            placeholder="Milestone title">
+        </td>
+
+        <td>
+          <textarea
+            class="tl-desc timeline-small-input"
+            rows="2"
+            placeholder="Description"
+            style="resize:vertical">${escAttr(rowItem.description)}</textarea>
+        </td>
+
+        <td>
+          <input
+            class="tl-start timeline-small-input"
+            type="datetime-local"
+            value="${escAttr(toDatetimeLocal(rowItem.start_date))}">
+        </td>
+
+        <td>
+          <input
+            class="tl-due timeline-small-input"
+            type="datetime-local"
+            value="${escAttr(toDatetimeLocal(rowItem.due_date))}">
+        </td>
+
+        <td>
+          <input
+            class="tl-label timeline-small-input"
+            value="${escAttr(rowItem.milestone_label)}"
+            placeholder="Label (optional)"
+            style="margin-bottom:4px">
+          <select class="tl-submitted-to timeline-small-input" style="font-size:12px">
+            <option value="supervisor" ${(rowItem.submitted_to || 'supervisor') === 'supervisor' ? 'selected' : ''}>→ Supervisor</option>
+            <option value="coordinator" ${(rowItem.submitted_to || '') === 'coordinator' ? 'selected' : ''}>→ Course Coordinator</option>
+          </select>
+        </td>
+
+        <td style="text-align:center">
+          <input
+            class="tl-deadline"
+            type="checkbox"
+            ${rowItem.is_deadline === false ? '' : 'checked'}>
+        </td>
+
+        <td>
+          <button
+            class="btn btn-outline"
+            type="button"
+            onclick="this.closest('tr').remove(); renumberTimelineRows();"
+            style="padding:7px 9px">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function renderTimelineRows(items) {
+    const tbody = document.getElementById('timelineRows');
+    if (!tbody) return;
+
+    tbody.innerHTML = (items || [])
+      .map((item, idx) => timelineRowTemplate(item, idx))
+      .join('');
+  }
+
+  function renumberTimelineRows() {
+    document.querySelectorAll('#timelineRows .tl-order').forEach((el, i) => {
+      el.value = i + 1;
+    });
+  }
+
+  function addTimelineRow(item) {
+    const body = document.getElementById('timelineRows');
+    if (!body) return;
+
+    body.insertAdjacentHTML(
+      'beforeend',
+      timelineRowTemplate(item || { is_deadline: true }, body.querySelectorAll('tr').length)
+    );
+  }
+
+  function loadDefaultTimeline() {
+    renderTimelineRows(defaultIntroTimeline);
+    setTimeout(resetExamScroll, 0);
+  }
+
+  function collectTimelineItems(onlyChecked) {
+    const rows = Array.from(document.querySelectorAll('#timelineRows tr'));
+    const all = rows.map((row, idx) => ({
+      item_order: Number(row.querySelector('.tl-order').value || idx + 1),
+      title: row.querySelector('.tl-title').value.trim(),
+      description: row.querySelector('.tl-desc').value.trim(),
+      start_date: row.querySelector('.tl-start').value,
+      due_date: row.querySelector('.tl-due').value,
+      milestone_label: row.querySelector('.tl-label').value.trim(),
+      submitted_to: row.querySelector('.tl-submitted-to').value,
+      is_deadline: row.querySelector('.tl-deadline').checked
+    }));
+    return onlyChecked ? all.filter(item => item.is_deadline) : all;
+  }
+
+  async function timelineFetch(url, options) {
+    const res = await fetch(
+      url,
+      Object.assign(
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        },
+        options || {}
+      )
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Timeline request failed.');
+    }
+
+    return data;
+  }
+
+  function updateTimelineMeta(timeline) {
+    const state = document.getElementById('timelinePublishState');
+    const meta = document.getElementById('timelineMeta');
+
+    if (!state || !meta) return;
+
+    if (!timeline) {
+      state.textContent = 'Draft';
+      meta.textContent = 'Not published yet';
+      return;
+    }
+
+    state.textContent = timeline.is_published ? 'Published' : 'Draft';
+
+    meta.textContent = timeline.is_published
+      ? `Published at ${timeline.published_at || '—'}`
+      : 'Draft saved — not visible to students yet';
+  }
+
+  async function loadIntroTimeline() {
+    try {
+      const data = await timelineFetch('/api/coordinator/intro-timeline');
+
+      document.getElementById('timelineTitle').value =
+        data.timeline?.title || 'Project Introduction Timeline';
+
+      document.getElementById('timelineNote').value =
+        data.timeline?.note || '';
+
+      renderTimelineRows(data.items || []);
+
+      updateTimelineMeta(data.timeline);
+    } catch (err) {
+      const meta = document.getElementById('timelineMeta');
+      if (meta) meta.textContent = err.message;
+
+      renderTimelineRows([]);
+    }
+  }
+
+  async function saveIntroTimeline(publishAfter) {
+    try {
+      const title = document.getElementById('timelineTitle').value.trim();
+      const note = document.getElementById('timelineNote').value.trim();
+
+      // Draft: save ALL rows; Publish: send only checked rows
+      const draftPayload = {
+        title,
+        note,
+        items: collectTimelineItems(false)
+      };
+
+      const saved = await timelineFetch('/api/coordinator/intro-timeline', {
+        method: 'POST',
+        body: JSON.stringify(draftPayload)
+      });
+
+      if (publishAfter) {
+        const checkedItems = collectTimelineItems(true);
+
+        if (checkedItems.length === 0) {
+          alert('No items selected. Please check at least one item to publish.');
+          return;
+        }
+
+        // Validate: checked items must have a due date
+        const missingDate = checkedItems.filter(it => !it.due_date);
+        if (missingDate.length > 0) {
+          const nums = missingDate.map(it => it.item_order).join(', ');
+          alert(`Please set a Close / Deadline date for checked item(s): #${nums}`);
+          return;
+        }
+
+        const publishPayload = {
+          title,
+          note,
+          items: checkedItems
+        };
+
+        const published = await timelineFetch('/api/coordinator/intro-timeline/publish', {
+          method: 'POST',
+          body: JSON.stringify(publishPayload)
+        });
+
+        updateTimelineMeta(published.timeline);
+        alert(published.message || `Timeline published (${checkedItems.length} item(s) sent to students).`);
+      } else {
+        updateTimelineMeta(saved.timeline);
+        alert(saved.message || 'Timeline saved as draft.');
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  function setGradMessage(message, type) {
+    const msg = document.getElementById('gradTimelineMsg');
+    if (!msg) return;
+
+    msg.textContent = message || '';
+    msg.className = 'exam-msg';
+
+    if (type) {
+      msg.classList.add(type);
+    }
+  }
+
+  function updateGradMeta(isPublished, publishedAt) {
+    const state = document.getElementById('gradPublishState');
+    const meta = document.getElementById('gradTimelineMeta');
+
+    if (!state || !meta) return;
+
+    state.textContent = isPublished ? 'Published' : 'Draft';
+    meta.textContent = isPublished
+      ? `Published at ${publishedAt || '—'}`
+      : 'Draft saved — not visible to students yet';
+  }
+
+  function loadGradTimeline() {
+    const saved = localStorage.getItem('apms_comp4300_final_submission');
+
+    if (!saved) {
+      updateGradMeta(false, null);
+      return;
+    }
+
+    try {
+      const data = JSON.parse(saved);
+
+      document.getElementById('gradTitle').value =
+        data.title || 'Graduation Project Final Submission';
+
+      document.getElementById('gradStartAt').value = data.start_at || '';
+      document.getElementById('gradDeadlineAt').value = data.deadline_at || '';
+      document.getElementById('gradNote').value = data.note || '';
+
+      updateGradMeta(Boolean(data.is_published), data.published_at);
+    } catch (err) {
+      updateGradMeta(false, null);
+    }
+  }
+
+  function saveGradTimeline(publishAfter) {
+    const title = document.getElementById('gradTitle').value.trim();
+    const startAt = document.getElementById('gradStartAt').value;
+    const deadlineAt = document.getElementById('gradDeadlineAt').value;
+    const note = document.getElementById('gradNote').value.trim();
+
+    if (!title) {
+      setGradMessage('Please write a title.', 'error');
+      return;
+    }
+
+    if (!startAt) {
+      setGradMessage('Please choose the start date and time.', 'error');
+      return;
+    }
+
+    if (!deadlineAt) {
+      setGradMessage('Please choose the final deadline.', 'error');
+      return;
+    }
+
+    if (new Date(deadlineAt) <= new Date(startAt)) {
+      setGradMessage('Final deadline must be after the start date/time.', 'error');
+      return;
+    }
+
+    const payload = {
+      title,
+      start_at: startAt,
+      deadline_at: deadlineAt,
+      note,
+      is_published: publishAfter,
+      published_at: publishAfter ? new Date().toLocaleString() : null
+    };
+
+    localStorage.setItem('apms_comp4300_final_submission', JSON.stringify(payload));
+
+    updateGradMeta(payload.is_published, payload.published_at);
+
+    setGradMessage(
+      publishAfter
+        ? 'COMP4300 final submission timeline published.'
+        : 'COMP4300 final submission timeline saved as draft.',
+      'ok'
+    );
+  }
+
+  function clearGradTimeline() {
+    if (!confirm('Clear COMP4300 final submission timeline?')) {
+      return;
+    }
+
+    localStorage.removeItem('apms_comp4300_final_submission');
+
+    document.getElementById('gradTitle').value = 'Graduation Project Final Submission';
+    document.getElementById('gradStartAt').value = '';
+    document.getElementById('gradDeadlineAt').value = '';
+    document.getElementById('gradNote').value = '';
+
+    updateGradMeta(false, null);
+    setGradMessage('Timeline cleared.', 'ok');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    loadIntroTimeline();
+    loadGradTimeline();
+
+    const firstTab = document.querySelector('#pg-exams .exam-tab');
+    showExamSection('introTimeline', firstTab);
+
+    setTimeout(resetExamScroll, 0);
+    setTimeout(resetExamScroll, 100);
+  });
+
+  window.addEventListener('load', function () {
+    setTimeout(resetExamScroll, 0);
+    setTimeout(resetExamScroll, 100);
+  });
 </script>
 
 {% endblock %}

@@ -6,7 +6,16 @@
 
 {% block content %}
 <div class="page on" id="pg-challenges">
-  <div class="two-col" style="align-items:start">
+  <div id="regLockOverlay" style="display:none;text-align:center;padding:60px 20px">
+    <div style="font-size:48px;margin-bottom:16px">🔒</div>
+    <div style="font-size:18px;font-weight:700;color:#344054;margin-bottom:8px">Registration Required</div>
+    <div style="font-size:14px;color:#667085;max-width:380px;margin:0 auto 20px">
+      This page is available after your supervisor is assigned and the coordinator approves your team.
+    </div>
+    <a href="/student/registration" class="btn btn-primary" style="text-decoration:none">Go to Registration</a>
+  </div>
+
+  <div id="regPageContent"><div class="two-col" style="align-items:start">
 
     <!-- ── Left: Add / Edit form ─────────────────────────── -->
     <div>
@@ -46,8 +55,7 @@
             placeholder="Write the solution, action taken, or lesson learned..."></textarea>
         </div>
 
-        <div id="formError"
-          style="display:none;color:var(--red,#e05);font-size:13px;margin-bottom:10px"></div>
+        <div id="formError" style="display:none;color:var(--red,#e05);font-size:13px;margin-bottom:10px"></div>
 
         <div class="btn-row">
           <button class="btn btn-primary" id="saveChallengeBtn" type="button">Save</button>
@@ -75,54 +83,54 @@
 </div>
 
 <script>
-(function () {
-  const TYPE_PILL = {
-    technical:      { label: "Technical",      cls: "p-review"  },
-    administrative: { label: "Administrative", cls: "p-pending" },
-    reflection:     { label: "Reflection",     cls: "p-accepted"},
-  };
-  const TYPE_BORDER = {
-    technical:      "var(--color-primary, #2563eb)",
-    administrative: "var(--orange, #f59e0b)",
-    reflection:     "var(--green, #22c55e)",
-  };
+  (function () {
+    const TYPE_PILL = {
+      technical: { label: "Technical", cls: "p-review" },
+      administrative: { label: "Administrative", cls: "p-pending" },
+      reflection: { label: "Reflection", cls: "p-accepted" },
+    };
+    const TYPE_BORDER = {
+      technical: "var(--color-primary, #2563eb)",
+      administrative: "var(--orange, #f59e0b)",
+      reflection: "var(--green, #22c55e)",
+    };
 
-  let challenges = [];
+    let challenges = [];
 
-  const listEl     = document.getElementById("challengeList");
-  const emptyEl    = document.getElementById("emptyChallenges");
-  const loadingEl  = document.getElementById("loadingChallenges");
-  const formTitle  = document.getElementById("formCardTitle");
-  const editId     = document.getElementById("editChallengeId");
-  const typeEl     = document.getElementById("challengeType");
-  const titleEl    = document.getElementById("challengeTitle");
-  const detailsEl  = document.getElementById("challengeDetails");
-  const solutionEl = document.getElementById("challengeSolution");
-  const saveBtn    = document.getElementById("saveChallengeBtn");
-  const cancelBtn  = document.getElementById("cancelChallengeBtn");
-  const errEl      = document.getElementById("formError");
+    const listEl = document.getElementById("challengeList");
+    const emptyEl = document.getElementById("emptyChallenges");
+    const loadingEl = document.getElementById("loadingChallenges");
+    const formTitle = document.getElementById("formCardTitle");
+    const editId = document.getElementById("editChallengeId");
+    const typeEl = document.getElementById("challengeType");
+    const titleEl = document.getElementById("challengeTitle");
+    const detailsEl = document.getElementById("challengeDetails");
+    const solutionEl = document.getElementById("challengeSolution");
+    const saveBtn = document.getElementById("saveChallengeBtn");
+    const cancelBtn = document.getElementById("cancelChallengeBtn");
+    const errEl = document.getElementById("formError");
 
-  /* ── Render list ──────────────────────────────────────── */
-  function render() {
-    listEl.innerHTML = "";
-    loadingEl.style.display = "none";
+    /* ── Render list ──────────────────────────────────────── */
+    function render() {
+      listEl.innerHTML = "";
+      loadingEl.style.display = "none";
 
-    if (!challenges.length) { emptyEl.style.display = ""; return; }
-    emptyEl.style.display = "none";
+      if (!challenges.length) { emptyEl.style.display = ""; return; }
+      emptyEl.style.display = "none";
 
-    challenges.forEach(ch => {
-      const pill   = TYPE_PILL[ch.type]   || { label: ch.type, cls: "p-review" };
-      const border = TYPE_BORDER[ch.type] || "var(--color-primary)";
+      challenges.forEach(ch => {
+        const pill = TYPE_PILL[ch.type] || { label: ch.type, cls: "p-review" };
+        const border = TYPE_BORDER[ch.type] || "var(--color-primary)";
 
-      const card = document.createElement("div");
-      card.className = "challenge-card";
-      card.dataset.id = ch.challenge_id;
-      card.style.borderLeftColor = border;
+        const card = document.createElement("div");
+        card.className = "challenge-card";
+        card.dataset.id = ch.challenge_id;
+        card.style.borderLeftColor = border;
 
-      const solHtml = ch.solution_lesson
-        ? `<div class="ch-sol">&#10003; Solution: ${esc(ch.solution_lesson)}</div>` : "";
+        const solHtml = ch.solution_lesson
+          ? `<div class="ch-sol">&#10003; Solution: ${esc(ch.solution_lesson)}</div>` : "";
 
-      const actionsHtml = ch.is_mine ? `
+        const actionsHtml = ch.is_mine ? `
         <div class="challenge-actions">
           <button class="btn btn-outline btn-xs ch-edit-btn"
                   data-id="${ch.challenge_id}" type="button">Update</button>
@@ -130,9 +138,9 @@
                   data-id="${ch.challenge_id}" type="button">Delete</button>
         </div>` : "";
 
-      const byLabel = ch.is_mine ? "Added by you" : "Added by team member";
+        const byLabel = ch.is_mine ? "Added by you" : "Added by team member";
 
-      card.innerHTML = `
+        card.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
           <div class="ch-title">${esc(ch.title)}</div>
           <span class="pill ${pill.cls}" style="font-size:10px">${pill.label}</span>
@@ -145,124 +153,140 @@
         ${solHtml}
         ${actionsHtml}
       `;
-      listEl.appendChild(card);
+        listEl.appendChild(card);
+      });
+
+      listEl.querySelectorAll(".ch-edit-btn").forEach(b =>
+        b.addEventListener("click", () => startEdit(+b.dataset.id)));
+      listEl.querySelectorAll(".ch-del-btn").forEach(b =>
+        b.addEventListener("click", () => deleteChallenge(+b.dataset.id)));
+    }
+
+    /* ── Load from server ─────────────────────────────────── */
+    async function loadChallenges() {
+      try {
+        const res = await fetch("/student/api/challenges");
+        const data = await res.json();
+        challenges = data.challenges || [];
+        render();
+      } catch {
+        loadingEl.textContent = "Failed to load.";
+      }
+    }
+
+    /* ── Save ─────────────────────────────────────────────── */
+    saveBtn.addEventListener("click", async () => {
+      hideError();
+      const id = editId.value;
+      const payload = {
+        type: typeEl.value,
+        title: titleEl.value.trim(),
+        description: detailsEl.value.trim(),
+        solution_lesson: solutionEl.value.trim(),
+      };
+      if (!payload.title) return showError("Title is required.");
+      if (!payload.description) return showError("Details are required.");
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving…";
+      try {
+        let res, data;
+        if (id) {
+          res = await fetch(`/student/api/challenges/${id}`, {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          data = await res.json();
+          if (!res.ok) return showError(data.error || "Update failed.");
+          const idx = challenges.findIndex(c => c.challenge_id === +id);
+          if (idx !== -1) challenges[idx] = data.challenge;
+        } else {
+          res = await fetch("/student/api/challenges", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          data = await res.json();
+          if (!res.ok) return showError(data.error || "Save failed.");
+          challenges.unshift(data.challenge);
+        }
+        resetForm();
+        render();
+      } catch {
+        showError("Network error. Please try again.");
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = editId.value ? "Update" : "Save";
+      }
     });
 
-    listEl.querySelectorAll(".ch-edit-btn").forEach(b =>
-      b.addEventListener("click", () => startEdit(+b.dataset.id)));
-    listEl.querySelectorAll(".ch-del-btn").forEach(b =>
-      b.addEventListener("click", () => deleteChallenge(+b.dataset.id)));
-  }
+    cancelBtn.addEventListener("click", resetForm);
 
-  /* ── Load from server ─────────────────────────────────── */
-  async function loadChallenges() {
-    try {
-      const res  = await fetch("/student/api/challenges");
-      const data = await res.json();
-      challenges = data.challenges || [];
-      render();
-    } catch {
-      loadingEl.textContent = "Failed to load.";
+    /* ── Start edit ──────────────────────────────────────── */
+    function startEdit(id) {
+      const ch = challenges.find(c => c.challenge_id === id);
+      if (!ch || !ch.is_mine) return;
+      editId.value = id;
+      typeEl.value = ch.type;
+      titleEl.value = ch.title;
+      detailsEl.value = ch.description;
+      solutionEl.value = ch.solution_lesson || "";
+      formTitle.textContent = "Edit Challenge or Reflection";
+      saveBtn.textContent = "Update";
+      document.querySelector(".two-col > div:first-child")
+        .scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }
 
-  /* ── Save ─────────────────────────────────────────────── */
-  saveBtn.addEventListener("click", async () => {
-    hideError();
-    const id      = editId.value;
-    const payload = {
-      type:            typeEl.value,
-      title:           titleEl.value.trim(),
-      description:     detailsEl.value.trim(),
-      solution_lesson: solutionEl.value.trim(),
-    };
-    if (!payload.title)       return showError("Title is required.");
-    if (!payload.description) return showError("Details are required.");
+    /* ── Delete ──────────────────────────────────────────── */
+    async function deleteChallenge(id) {
+      if (!confirm("Delete this entry?")) return;
+      try {
+        const res = await fetch(`/student/api/challenges/${id}`, { method: "DELETE" });
+        if (!res.ok) { const d = await res.json(); return alert(d.error || "Failed."); }
+        challenges = challenges.filter(c => c.challenge_id !== id);
+        render();
+      } catch { alert("Network error."); }
+    }
 
-    saveBtn.disabled    = true;
-    saveBtn.textContent = "Saving…";
-    try {
-      let res, data;
-      if (id) {
-        res  = await fetch(`/student/api/challenges/${id}`, {
-          method: "PUT", headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) return showError(data.error || "Update failed.");
-        const idx = challenges.findIndex(c => c.challenge_id === +id);
-        if (idx !== -1) challenges[idx] = data.challenge;
-      } else {
-        res  = await fetch("/student/api/challenges", {
-          method: "POST", headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(payload),
-        });
-        data = await res.json();
-        if (!res.ok) return showError(data.error || "Save failed.");
-        challenges.unshift(data.challenge);
-      }
-      resetForm();
-      render();
-    } catch {
-      showError("Network error. Please try again.");
-    } finally {
-      saveBtn.disabled    = false;
+    /* ── Helpers ─────────────────────────────────────────── */
+    function resetForm() {
+      editId.value = "";
+      typeEl.value = "technical";
+      titleEl.value = "";
+      detailsEl.value = "";
+      solutionEl.value = "";
+      formTitle.textContent = "Add New Challenge or Reflection";
+      saveBtn.textContent = "Save";
+      hideError();
+    }
+    function showError(msg) {
+      errEl.textContent = msg;
+      errEl.style.display = "";
+      saveBtn.disabled = false;
       saveBtn.textContent = editId.value ? "Update" : "Save";
     }
-  });
+    function hideError() { errEl.style.display = "none"; }
+    function esc(s) {
+      return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
 
-  cancelBtn.addEventListener("click", resetForm);
-
-  /* ── Start edit ──────────────────────────────────────── */
-  function startEdit(id) {
-    const ch = challenges.find(c => c.challenge_id === id);
-    if (!ch || !ch.is_mine) return;
-    editId.value          = id;
-    typeEl.value          = ch.type;
-    titleEl.value         = ch.title;
-    detailsEl.value       = ch.description;
-    solutionEl.value      = ch.solution_lesson || "";
-    formTitle.textContent = "Edit Challenge or Reflection";
-    saveBtn.textContent   = "Update";
-    document.querySelector(".two-col > div:first-child")
-            .scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  /* ── Delete ──────────────────────────────────────────── */
-  async function deleteChallenge(id) {
-    if (!confirm("Delete this entry?")) return;
-    try {
-      const res = await fetch(`/student/api/challenges/${id}`, { method: "DELETE" });
-      if (!res.ok) { const d = await res.json(); return alert(d.error || "Failed."); }
-      challenges = challenges.filter(c => c.challenge_id !== id);
-      render();
-    } catch { alert("Network error."); }
-  }
-
-  /* ── Helpers ─────────────────────────────────────────── */
-  function resetForm() {
-    editId.value          = "";
-    typeEl.value          = "technical";
-    titleEl.value         = "";
-    detailsEl.value       = "";
-    solutionEl.value      = "";
-    formTitle.textContent = "Add New Challenge or Reflection";
-    saveBtn.textContent   = "Save";
-    hideError();
-  }
-  function showError(msg) {
-    errEl.textContent   = msg;
-    errEl.style.display = "";
-    saveBtn.disabled    = false;
-    saveBtn.textContent = editId.value ? "Update" : "Save";
-  }
-  function hideError() { errEl.style.display = "none"; }
-  function esc(s) {
-    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")
-                        .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  }
-
-  loadChallenges();
-})();
+    loadChallenges();
+  })();
+</script>
+  </div><!-- /regPageContent -->
+</div><!-- /pg-challenges -->
+<script>
+  (function () {
+    fetch('/student/api/registration-check')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.registered) {
+          var ov = document.getElementById('regLockOverlay');
+          var ct = document.getElementById('regPageContent');
+          if (ov) ov.style.display = '';
+          if (ct) ct.style.display = 'none';
+        }
+      }).catch(() => {});
+  })();
 </script>
 {% endblock %}

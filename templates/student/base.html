@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>APMS — {% block page_title %}Dashboard{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+    rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}" />
 </head>
 
@@ -21,7 +24,7 @@
           <div class="tb-left">
             <div class="tb-titles">
               <div class="tb-title">{% block topbar_title %}Dashboard{% endblock %}</div>
-              <div class="tb-sub">COMP4200 · Semester 2025/2026</div>
+              <div class="tb-sub" id="tbSub">Loading…</div>
             </div>
           </div>
           <div class="tb-right">
@@ -30,7 +33,7 @@
             </div>
             <div class="tb-notif" onclick="window.location.href='/student/notifs'" title="Notifications">
               <span class="material-symbols-outlined icon-inline">notifications</span>
-              <div class="tb-notif-dot"></div>
+              <div class="tb-notif-badge" id="notif-badge" style="display:none"></div>
             </div>
             <div class="tb-logo">APMS</div>
           </div>
@@ -47,5 +50,67 @@
 
   <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
+  <style>
+    .tb-notif {
+      position: relative;
+    }
+
+    .tb-notif-badge {
+      position: absolute;
+      top: -5px;
+      right: -6px;
+      min-width: 17px;
+      height: 17px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background: #e02b2b;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 17px;
+      text-align: center;
+      pointer-events: none;
+      border: 2px solid var(--color-background-primary, #fff);
+    }
+  </style>
+  <script>
+    (function () {
+      function updateNotifBadge() {
+        fetch('/student/api/notifications/unread-count')
+          .then(r => r.json())
+          .then(d => {
+            var count = d.unread || 0;
+            var badge = document.getElementById('notif-badge');
+            if (!badge) return;
+            if (count > 0) {
+              badge.textContent = count > 99 ? '99+' : count;
+              badge.style.display = '';
+            } else {
+              badge.style.display = 'none';
+            }
+          })
+          .catch(() => { });
+      }
+      updateNotifBadge();
+      setInterval(updateNotifBadge, 60000);
+    })();
+  </script>
+  <script>
+    (function () {
+      fetch('/student/api/topbar-info')
+        .then(r => r.json())
+        .then(d => {
+          var el = document.getElementById('tbSub');
+          if (!el) return;
+          var year = d.academic_year ? ' · Semester ' + d.academic_year : '';
+          el.textContent = (d.course_code || 'COMP4200') + year;
+        })
+        .catch(() => {
+          var el = document.getElementById('tbSub');
+          if (el) el.textContent = 'COMP4200';
+        });
+    })();
+  </script>
 </body>
+
 </html>

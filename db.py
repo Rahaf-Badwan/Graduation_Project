@@ -6,6 +6,7 @@ DB_CONFIG = {
     "password": "root123",
     "database": "apms_db",
     "charset":  "utf8mb4",
+    "connection_timeout": 5,
 }
 
 def get_db():

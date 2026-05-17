@@ -6,11 +6,9 @@ from flask import (
     url_for,
     session,
     jsonify,
-    current_app,
     Response,
 )
 import bcrypt
-import os
 from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
@@ -22,21 +20,131 @@ ALLOWED_EXTENSIONS = {
 }
 MAX_FILE_MB = 50
 
-import bcrypt
-from db import get_db
-from auth import login_required
-
 student_bp = Blueprint("student", __name__, url_prefix="/student")
 
 
 def _fmt_date(dt):
-    """Format a datetime object → 'Apr 8, 2026'."""
     if not dt:
         return ""
+    return f"{dt.strftime('%b')} {dt.day}, {dt.year}"
+
+
+def _fmt_short(dt):
+    if not dt:
+        return ""
+    return f"{dt.strftime('%b')} {dt.day}"
+
+
+def _as_date(val):
+    if val is None:
+        return None
     try:
-        return dt.strftime("%b %-d, %Y")  # Linux/Mac
-    except ValueError:
-        return dt.strftime("%b %d, %Y")  # Windows
+        return val.date()
+    except AttributeError:
+        return val
+
+
+def _project_type_text(value):
+    if not value:
+        return ""
+    if isinstance(value, (set, list, tuple)):
+        return ",".join(str(v) for v in value if v)
+    return str(value)
+
+
+def _split_project_types(value):
+    """Return a clean list of project type values from MySQL SET/string values."""
+    if not value:
+        return []
+    if isinstance(value, (set, list, tuple)):
+        raw_items = value
+    else:
+        raw_items = str(value).split(",")
+    return [str(item).strip().lower() for item in raw_items if str(item).strip()]
+
+
+def _pretty_project_type(value):
+    labels = {
+        "web": "Web",
+        "mobile": "Mobile",
+        "ai": "AI",
+        "desktop": "Desktop",
+        "database": "Database",
+        "network": "Network",
+        "security": "Security",
+        "iot": "IoT",
+        "other": "Other",
+        "software_engineering": "Software Engineering",
+        "software engineering": "Software Engineering",
+    }
+    return labels.get(str(value).strip().lower(), str(value).strip().title())
+
+
+def _json_safe(value):
+    """Convert MySQL/Python values that Flask cannot serialize to JSON-safe values."""
+    from datetime import date, datetime
+    from decimal import Decimal
+
+    if isinstance(value, set):
+        return ", ".join(str(v) for v in value if v)
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def _notify_project_team(
+    cursor,
+    project_id,
+    sender_id,
+    title,
+    message,
+    notification_type="system",
+    exclude_user_id=None,
+):
+    """Create a notification for every active student in a project team."""
+    cursor.execute(
+        """
+        SELECT DISTINCT u.user_id
+        FROM   project_members pm
+        JOIN   students st ON st.student_id = pm.student_id
+        JOIN   users    u  ON u.user_id     = st.user_id
+        WHERE  pm.project_id = %s
+          AND  u.is_active = TRUE
+        """,
+        (project_id,),
+    )
+    recipients = []
+    for row in cursor.fetchall():
+        recipient_id = row.get("user_id")
+        if not recipient_id:
+            continue
+        if exclude_user_id is not None and int(recipient_id) == int(exclude_user_id):
+            continue
+        recipients.append(int(recipient_id))
+
+    for recipient_id in sorted(set(recipients)):
+        cursor.execute(
+            """
+            INSERT INTO notifications
+                (recipient_id, sender_id, notification_type, title, message,
+                 related_project_id, is_read)
+            VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+            """,
+            (
+                recipient_id,
+                sender_id,
+                notification_type,
+                title,
+                message,
+                project_id,
+            ),
+        )
 
 
 # ─── Dashboard ──────────────────────────────────────────────
@@ -44,6 +152,687 @@ def _fmt_date(dt):
 @login_required(role="student")
 def dashboard():
     return render_template("student/index.html")
+
+
+# ─── Dashboard API ──────────────────────────────────────────
+@student_bp.route("/api/dashboard-data", methods=["GET"])
+@login_required(role="student")
+def api_dashboard_data():
+    from datetime import date, timedelta
+
+    user_id = session["user_id"]
+
+    result = {
+        "student_name": "",
+        "student_university_id": "",
+        "project": None,
+        "supervisor_name": None,
+        "academic_year": "",
+        "progress": {
+            # Overall completion is based only on the required final report.
+            # Source code and presentation are optional, so they do not reduce overall.
+            "final_report": 0,
+            "source_code": None,
+            "presentation": None,
+            "overall": 0,
+        },
+        "registration_date": "",
+        "deadlines": [],
+        "days_to_deadline": None,
+        "notifications": [],
+        "unread_notifs": 0,
+        "team_members": [],
+        "project_type_distribution": [],
+        "milestone_progress": {
+            "submitted": 0,
+            "total": 0,
+            "final_report_uploaded": False,
+            "last_submission": "",
+            "last_submission_title": "",
+            "overall": 0,
+        },
+        "weekly_progress": [None] * 12,
+        "weekly_expected": [],
+    }
+
+    db = None
+    cursor = None
+    project_id = None
+    semester_id = None
+    student_id = None
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # 1. student info
+        cursor.execute(
+            """
+            SELECT st.student_id, u.full_name, u.university_id
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE st.user_id = %s
+            """,
+            (user_id,),
+        )
+        st = cursor.fetchone()
+        if not st:
+            return jsonify(_json_safe(result))
+        student_id = st["student_id"]
+        result["student_name"] = st.get("full_name") or ""
+        result["student_university_id"] = st.get("university_id") or ""
+
+        # 2. الكورس الصح (COMP4200 أو COMP4300)
+        cursor.execute(
+            """
+            SELECT scr.status AS course_status
+            FROM   student_course_results scr
+            JOIN   semesters s ON s.semester_id = scr.semester_id
+            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
+            ORDER  BY scr.semester_id DESC LIMIT 1
+            """,
+            (student_id,),
+        )
+        r = cursor.fetchone()
+        target_course = (
+            "COMP4300" if (r or {}).get("course_status") == "passed" else "COMP4200"
+        )
+
+        # 3. السمستر الأكتف
+        cursor.execute(
+            """
+            SELECT semester_id, academic_year, start_date, end_date
+            FROM   semesters
+            WHERE  is_active = TRUE AND course_code = %s
+            ORDER  BY semester_id DESC LIMIT 1
+            """,
+            (target_course,),
+        )
+        sem = cursor.fetchone()
+        if not sem:
+            return jsonify(_json_safe(result))
+
+        semester_id = sem["semester_id"]
+        semester_start = _as_date(sem["start_date"])
+        result["academic_year"] = sem["academic_year"] or ""
+
+        # 4. Most used project types.
+        # This chart is GLOBAL for all students and does NOT depend on the
+        # logged-in student having a project. It counts archived projects only.
+        cursor.execute("""
+            SELECT p.project_id, p.project_type
+            FROM   projects p
+            WHERE  p.status = 'archived'
+              AND  p.project_type IS NOT NULL
+              AND  p.project_type <> ''
+            """)
+        type_counts = {}
+        for row in cursor.fetchall():
+            for type_name in _split_project_types(row.get("project_type")):
+                type_counts[type_name] = type_counts.get(type_name, 0) + 1
+
+        result["project_type_distribution"] = [
+            {"type": _pretty_project_type(type_name), "count": count}
+            for type_name, count in sorted(
+                type_counts.items(),
+                key=lambda item: (-item[1], _pretty_project_type(item[0])),
+            )
+        ][:6]
+
+        # 5. المشروع
+        cursor.execute(
+            """
+            SELECT p.project_id, p.title, p.status, p.final_score, p.project_type,
+                   pm.joined_at, pm.is_primary_contact,
+                   u.full_name AS supervisor_name
+            FROM   project_members pm
+            JOIN   students  st  ON st.student_id = pm.student_id
+            JOIN   projects  p   ON p.project_id  = pm.project_id
+            JOIN   semesters s   ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            LEFT JOIN faculty  f ON f.faculty_id  = p.supervisor_id
+            LEFT JOIN users    u ON u.user_id      = f.user_id
+            WHERE  st.user_id = %s
+            ORDER  BY p.project_id DESC LIMIT 1
+            """,
+            (user_id,),
+        )
+        project = cursor.fetchone()
+        if not project:
+            milestone = _student_dashboard_milestone_progress(
+                cursor, student_id, project_id=None, final_report_uploaded=False
+            )
+            result["milestone_progress"] = milestone
+            result["progress"]["overall"] = milestone["overall"]
+            result["deadlines"] = _student_intro_timeline_deadlines(cursor)
+            return jsonify(_json_safe(result))
+
+        project_id = project["project_id"]
+        result["project"] = {
+            "project_id": project_id,
+            "title": project["title"] or "",
+            "status": project["status"] or "",
+            "project_type": _project_type_text(project.get("project_type")),
+            "is_primary_contact": bool(project.get("is_primary_contact")),
+            "final_score": (
+                float(project["final_score"]) if project["final_score"] else None
+            ),
+        }
+        result["supervisor_name"] = project["supervisor_name"] or "—"
+        result["registration_date"] = _fmt_date(project.get("joined_at"))
+
+        # 5. File completion based on project_files uploads, not manual/random percentages.
+        # Only the Final Report is required for dashboard completion.
+        # Source Code and Presentation are optional, so they are shown but do NOT reduce overall if missing.
+        required_files = ["final_report"]
+        optional_files = ["source_code", "presentation"]
+        all_dashboard_files = required_files + optional_files
+
+        file_progress = {file_type: 0 for file_type in required_files}
+        file_progress["source_code"] = None
+        file_progress["presentation"] = None
+
+        file_status = {
+            file_type: {
+                "uploaded": False,
+                "required": file_type in required_files,
+                "upload_status": "not_uploaded",
+                "file_name": "",
+                "uploaded_at": "",
+                "label": file_type.replace("_", " ").title(),
+            }
+            for file_type in all_dashboard_files
+        }
+
+        cursor.execute(
+            """
+            SELECT file_type, file_name, upload_status, uploaded_at
+            FROM   project_files
+            WHERE  project_id = %s
+              AND  file_type IN ('final_report', 'source_code', 'presentation')
+            """,
+            (project_id,),
+        )
+        for row in cursor.fetchall():
+            file_type = row.get("file_type")
+            if file_type not in all_dashboard_files:
+                continue
+
+            uploaded = row.get("upload_status") == "uploaded"
+            if file_type in required_files:
+                file_progress[file_type] = 100 if uploaded else 0
+            else:
+                file_progress[file_type] = 100 if uploaded else None
+
+            file_status[file_type] = {
+                "uploaded": uploaded,
+                "required": file_type in required_files,
+                "upload_status": row.get("upload_status") or "not_uploaded",
+                "file_name": row.get("file_name") or "",
+                "uploaded_at": _fmt_date(row.get("uploaded_at")),
+                "label": file_type.replace("_", " ").title(),
+            }
+
+        result["progress"]["final_report"] = file_progress["final_report"]
+        result["progress"]["source_code"] = file_progress["source_code"]
+        result["progress"]["presentation"] = file_progress["presentation"]
+        result["progress"]["overall"] = (
+            round(
+                sum(file_progress[file_type] for file_type in required_files)
+                / len(required_files)
+            )
+            if required_files
+            else 0
+        )
+        result["file_status"] = file_status
+
+        final_report_uploaded = bool(file_status["final_report"]["uploaded"])
+        result["milestone_progress"] = _student_dashboard_milestone_progress(
+            cursor,
+            student_id,
+            project_id=project_id,
+            final_report_uploaded=final_report_uploaded,
+        )
+        result["progress"]["overall"] = result["milestone_progress"]["overall"]
+
+        # 7. Deadlines — من جدول deadlines + timeline items
+        cursor.execute(
+            """
+            SELECT deadline_type, deadline_date, description
+            FROM   deadlines
+            WHERE  semester_id = %s
+              AND  (project_id IS NULL OR project_id = %s)
+              AND  deadline_date >= CURDATE()
+            ORDER  BY deadline_date ASC LIMIT 5
+            """,
+            (semester_id, project_id),
+        )
+        deadlines = []
+        for d in cursor.fetchall():
+            dd = d["deadline_date"]
+            deadlines.append(
+                {
+                    "label": d["description"]
+                    or d["deadline_type"].replace("_", " ").title(),
+                    "date_str": _fmt_short(dd),
+                    "deadline_type": d["deadline_type"],
+                    "_sort": _as_date(dd),
+                }
+            )
+
+        # جيب timeline items كـ deadlines — بدون فلتر semester_id
+        # لأن التايملاين مرتبط بأي سمستر أكتف وليس بالضرورة نفس سمستر الطالب
+        try:
+            cursor.execute("""
+                SELECT ti.title, ti.due_date
+                FROM   comp4200_timeline_items ti
+                JOIN   comp4200_timelines t ON t.timeline_id = ti.timeline_id
+                WHERE  t.is_published = TRUE
+                  AND  ti.is_deadline = TRUE
+                  AND  COALESCE(ti.is_archived, FALSE) = FALSE
+                  AND  ti.due_date   >= CURDATE()
+                ORDER  BY ti.due_date ASC
+                """)
+            for ti in cursor.fetchall():
+                dd = ti["due_date"]
+                deadlines.append(
+                    {
+                        "label": ti["title"] or "Timeline Milestone",
+                        "date_str": _fmt_short(dd),
+                        "deadline_type": "timeline",
+                        "_sort": _as_date(dd),
+                    }
+                )
+        except Exception:
+            pass  # الجداول ممكن ما تكون موجودة بعد
+
+        # رتّب حسب التاريخ وخذ أقرب 5
+        deadlines.sort(key=lambda x: (x.get("_sort") or date.max))
+        for d in deadlines:
+            d.pop("_sort", None)
+        deadlines = deadlines[:5]
+        result["deadlines"] = deadlines
+
+        if deadlines:
+            # أقرب تاريخ من deadlines العادية
+            cursor.execute(
+                """
+                SELECT MIN(deadline_date) AS nearest
+                FROM   deadlines
+                WHERE  semester_id = %s
+                  AND  (project_id IS NULL OR project_id = %s)
+                  AND  deadline_date >= CURDATE()
+                """,
+                (semester_id, project_id),
+            )
+            nr = cursor.fetchone()
+            nearest_d = _as_date((nr or {}).get("nearest")) if nr else None
+
+            # قارن مع أقرب timeline item
+            try:
+                cursor.execute("""
+                    SELECT MIN(ti.due_date) AS nearest
+                    FROM   comp4200_timeline_items ti
+                    JOIN   comp4200_timelines t ON t.timeline_id = ti.timeline_id
+                    WHERE  t.is_published = TRUE
+                      AND  ti.is_deadline = TRUE
+                      AND  COALESCE(ti.is_archived, FALSE) = FALSE
+                      AND  ti.due_date   >= CURDATE()
+                    """)
+                tnr = cursor.fetchone()
+                tnearest = _as_date((tnr or {}).get("nearest")) if tnr else None
+                if tnearest and (nearest_d is None or tnearest < nearest_d):
+                    nearest_d = tnearest
+            except Exception:
+                pass
+
+            if nearest_d:
+                result["days_to_deadline"] = max((nearest_d - date.today()).days, 0)
+
+        # 8. آخر 5 إشعارات
+        cursor.execute(
+            """
+            SELECT n.title, n.message, n.notification_type, n.created_at, n.is_read,
+                   sender.full_name AS sender_name
+            FROM   notifications n
+            LEFT JOIN users sender ON sender.user_id = n.sender_id
+            WHERE  n.recipient_id = %s
+            ORDER  BY n.created_at DESC LIMIT 5
+            """,
+            (user_id,),
+        )
+        notifs = cursor.fetchall()
+        result["notifications"] = [
+            {
+                "title": n["title"],
+                "notification_type": n["notification_type"],
+                "is_read": bool(n["is_read"]),
+                "sender_name": n["sender_name"] or "System",
+            }
+            for n in notifs
+        ]
+        result["unread_notifs"] = sum(1 for n in notifs if not n["is_read"])
+
+        # 9. أعضاء الفريق
+        cursor.execute(
+            """
+            SELECT u.full_name, u.university_id,
+                   (st2.user_id = %s) AS is_me
+            FROM   project_members pm
+            JOIN   students st2 ON st2.student_id = pm.student_id
+            JOIN   users    u   ON u.user_id       = st2.user_id
+            WHERE  pm.project_id = %s
+            """,
+            (user_id, project_id),
+        )
+        result["team_members"] = [
+            {
+                "full_name": m["full_name"],
+                "university_id": m["university_id"],
+                "is_me": bool(m["is_me"]),
+                "initials": m["full_name"][:2].upper() if m["full_name"] else "??",
+            }
+            for m in cursor.fetchall()
+        ]
+
+        # 10. Weekly Progress من project_lifecycle
+        STAGE_WEIGHT = {
+            "registration": 15,
+            "file_submission": 35,
+            "initial_review": 55,
+            "supervisor_review": 70,
+            "committee_evaluation": 85,
+            "final_result": 100,
+        }
+        cursor.execute(
+            """
+            SELECT stage, status, completed_date
+            FROM   project_lifecycle
+            WHERE  project_id = %s
+            ORDER  BY lifecycle_id ASC
+            """,
+            (project_id,),
+        )
+        lifecycle_rows = cursor.fetchall()
+
+        NUM_WEEKS = 12
+        weekly_prog = [None] * NUM_WEEKS
+        weekly_exp = []
+
+        if semester_start:
+            for w in range(NUM_WEEKS):
+                week_end = semester_start + timedelta(weeks=w + 1)
+                achieved = 0
+                for lc in lifecycle_rows:
+                    cd = _as_date(lc.get("completed_date"))
+                    if lc["status"] == "completed" and cd and cd <= week_end:
+                        achieved = max(achieved, STAGE_WEIGHT.get(lc["stage"], 0))
+                if week_end <= date.today():
+                    weekly_prog[w] = achieved
+                weekly_exp.append(round((w + 1) * 100 / NUM_WEEKS))
+
+        result["weekly_progress"] = weekly_prog
+        result["weekly_expected"] = weekly_exp
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
+        try:
+            db.close()
+        except Exception:
+            pass
+
+    return jsonify(_json_safe(result))
+
+
+# ─── Project Introduction Timeline ──────────────────────────────────────
+def _student_intro_timeline_tables_ready(cursor):
+    cursor.execute("""
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME IN ('comp4200_timelines', 'comp4200_timeline_items')
+        """)
+    return int((cursor.fetchone() or {}).get("cnt") or 0) == 2
+
+
+def _student_active_semester(cursor):
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number
+        FROM semesters
+        WHERE is_active = TRUE
+        ORDER BY semester_id DESC
+        LIMIT 1
+        """)
+    return cursor.fetchone()
+
+
+def _student_published_intro_timeline(cursor):
+    if not _student_intro_timeline_tables_ready(cursor):
+        return None
+
+    semester = _student_active_semester(cursor)
+    if not semester:
+        return None
+
+    cursor.execute(
+        """
+        SELECT timeline_id, semester_id, title, note, is_published, published_at, updated_at
+        FROM comp4200_timelines
+        WHERE semester_id = %s AND is_published = TRUE
+        LIMIT 1
+        """,
+        (semester["semester_id"],),
+    )
+    return cursor.fetchone()
+
+
+def _student_dashboard_milestone_progress(
+    cursor, student_id, project_id=None, final_report_uploaded=False
+):
+    milestone_total = 0
+    milestone_submitted = 0
+    last_milestone_submission = ""
+    last_milestone_title = ""
+
+    try:
+        timeline = _student_published_intro_timeline(cursor)
+        timeline_id = (timeline or {}).get("timeline_id")
+        if timeline_id:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM comp4200_timeline_items
+                WHERE timeline_id = %s
+                  AND is_deadline = TRUE
+                  AND COALESCE(is_archived, FALSE) = FALSE
+                """,
+                (timeline_id,),
+            )
+            milestone_total = int((cursor.fetchone() or {}).get("total") or 0)
+
+            cursor.execute("""
+                SELECT COUNT(*) AS tbl_exists
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'milestone_submissions'
+            """)
+            if (cursor.fetchone() or {}).get("tbl_exists"):
+                if project_id:
+                    submit_where = """
+                          AND (
+                                ms.project_id = %s
+                             OR ms.student_id = %s
+                             OR EXISTS (
+                                  SELECT 1
+                                  FROM project_members pm_team
+                                  WHERE pm_team.project_id = %s
+                                    AND pm_team.student_id = ms.student_id
+                                )
+                          )
+                    """
+                    submit_params = (project_id, student_id, project_id)
+                else:
+                    submit_where = " AND ms.student_id = %s"
+                    submit_params = (student_id,)
+
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(DISTINCT ms.item_id) AS submitted
+                    FROM milestone_submissions ms
+                    JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                    WHERE ti.timeline_id = %s
+                    {submit_where}
+                    """,
+                    (timeline_id, *submit_params),
+                )
+                milestone_submitted = int(
+                    (cursor.fetchone() or {}).get("submitted") or 0
+                )
+
+                cursor.execute(
+                    f"""
+                    SELECT ms.submitted_at, ti.title
+                    FROM milestone_submissions ms
+                    JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                    WHERE ti.timeline_id = %s
+                    {submit_where}
+                    ORDER BY ms.submitted_at DESC
+                    LIMIT 1
+                    """,
+                    (timeline_id, *submit_params),
+                )
+                last_row = cursor.fetchone() or {}
+                last_milestone_submission = _fmt_date(last_row.get("submitted_at"))
+                last_milestone_title = last_row.get("title") or ""
+    except Exception:
+        milestone_total = 0
+        milestone_submitted = 0
+        last_milestone_submission = ""
+        last_milestone_title = ""
+
+    total_steps = milestone_total + 1
+    completed_steps = min(milestone_submitted, milestone_total) + (
+        1 if final_report_uploaded else 0
+    )
+    overall = (
+        100
+        if final_report_uploaded
+        else round((completed_steps / total_steps) * 100) if total_steps else 0
+    )
+
+    return {
+        "submitted": min(milestone_submitted, milestone_total),
+        "total": milestone_total,
+        "final_report_uploaded": final_report_uploaded,
+        "last_submission": last_milestone_submission,
+        "last_submission_title": last_milestone_title,
+        "overall": overall,
+    }
+
+
+def _student_intro_timeline_deadlines(cursor, limit=5):
+    timeline = _student_published_intro_timeline(cursor)
+    timeline_id = (timeline or {}).get("timeline_id")
+    if not timeline_id:
+        return []
+
+    cursor.execute(
+        """
+        SELECT title, due_date
+        FROM comp4200_timeline_items
+        WHERE timeline_id = %s
+          AND is_deadline = TRUE
+          AND COALESCE(is_archived, FALSE) = FALSE
+          AND due_date >= CURDATE()
+        ORDER BY due_date ASC, item_order ASC, item_id ASC
+        LIMIT %s
+        """,
+        (timeline_id, limit),
+    )
+    return [
+        {
+            "label": row.get("title") or "Timeline milestone",
+            "date_str": _fmt_short(row.get("due_date")),
+            "deadline_type": "timeline",
+            "_sort": _as_date(row.get("due_date")),
+        }
+        for row in cursor.fetchall()
+    ]
+
+
+@student_bp.route("/timeline")
+@login_required(role="student")
+def timeline():
+    return render_template("student/timeline.html")
+
+
+@student_bp.route("/api/intro-timeline", methods=["GET"])
+@login_required(role="student")
+def api_student_intro_timeline():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        if not _student_intro_timeline_tables_ready(cursor):
+            cursor.close()
+            db.close()
+            return jsonify(
+                {
+                    "timeline": None,
+                    "items": [],
+                    "message": "The coordinator has not published the timeline yet.",
+                }
+            )
+        semester = _student_active_semester(cursor)
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify(
+                {"timeline": None, "items": [], "message": "No active semester found."}
+            )
+        timeline = _student_published_intro_timeline(cursor)
+        if not timeline:
+            cursor.close()
+            db.close()
+            return jsonify(
+                {
+                    "timeline": None,
+                    "items": [],
+                    "message": "The coordinator has not published the timeline yet.",
+                }
+            )
+        cursor.execute(
+            """
+            SELECT item_id, item_order, title, description, start_date, start_time, due_date, due_time, milestone_label, submitted_to, is_deadline
+            FROM comp4200_timeline_items
+            WHERE timeline_id = %s AND COALESCE(is_archived, FALSE) = FALSE AND is_deadline = TRUE
+            ORDER BY item_order ASC, due_date ASC, item_id ASC
+            """,
+            (timeline["timeline_id"],),
+        )
+        items = cursor.fetchall()
+        for item in items:
+            item["is_deadline"] = bool(item.get("is_deadline"))
+            # Combine date+time for frontend datetime-local display
+            s_date = str(item.get("start_date") or "")
+            s_time = (item.get("start_time") or "").strip()
+            item["start_date"] = f"{s_date}T{s_time}" if s_date and s_time else s_date
+            due_date_str = str(item.get("due_date") or "")
+            due_time_str = (item.get("due_time") or "").strip()
+            if due_date_str and due_time_str:
+                item["due_date"] = f"{due_date_str}T{due_time_str}"
+            else:
+                item["due_date"] = due_date_str
+        timeline["is_published"] = bool(timeline.get("is_published"))
+        cursor.close()
+        db.close()
+        return jsonify(_json_safe({"timeline": timeline, "items": items}))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ─── Registration ───────────────────────────────────────────
@@ -77,7 +866,30 @@ def submit():
         st_row = cursor.fetchone()
         student_id = st_row["student_id"] if st_row else None
 
-        # آخر مشروع للطالب — بغض النظر عن الـ status (draft أو submitted)
+        # تحديد الكورس الصح بناءً على نتيجة الطالب
+        cursor.execute(
+            """
+            SELECT scr.status AS course_status
+            FROM   student_course_results scr
+            JOIN   semesters s ON s.semester_id = scr.semester_id
+            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
+            ORDER  BY scr.semester_id DESC LIMIT 1
+            """,
+            (student_id,),
+        )
+        result_row = cursor.fetchone()
+        course_status = (result_row or {}).get("course_status", "pending")
+        target_course = "COMP4300" if course_status == "passed" else "COMP4200"
+
+        # جيب السمستر الأكتف للكورس الصح
+        cursor.execute(
+            "SELECT semester_id FROM semesters WHERE is_active = TRUE AND course_code = %s ORDER BY semester_id DESC LIMIT 1",
+            (target_course,),
+        )
+        sem_row = cursor.fetchone()
+        active_semester_id = sem_row["semester_id"] if sem_row else None
+
+        # جيب المشروع الخاص بهذا السمستر تحديداً
         cursor.execute(
             """
             SELECT p.project_id, p.status,
@@ -89,14 +901,14 @@ def submit():
             JOIN   students st   ON st.student_id = pm.student_id
             JOIN   projects p    ON p.project_id  = pm.project_id
             JOIN   semesters s   ON s.semester_id = p.semester_id
-                                AND s.is_active   = TRUE
             LEFT JOIN faculty f      ON f.faculty_id = p.supervisor_id
             LEFT JOIN users sup_u    ON sup_u.user_id = f.user_id
             WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             ORDER  BY p.project_id DESC
             LIMIT  1
             """,
-            (user_id,),
+            (user_id, active_semester_id),
         )
         project = cursor.fetchone()
 
@@ -104,15 +916,52 @@ def submit():
             academic_year = project["academic_year"]
             supervisor_name = project["supervisor_name"]
             is_my_submission = bool(project["is_primary_contact"])
+            is_team_member = True  # all members can upload files
             proj_title = project["title"] or ""
             proj_abstract = project["abstract"] or ""
             proj_keywords = project["keywords"] or ""
-            proj_type = project["project_type"] or ""
-            # MySQL SET columns come back as Python set — convert
-            if isinstance(proj_type, set):
-                proj_type = ",".join(sorted(proj_type))
+            proj_type = ""  # student must choose manually
+        elif active_semester_id:
+            # ما في مشروع بالسمستر الجديد → جيب السوبرفايزر والفريق من آخر مشروع قديم
+            cursor.execute(
+                """
+                SELECT p.project_id, p.title, p.project_type,
+                       s.academic_year,
+                       sup_u.full_name AS supervisor_name
+                FROM   project_members pm
+                JOIN   students st   ON st.student_id = pm.student_id
+                JOIN   projects p    ON p.project_id  = pm.project_id
+                JOIN   semesters s   ON s.semester_id = p.semester_id
+                LEFT JOIN faculty f      ON f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_u    ON sup_u.user_id = f.user_id
+                WHERE  st.user_id = %s
+                ORDER  BY p.project_id DESC
+                LIMIT  1
+                """,
+                (user_id,),
+            )
+            prev = cursor.fetchone()
+            if prev:
+                supervisor_name = prev["supervisor_name"]
+                academic_year = prev["academic_year"]
+                proj_title = prev["title"] or ""
+                proj_type = ""  # student must choose manually
+                # جيب الفريق من مشروع COMP4200 القديم — هم نفسهم
+                cursor.execute(
+                    """
+                    SELECT u.full_name, u.university_id
+                    FROM   project_members pm
+                    JOIN   students st ON st.student_id = pm.student_id
+                    JOIN   users    u  ON u.user_id     = st.user_id
+                    WHERE  pm.project_id = %s
+                    ORDER  BY pm.is_primary_contact DESC
+                    """,
+                    (prev["project_id"],),
+                )
+                team_members = cursor.fetchall()
 
-            # أعضاء الفريق
+        if project:
+            # أعضاء الفريق من المشروع الحالي
             cursor.execute(
                 """
                 SELECT u.full_name, u.university_id
@@ -127,7 +976,25 @@ def submit():
             team_members = cursor.fetchall()
 
             # إذا المشروع مسلَّم (مش draft) → جيب اسم من سلّم لكل أعضاء الفريق
-            if project["status"] not in ("draft",):
+            cursor.execute(
+                """
+                SELECT pf.uploaded_by, u.full_name
+                FROM   project_files pf
+                LEFT JOIN users u ON u.user_id = pf.uploaded_by
+                WHERE  pf.project_id = %s
+                  AND  pf.file_type = 'final_report'
+                  AND  pf.upload_status = 'uploaded'
+                ORDER  BY pf.uploaded_at DESC
+                LIMIT  1
+                """,
+                (project["project_id"],),
+            )
+            final_submission = cursor.fetchone()
+
+            # Registration/coordinator approval changes projects.status, but the
+            # submit page should only lock after a final report is uploaded.
+            if final_submission:
+                is_my_submission = final_submission.get("uploaded_by") == user_id
                 cursor.execute(
                     """
                     SELECT u.full_name
@@ -140,7 +1007,7 @@ def submit():
                     (project["project_id"],),
                 )
                 submitter = cursor.fetchone()
-                already_submitted_by = (
+                already_submitted_by = final_submission.get("full_name") or (
                     submitter["full_name"] if submitter else "your teammate"
                 )
 
@@ -163,18 +1030,192 @@ def submit():
     )
 
 
-# ─── Status ─────────────────────────────────────────────────
-@student_bp.route("/status")
-@login_required(role="student")
-def status():
-    return render_template("student/status.html")
-
-
 # ─── Feedback ───────────────────────────────────────────────
 @student_bp.route("/feedback")
 @login_required(role="student")
 def feedback():
     return render_template("student/feedback.html")
+
+
+@student_bp.route("/result")
+@login_required(role="student")
+def result():
+    user_id = session["user_id"]
+    result_data = None
+    history = []
+    error = None
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT st.student_id, u.full_name, u.university_id
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE st.user_id = %s
+            """,
+            (user_id,),
+        )
+        student = cursor.fetchone()
+        if not student:
+            cursor.close()
+            db.close()
+            return render_template(
+                "student/result.html",
+                result=None,
+                history=[],
+                error="Student record was not found.",
+            )
+
+        cursor.execute(
+            """
+            SELECT
+                scr.result_id,
+                scr.status AS course_status,
+                scr.notes,
+                scr.updated_at AS result_updated_at,
+                s.semester_id,
+                s.academic_year,
+                s.semester_number,
+                s.course_code,
+                s.end_date,
+                (
+                    SELECT p2.project_id
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS project_id,
+                (
+                    SELECT p2.title
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS project_title,
+                (
+                    SELECT p2.status
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS project_status,
+                (
+                    SELECT COALESCE(fd2.final_score, p2.final_score)
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS final_score,
+                (
+                    SELECT fd2.decision
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS final_decision,
+                (
+                    SELECT fd2.decided_at
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS decided_at,
+                (
+                    SELECT sup_u2.full_name
+                    FROM project_members pm2
+                    JOIN projects p2 ON p2.project_id = pm2.project_id
+                    LEFT JOIN faculty sup_f2 ON sup_f2.faculty_id = p2.supervisor_id
+                    LEFT JOIN users sup_u2 ON sup_u2.user_id = sup_f2.user_id
+                    WHERE pm2.student_id = scr.student_id
+                      AND p2.semester_id = scr.semester_id
+                    ORDER BY p2.project_id DESC
+                    LIMIT 1
+                ) AS supervisor_name
+            FROM student_course_results scr
+            JOIN semesters s ON s.semester_id = scr.semester_id
+            WHERE scr.student_id = %s
+            ORDER BY s.semester_id DESC
+            LIMIT 1
+            """,
+            (student["student_id"],),
+        )
+        result_data = cursor.fetchone()
+
+        if result_data:
+            result_data["student_name"] = student["full_name"]
+            result_data["university_id"] = student["university_id"]
+            if result_data.get("final_score") is not None:
+                result_data["final_score"] = float(result_data["final_score"])
+
+            cursor.execute(
+                """
+                SELECT
+                    scr.result_id,
+                    scr.status AS course_status,
+                    scr.updated_at AS result_updated_at,
+                    s.academic_year,
+                    s.semester_number,
+                    s.course_code,
+                    (
+                        SELECT p2.title
+                        FROM project_members pm2
+                        JOIN projects p2 ON p2.project_id = pm2.project_id
+                        WHERE pm2.student_id = scr.student_id
+                          AND p2.semester_id = scr.semester_id
+                        ORDER BY p2.project_id DESC
+                        LIMIT 1
+                    ) AS project_title,
+                    (
+                        SELECT COALESCE(fd2.final_score, p2.final_score)
+                        FROM project_members pm2
+                        JOIN projects p2 ON p2.project_id = pm2.project_id
+                        LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+                        WHERE pm2.student_id = scr.student_id
+                          AND p2.semester_id = scr.semester_id
+                        ORDER BY p2.project_id DESC
+                        LIMIT 1
+                    ) AS final_score
+                FROM student_course_results scr
+                JOIN semesters s ON s.semester_id = scr.semester_id
+                WHERE scr.student_id = %s
+                ORDER BY s.semester_id DESC
+                """,
+                (student["student_id"],),
+            )
+            history = cursor.fetchall()
+            for item in history:
+                if item.get("final_score") is not None:
+                    item["final_score"] = float(item["final_score"])
+
+        cursor.close()
+        db.close()
+    except Exception as e:
+        error = str(e)
+
+    return render_template(
+        "student/result.html",
+        result=result_data,
+        history=history,
+        error=error,
+    )
 
 
 # ─── Challenges page ────────────────────────────────────────
@@ -203,6 +1244,85 @@ def _get_student_project(user_id):
     cursor.close()
     db.close()
     return row  # None if student has no project yet
+
+
+# ─── Helper: check if submission window is still open ───────
+def _is_submission_open(cursor, semester_id, project_id):
+    """Returns True if the file_submission deadline hasn't passed yet.
+    Also returns True if there is an active 'final report/submission'
+    timeline milestone (timeline controls the window in that case).
+    If no deadline configured at all, submission is considered open."""
+    from datetime import date, datetime as _dt
+
+    # ── Check if an active final-report timeline milestone exists ──
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN ('comp4200_timelines','comp4200_timeline_items')
+        """)
+        if int((cursor.fetchone() or {}).get("cnt") or 0) >= 2:
+            now = _dt.now()
+            cursor.execute("""
+                SELECT ti.due_date, ti.due_time, ti.start_date, ti.start_time
+                FROM comp4200_timeline_items ti
+                JOIN comp4200_timelines t ON t.timeline_id = ti.timeline_id
+                WHERE t.is_published = TRUE
+                  AND ti.is_deadline = TRUE
+                  AND COALESCE(ti.is_archived, FALSE) = FALSE
+                  AND (LOWER(ti.title) LIKE '%final report%'
+                    OR LOWER(ti.title) LIKE '%final submission%')
+            """)
+            for item in cursor.fetchall():
+                # Build start datetime
+                s_d = item.get("start_date")
+                s_t = (item.get("start_time") or "").strip()
+                if s_d and s_t:
+                    try:
+                        start_dt = _dt.strptime(f"{s_d} {s_t}", "%Y-%m-%d %H:%M")
+                    except:
+                        start_dt = _dt(s_d.year, s_d.month, s_d.day, 0, 0)
+                elif s_d:
+                    start_dt = _dt(s_d.year, s_d.month, s_d.day, 0, 0)
+                else:
+                    start_dt = None
+                # Build due datetime
+                d_d = item.get("due_date")
+                d_t = (item.get("due_time") or "").strip()
+                if d_d and d_t:
+                    try:
+                        due_dt = _dt.strptime(f"{d_d} {d_t}", "%Y-%m-%d %H:%M")
+                    except:
+                        due_dt = _dt(d_d.year, d_d.month, d_d.day, 23, 59)
+                elif d_d:
+                    due_dt = _dt(d_d.year, d_d.month, d_d.day, 23, 59)
+                else:
+                    due_dt = None
+                # Window open?
+                if start_dt and now < start_dt:
+                    continue
+                if due_dt and now > due_dt:
+                    continue
+                return True  # active final milestone → allow upload
+    except Exception:
+        pass
+
+    # ── Fall back to deadlines table ───────────────────────────────
+    cursor.execute(
+        """
+        SELECT MIN(deadline_date) AS deadline
+        FROM   deadlines
+        WHERE  semester_id = %s
+          AND  (project_id IS NULL OR project_id = %s)
+          AND  deadline_type = 'file_submission'
+        """,
+        (semester_id, project_id),
+    )
+    row = cursor.fetchone()
+    if not row or not row.get("deadline"):
+        return True  # no deadline configured → open
+    return _as_date(row["deadline"]) >= date.today()
 
 
 # ─── API: list challenges for the team ──────────────────────
@@ -286,6 +1406,23 @@ def api_challenges_add():
         db.commit()
         new_id = cursor.lastrowid
 
+        # notify the rest of the team
+        type_label = {
+            "technical": "Technical Challenge",
+            "administrative": "Administrative Challenge",
+            "reflection": "Reflection",
+        }.get(ch_type, "Challenge")
+        _notify_project_team(
+            cursor,
+            project_id=info["project_id"],
+            sender_id=user_id,
+            title=f"New {type_label} Added",
+            message=f'A team member added a new {type_label.lower()}: "{title}"',
+            notification_type="system",
+            exclude_user_id=user_id,
+        )
+        db.commit()
+
         # return the inserted row with full_name
         cursor.execute(
             """
@@ -354,6 +1491,29 @@ def api_challenges_update(challenge_id):
             (ch_type, title, details, solution, challenge_id),
         )
         db.commit()
+
+        # notify the rest of the team about the update
+        type_label = {
+            "technical": "Technical Challenge",
+            "administrative": "Administrative Challenge",
+            "reflection": "Reflection",
+        }.get(ch_type, "Challenge")
+        cursor.execute(
+            "SELECT project_id FROM challenges_reflections WHERE challenge_id = %s",
+            (challenge_id,),
+        )
+        proj = cursor.fetchone()
+        if proj:
+            _notify_project_team(
+                cursor,
+                project_id=proj["project_id"],
+                sender_id=user_id,
+                title=f"{type_label} Updated",
+                message=f'A team member updated a {type_label.lower()}: "{title}"',
+                notification_type="system",
+                exclude_user_id=user_id,
+            )
+            db.commit()
 
         # return updated row
         cursor.execute(
@@ -472,18 +1632,25 @@ def api_submit_info():
         )
         target_sem = cursor.fetchone()
 
-        # If COMP4300 active semester not found, fallback to COMP4200
-        if not target_sem and target_course == "COMP4300":
-            cursor.execute("""
-                SELECT semester_id, academic_year, course_code
-                FROM   semesters
-                WHERE  is_active = TRUE AND course_code = 'COMP4200'
-                ORDER  BY semester_id DESC LIMIT 1
-                """)
-            target_sem = cursor.fetchone()
-            target_course = "COMP4200"
+        if not target_sem:
+            cursor.close()
+            db.close()
+            return (
+                jsonify(
+                    {
+                        "project": None,
+                        "files": [],
+                        "course_status": course_status,
+                        "target_course": target_course,
+                        "target_semester_id": None,
+                        "target_academic_year": "",
+                        "error": f"No active {target_course} semester found.",
+                    }
+                ),
+                400,
+            )
 
-        # Get current project for this student (any active semester)
+        # Get current project — بس من السمستر الأكتف الصح (COMP4200 أو COMP4300)
         cursor.execute(
             """
             SELECT p.project_id, p.title, p.title_en, p.abstract, p.keywords,
@@ -495,22 +1662,23 @@ def api_submit_info():
             FROM   project_members pm
             JOIN   students st  ON st.student_id = pm.student_id
             JOIN   projects p   ON p.project_id  = pm.project_id
-            JOIN   semesters s  ON s.semester_id  = p.semester_id
+            JOIN   semesters s  ON s.semester_id  = p.semester_id AND s.is_active = TRUE
             LEFT JOIN faculty f ON f.faculty_id   = p.supervisor_id
             LEFT JOIN users sup_u ON sup_u.user_id = f.user_id
             LEFT JOIN project_members pm2 ON pm2.project_id = p.project_id
             LEFT JOIN students st2 ON st2.student_id = pm2.student_id
             LEFT JOIN users u2 ON u2.user_id = st2.user_id
             WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             GROUP  BY p.project_id
             ORDER  BY p.project_id DESC
             LIMIT  1
             """,
-            (user_id,),
+            (user_id, target_sem["semester_id"]),
         )
         project = cursor.fetchone()
 
-        # Get uploaded files for the project
+        # Get uploaded files — بس من نفس السمستر الحالي
         files = []
         if project:
             cursor.execute(
@@ -571,7 +1739,11 @@ def api_submit_project():
     title = (data.get("title") or "").strip()
     abstract = (data.get("abstract") or "").strip() or None
     keywords = (data.get("keywords") or "").strip() or None
-    proj_type = (data.get("project_type") or "software_engineering").strip()
+    # Project type is no longer entered by the student in the submit form.
+    # The database column is NOT NULL, so the backend keeps the existing DB value
+    # when updating a draft/submission. For a brand-new project, it silently uses
+    # a safe default value instead of asking the student.
+    proj_type = (data.get("project_type") or "").strip()
 
     if not title:
         return jsonify({"error": "Project title is required."}), 400
@@ -585,8 +1757,19 @@ def api_submit_project():
         "databases",
         "other",
     }
-    if proj_type not in valid_types:
-        proj_type = "software_engineering"
+
+    def normalize_project_type(value, default="web"):
+        if isinstance(value, set):
+            parts = [str(v).strip().lower() for v in value if str(v).strip()]
+            return ",".join(p for p in parts if p in valid_types) or default
+        value = str(value or "").strip().lower()
+        if not value:
+            return default
+        parts = [p.strip() for p in value.split(",") if p.strip()]
+        parts = [p for p in parts if p in valid_types]
+        return ",".join(parts) if parts else default
+
+    proj_type = normalize_project_type(proj_type, default="web")
 
     try:
         db = get_db()
@@ -628,37 +1811,51 @@ def api_submit_project():
         )
         target_sem = cursor.fetchone()
 
-        # Fallback: if COMP4300 not found, use COMP4200
-        if not target_sem and target_course == "COMP4300":
-            cursor.execute("""
-                SELECT semester_id, academic_year, course_code
-                FROM   semesters
-                WHERE  is_active = TRUE AND course_code = 'COMP4200'
-                ORDER  BY semester_id DESC LIMIT 1
-                """)
-            target_sem = cursor.fetchone()
-            target_course = "COMP4200"
-
         if not target_sem:
             cursor.close()
             db.close()
-            return jsonify({"error": "No active semester found."}), 400
+            return jsonify({"error": f"No active {target_course} semester found."}), 400
 
         semester_id = target_sem["semester_id"]
 
         # ── Check if student already has a project in this semester ──
         cursor.execute(
             """
-            SELECT p.project_id, p.status
+            SELECT p.project_id, p.status, p.project_type
             FROM   project_members pm
             JOIN   students st ON st.student_id = pm.student_id
             JOIN   projects p  ON p.project_id  = pm.project_id
-            WHERE  st.user_id = %s AND p.semester_id = %s
+            WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             ORDER  BY p.project_id DESC LIMIT 1
             """,
             (user_id, semester_id),
         )
         existing = cursor.fetchone()
+
+        final_submission = None
+        if existing:
+            cursor.execute(
+                """
+                SELECT pf.uploaded_by, u.full_name
+                FROM   project_files pf
+                LEFT JOIN users u ON u.user_id = pf.uploaded_by
+                WHERE  pf.project_id = %s
+                  AND  pf.file_type = 'final_report'
+                  AND  pf.upload_status = 'uploaded'
+                ORDER  BY pf.uploaded_at DESC
+                LIMIT  1
+                """,
+                (existing["project_id"],),
+            )
+            final_submission = cursor.fetchone()
+
+        # If the form did not send a project_type, keep the type already stored
+        # on the draft project instead of changing it.
+        if existing and not (data.get("project_type") or "").strip():
+            proj_type = normalize_project_type(
+                existing.get("project_type"), default="web"
+            )
 
         if not existing:
             # ── تحقق: هل زميل في نفس الفريق سبق وسلّم؟ ──
@@ -718,7 +1915,7 @@ def api_submit_project():
 
         if existing:
             # ── إذا المشروع draft → أي عضو يقدر يسلم ويصير primary contact ──
-            if existing["status"] == "draft":
+            if not final_submission:
                 # حوّل الكل لـ 0 ثم اجعل هذا الطالب primary
                 cursor.execute(
                     "UPDATE project_members SET is_primary_contact = 0 WHERE project_id = %s",
@@ -741,18 +1938,11 @@ def api_submit_project():
                 action = "created"
 
             else:
-                # المشروع مسلَّم → تحقق إنه هو من أنشأه
-                cursor.execute(
-                    """
-                    SELECT is_primary_contact
-                    FROM   project_members
-                    WHERE  project_id = %s AND student_id = %s
-                    """,
-                    (existing["project_id"], student_id),
-                )
-                membership = cursor.fetchone()
+                # المشروع مسلَّم → بس اللي رفع الملف يقدر يعدّل
+                uploaded_by = final_submission.get("uploaded_by")
+                can_update_submission = uploaded_by == user_id
 
-                if not membership or not membership["is_primary_contact"]:
+                if not can_update_submission:
                     cursor.execute(
                         """
                         SELECT u.full_name
@@ -765,7 +1955,9 @@ def api_submit_project():
                         (existing["project_id"],),
                     )
                     submitter = cursor.fetchone()
-                    name = submitter["full_name"] if submitter else "your teammate"
+                    name = final_submission.get("full_name") or (
+                        submitter["full_name"] if submitter else "your teammate"
+                    )
                     cursor.close()
                     db.close()
                     return (
@@ -782,6 +1974,21 @@ def api_submit_project():
                         409,
                     )
 
+                # ── فحص نافذة التسليم ──────────────────────────────────────
+                if not _is_submission_open(cursor, semester_id, existing["project_id"]):
+                    cursor.close()
+                    db.close()
+                    return (
+                        jsonify(
+                            {
+                                "error": "The submission window has closed. You can no longer edit your submission.",
+                                "already_submitted_by_team": True,
+                                "project_id": existing["project_id"],
+                            }
+                        ),
+                        403,
+                    )
+
                 cursor.execute(
                     """
                     UPDATE projects
@@ -795,13 +2002,31 @@ def api_submit_project():
                 action = "updated"
         else:
             # Insert new project
+            # ── جيب السوبرفايزر والزملاء من آخر مشروع قديم للطالب ──
+            cursor.execute(
+                """
+                SELECT p.project_id, p.supervisor_id
+                FROM   project_members pm
+                JOIN   students st ON st.student_id = pm.student_id
+                JOIN   projects p  ON p.project_id  = pm.project_id
+                WHERE  st.user_id = %s
+                ORDER  BY p.project_id DESC
+                LIMIT  1
+                """,
+                (user_id,),
+            )
+            prev_project = cursor.fetchone()
+            prev_supervisor_id = prev_project["supervisor_id"] if prev_project else None
+            prev_project_id = prev_project["project_id"] if prev_project else None
+
             cursor.execute(
                 """
                 INSERT INTO projects
-                    (title, abstract, keywords, project_type, semester_id, status, submission_date)
-                VALUES (%s, %s, %s, %s, %s, 'submitted', CURDATE())
+                    (title, abstract, keywords, project_type, semester_id,
+                     supervisor_id, status, submission_date)
+                VALUES (%s, %s, %s, %s, %s, %s, 'submitted', CURDATE())
                 """,
-                (title, abstract, keywords, proj_type, semester_id),
+                (title, abstract, keywords, proj_type, semester_id, prev_supervisor_id),
             )
             project_id = cursor.lastrowid
 
@@ -811,7 +2036,7 @@ def api_submit_project():
                 (project_id, student_id),
             )
 
-            # ── ربط الزملاء تلقائياً من student_groups ──
+            # ── ربط الزملاء تلقائياً من student_groups أولاً ──
             # هذا يضمن أن أي زميل يحاول يسلم لاحقاً سيجد مشروعاً موجوداً باسمه
             cursor.execute(
                 """
@@ -823,6 +2048,19 @@ def api_submit_project():
                 (student_id, student_id),
             )
             teammates = cursor.fetchall()
+
+            # ── إذا student_groups فاضي، جيب الزملاء من المشروع القديم ──
+            if not teammates and prev_project_id:
+                cursor.execute(
+                    """
+                    SELECT pm.student_id
+                    FROM   project_members pm
+                    WHERE  pm.project_id = %s AND pm.student_id != %s
+                    """,
+                    (prev_project_id, student_id),
+                )
+                teammates = cursor.fetchall()
+
             for tm in teammates:
                 cursor.execute(
                     """
@@ -834,6 +2072,9 @@ def api_submit_project():
                 )
 
             action = "created"
+
+        # ── Sync lifecycle after registration ──
+        _sync_lifecycle(cursor, project_id)
 
         db.commit()
         cursor.close()
@@ -859,7 +2100,7 @@ def api_submit_project():
 def api_upload_file():
     """
     Accept a file upload (report / source_code / presentation),
-    save to disk and record in project_files.
+    store it in project_files so the archive and AI training use the same file.
     """
     user_id = session["user_id"]
     file_type = request.form.get("file_type", "").strip()
@@ -927,29 +2168,22 @@ def api_upload_file():
             (target_course,),
         )
         sem_row = cursor.fetchone()
-        if not sem_row and target_course == "COMP4300":
-            cursor.execute("""
-                SELECT semester_id FROM semesters
-                WHERE  is_active = TRUE AND course_code = 'COMP4200'
-                ORDER  BY semester_id DESC LIMIT 1
-            """)
-            sem_row = cursor.fetchone()
-            target_course = "COMP4200"
 
         if not sem_row:
             cursor.close()
             db.close()
-            return jsonify({"error": "No active semester found."}), 400
+            return jsonify({"error": f"No active {target_course} semester found."}), 400
         active_semester_id = sem_row["semester_id"]
 
         # جيب الـ project المرتبط بهذا الطالب وهذا السمستر تحديداً
         cursor.execute(
             """
-            SELECT pm.project_id
+            SELECT pm.project_id, p.title
             FROM   project_members pm
             JOIN   projects p ON p.project_id = pm.project_id
             JOIN   students st ON st.student_id = pm.student_id
-            WHERE  st.user_id = %s AND p.semester_id = %s
+            WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             ORDER  BY pm.project_id DESC LIMIT 1
             """,
             (user_id, active_semester_id),
@@ -967,6 +2201,45 @@ def api_upload_file():
                 400,
             )
         project_id = row["project_id"]
+        project_title = row.get("title") or "your team project"
+
+        # ── فحص نافذة التسليم (deadline) ─────────────────────────
+        if not _is_submission_open(cursor, active_semester_id, project_id):
+            cursor.close()
+            db.close()
+            return (
+                jsonify(
+                    {
+                        "error": "The submission window has closed. No more uploads are allowed."
+                    }
+                ),
+                403,
+            )
+
+        cursor.execute(
+            """
+            SELECT uploaded_by
+            FROM   project_files
+            WHERE  project_id = %s
+              AND  file_type = 'final_report'
+              AND  upload_status = 'uploaded'
+            LIMIT  1
+            """,
+            (project_id,),
+        )
+        final_submission = cursor.fetchone()
+        had_final_submission = bool(final_submission)
+        if final_submission and final_submission.get("uploaded_by") != user_id:
+            cursor.close()
+            db.close()
+            return (
+                jsonify(
+                    {
+                        "error": "This project has already been submitted by another team member."
+                    }
+                ),
+                403,
+            )
 
         # Read file bytes into memory (already size-checked above)
         file_bytes = f.read()
@@ -992,6 +2265,22 @@ def api_upload_file():
             """,
             (project_id, file_type, safe_name, file_bytes, mime_type, size_mb, user_id),
         )
+
+        if file_type == "final_report" and not had_final_submission:
+            actor_name = session.get("full_name") or "A teammate"
+            _notify_project_team(
+                cursor,
+                project_id,
+                user_id,
+                "Project submitted",
+                f'{actor_name} submitted the final report for "{project_title}".',
+                notification_type="file_uploaded",
+                exclude_user_id=user_id,
+            )
+
+        # ── Sync lifecycle after file upload ──
+        _sync_lifecycle(cursor, project_id)
+
         db.commit()
         cursor.close()
         db.close()
@@ -1125,14 +2414,911 @@ def api_clear_submission():
         return jsonify({"error": str(e)}), 500
 
 
-# ─── Search ─────────────────────────────────────────────────
-@student_bp.route("/search")
+# ─── API: milestone submission (timeline items) ─────────────
+@student_bp.route("/api/milestone-submit", methods=["POST"])
 @login_required(role="student")
-def search():
-    return render_template("student/search.html")
+def api_milestone_submit():
+    """
+    Upload a file for a specific timeline milestone item.
+    Determines submitted_to (supervisor/coordinator) from milestone_label.
+    Creates milestone_submissions table if it does not exist yet.
+    """
+    user_id = session["user_id"]
+    item_id = request.form.get("item_id", "").strip()
+
+    if not item_id or not item_id.isdigit():
+        return jsonify({"error": "Invalid milestone item."}), 400
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided."}), 400
+
+    f = request.files["file"]
+    if not f or not f.filename:
+        return jsonify({"error": "Empty file."}), 400
+
+    # Size check (max 50 MB)
+    f.seek(0, 2)
+    size_bytes = f.tell()
+    f.seek(0)
+    MAX_MB = 50
+    if size_bytes > MAX_MB * 1024 * 1024:
+        return jsonify({"error": f"File exceeds {MAX_MB} MB limit."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # ── تأكد إن الجدول موجود ──────────────────────────────────
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS milestone_submissions (
+                submission_id  INT          PRIMARY KEY AUTO_INCREMENT,
+                item_id        INT          NOT NULL,
+                student_id     INT          NOT NULL,
+                project_id     INT          NULL,
+                file_name      VARCHAR(255) NOT NULL,
+                file_data      LONGBLOB     NOT NULL,
+                file_mime      VARCHAR(120) NOT NULL,
+                file_size_mb   DECIMAL(6,2) NULL,
+                submitted_to   ENUM('supervisor','coordinator','both')
+                               NOT NULL DEFAULT 'supervisor',
+                submitted_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                item_title     VARCHAR(255) NULL,
+                item_label     VARCHAR(180) NULL,
+                INDEX idx_ms_item    (item_id),
+                INDEX idx_ms_student (student_id),
+                FOREIGN KEY (item_id)
+                    REFERENCES comp4200_timeline_items(item_id)
+                    ON DELETE CASCADE,
+                FOREIGN KEY (student_id)
+                    REFERENCES students(student_id)
+                    ON DELETE CASCADE,
+                FOREIGN KEY (project_id)
+                    REFERENCES projects(project_id)
+                    ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        # Migration: add snapshot columns if not exist (use existing dictionary cursor)
+        for _col, _col_def in [
+            ("item_title", "VARCHAR(255) NULL"),
+            ("item_label", "VARCHAR(180) NULL"),
+        ]:
+            try:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='milestone_submissions' AND COLUMN_NAME=%s
+                """,
+                    (_col,),
+                )
+                _row = cursor.fetchone() or {}
+                if not int(_row.get("cnt") or 0):
+                    cursor.execute(
+                        f"ALTER TABLE milestone_submissions ADD COLUMN {_col} {_col_def}"
+                    )
+            except Exception:
+                pass
+        # ── جيب بيانات الطالب ─────────────────────────────────────
+        cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
+        st_row = cursor.fetchone()
+        if not st_row:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Student record not found."}), 404
+        student_id = st_row["student_id"]
+
+        # ── جيب بيانات الـ milestone item ─────────────────────────
+        cursor.execute(
+            """
+            SELECT item_id, title, milestone_label, submitted_to, start_date, start_time, due_date, due_time, is_archived
+            FROM comp4200_timeline_items
+            WHERE item_id = %s
+            """,
+            (int(item_id),),
+        )
+        item = cursor.fetchone()
+        if not item:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Timeline item not found."}), 404
+
+        from datetime import date as _date, datetime as _datetime
+
+        now = _datetime.now()
+        today = _date.today()
+
+        # Build start datetime with time if available
+        start_date_val = _as_date(item.get("start_date"))
+        start_time_str = (item.get("start_time") or "").strip()
+        if start_date_val and start_time_str:
+            try:
+                start_dt = _datetime.strptime(
+                    f"{start_date_val} {start_time_str}", "%Y-%m-%d %H:%M"
+                )
+            except ValueError:
+                start_dt = _datetime(
+                    start_date_val.year, start_date_val.month, start_date_val.day, 0, 0
+                )
+        elif start_date_val:
+            start_dt = _datetime(
+                start_date_val.year, start_date_val.month, start_date_val.day, 0, 0
+            )
+        else:
+            start_dt = None
+
+        # Build due datetime: combine due_date + due_time if available
+        due_date_val = _as_date(item.get("due_date"))
+        due_time_str = (item.get("due_time") or "").strip()
+        if due_date_val and due_time_str:
+            try:
+                due_dt = _datetime.strptime(
+                    f"{due_date_val} {due_time_str}", "%Y-%m-%d %H:%M"
+                )
+            except ValueError:
+                due_dt = _datetime(
+                    due_date_val.year, due_date_val.month, due_date_val.day, 23, 59
+                )
+        elif due_date_val:
+            due_dt = _datetime(
+                due_date_val.year, due_date_val.month, due_date_val.day, 23, 59
+            )
+        else:
+            due_dt = None
+
+        if start_dt and now < start_dt:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "The submission window has not opened yet."}), 403
+
+        if due_dt and now > due_dt:
+            cursor.close()
+            db.close()
+            return (
+                jsonify(
+                    {
+                        "error": "The submission window has closed. No more uploads are allowed."
+                    }
+                ),
+                403,
+            )
+
+        # ── submitted_to مخزن مباشرة في الـ item ─────────────────
+        submitted_to = (item.get("submitted_to") or "supervisor").strip().lower()
+        if submitted_to not in ("supervisor", "coordinator", "both"):
+            submitted_to = "supervisor"
+
+        # ── جيب project_id الحالي للطالب (optional) ───────────────
+        cursor.execute(
+            """
+            SELECT pm.project_id, p.title
+            FROM   project_members pm
+            JOIN   projects p  ON p.project_id  = pm.project_id
+            JOIN   semesters s ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            JOIN   students st ON st.student_id  = pm.student_id
+            WHERE  st.user_id = %s
+            ORDER  BY pm.project_id DESC LIMIT 1
+            """,
+            (user_id,),
+        )
+        proj_row = cursor.fetchone()
+        project_id = proj_row["project_id"] if proj_row else None
+        project_title = (proj_row or {}).get("title") or "your team project"
+
+        if project_id:
+            cursor.execute(
+                """
+                SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
+                FROM   milestone_submissions ms
+                JOIN   students st ON st.student_id = ms.student_id
+                JOIN   users    u  ON u.user_id     = st.user_id
+                WHERE  ms.item_id = %s
+                  AND  ms.project_id = %s
+                ORDER  BY ms.submitted_at DESC
+                LIMIT  1
+                """,
+                (int(item_id), project_id),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
+                FROM   milestone_submissions ms
+                JOIN   students st ON st.student_id = ms.student_id
+                JOIN   users    u  ON u.user_id     = st.user_id
+                WHERE  ms.item_id = %s
+                  AND  ms.student_id = %s
+                ORDER  BY ms.submitted_at DESC
+                LIMIT  1
+                """,
+                (int(item_id), student_id),
+            )
+        existing_submission = cursor.fetchone()
+        is_resubmit = False  # هل هذا تعديل من نفس الطالب؟
+
+        if existing_submission:
+            submitted_by = existing_submission.get("submitted_by") or "a teammate"
+            original_student_id = existing_submission.get("student_id")
+
+            if original_student_id != student_id:
+                # طالب ثاني يحاول يسلم → امنع
+                cursor.close()
+                db.close()
+                return (
+                    jsonify(
+                        {
+                            "error": f"This timeline milestone has already been submitted by {submitted_by}. Only one submission is allowed per team.",
+                            "already_submitted_by_team": True,
+                            "submitted_by": submitted_by,
+                        }
+                    ),
+                    409,
+                )
+
+            # نفس الطالب → تحقق إن الـ deadline ما فات
+            if due_dt and _datetime.now() > due_dt:
+                cursor.close()
+                db.close()
+                return (
+                    jsonify(
+                        {
+                            "error": "The deadline for this milestone has passed. You can no longer update your submission.",
+                        }
+                    ),
+                    403,
+                )
+
+            # مسموح بالتعديل → احذف القديم وارفع الجديد
+            cursor.execute(
+                "DELETE FROM milestone_submissions WHERE submission_id = %s",
+                (existing_submission["submission_id"],),
+            )
+            is_resubmit = True
+
+        # ── احفظ الملف ────────────────────────────────────────────
+        file_bytes = f.read()
+        safe_name = secure_filename(f.filename)
+        mime_type = f.mimetype or "application/octet-stream"
+        size_mb = round(size_bytes / (1024 * 1024), 2)
+
+        cursor.execute(
+            """
+            INSERT INTO milestone_submissions
+                (item_id, student_id, project_id, file_name,
+                 file_data, file_mime, file_size_mb, submitted_to,
+                 item_title, item_label)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                int(item_id),
+                student_id,
+                project_id,
+                safe_name,
+                file_bytes,
+                mime_type,
+                size_mb,
+                submitted_to,
+                item.get("title") or "",
+                item.get("milestone_label") or "",
+            ),
+        )
+        if project_id:
+            actor_name = session.get("full_name") or "A teammate"
+            milestone_title = item.get("title") or "a timeline milestone"
+            _notify_project_team(
+                cursor,
+                project_id,
+                user_id,
+                "Timeline milestone submitted",
+                f'{actor_name} submitted "{milestone_title}" for "{project_title}".',
+                notification_type="file_uploaded",
+                exclude_user_id=user_id,
+            )
+        db.commit()
+        submission_id = cursor.lastrowid
+        cursor.close()
+        db.close()
+
+        return jsonify(
+            {
+                "success": True,
+                "submission_id": submission_id,
+                "file_name": safe_name,
+                "size_mb": size_mb,
+                "submitted_to": submitted_to,
+                "milestone": item.get("title") or "",
+                "is_resubmit": is_resubmit,
+            }
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-# ─── Notifications ──────────────────────────────────────────
+# ─── API: get my milestone submissions ──────────────────────
+@student_bp.route("/api/milestone-submissions", methods=["GET"])
+@login_required(role="student")
+def api_milestone_submissions_list():
+    """Return all milestone submissions for the current student."""
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
+        st_row = cursor.fetchone()
+        if not st_row:
+            cursor.close()
+            db.close()
+            return jsonify({"submissions": []})
+        student_id = st_row["student_id"]
+
+        cursor.execute("""
+            SELECT COUNT(*) AS tbl_exists
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'milestone_submissions'
+        """)
+        if not (cursor.fetchone() or {}).get("tbl_exists"):
+            cursor.close()
+            db.close()
+            return jsonify({"submissions": []})
+
+        cursor.execute(
+            """
+            SELECT pm.project_id
+            FROM   project_members pm
+            JOIN   projects p  ON p.project_id  = pm.project_id
+            JOIN   semesters s ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            WHERE  pm.student_id = %s
+            ORDER  BY pm.project_id DESC
+            LIMIT  1
+            """,
+            (student_id,),
+        )
+        proj_row = cursor.fetchone()
+        project_id = proj_row["project_id"] if proj_row else None
+
+        if project_id:
+            cursor.execute(
+                """
+                SELECT ms.submission_id, ms.item_id, ms.file_name,
+                       ms.file_size_mb, ms.submitted_to, ms.submitted_at,
+                       ti.title AS milestone_title,
+                       u.full_name AS submitted_by,
+                       (ms.student_id = %s) AS submitted_by_me
+                FROM   milestone_submissions ms
+                JOIN   comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                JOIN   students st ON st.student_id = ms.student_id
+                JOIN   users    u  ON u.user_id     = st.user_id
+                WHERE  ms.project_id = %s
+                ORDER  BY ms.submitted_at DESC
+                """,
+                (student_id, project_id),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT ms.submission_id, ms.item_id, ms.file_name,
+                       ms.file_size_mb, ms.submitted_to, ms.submitted_at,
+                       ti.title AS milestone_title,
+                       u.full_name AS submitted_by,
+                       TRUE AS submitted_by_me
+                FROM   milestone_submissions ms
+                JOIN   comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                JOIN   students st ON st.student_id = ms.student_id
+                JOIN   users    u  ON u.user_id     = st.user_id
+                WHERE  ms.student_id = %s
+                ORDER  BY ms.submitted_at DESC
+                """,
+                (student_id,),
+            )
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        for r in rows:
+            if r.get("submitted_at"):
+                r["submitted_at"] = str(r["submitted_at"])
+            r["submitted_by_me"] = bool(r.get("submitted_by_me"))
+
+        return jsonify({"submissions": rows})
+    except Exception as e:
+        return jsonify({"submissions": [], "error": str(e)})
+
+
+@student_bp.route("/api/supervisors", methods=["GET"])
+@login_required(role="student")
+def api_student_supervisors():
+    """Return list of supervisors for the registration form."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT f.faculty_id, u.full_name,
+                   COUNT(DISTINCT p.project_id) AS assigned_projects
+            FROM   faculty f
+            JOIN   users u ON u.user_id = f.user_id
+            LEFT JOIN projects p ON p.supervisor_id = f.faculty_id
+            WHERE  u.role = 'supervisor'
+            GROUP  BY f.faculty_id, u.full_name
+            ORDER  BY u.full_name
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+        return jsonify({"supervisors": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ═══════════════════════════════════════════════════════════════
+# REGISTRATION APIs  (moved from app.py)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _get_active_semester_st(cursor):
+    """Local copy of _get_active_semester for student blueprint."""
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number, course_code,
+               COALESCE(distribution_open, 0) AS distribution_open,
+               distribution_opened_at, distribution_closed_at
+        FROM semesters
+        WHERE is_active = TRUE
+        ORDER BY semester_id DESC
+        LIMIT 1
+    """)
+    return cursor.fetchone()
+
+
+@student_bp.route("/api/registration-check", methods=["GET"])
+@login_required(role="student")
+def api_student_registration_check():
+    user_id = session.get("user_id")
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester_st(cursor)
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify(
+                {"registered": False, "project": None, "distribution_open": False}
+            )
+
+        cursor.execute(
+            """
+            SELECT
+                p.project_id,
+                p.title, p.status, p.submission_date,
+                pref1.full_name AS preferred_1,
+                pref2.full_name AS preferred_2,
+                pref3.full_name AS preferred_3,
+                GROUP_CONCAT(u2.full_name ORDER BY pm2.is_primary_contact DESC SEPARATOR ', ') AS team_members
+            FROM project_members pm
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN projects p  ON p.project_id  = pm.project_id
+            JOIN semesters s ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            LEFT JOIN faculty f1  ON f1.faculty_id = p.preferred_supervisor_1
+            LEFT JOIN users pref1 ON pref1.user_id = f1.user_id
+            LEFT JOIN faculty f2  ON f2.faculty_id = p.preferred_supervisor_2
+            LEFT JOIN users pref2 ON pref2.user_id = f2.user_id
+            LEFT JOIN faculty f3  ON f3.faculty_id = p.preferred_supervisor_3
+            LEFT JOIN users pref3 ON pref3.user_id = f3.user_id
+            LEFT JOIN project_members pm2 ON pm2.project_id = p.project_id
+            LEFT JOIN students st2        ON st2.student_id  = pm2.student_id
+            LEFT JOIN users u2            ON u2.user_id      = st2.user_id
+            WHERE st.user_id = %s
+              AND p.semester_id = %s
+            GROUP BY p.project_id, p.title, p.status, p.submission_date,
+                     preferred_1, preferred_2, preferred_3
+            ORDER BY p.project_id DESC
+            LIMIT 1
+        """,
+            (user_id, semester["semester_id"]),
+        )
+        project = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if project:
+            if isinstance(project.get("submission_date"), object) and hasattr(
+                project["submission_date"], "isoformat"
+            ):
+                project["submission_date"] = str(project["submission_date"])
+            return jsonify(
+                {
+                    "registered": True,
+                    "project": project,
+                    "distribution_open": bool(semester.get("distribution_open")),
+                }
+            )
+        return jsonify(
+            {
+                "registered": False,
+                "project": None,
+                "distribution_open": bool(semester.get("distribution_open")),
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@student_bp.route("/api/final-submission-window", methods=["GET"])
+@login_required(role="student")
+def api_final_submission_window():
+    """
+    Returns whether a 'final report/submission' milestone is currently active
+    (published, is_deadline=TRUE, not archived, within start→due datetime window).
+    Used by the sidebar to show/hide the Submit Project link.
+    """
+    try:
+        from datetime import datetime as _dt
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # Check if timeline tables exist
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN ('comp4200_timelines', 'comp4200_timeline_items')
+        """)
+        if int((cursor.fetchone() or {}).get("cnt") or 0) < 2:
+            cursor.close()
+            db.close()
+            return jsonify({"is_active": False, "item_id": None})
+
+        now = _dt.now()
+        cursor.execute("""
+            SELECT ti.item_id, ti.title, ti.due_date, ti.due_time, ti.start_date, ti.start_time
+            FROM comp4200_timeline_items ti
+            JOIN comp4200_timelines t ON t.timeline_id = ti.timeline_id
+            WHERE t.is_published = TRUE
+              AND ti.is_deadline = TRUE
+              AND COALESCE(ti.is_archived, FALSE) = FALSE
+              AND (LOWER(ti.title) LIKE '%final report%'
+                OR LOWER(ti.title) LIKE '%final submission%')
+            ORDER BY ti.item_id ASC
+        """)
+        items = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        active_item = None
+        for item in items:
+            # Build start datetime
+            s_date = item.get("start_date")
+            s_time = (item.get("start_time") or "").strip()
+            if s_date and s_time:
+                try:
+                    start_dt = _dt.strptime(f"{s_date} {s_time}", "%Y-%m-%d %H:%M")
+                except ValueError:
+                    start_dt = _dt(s_date.year, s_date.month, s_date.day, 0, 0)
+            elif s_date:
+                start_dt = _dt(s_date.year, s_date.month, s_date.day, 0, 0)
+            else:
+                start_dt = None
+
+            # Build due datetime
+            d_date = item.get("due_date")
+            d_time = (item.get("due_time") or "").strip()
+            if d_date and d_time:
+                try:
+                    due_dt = _dt.strptime(f"{d_date} {d_time}", "%Y-%m-%d %H:%M")
+                except ValueError:
+                    due_dt = _dt(d_date.year, d_date.month, d_date.day, 23, 59)
+            elif d_date:
+                due_dt = _dt(d_date.year, d_date.month, d_date.day, 23, 59)
+            else:
+                due_dt = None
+
+            # Check window
+            if start_dt and now < start_dt:
+                continue  # not opened yet
+            if due_dt and now > due_dt:
+                continue  # closed
+            active_item = item
+            break
+
+        if active_item:
+            return jsonify({"is_active": True, "item_id": active_item["item_id"]})
+        return jsonify({"is_active": False, "item_id": None})
+
+    except Exception as e:
+        return jsonify({"is_active": False, "item_id": None, "error": str(e)})
+
+
+@student_bp.route("/api/distribution-window-status", methods=["GET"])
+@login_required(role="student")
+def api_student_distribution_window_status():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester_st(cursor)
+        cursor.close()
+        db.close()
+        if not semester:
+            return jsonify({"error": "No active semester found."}), 400
+        return jsonify(
+            {
+                "is_open": bool(semester.get("distribution_open")),
+                "opened_at": str(semester.get("distribution_opened_at") or ""),
+                "closed_at": str(semester.get("distribution_closed_at") or ""),
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@student_bp.route("/api/distribution-submit", methods=["POST"])
+@login_required(role="student")
+def api_student_distribution_submit():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    abstract = (data.get("abstract") or "").strip()
+    keywords = (data.get("keywords") or "").strip()
+    preferred = data.get("preferred_supervisors") or []
+    member_ids = [
+        str(x).strip() for x in (data.get("member_ids") or []) if str(x).strip()
+    ]
+    user_uid = session.get("university_id")
+
+    if user_uid and user_uid not in member_ids:
+        member_ids.insert(0, user_uid)
+
+    if not title:
+        return jsonify({"error": "Project title is required."}), 400
+    if not member_ids:
+        return jsonify({"error": "At least one team member is required."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_semester_st(cursor)
+
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No active semester is configured."}), 400
+
+        if int(semester.get("distribution_open") or 0) != 1:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Student distribution is currently closed."}), 403
+
+        # Duplicate check
+        for uid in member_ids:
+            cursor.execute(
+                """
+                SELECT p.project_id, p.title
+                FROM project_members pm
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users u     ON u.user_id      = st.user_id
+                JOIN projects p  ON p.project_id   = pm.project_id
+                JOIN semesters s ON s.semester_id   = p.semester_id AND s.is_active = TRUE
+                WHERE u.university_id = %s
+                  AND p.semester_id = %s
+                LIMIT 1
+            """,
+                (uid, semester["semester_id"]),
+            )
+            dup = cursor.fetchone()
+            if dup:
+                cursor.close()
+                db.close()
+                return (
+                    jsonify(
+                        {
+                            "already_registered": True,
+                            "error": f"Student {uid} is already registered (Project: \"{dup['title']}\").",
+                        }
+                    ),
+                    409,
+                )
+
+        pref_ids = [int(x) for x in preferred[:3] if str(x).strip().isdigit()]
+        while len(pref_ids) < 3:
+            pref_ids.append(None)
+
+        cursor.execute(
+            """
+            INSERT INTO projects
+                (title, abstract, keywords, project_type, semester_id, status, submission_date,
+                 preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
+            VALUES (%s, %s, %s, 'software_engineering', %s, 'submitted', CURDATE(), %s, %s, %s)
+        """,
+            (
+                title,
+                abstract or None,
+                keywords or None,
+                semester["semester_id"],
+                pref_ids[0],
+                pref_ids[1],
+                pref_ids[2],
+            ),
+        )
+        project_id = cursor.lastrowid
+
+        for i, uid in enumerate(member_ids):
+            cursor.execute(
+                """
+                SELECT st.student_id FROM students st
+                JOIN users u ON u.user_id = st.user_id
+                WHERE u.university_id = %s AND u.role = 'student'
+            """,
+                (uid,),
+            )
+            row = cursor.fetchone()
+            if row:
+                cursor.execute(
+                    "INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact) VALUES (%s, %s, %s)",
+                    (project_id, row["student_id"], i == 0),
+                )
+
+        actor_name = session.get("full_name") or "A teammate"
+        _notify_project_team(
+            cursor,
+            project_id,
+            session.get("user_id"),
+            "Project registration submitted",
+            f'{actor_name} registered your team project "{title}".',
+            notification_type="system",
+            exclude_user_id=session.get("user_id"),
+        )
+
+        # Sync lifecycle
+        _sync_lifecycle(cursor, project_id)
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify(
+            {
+                "message": "Project proposal submitted successfully.",
+                "project_id": project_id,
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── Lifecycle Sync Helper ───────────────────────────────────
+def _sync_lifecycle(cursor, project_id):
+    """
+    Auto-update project_lifecycle based on actual project state.
+    Called after registration or file upload.
+
+    Rules (student-controlled stages only):
+      registration    → completed  : always (project exists)
+      file_submission → in_progress: at least 1 required file uploaded
+      file_submission → completed  : final_report + source_code both uploaded
+      initial_review  → in_progress: auto when file_submission = completed
+    """
+    # 1. Ensure all lifecycle rows exist
+    STAGES = [
+        "registration",
+        "file_submission",
+        "initial_review",
+        "supervisor_review",
+        "committee_evaluation",
+        "final_result",
+        "archiving",
+    ]
+    for stage in STAGES:
+        cursor.execute(
+            """
+            INSERT IGNORE INTO project_lifecycle (project_id, stage, status)
+            VALUES (%s, %s, 'pending')
+            """,
+            (project_id, stage),
+        )
+
+    # 2. Registration → always completed
+    cursor.execute(
+        """
+        UPDATE project_lifecycle
+        SET    status = 'completed', completed_date = COALESCE(completed_date, CURDATE())
+        WHERE  project_id = %s AND stage = 'registration' AND status != 'completed'
+        """,
+        (project_id,),
+    )
+
+    # 3. Check uploaded files
+    cursor.execute(
+        """
+        SELECT file_type FROM project_files
+        WHERE  project_id = %s AND upload_status = 'uploaded'
+          AND  file_type IN ('final_report', 'source_code', 'presentation')
+        """,
+        (project_id,),
+    )
+    uploaded = {r["file_type"] for r in cursor.fetchall()}
+    required_done = "final_report" in uploaded and "source_code" in uploaded
+
+    if required_done:
+        # file_submission → completed
+        cursor.execute(
+            """
+            UPDATE project_lifecycle
+            SET    status = 'completed', completed_date = COALESCE(completed_date, CURDATE())
+            WHERE  project_id = %s AND stage = 'file_submission' AND status != 'completed'
+            """,
+            (project_id,),
+        )
+        # initial_review → in_progress (only if still pending)
+        cursor.execute(
+            """
+            UPDATE project_lifecycle
+            SET    status = 'in_progress'
+            WHERE  project_id = %s AND stage = 'initial_review' AND status = 'pending'
+            """,
+            (project_id,),
+        )
+    elif uploaded:
+        # at least one file → file_submission in_progress
+        cursor.execute(
+            """
+            UPDATE project_lifecycle
+            SET    status = 'in_progress'
+            WHERE  project_id = %s AND stage = 'file_submission' AND status = 'pending'
+            """,
+            (project_id,),
+        )
+
+
+# ─── Topbar Info ─────────────────────────────────────────────
+@student_bp.route("/api/topbar-info", methods=["GET"])
+@login_required(role="student")
+def api_student_topbar_info():
+    """Return the active course code and academic year for this student."""
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
+        st = cursor.fetchone()
+        if not st:
+            cursor.close()
+            db.close()
+            return jsonify({"course_code": "COMP4200", "academic_year": ""})
+        student_id = st["student_id"]
+
+        # Determine course (COMP4200 or COMP4300)
+        cursor.execute(
+            """
+            SELECT scr.status AS course_status
+            FROM   student_course_results scr
+            JOIN   semesters s ON s.semester_id = scr.semester_id
+            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
+            ORDER  BY scr.semester_id DESC LIMIT 1
+            """,
+            (student_id,),
+        )
+        r = cursor.fetchone()
+        course_code = (
+            "COMP4300" if (r or {}).get("course_status") == "passed" else "COMP4200"
+        )
+
+        # Get active semester academic_year
+        cursor.execute(
+            """
+            SELECT academic_year FROM semesters
+            WHERE  is_active = TRUE AND course_code = %s
+            ORDER  BY semester_id DESC LIMIT 1
+            """,
+            (course_code,),
+        )
+        sem = cursor.fetchone()
+        academic_year = (sem or {}).get("academic_year") or ""
+
+        cursor.close()
+        db.close()
+        return jsonify({"course_code": course_code, "academic_year": academic_year})
+    except Exception as e:
+        return jsonify({"course_code": "COMP4200", "academic_year": ""})
+
+
 @student_bp.route("/notifs")
 @login_required(role="student")
 def notifs():
@@ -1143,7 +3329,7 @@ def notifs():
 @student_bp.route("/ai")
 @login_required(role="student")
 def ai():
-    return render_template("student/ai.html")
+    return render_template("shared/ai.html", base_template="student/base.html")
 
 
 # ─── Profile ────────────────────────────────────────────────
@@ -1306,3 +3492,420 @@ def change_password():
             pwd_error=f"Error: {e}",
             pwd_success=None,
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+# STUDENT NOTIFICATIONS API
+# ═══════════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════════
+# STUDENT NOTIFICATIONS API  (with attachments + reply)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _ensure_notif_attachment_columns(cursor):
+    """Add attachment columns to notifications table if they don't exist yet."""
+    cursor.execute("""
+        SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = 'notifications'
+          AND COLUMN_NAME  = 'attachment_name'
+        """)
+    if not (cursor.fetchone() or {}).get("cnt"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN attachment_name VARCHAR(255)  DEFAULT NULL"
+        )
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN attachment_mime VARCHAR(120)  DEFAULT NULL"
+        )
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN attachment_data MEDIUMBLOB    DEFAULT NULL"
+        )
+
+
+def _student_notif_row_to_json(row):
+    """Convert a notification row dict to safe JSON-serialisable values."""
+    if not row:
+        return row
+    clean = dict(row)
+    if clean.get("created_at") is not None:
+        clean["created_at"] = str(clean["created_at"])
+    clean["is_read"] = bool(clean.get("is_read"))
+    clean["course_scope"] = clean.get("course_scope") or "both"
+    clean["has_attachment"] = bool(clean.get("attachment_name"))
+    clean.pop("attachment_data", None)  # never send binary over JSON
+    return clean
+
+
+def _get_student_project_info(cursor, user_id):
+    """Return (student_id, project_id, supervisor_user_id) or (None, None, None)."""
+    cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
+    st_row = cursor.fetchone()
+    if not st_row:
+        return None, None, None
+    student_id = st_row["student_id"]
+    cursor.execute(
+        """
+        SELECT p.project_id, f.user_id AS supervisor_user_id
+        FROM   project_members pm
+        JOIN   projects  p  ON p.project_id = pm.project_id
+        LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+        WHERE  pm.student_id = %s
+        ORDER  BY p.project_id DESC LIMIT 1
+        """,
+        (student_id,),
+    )
+    proj = cursor.fetchone()
+    if not proj:
+        return student_id, None, None
+    return student_id, proj["project_id"], proj["supervisor_user_id"]
+
+
+# ── Options ────────────────────────────────────────────────────
+@student_bp.route("/api/notifications/options", methods=["GET"])
+@login_required(role="student")
+def api_student_notification_options():
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        student_id, project_id, _ = _get_student_project_info(cursor, user_id)
+        team_members = []
+        supervisor = None
+        if project_id:
+            cursor.execute(
+                """
+                SELECT u.user_id, u.full_name, u.university_id
+                FROM   project_members pm
+                JOIN   students st ON st.student_id = pm.student_id
+                JOIN   users    u  ON u.user_id     = st.user_id
+                WHERE  pm.project_id = %s AND st.user_id != %s AND u.is_active = TRUE
+                """,
+                (project_id, user_id),
+            )
+            team_members = [dict(r) for r in cursor.fetchall()]
+            cursor.execute(
+                """
+                SELECT u.user_id, u.full_name, f.faculty_id
+                FROM   projects p
+                JOIN   faculty  f ON f.faculty_id = p.supervisor_id
+                JOIN   users    u ON u.user_id    = f.user_id
+                WHERE  p.project_id = %s AND u.is_active = TRUE
+                """,
+                (project_id,),
+            )
+            sup = cursor.fetchone()
+            if sup:
+                supervisor = dict(sup)
+        cursor.close()
+        db.close()
+        return jsonify({"team_members": team_members, "supervisor": supervisor})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Inbox ──────────────────────────────────────────────────────
+@student_bp.route("/api/notifications/inbox", methods=["GET"])
+@login_required(role="student")
+def api_student_notifications_inbox():
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_notif_attachment_columns(cursor)
+        cursor.execute(
+            """
+            SELECT n.notification_id, n.notification_type, n.title, n.message,
+                   n.course_scope, n.is_read, n.created_at,
+                   n.attachment_name, n.attachment_mime,
+                   sender.user_id  AS sender_user_id,
+                   sender.full_name AS sender_name,
+                   sender.role      AS sender_role
+            FROM   notifications n
+            LEFT JOIN users sender ON sender.user_id = n.sender_id
+            WHERE  n.recipient_id = %s
+            ORDER  BY n.created_at DESC, n.notification_id DESC
+            """,
+            (user_id,),
+        )
+        rows = [_student_notif_row_to_json(r) for r in cursor.fetchall()]
+        cursor.close()
+        db.close()
+        return jsonify({"notifications": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Sent ───────────────────────────────────────────────────────
+@student_bp.route("/api/notifications/sent", methods=["GET"])
+@login_required(role="student")
+def api_student_notifications_sent():
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_notif_attachment_columns(cursor)
+        cursor.execute(
+            """
+            SELECT n.notification_id, n.title, n.message, n.notification_type,
+                   n.course_scope, n.created_at,
+                   n.attachment_name, n.attachment_mime,
+                   recip.full_name AS recipient_name,
+                   recip.role      AS recipient_role
+            FROM   notifications n
+            JOIN   users recip ON recip.user_id = n.recipient_id
+            WHERE  n.sender_id = %s
+            ORDER  BY n.created_at DESC, n.notification_id DESC
+            """,
+            (user_id,),
+        )
+        rows = [_student_notif_row_to_json(r) for r in cursor.fetchall()]
+        cursor.close()
+        db.close()
+        return jsonify({"sent": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Send / Reply ───────────────────────────────────────────────
+@student_bp.route("/api/notifications/send", methods=["POST"])
+@login_required(role="student")
+def api_student_notifications_send():
+    """
+    Accepts multipart/form-data:
+      scope   : 'team' | 'supervisor' | 'member' | 'reply'
+      value   : user_id  (for 'member' and 'reply')
+      title   : string
+      message : string
+      file    : (optional) attached file
+    """
+    scope = (request.form.get("scope") or "").strip()
+    title = (request.form.get("title") or "").strip()
+    message = (request.form.get("message") or "").strip()
+    value = request.form.get("value")
+
+    if not title:
+        return jsonify({"error": "Please enter a title for your memo."}), 400
+    if not message:
+        return jsonify({"error": "Please write a message."}), 400
+    if scope not in ("team", "supervisor", "member", "reply"):
+        return jsonify({"error": "Please choose who to send the message to."}), 400
+
+    # ── optional attachment ────────────────────────────────────
+    att_name = att_mime = att_data = None
+    uploaded = request.files.get("file")
+    if uploaded and uploaded.filename:
+        att_data = uploaded.read()
+        att_name = secure_filename(uploaded.filename)
+        att_mime = uploaded.mimetype or "application/octet-stream"
+        MAX_ATT_MB = 10
+        if len(att_data) > MAX_ATT_MB * 1024 * 1024:
+            return jsonify({"error": f"Attachment exceeds {MAX_ATT_MB} MB limit."}), 400
+
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_notif_attachment_columns(cursor)
+
+        student_id, project_id, supervisor_user_id = _get_student_project_info(
+            cursor, user_id
+        )
+
+        recipients = []
+
+        if scope in ("team", "supervisor", "member"):
+            if not project_id:
+                return (
+                    jsonify({"error": "You are not registered in any project yet."}),
+                    400,
+                )
+
+            if scope == "team":
+                cursor.execute(
+                    """
+                    SELECT u.user_id FROM project_members pm
+                    JOIN students st ON st.student_id = pm.student_id
+                    JOIN users    u  ON u.user_id     = st.user_id
+                    WHERE pm.project_id = %s AND st.user_id != %s AND u.is_active = TRUE
+                    """,
+                    (project_id, user_id),
+                )
+                recipients = [r["user_id"] for r in cursor.fetchall()]
+
+            elif scope == "supervisor":
+                if not supervisor_user_id:
+                    return (
+                        jsonify(
+                            {"error": "No supervisor assigned to your project yet."}
+                        ),
+                        400,
+                    )
+                recipients = [supervisor_user_id]
+
+            elif scope == "member":
+                if not value:
+                    return (
+                        jsonify({"error": "Please choose a specific team member."}),
+                        400,
+                    )
+                cursor.execute(
+                    """
+                    SELECT u.user_id FROM project_members pm
+                    JOIN students st ON st.student_id = pm.student_id
+                    JOIN users    u  ON u.user_id     = st.user_id
+                    WHERE pm.project_id = %s AND st.user_id = %s AND u.is_active = TRUE
+                    """,
+                    (project_id, int(value)),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return jsonify({"error": "This member is not on your team."}), 400
+                recipients = [row["user_id"]]
+
+        elif scope == "reply":
+            # Reply to any sender of a notification received by this student
+            if not value:
+                return jsonify({"error": "Missing reply recipient."}), 400
+            cursor.execute(
+                """
+                SELECT DISTINCT n.sender_id FROM notifications n
+                WHERE n.recipient_id = %s AND n.sender_id = %s
+                LIMIT 1
+                """,
+                (user_id, int(value)),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return (
+                    jsonify(
+                        {
+                            "error": "You can only reply to someone who sent you a message."
+                        }
+                    ),
+                    403,
+                )
+            recipients = [int(value)]
+
+        recipients = sorted({int(r) for r in recipients if int(r) != int(user_id)})
+        if not recipients:
+            return jsonify({"error": "No valid recipients found."}), 400
+
+        for recipient_id in recipients:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     course_scope, is_read, attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, 'system', %s, %s, 'both', FALSE, %s, %s, %s)
+                """,
+                (recipient_id, user_id, title, message, att_name, att_mime, att_data),
+            )
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify(
+            {
+                "message": f"Memo sent successfully to {len(recipients)} recipient(s).",
+                "sent_count": len(recipients),
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Download attachment ────────────────────────────────────────
+@student_bp.route(
+    "/api/notifications/<int:notification_id>/attachment", methods=["GET"]
+)
+@login_required(role="student")
+def api_student_notification_attachment(notification_id):
+    """Download the file attached to a notification (inbox or sent)."""
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT attachment_name, attachment_mime, attachment_data
+            FROM   notifications
+            WHERE  notification_id = %s
+              AND  (recipient_id = %s OR sender_id = %s)
+            """,
+            (notification_id, user_id, user_id),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+        if not row or not row.get("attachment_data"):
+            return jsonify({"error": "Attachment not found."}), 404
+        return Response(
+            row["attachment_data"],
+            mimetype=row["attachment_mime"] or "application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{row["attachment_name"]}"'
+            },
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Unread count ───────────────────────────────────────────────
+@student_bp.route("/api/notifications/unread-count", methods=["GET"])
+@login_required(role="student")
+def api_student_notifications_unread_count():
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM notifications WHERE recipient_id = %s AND is_read = FALSE",
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+        return jsonify({"unread": int((row or {}).get("cnt") or 0)})
+    except Exception as e:
+        return jsonify({"unread": 0})
+
+
+# ── Mark read ──────────────────────────────────────────────────
+@student_bp.route("/api/notifications/<int:notification_id>/read", methods=["POST"])
+@login_required(role="student")
+def api_student_notification_mark_read(notification_id):
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            "UPDATE notifications SET is_read = TRUE WHERE notification_id = %s AND recipient_id = %s",
+            (notification_id, user_id),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Marked as read."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Mark all read ──────────────────────────────────────────────
+@student_bp.route("/api/notifications/read-all", methods=["POST"])
+@login_required(role="student")
+def api_student_notifications_mark_all_read():
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            "UPDATE notifications SET is_read = TRUE WHERE recipient_id = %s",
+            (user_id,),
+        )
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "All notifications marked as read."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

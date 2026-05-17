@@ -1,4 +1,13 @@
-from flask import Flask, request, redirect, url_for, session, render_template, jsonify, Response
+from flask import (
+    Flask,
+    request,
+    redirect,
+    url_for,
+    session,
+    render_template,
+    jsonify,
+    Response,
+)
 import bcrypt
 import secrets
 import datetime
@@ -6,19 +15,24 @@ import os
 import csv
 import io
 import re
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dotenv import load_dotenv
+
 load_dotenv()
 from flask_mail import Mail, Message
 from db import get_db
 from auth import login_required
+from routes.archive_search import archive_bp
+from routes.shared_ai import shared_ai_bp
 from routes.student import student_bp
 from routes.head import head_bp
 from routes.appCoordinator import coordinator_bp
 from ai_engine import ask_apms_ai, search_uploaded_semantic
-from activate_student import activate_bp
-from announcements import announcements_bp
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+AI_RESPONSE_TIMEOUT_SECONDS = int(os.environ.get("AI_RESPONSE_TIMEOUT_SECONDS", "55"))
+_ai_executor = ThreadPoolExecutor(max_workers=2)
 
 # ─── Mail config ─────────────────────────────────────────────────────────
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
@@ -26,38 +40,22 @@ app.config["MAIL_PORT"] = 587
 app.config["MAIL_USE_TLS"] = True
 app.config["MAIL_USERNAME"] = "rahafbadwan574@gmail.com"
 app.config["MAIL_PASSWORD"] = "ykma scjl fdwg ohlt"
-app.config["MAIL_DEFAULT_SENDER"] = ("APMS — Birzeit University", "rahafbadwan574@gmail.com")
+app.config["MAIL_DEFAULT_SENDER"] = (
+    "APMS — Birzeit University",
+    "rahafbadwan574@gmail.com",
+)
 
 mail = Mail(app)
 
 # ─── Register Blueprints ─────────────────────────────────────────────────
+app.register_blueprint(archive_bp)
+app.register_blueprint(shared_ai_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(head_bp)
 app.register_blueprint(coordinator_bp)
 app.register_blueprint(activate_bp)
 app.register_blueprint(announcements_bp, url_prefix='/head')
 # ─── Helpers ─────────────────────────────────────────────────────────────
-def fetch_supervisors():
-    db = get_db()
-    cursor = db.cursor(dictionary=True)
-    cursor.execute(
-        """
-        SELECT f.faculty_id, u.full_name,
-               COUNT(DISTINCT p.project_id) AS assigned_projects
-        FROM faculty f
-        JOIN users u ON u.user_id = f.user_id
-        LEFT JOIN projects p ON p.supervisor_id = f.faculty_id
-        WHERE u.role = 'supervisor'
-        GROUP BY f.faculty_id, u.full_name
-        ORDER BY u.full_name
-        """
-    )
-    rows = cursor.fetchall()
-    cursor.close()
-    db.close()
-    return rows
-
-
 def _get_active_semester(cursor):
     cursor.execute("""
         SELECT semester_id, academic_year, semester_number, course_code,
@@ -87,12 +85,37 @@ def _csv_response(filename, headers, rows):
     )
 
 
+def _get_public_notice():
+    """Return the active important notice for the public login page."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT title, body, highlight_text, button1_text, button2_text, button3_text, course_scope
+            FROM system_notices
+            WHERE is_active = TRUE
+            ORDER BY updated_at DESC, notice_id DESC
+            LIMIT 1
+            """)
+        notice = cursor.fetchone()
+        cursor.close()
+        db.close()
+        return notice
+    except Exception:
+        return None
+
+
+def _render_login(**context):
+    context.setdefault("public_notice", _get_public_notice())
+    return render_template("login.html", **context)
+
+
 # ─── Login / Logout ──────────────────────────────────────────────────────
 @app.route("/", methods=["GET"])
 def login_page():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
-    return render_template("login.html")
+    return _render_login()
 
 
 @app.route("/login", methods=["POST", "GET"])
@@ -101,7 +124,7 @@ def login():
     pwd = request.form.get("password", "").strip()
 
     if not uid or not pwd:
-        return render_template("login.html", error="Please fill in all fields.")
+        return _render_login(error="Please fill in all fields.")
 
     try:
         db = get_db()
@@ -113,19 +136,21 @@ def login():
         cursor.close()
         db.close()
     except Exception as e:
-        return render_template("login.html", error=f"Database error: {e}")
+        return _render_login(error=f"Database error: {e}")
 
     if not user:
-        return render_template("login.html", error="Invalid University ID or password.")
+        return _render_login(error="Invalid University ID or password.")
 
     if not bcrypt.checkpw(pwd.encode(), user["password_hash"].encode()):
-        return render_template("login.html", error="Invalid University ID or password.")
+        return _render_login(error="Invalid University ID or password.")
 
     session["user_id"] = user["user_id"]
     session["university_id"] = user["university_id"]
     session["full_name"] = user["full_name"]
     session["role"] = user["role"]
-    session["avatar_initials"] = user["avatar_initials"] or user["full_name"][:2].upper()
+    session["avatar_initials"] = (
+        user["avatar_initials"] or user["full_name"][:2].upper()
+    )
     return redirect(url_for("dashboard"))
 
 
@@ -243,7 +268,9 @@ def reset_password(token):
         cursor.close()
         db.close()
     except Exception as e:
-        return render_template("reset_password.html", error=f"Database error: {e}", token=token)
+        return render_template(
+            "reset_password.html", error=f"Database error: {e}", token=token
+        )
 
     if not record:
         return render_template(
@@ -253,14 +280,19 @@ def reset_password(token):
         )
 
     if request.method == "GET":
-        return render_template("reset_password.html", token=token, name=record["full_name"])
+        return render_template(
+            "reset_password.html", token=token, name=record["full_name"]
+        )
 
     new_password = request.form.get("new_password", "").strip()
     confirm_password = request.form.get("confirm_password", "").strip()
 
     if not new_password or not confirm_password:
         return render_template(
-            "reset_password.html", token=token, name=record["full_name"], error="Please fill in all fields."
+            "reset_password.html",
+            token=token,
+            name=record["full_name"],
+            error="Please fill in all fields.",
         )
     if len(new_password) < 8:
         return render_template(
@@ -271,22 +303,33 @@ def reset_password(token):
         )
     if new_password != confirm_password:
         return render_template(
-            "reset_password.html", token=token, name=record["full_name"], error="Passwords do not match."
+            "reset_password.html",
+            token=token,
+            name=record["full_name"],
+            error="Passwords do not match.",
         )
 
     try:
         hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed, record["user_id"]))
-        cursor.execute("UPDATE password_reset_tokens SET used = TRUE WHERE token = %s", (token,))
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE user_id = %s",
+            (hashed, record["user_id"]),
+        )
+        cursor.execute(
+            "UPDATE password_reset_tokens SET used = TRUE WHERE token = %s", (token,)
+        )
         db.commit()
         cursor.close()
         db.close()
         return render_template("reset_password.html", success=True)
     except Exception as e:
         return render_template(
-            "reset_password.html", token=token, name=record["full_name"], error=f"An error occurred: {e}"
+            "reset_password.html",
+            token=token,
+            name=record["full_name"],
+            error=f"An error occurred: {e}",
         )
 
 
@@ -312,8 +355,7 @@ _AI_SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{1,120}$")
 
 
 def _ensure_ai_archive_table(cursor):
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS ai_conversations (
             conv_id      INT PRIMARY KEY AUTO_INCREMENT,
             user_id      INT NOT NULL,
@@ -323,10 +365,11 @@ def _ensure_ai_archive_table(cursor):
             created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """
-    )
+        """)
     try:
-        cursor.execute("CREATE INDEX idx_ai_user_session ON ai_conversations(user_id, session_id, created_at)")
+        cursor.execute(
+            "CREATE INDEX idx_ai_user_session ON ai_conversations(user_id, session_id, created_at)"
+        )
     except Exception:
         pass
     try:
@@ -421,17 +464,43 @@ def api_ai_ask():
     session_id = _normalize_ai_session_id(data.get("session_id"))
 
     if not question:
-        return jsonify({"error": "Please write a question before sending.", "session_id": session_id}), 400
+        return (
+            jsonify(
+                {
+                    "error": "Please write a question before sending.",
+                    "session_id": session_id,
+                }
+            ),
+            400,
+        )
 
     try:
-        answer = ask_apms_ai(question)
+        future = _ai_executor.submit(ask_apms_ai, question)
+        answer = future.result(timeout=AI_RESPONSE_TIMEOUT_SECONDS)
+    except TimeoutError:
+        future.cancel()
+        return (
+            jsonify(
+                {
+                    "error": "AI service timed out. Please try a shorter question or try again in a moment.",
+                    "session_id": session_id,
+                }
+            ),
+            504,
+        )
     except Exception as exc:
         import traceback
+
         traceback.print_exc()
-        return jsonify({"error": f"AI engine error: {exc}", "session_id": session_id}), 500
+        return (
+            jsonify({"error": f"AI engine error: {exc}", "session_id": session_id}),
+            500,
+        )
 
     try:
-        saved, save_error = _save_ai_exchange(session["user_id"], session_id, question, answer)
+        saved, save_error = _save_ai_exchange(
+            session["user_id"], session_id, question, answer
+        )
     except Exception as exc:
         saved, save_error = False, str(exc)
 
@@ -495,7 +564,9 @@ def api_ai_archive():
                     "message_count": int(row.get("message_count") or 0),
                 }
             )
-        return jsonify({"conversations": conversations, "retention_days": AI_ARCHIVE_DAYS})
+        return jsonify(
+            {"conversations": conversations, "retention_days": AI_ARCHIVE_DAYS}
+        )
     except Exception as exc:
         return jsonify({"error": f"Could not load AI archive: {exc}"}), 500
 
@@ -564,206 +635,6 @@ def api_ai_archive_delete(session_id):
 
 # ─── Student distribution APIs ───────────────────────────────────────────
 
-@app.route("/api/student/supervisors", methods=["GET"])
-@login_required(role="student")
-def api_student_supervisors():
-    """Return list of supervisors for the registration form."""
-    try:
-        rows = fetch_supervisors()
-        return jsonify({"supervisors": rows})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/student/registration-check", methods=["GET"])
-@login_required(role="student")
-def api_student_registration_check():
-    """Check if the current student is already registered in the active semester."""
-    user_id = session.get("user_id")
-    try:
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-
-        semester = _get_active_semester(cursor)
-        if not semester:
-            cursor.close()
-            db.close()
-            return jsonify({"registered": False, "project": None, "distribution_open": False})
-
-        cursor.execute("""
-            SELECT
-                p.project_id,
-                CONCAT('Group ', p.project_id) AS group_name,
-                p.title,
-                p.status,
-                p.submission_date,
-                pref1.full_name AS preferred_1,
-                pref2.full_name AS preferred_2,
-                pref3.full_name AS preferred_3,
-                GROUP_CONCAT(u2.full_name ORDER BY pm2.is_primary_contact DESC SEPARATOR ', ') AS team_members
-            FROM project_members pm
-            JOIN students st ON st.student_id = pm.student_id
-            JOIN projects p  ON p.project_id  = pm.project_id
-            LEFT JOIN faculty f1  ON f1.faculty_id = p.preferred_supervisor_1
-            LEFT JOIN users pref1 ON pref1.user_id = f1.user_id
-            LEFT JOIN faculty f2  ON f2.faculty_id = p.preferred_supervisor_2
-            LEFT JOIN users pref2 ON pref2.user_id = f2.user_id
-            LEFT JOIN faculty f3  ON f3.faculty_id = p.preferred_supervisor_3
-            LEFT JOIN users pref3 ON pref3.user_id = f3.user_id
-            LEFT JOIN project_members pm2 ON pm2.project_id = p.project_id
-            LEFT JOIN students st2        ON st2.student_id  = pm2.student_id
-            LEFT JOIN users u2            ON u2.user_id      = st2.user_id
-            WHERE st.user_id = %s AND p.semester_id = %s
-            GROUP BY p.project_id, p.title, p.status, p.submission_date, preferred_1, preferred_2, preferred_3
-            ORDER BY p.project_id DESC
-            LIMIT 1
-        """, (user_id, semester["semester_id"]))
-        project = cursor.fetchone()
-        cursor.close()
-        db.close()
-
-        if project:
-            return jsonify({
-                "registered": True,
-                "project": project,
-                "distribution_open": bool(semester.get("distribution_open"))
-            })
-
-        return jsonify({
-            "registered": False,
-            "project": None,
-            "distribution_open": bool(semester.get("distribution_open"))
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/student/distribution-window-status", methods=["GET"])
-@login_required(role="student")
-def api_student_distribution_window_status():
-    try:
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        semester = _get_active_semester(cursor)
-        cursor.close()
-        db.close()
-
-        if not semester:
-            return jsonify({"error": "No active semester found."}), 400
-
-        return jsonify({
-            "is_open": bool(semester.get("distribution_open")),
-            "opened_at": str(semester.get("distribution_opened_at") or ""),
-            "closed_at": str(semester.get("distribution_closed_at") or "")
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/student/distribution-submit", methods=["POST"])
-@login_required(role="student")
-def api_student_distribution_submit():
-    data = request.get_json(silent=True) or {}
-    title = (data.get("title") or "").strip()
-    abstract = (data.get("abstract") or "").strip()
-    keywords = (data.get("keywords") or "").strip()
-    preferred = data.get("preferred_supervisors") or []
-    member_ids = [str(x).strip() for x in (data.get("member_ids") or []) if str(x).strip()]
-    user_uid = session.get("university_id")
-
-    if user_uid and user_uid not in member_ids:
-        member_ids.insert(0, user_uid)
-
-    if not title:
-        return jsonify({"error": "Project title is required."}), 400
-    if len(member_ids) == 0:
-        return jsonify({"error": "At least one team member is required."}), 400
-
-    try:
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        semester = _get_active_semester(cursor)
-
-        if not semester:
-            cursor.close()
-            db.close()
-            return jsonify({"error": "No active semester is configured."}), 400
-
-        if int(semester.get("distribution_open") or 0) != 1:
-            cursor.close()
-            db.close()
-            return jsonify({"error": "Student distribution is currently closed."}), 403
-
-        all_uids_to_check = list(member_ids)
-        if user_uid and user_uid not in all_uids_to_check:
-            all_uids_to_check.insert(0, user_uid)
-
-        for uid in all_uids_to_check:
-            cursor.execute("""
-                SELECT p.project_id, p.title
-                FROM project_members pm
-                JOIN students st ON st.student_id = pm.student_id
-                JOIN users u     ON u.user_id      = st.user_id
-                JOIN projects p  ON p.project_id   = pm.project_id
-                WHERE u.university_id = %s AND p.semester_id = %s
-                LIMIT 1
-            """, (uid, semester["semester_id"]))
-            dup = cursor.fetchone()
-            if dup:
-                cursor.close()
-                db.close()
-                return jsonify({
-                    "already_registered": True,
-                    "error": f"Student {uid} is already registered in this semester (Project: \"{dup['title']}\")."
-                }), 409
-
-        pref_ids = [int(x) for x in preferred[:3] if str(x).strip().isdigit()]
-        while len(pref_ids) < 3:
-            pref_ids.append(None)
-
-        cursor.execute(
-            """
-            INSERT INTO projects
-            (title, abstract, keywords, project_type, semester_id, status, submission_date,
-             preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
-            VALUES (%s, %s, %s, 'software_engineering', %s, 'submitted', CURDATE(), %s, %s, %s)
-            """,
-            (
-                title,
-                abstract or None,
-                keywords or None,
-                semester["semester_id"],
-                pref_ids[0],
-                pref_ids[1],
-                pref_ids[2],
-            ),
-        )
-        project_id = cursor.lastrowid
-
-        for i, uid in enumerate(member_ids):
-            cursor.execute(
-                """
-                SELECT st.student_id
-                FROM students st
-                JOIN users u ON u.user_id = st.user_id
-                WHERE u.university_id = %s AND u.role = 'student'
-                """,
-                (uid,),
-            )
-            row = cursor.fetchone()
-            if row:
-                cursor.execute(
-                    "INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact) VALUES (%s, %s, %s)",
-                    (project_id, row["student_id"], i == 0),
-                )
-
-        db.commit()
-        cursor.close()
-        db.close()
-        return jsonify({"message": "Project proposal submitted successfully.", "project_id": project_id})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 
 @app.route("/api/coordinator/assign-student", methods=["POST"])
 @login_required(role="coordinator")
@@ -792,7 +663,11 @@ def api_assign_student():
 
         cursor.execute(
             "INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date) VALUES (%s, 'software_engineering', %s, %s, 'under_review', CURDATE())",
-            (f"Individual Project - {student['full_name']}", semester["semester_id"], faculty_id),
+            (
+                f"Individual Project - {student['full_name']}",
+                semester["semester_id"],
+                faculty_id,
+            ),
         )
         project_id = cursor.lastrowid
 
@@ -804,22 +679,24 @@ def api_assign_student():
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": "Student assigned successfully.", "project_id": project_id})
+        return jsonify(
+            {"message": "Student assigned successfully.", "project_id": project_id}
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 # ─── Supervisor routes ────────────────────────────────────────────────────
 SUPERVISOR_PAGES = {
-    "dashboard":  "supervisor/index.html",
+    "dashboard": "supervisor/index.html",
     "mystudents": "supervisor/mystudents.html",
-    "progress":   "supervisor/progress.html",
-    "feedback":   "supervisor/feedback.html",
+    "progress": "supervisor/progress.html",
+    "feedback": "supervisor/feedback.html",
     "evaluation": "supervisor/evaluation.html",
-    "search":     "supervisor/search.html",
-    "notifs":     "supervisor/notifs.html",
-    "ai":         "supervisor/ai.html",
-    "profile":    "supervisor/profile.html",
+    "search": "shared/archive_search.html",
+    "notifs": "supervisor/notifs.html",
+    "ai": "shared/ai.html",
+    "profile": "supervisor/profile.html",
 }
 
 
@@ -841,12 +718,15 @@ def supervisor_subpage(page):
 
 # ─── Supervisor feedback APIs ─────────────────────────────────────────────
 
+
 @app.route("/api/supervisor/my-projects", methods=["GET"])
 @login_required(role="supervisor")
 def api_supervisor_my_projects():
     user_id = session["user_id"]
-    db = get_db(); cursor = db.cursor(dictionary=True)
-    cursor.execute("""
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute(
+        """
         SELECT p.project_id, p.title,
                GROUP_CONCAT(u2.full_name ORDER BY pm.project_id SEPARATOR ', ') AS members
         FROM   faculty f
@@ -858,9 +738,12 @@ def api_supervisor_my_projects():
         WHERE  f.user_id = %s
         GROUP  BY p.project_id, p.title
         ORDER  BY p.project_id DESC
-    """, (user_id,))
+    """,
+        (user_id,),
+    )
     projects = cursor.fetchall()
-    cursor.close(); db.close()
+    cursor.close()
+    db.close()
     return jsonify({"projects": projects})
 
 
@@ -868,15 +751,15 @@ def api_supervisor_my_projects():
 @login_required(role="supervisor")
 def api_supervisor_submit_feedback():
     user_id = session["user_id"]
-    data    = request.get_json(force=True)
+    data = request.get_json(force=True)
 
-    project_id    = data.get("project_id")
+    project_id = data.get("project_id")
     feedback_type = data.get("feedback_type", "general_performance")
     feedback_text = (data.get("feedback_text") or "").strip()
-    score         = data.get("score")
-    priority      = data.get("priority", "normal")
-    is_draft      = bool(data.get("is_draft", False))
-    points        = data.get("improvement_points", [])
+    score = data.get("score")
+    priority = data.get("priority", "normal")
+    is_draft = bool(data.get("is_draft", False))
+    points = data.get("improvement_points", [])
 
     if not project_id or not feedback_text:
         return jsonify({"error": "project_id and feedback_text are required"}), 400
@@ -888,22 +771,30 @@ def api_supervisor_submit_feedback():
     except (ValueError, TypeError):
         score = None
 
-    db = get_db(); cursor = db.cursor(dictionary=True)
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
 
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT sa.sa_id FROM supervisor_assignments sa
         JOIN   faculty f ON f.faculty_id = sa.faculty_id
         WHERE  f.user_id = %s AND sa.project_id = %s
         LIMIT  1
-    """, (user_id, project_id))
+    """,
+        (user_id, project_id),
+    )
     if not cursor.fetchone():
-        cursor.close(); db.close()
+        cursor.close()
+        db.close()
         return jsonify({"error": "You are not assigned to this project"}), 403
 
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, score, priority, is_draft)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, (project_id, user_id, feedback_type, feedback_text, score, priority, is_draft))
+    """,
+        (project_id, user_id, feedback_type, feedback_text, score, priority, is_draft),
+    )
     feedback_id = cursor.lastrowid
 
     for pt in points:
@@ -911,19 +802,22 @@ def api_supervisor_submit_feedback():
         if pt:
             cursor.execute(
                 "INSERT INTO feedback_improvement_points (feedback_id, point_text) VALUES (%s, %s)",
-                (feedback_id, pt)
+                (feedback_id, pt),
             )
 
-    db.commit(); cursor.close(); db.close()
+    db.commit()
+    cursor.close()
+    db.close()
     return jsonify({"success": True, "feedback_id": feedback_id})
 
 
 @app.route("/api/supervisor/my-feedback", methods=["GET"])
 @login_required(role="supervisor")
 def api_supervisor_my_feedback():
-    user_id    = session["user_id"]
+    user_id = session["user_id"]
     project_id = request.args.get("project_id")
-    db = get_db(); cursor = db.cursor(dictionary=True)
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
 
     sql = """
         SELECT f.feedback_id, f.project_id, p.title AS project_title,
@@ -942,12 +836,15 @@ def api_supervisor_my_feedback():
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     for r in rows:
-        r["created_at"] = r["created_at"].strftime("%b %d, %Y") if r["created_at"] else ""
+        r["created_at"] = (
+            r["created_at"].strftime("%b %d, %Y") if r["created_at"] else ""
+        )
         if r["score"] is not None:
             r["score"] = float(r["score"])
         r["is_draft"] = bool(r["is_draft"])
 
-    cursor.close(); db.close()
+    cursor.close()
+    db.close()
     return jsonify({"feedback": rows})
 
 

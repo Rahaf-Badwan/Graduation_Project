@@ -6,8 +6,16 @@
 
 {% block content %}
 <div class="page on" id="pg-feedback">
+  <div id="regLockOverlay" style="display:none;text-align:center;padding:60px 20px">
+    <div style="font-size:48px;margin-bottom:16px">🔒</div>
+    <div style="font-size:18px;font-weight:700;color:#344054;margin-bottom:8px">Registration Required</div>
+    <div style="font-size:14px;color:#667085;max-width:380px;margin:0 auto 20px">
+      This page is available after your supervisor is assigned and the coordinator approves your team.
+    </div>
+    <a href="/student/registration" class="btn btn-primary" style="text-decoration:none">Go to Registration</a>
+  </div>
 
-  <div class="two-col" style="align-items:start">
+  <div id="regPageContent"><div class="two-col" style="align-items:start">
     <div>
       <div class="card">
         <div class="card-hd"><span class="card-title">All Feedback</span></div>
@@ -102,7 +110,18 @@
     </div>
   </div>
 
-</div>
-</div>
-</div>
+</div></div><!-- /regPageContent --><script>
+  (function () {
+    fetch('/student/api/registration-check')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.registered) {
+          var ov = document.getElementById('regLockOverlay');
+          var ct = document.getElementById('regPageContent');
+          if (ov) ov.style.display = '';
+          if (ct) ct.style.display = 'none';
+        }
+      }).catch(() => {});
+  })();
+</script>
 {% endblock %}
