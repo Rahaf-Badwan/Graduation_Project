@@ -93,6 +93,9 @@ def assign_coordinator():
         now = datetime.datetime.now()
         last_assigned = existing["assigned_at"]
         days_diff = (now - last_assigned).days
+        if days_diff > 20 :
+            cursor.close()
+            conn.close()
         if days_diff > 20:
             return jsonify({"error": "Cannot change coordinator after 20 days "})
 
@@ -112,9 +115,8 @@ def assign_coordinator():
             INSERT INTO coordinator_assignments
                    (faculty_id, semester_id, assigned_by)
                    VALUES (%s, %s, %s)
-                   """,
-            (faculty_id, semester_id, assigned_by),
-        )
+                   """, (faculty_id, semester_id, assigned_by))
+    conn.commit()
     cursor.close()
     conn.close()
     return jsonify({"success": True})

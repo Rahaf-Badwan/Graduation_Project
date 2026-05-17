@@ -28,7 +28,8 @@ from routes.student import student_bp
 from routes.head import head_bp
 from routes.appCoordinator import coordinator_bp
 from ai_engine import ask_apms_ai, search_uploaded_semantic
-
+from activate_student import activate_bp
+from announcements import announcements_bp
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 AI_RESPONSE_TIMEOUT_SECONDS = int(os.environ.get("AI_RESPONSE_TIMEOUT_SECONDS", "55"))
