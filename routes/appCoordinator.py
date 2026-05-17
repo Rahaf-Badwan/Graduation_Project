@@ -491,6 +491,51 @@ def api_coordinator_dashboard_data():
         )
         committees = cursor.fetchone() or {}
 
+        # ── Active students count ──────────────────────────────────────────
+        cursor.execute("""
+            SELECT COUNT(*) AS active_students
+            FROM users
+            WHERE role = 'student' AND is_active = TRUE
+        """)
+        students_row = cursor.fetchone() or {}
+
+        # ── Sections count (student_distribution_sections if table exists) ─
+        sections_count = 0
+        if _table_exists(cursor, "student_distribution_sections"):
+            cursor.execute("""
+                SELECT COUNT(*) AS total_sections
+                FROM student_distribution_sections
+            """)
+            sections_row = cursor.fetchone() or {}
+            sections_count = int(sections_row.get("total_sections") or 0)
+
+        # ── Archived projects count per type (for Projects by Type panel) ──
+        # project_type is a SET column so we use FIND_IN_SET per type
+        cursor.execute("""
+            SELECT
+                SUM(CASE WHEN FIND_IN_SET('web',                  project_type) > 0 THEN 1 ELSE 0 END) AS web,
+                SUM(CASE WHEN FIND_IN_SET('mobile',               project_type) > 0 THEN 1 ELSE 0 END) AS mobile,
+                SUM(CASE WHEN FIND_IN_SET('ai',                   project_type) > 0 THEN 1 ELSE 0 END) AS ai,
+                SUM(CASE WHEN FIND_IN_SET('software_engineering',  project_type) > 0 THEN 1 ELSE 0 END) AS software_engineering,
+                SUM(CASE WHEN FIND_IN_SET('security',             project_type) > 0 THEN 1 ELSE 0 END) AS security,
+                SUM(CASE WHEN FIND_IN_SET('databases',            project_type) > 0 THEN 1 ELSE 0 END) AS `databases`,
+                SUM(CASE WHEN FIND_IN_SET('other',                project_type) > 0 THEN 1 ELSE 0 END) AS other,
+                COUNT(*) AS total_archived
+            FROM projects
+            WHERE status = 'archived'
+        """)
+        archive_type_row = cursor.fetchone() or {}
+        archive_by_type = {
+            "web":                  int(archive_type_row.get("web")                  or 0),
+            "mobile":               int(archive_type_row.get("mobile")               or 0),
+            "ai":                   int(archive_type_row.get("ai")                   or 0),
+            "software_engineering": int(archive_type_row.get("software_engineering") or 0),
+            "security":             int(archive_type_row.get("security")             or 0),
+            "databases":            int(archive_type_row.get("databases")            or 0),
+            "other":                int(archive_type_row.get("other")                or 0),
+            "_total":               int(archive_type_row.get("total_archived")       or 0),
+        }
+
         cursor.close()
         db.close()
 
@@ -506,9 +551,12 @@ def api_coordinator_dashboard_data():
                         "accepted": int(stats.get("accepted") or 0),
                         "rejected": int(stats.get("rejected") or 0),
                         "committees": int(committees.get("committees") or 0),
+                        "active_students": int(students_row.get("active_students") or 0),
+                        "total_sections": sections_count,
                     },
                     "by_status": by_status,
                     "by_type": by_type,
+                    "archive_by_type": archive_by_type,
                     "latest_projects": latest_projects,
                 }
             )

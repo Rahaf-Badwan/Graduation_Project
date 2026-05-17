@@ -6,575 +6,600 @@
 
 {% block content %}
 <div class="page page-single on" id="pg-dashboard">
+<style>
+  html, body { scroll-behavior: auto !important; }
+  #pg-dashboard {
+    display: block !important; min-height: auto !important;
+    height: auto !important; padding: 0 0 80px !important;
+    margin: 0 !important; background: #f5f6f7;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
 
-  <style>
-    html,
-    body {
-      scroll-behavior: auto !important;
-    }
+  /* TOP STAT BAR */
+  #pg-dashboard .top-stat-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    background: #fff; border-bottom: 1.5px solid #e8edea; margin-bottom: 20px;
+  }
+  #pg-dashboard .top-stat-item {
+    padding: 18px 28px 16px; border-right: 1.5px solid #e8edea;
+  }
+  #pg-dashboard .top-stat-item:last-child { border-right: none; }
+  #pg-dashboard .top-stat-num {
+    font-size: 30px; font-weight: 900; line-height: 1;
+    margin-bottom: 5px; letter-spacing: -0.5px;
+  }
+  #pg-dashboard .top-stat-num.green  { color: #2e7d42; }
+  #pg-dashboard .top-stat-num.teal   { color: #0f766e; }
+  #pg-dashboard .top-stat-num.orange { color: #c2410c; }
+  #pg-dashboard .top-stat-num.blue   { color: #1d4ed8; }
+  #pg-dashboard .top-stat-num.loading { color: #d1d5db; font-size: 22px; }
+  #pg-dashboard .top-stat-lbl { font-size: 12px; color: #6b7280; font-weight: 500; }
 
-    #pg-dashboard {
-      display: block !important;
-      min-height: auto !important;
-      height: auto !important;
-      padding: 20px 22px 90px !important;
-      margin: 0 !important;
-    }
+  /* BODY */
+  #pg-dashboard .dash-body {
+    display: grid; grid-template-columns: 1fr 370px;
+    gap: 16px; padding: 0 22px; align-items: start;
+  }
 
-    #pg-dashboard .dash-hero {
-      background: linear-gradient(135deg, #2e7d42, #173b24);
-      border-radius: 22px;
-      padding: 22px;
-      color: #fff;
-      box-shadow: 0 16px 36px rgba(46, 125, 66, 0.18);
-      margin-bottom: 16px;
-    }
+  /* PANELS */
+  #pg-dashboard .panel {
+    background: #fff; border: 1px solid #e8edea;
+    border-radius: 14px; overflow: hidden; margin-bottom: 16px;
+  }
+  #pg-dashboard .panel-hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid #eef2ef;
+  }
+  #pg-dashboard .panel-hd-left { display: flex; align-items: center; gap: 8px; }
+  #pg-dashboard .panel-title { font-size: 14px; font-weight: 800; color: #1a3d25; }
+  #pg-dashboard .panel-badge {
+    font-size: 11px; font-weight: 700; color: #6b7280;
+    background: #f3f4f6; border-radius: 999px; padding: 2px 8px;
+  }
+  #pg-dashboard .panel-action {
+    font-size: 12.5px; color: #2e7d42; font-weight: 700;
+    cursor: pointer; background: none; border: none; padding: 0; text-decoration: none;
+  }
+  #pg-dashboard .panel-action:hover { text-decoration: underline; }
 
-    #pg-dashboard .dash-hero-title {
-      font-size: 24px;
-      font-weight: 900;
-      margin-bottom: 6px;
-    }
+  /* QUICK ACTIONS */
+  #pg-dashboard .qa-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: #eef2ef;
+  }
+  #pg-dashboard .qa-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; background: #fff;
+    cursor: pointer; transition: background 0.13s; text-decoration: none;
+  }
+  #pg-dashboard .qa-card:hover { background: #f8fbf9; }
+  #pg-dashboard .qa-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  #pg-dashboard .qa-label { font-size: 13px; font-weight: 700; color: #1a3d25; }
+  #pg-dashboard .qa-sub   { font-size: 11px; color: #9ca3af; margin-top: 1px; }
 
-    #pg-dashboard .dash-hero-sub {
-      font-size: 13px;
-      opacity: 0.9;
-      line-height: 1.6;
-    }
+  /* PROJECT ROWS */
+  #pg-dashboard .proj-row {
+    display: flex; align-items: center; gap: 13px;
+    padding: 12px 18px; border-bottom: 1px solid #f0f4f1;
+    transition: background 0.12s; cursor: pointer;
+  }
+  #pg-dashboard .proj-row:last-child { border-bottom: none; }
+  #pg-dashboard .proj-row:hover { background: #f8fbf9; }
+  #pg-dashboard .proj-info { flex: 1; min-width: 0; }
+  #pg-dashboard .proj-title {
+    font-size: 13.5px; font-weight: 700; color: #111827;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
+  }
+  #pg-dashboard .proj-meta { font-size: 11.5px; color: #9ca3af; }
+  #pg-dashboard .proj-badge {
+    font-size: 11px; font-weight: 700; padding: 4px 10px;
+    border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+  }
 
-    #pg-dashboard .dash-tabs {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin: 0 0 16px 0;
-      padding: 0;
-    }
+  /* EMPTY STATE */
+  #pg-dashboard .dash-empty {
+    padding: 22px 18px; color: #9ca3af; font-size: 13px; text-align: center;
+  }
+  #pg-dashboard .dash-empty-icon { font-size: 28px; margin-bottom: 6px; }
+  #pg-dashboard .dash-empty-hint { font-size: 12px; color: #c4cdc8; margin-top: 4px; }
 
-    #pg-dashboard .dash-tab {
-      border: 1px solid #d7e3dc;
-      background: #fff;
-      color: #2d5137;
-      border-radius: 999px;
-      padding: 9px 14px;
-      font-weight: 800;
-      cursor: pointer;
-      transition: 0.18s ease;
-    }
+  /* BAR CHART */
+  #pg-dashboard .chart-wrap { padding: 16px 18px; height: 220px; position: relative; }
 
-    #pg-dashboard .dash-tab:hover {
-      background: #f3f7f4;
-    }
+  /* MINI STAT GRID */
+  #pg-dashboard .mini-stat-grid { display: grid; grid-template-columns: 1fr 1fr; }
+  #pg-dashboard .mini-stat-cell {
+    padding: 14px 18px;
+    border-right: 1px solid #eef2ef; border-bottom: 1px solid #eef2ef;
+  }
+  #pg-dashboard .mini-stat-cell:nth-child(2n)  { border-right: none; }
+  #pg-dashboard .mini-stat-cell:nth-child(n+3) { border-bottom: none; }
+  #pg-dashboard .mini-stat-val {
+    font-size: 22px; font-weight: 900; color: #2e7d42; line-height: 1; margin-bottom: 4px;
+  }
+  #pg-dashboard .mini-stat-val.blue { color: #1d4ed8; }
+  #pg-dashboard .mini-stat-val.red  { color: #b42318; }
+  #pg-dashboard .mini-stat-lbl { font-size: 11.5px; color: #6b7280; font-weight: 500; }
 
-    #pg-dashboard .dash-tab.on {
-      background: #2e7d42;
-      border-color: #2e7d42;
-      color: #fff;
-      box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
-    }
+  /* PROGRESS BARS */
+  #pg-dashboard .progress-list { padding: 14px 18px; border-top: 1px solid #eef2ef; }
+  #pg-dashboard .progress-item { margin-bottom: 12px; }
+  #pg-dashboard .progress-item:last-child { margin-bottom: 0; }
+  #pg-dashboard .progress-row {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;
+  }
+  #pg-dashboard .progress-lbl { font-size: 12.5px; color: #374151; font-weight: 600; }
+  #pg-dashboard .progress-pct { font-size: 12px; color: #6b7280; font-weight: 600; }
+  #pg-dashboard .progress-bg { background: #e8f0ea; border-radius: 999px; height: 6px; overflow: hidden; }
+  #pg-dashboard .progress-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; }
 
-    #pg-dashboard .dash-section {
-      display: none;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
+  /* SEMESTER CONTROL */
+  #pg-dashboard .sem-info { padding: 13px 18px; }
+  #pg-dashboard .sem-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+  }
+  #pg-dashboard .sem-row:last-child { margin-bottom: 0; }
+  #pg-dashboard .sem-key { font-size: 12.5px; color: #6b7280; }
+  #pg-dashboard .sem-val { font-size: 12.5px; font-weight: 700; color: #1a3d25; }
+  #pg-dashboard .sem-val.open   { color: #2e7d42; }
+  #pg-dashboard .sem-val.closed { color: #9ca3af; }
+  #pg-dashboard .sem-actions {
+    display: flex; gap: 8px; padding: 12px 18px;
+    border-top: 1px solid #eef2ef; flex-wrap: wrap;
+  }
+  #pg-dashboard .sem-btn {
+    flex: 1; min-width: 90px; padding: 9px 12px; border-radius: 9px;
+    font-size: 12.5px; font-weight: 700; cursor: pointer; transition: 0.14s ease;
+    border: 1px solid #d1e7d9; background: #f0f8f2; color: #1a5c2e; text-align: center;
+  }
+  #pg-dashboard .sem-btn:hover { background: #e2f0e6; }
+  #pg-dashboard .sem-btn.primary { background: #2e7d42; color: #fff; border-color: #2e7d42; }
+  #pg-dashboard .sem-btn.primary:hover { background: #245c33; }
 
-    #pg-dashboard .dash-section.active {
-      display: block !important;
-    }
+  /* NOTIFICATIONS */
+  #pg-dashboard .notif-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 18px; border-bottom: 1px solid #f0f4f1;
+    cursor: pointer; transition: background 0.12s;
+  }
+  #pg-dashboard .notif-item:last-child { border-bottom: none; }
+  #pg-dashboard .notif-item:hover { background: #f8fbf9; }
+  #pg-dashboard .notif-item.unread { background: #f7fbf8; }
+  #pg-dashboard .notif-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #2e7d42; flex-shrink: 0; margin-top: 5px;
+  }
+  #pg-dashboard .notif-dot.read { background: #e5e7eb; }
+  #pg-dashboard .notif-body { flex: 1; min-width: 0; }
+  #pg-dashboard .notif-title {
+    font-size: 13px; font-weight: 700; color: #111827;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
+  }
+  #pg-dashboard .notif-meta { font-size: 11.5px; color: #9ca3af; }
+  #pg-dashboard .notif-unread-badge {
+    font-size: 11px; font-weight: 800; color: #fff;
+    background: #2e7d42; border-radius: 999px; padding: 2px 7px; margin-left: 4px;
+  }
 
-    #pg-dashboard .dash-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      align-items: start;
-    }
+  .dashboard-hidden-values { display: none !important; }
 
-    #pg-dashboard .card {
-      background: #fff;
-      border: 1px solid #e6ece8;
-      border-radius: 18px;
-      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
-      overflow: hidden;
-      margin-bottom: 16px;
-    }
+  @media (max-width: 1000px) {
+    #pg-dashboard .dash-body { grid-template-columns: 1fr; }
+    #pg-dashboard .qa-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    #pg-dashboard .top-stat-bar { grid-template-columns: 1fr 1fr; }
+    #pg-dashboard .top-stat-item:nth-child(2) { border-right: none; }
+    #pg-dashboard .top-stat-item:nth-child(3),
+    #pg-dashboard .top-stat-item:nth-child(4) { border-top: 1.5px solid #e8edea; }
+    #pg-dashboard .top-stat-item:nth-child(4) { border-right: none; }
+    #pg-dashboard .top-stat-num { font-size: 24px; }
+    #pg-dashboard .top-stat-item { padding: 14px 16px 12px; }
+    #pg-dashboard .qa-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
 
-    #pg-dashboard .card-hd {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      padding: 16px 18px;
-      border-bottom: 1px solid #edf2ef;
-    }
+<!-- legacy compat -->
+<div class="dashboard-hidden-values">
+  <div id="dashTotalProjects">0</div><div id="dashAwaitingReview">0</div>
+  <div id="dashUnderEvaluation">0</div><div id="dashAccepted">0</div>
+  <div id="dashRejected">0</div>
+</div>
 
-    #pg-dashboard .card-title {
-      font-size: 16px;
-      font-weight: 900;
-      color: #173b24;
-    }
-
-    #pg-dashboard .card-action {
-      border: 1px solid #d7e3dc;
-      background: #f3f7f4;
-      color: #245c33;
-      border-radius: 12px;
-      padding: 8px 12px;
-      font-weight: 800;
-      cursor: pointer;
-      transition: 0.18s ease;
-    }
-
-    #pg-dashboard .card-action:hover {
-      background: #e8f3eb;
-      border-color: #b9d7c2;
-    }
-
-    #pg-dashboard .dash-card-body {
-      padding: 16px 18px;
-    }
-
-    #pg-dashboard .dash-info-box {
-      border-left: 5px solid #2e7d42;
-      background: #f7fbf8;
-      border-radius: 14px;
-      padding: 13px 14px;
-      color: #344054;
-      line-height: 1.55;
-      font-size: 13px;
-    }
-
-    #pg-dashboard .dash-chart-body {
-      height: 320px;
-      padding: 16px;
-    }
-
-    #pg-dashboard .dash-chart-body.small {
-      height: 280px;
-    }
-
-    #pg-dashboard .dash-badge {
-      font-size: 11px;
-      font-weight: 900;
-      color: #2e7d42;
-      background: #ecfdf3;
-      border: 1px solid #ccebd5;
-      padding: 5px 9px;
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-
-    #pg-dashboard .dash-subtitle {
-      font-size: 12px;
-      color: #667085;
-      margin-top: 3px;
-      line-height: 1.5;
-    }
-
-    #pg-dashboard .dash-list-box {
-      padding: 16px 18px;
-    }
-
-    #pg-dashboard .dash-loading,
-    #pg-dashboard .dash-empty {
-      padding: 18px;
-      border: 1px dashed #cddbd2;
-      border-radius: 14px;
-      color: #667085;
-      text-align: center;
-      background: #fbfdfb;
-      font-size: 13px;
-    }
-
-    #pg-dashboard .semester-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 12px;
-    }
-
-    #pg-dashboard .btn {
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-
-    #pg-dashboard .btn-primary {
-      background: #2e7d42;
-      color: #fff;
-      border: 1px solid #2e7d42;
-    }
-
-    #pg-dashboard .btn-outline {
-      background: #fff;
-      color: #2e7d42;
-      border: 1px solid #ccebd5;
-    }
-
-    #pg-dashboard .btn-outline:hover {
-      background: #f3f7f4;
-    }
-
-    .dashboard-hidden-values {
-      display: none !important;
-    }
-
-    @media (max-width: 1100px) {
-      #pg-dashboard .dash-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 620px) {
-      #pg-dashboard .dash-tab {
-        width: 100%;
-        text-align: center;
-      }
-
-      #pg-dashboard .dash-hero-title {
-        font-size: 20px;
-      }
-    }
-  </style>
-
-  <div class="dash-hero">
-    <div class="dash-hero-title">Welcome to APMS Coordinator Dashboard</div>
-    <div class="dash-hero-sub">
-      Monitor project charts, workflow progress, semester control, and project statistics.
-    </div>
+<!-- ════════════════════════════════════════
+     TOP STAT BAR  (plain text — no links)
+═════════════════════════════════════════ -->
+<div class="top-stat-bar">
+  <div class="top-stat-item">
+    <div class="top-stat-num green loading" id="statTotal">—</div>
+    <div class="top-stat-lbl">Projects this semester</div>
   </div>
-
-  <!-- Hidden old IDs so old app.js and chart numbers still work -->
-  <div class="dashboard-hidden-values">
-    <div id="dashTotalProjects">0</div>
-    <div id="dashAwaitingReview">0</div>
-    <div id="dashUnderEvaluation">0</div>
-    <div id="dashAccepted">0</div>
-    <div id="dashRejected">0</div>
-    <div id="dashLatestProjects"></div>
+  <div class="top-stat-item">
+    <div class="top-stat-num teal loading" id="statAwaiting">—</div>
+    <div class="top-stat-lbl">Awaiting review</div>
   </div>
-
-  <div class="dash-tabs" role="tablist" aria-label="Dashboard tabs">
-    <button class="dash-tab on" type="button" onclick="showDashSection('dashChartsTab', this)">
-      Projects Charts
-    </button>
-
-    <button class="dash-tab" type="button" onclick="showDashSection('dashWorkflowTab', this)">
-      Workflow
-    </button>
-
-    <button class="dash-tab" type="button" onclick="showDashSection('dashSemesterTab', this)">
-      Semester Control
-    </button>
+  <div class="top-stat-item">
+    <div class="top-stat-num orange loading" id="statEvaluation">—</div>
+    <div class="top-stat-lbl">In committee evaluation</div>
   </div>
+  <div class="top-stat-item">
+    <div class="top-stat-num blue loading" id="statStudents">—</div>
+    <div class="top-stat-lbl">Active students</div>
+  </div>
+</div>
 
-  <!-- =========================
-       TAB 1: PROJECTS CHARTS
-  ========================== -->
-  <div id="dashChartsTab" class="dash-section active">
-    <div class="dash-grid">
-      <div class="card">
-        <div class="card-hd">
-          <div>
-            <span class="card-title">Project Distribution by Status</span>
-            <div class="dash-subtitle">Accepted, rejected, awaiting review, and under evaluation</div>
-          </div>
-          <span class="dash-badge">Doughnut</span>
-        </div>
+<!-- ════════════════════════════════════════
+     BODY — 2 COLUMNS
+═════════════════════════════════════════ -->
+<div class="dash-body">
 
-        <div class="dash-chart-body small">
-          <canvas id="dashStatusChart"></canvas>
-        </div>
+  <!-- ═══ LEFT COLUMN ═══════════════════ -->
+  <div>
 
-        <div id="dashStatusDistribution" class="u-a10c5e0d dash-list-box">
-          <div class="dash-loading">Loading status distribution...</div>
-        </div>
+    <!-- Quick Actions -->
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">Quick actions</span>
       </div>
+      <div class="qa-grid">
+        <a class="qa-card" href="/coordinator/review">
+          <div class="qa-icon" style="background:#f0fdf4">📋</div>
+          <div><div class="qa-label">Project Review</div><div class="qa-sub">Review submissions</div></div>
+        </a>
+        <a class="qa-card" href="/coordinator/committee">
+          <div class="qa-icon" style="background:#f0f9ff">👨‍⚖️</div>
+          <div><div class="qa-label">Committees</div><div class="qa-sub">Schedule & manage</div></div>
+        </a>
+        <a class="qa-card" href="/coordinator/registration">
+          <div class="qa-icon" style="background:#fdf4ff">📬</div>
+          <div><div class="qa-label">Distribution</div><div class="qa-sub">Student registration</div></div>
+        </a>
+        <a class="qa-card" href="/coordinator/hours">
+          <div class="qa-icon" style="background:#fff7ed">⏱️</div>
+          <div><div class="qa-label">Faculty Hours</div><div class="qa-sub">Supervisor load</div></div>
+        </a>
+        <a class="qa-card" href="/coordinator/lectures">
+          <div class="qa-icon" style="background:#f8fafc">📚</div>
+          <div><div class="qa-label">Lectures</div><div class="qa-sub">Deliverables & timeline</div></div>
+        </a>
+        <a class="qa-card" href="/coordinator/search">
+          <div class="qa-icon" style="background:#f0fdf4">🗃️</div>
+          <div><div class="qa-label">Archive Search</div><div class="qa-sub">Browse past projects</div></div>
+        </a>
+      </div>
+    </div>
 
-      <div class="card">
-        <div class="card-hd">
-          <div>
-            <span class="card-title">Projects by Type</span>
-            <div class="dash-subtitle">Web, mobile, AI, database, security, and other</div>
-          </div>
-          <span class="dash-badge">Bar</span>
-        </div>
-
-        <div class="dash-chart-body small">
-          <canvas id="dashTypeChart"></canvas>
-        </div>
-
-        <div id="dashTypeDistribution" class="u-a10c5e0d dash-list-box">
-          <div class="dash-loading">Loading project types...</div>
+    <!-- Projects Overview -->
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">Projects — Overview</span>
+        <a class="panel-action" href="/coordinator/review">Details →</a>
+      </div>
+      <div id="projList">
+        <div class="dash-empty">
+          <div class="dash-empty-icon">📋</div>
+          Loading projects...
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- =========================
-       TAB 2: WORKFLOW
-  ========================== -->
-  <div id="dashWorkflowTab" class="dash-section">
-    <div class="dash-grid">
-      <div class="card">
-        <div class="card-hd">
-          <div>
-            <span class="card-title">Coordinator Workflow Progress</span>
-            <div class="dash-subtitle">Review, committee evaluation, and final decision progress</div>
-          </div>
-          <span class="dash-badge">Progress</span>
+    <!-- Projects by Type — horizontal bar chart from archive -->
+    <div class="panel">
+      <div class="panel-hd">
+        <div class="panel-hd-left">
+          <span class="panel-title">Projects by type</span>
+          <span class="panel-badge" id="archiveTotalBadge">from archive</span>
         </div>
-
-        <div class="dash-list-box" id="dashWorkflowProgress">
-          <div class="dash-loading">Loading workflow progress...</div>
-        </div>
+        <a class="panel-action" href="/coordinator/search">Browse archive →</a>
       </div>
-
-      <div class="card">
-        <div class="card-hd">
-          <div>
-            <span class="card-title">Review Status Overview</span>
-            <div class="dash-subtitle">Simple comparison between project stages</div>
-          </div>
-          <span class="dash-badge">Bar</span>
-        </div>
-
-        <div class="dash-chart-body">
-          <canvas id="dashReviewBarChart"></canvas>
-        </div>
+      <div class="chart-wrap">
+        <canvas id="typeBarChart"></canvas>
       </div>
     </div>
-  </div>
 
-  <!-- =========================
-       TAB 3: SEMESTER CONTROL
-  ========================== -->
-  <div id="dashSemesterTab" class="dash-section">
-    <div class="card">
-      <div class="card-hd">
-        <div>
-          <span class="card-title">Semester Control</span>
-          <div class="dash-subtitle">Current registration window and committee status</div>
+  </div>
+  <!-- ═══ END LEFT COLUMN ════════════════ -->
+
+  <!-- ═══ RIGHT COLUMN ══════════════════ -->
+  <div>
+
+    <!-- Semester at a glance -->
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">Semester at a glance</span>
+        <span id="semLabel" style="font-size:12px;color:#9ca3af;font-weight:600">—</span>
+      </div>
+      <div class="mini-stat-grid">
+        <div class="mini-stat-cell">
+          <div class="mini-stat-val" id="miniAccepted">—</div>
+          <div class="mini-stat-lbl">Accepted / Archived</div>
+        </div>
+        <div class="mini-stat-cell">
+          <div class="mini-stat-val blue" id="miniSections">—</div>
+          <div class="mini-stat-lbl">Sections</div>
+        </div>
+        <div class="mini-stat-cell">
+          <div class="mini-stat-val red" id="miniRejected">—</div>
+          <div class="mini-stat-lbl">Rejected</div>
+        </div>
+        <div class="mini-stat-cell">
+          <div class="mini-stat-val blue" id="miniCommittees">—</div>
+          <div class="mini-stat-lbl">Committees</div>
         </div>
       </div>
-
-      <div class="dash-card-body">
-        <div class="dash-info-box">
-          Student registration window:
-          <b id="dashDistributionStatus">Loading...</b>
-          <br>
-          Scheduled committees:
-          <b id="dashCommitteesCount">0</b>
-        </div>
-
-        <div class="semester-actions">
-          <button class="btn btn-primary" type="button" data-go="registration">
-            Student Distribution
-          </button>
-
-          <button class="btn btn-outline" type="button" data-go="committee">
-            Committees
-          </button>
-        </div>
+      <div class="progress-list" id="workflowBars">
+        <div style="padding:8px 0;color:#9ca3af;font-size:13px;text-align:center">Loading...</div>
       </div>
     </div>
+
+    <!-- Semester Control -->
+    <div class="panel">
+      <div class="panel-hd">
+        <span class="panel-title">Semester control</span>
+      </div>
+      <div class="sem-info">
+        <div class="sem-row">
+          <span class="sem-key">Registration window</span>
+          <span class="sem-val" id="regStatus">—</span>
+        </div>
+        <div class="sem-row">
+          <span class="sem-key">Committees scheduled</span>
+          <span class="sem-val" id="semComm">—</span>
+        </div>
+        <div class="sem-row">
+          <span class="sem-key">Active semester</span>
+          <span class="sem-val" id="semName">—</span>
+        </div>
+      </div>
+      <div class="sem-actions">
+        <button class="sem-btn primary" onclick="window.location.href='/coordinator/registration'">Student Distribution</button>
+        <button class="sem-btn" onclick="window.location.href='/coordinator/committee'">Committees</button>
+        <button class="sem-btn" onclick="window.location.href='/coordinator/sections'">Sections</button>
+      </div>
+    </div>
+
+    <!-- Recent Notifications -->
+    <div class="panel">
+      <div class="panel-hd">
+        <div class="panel-hd-left">
+          <span class="panel-title">Recent notifications</span>
+          <span class="notif-unread-badge" id="notifUnreadBadge" style="display:none"></span>
+        </div>
+        <a class="panel-action" href="/coordinator/notifs">View all →</a>
+      </div>
+      <div id="notifList">
+        <div class="dash-empty" style="padding:16px 18px;font-size:13px">Loading...</div>
+      </div>
+    </div>
+
   </div>
+  <!-- ═══ END RIGHT COLUMN ══════════════ -->
+
+</div>
+<!-- ═══ END BODY ══════════════════════════ -->
 
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-  function resetDashboardScroll() {
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+/* ── helpers ── */
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setEl(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('loading');
+  el.textContent = (val !== null && val !== undefined) ? String(val) : '—';
+}
+function timeAgo(str) {
+  if (!str) return '';
+  const d = Math.floor((Date.now() - new Date(str)) / 1000);
+  if (d < 60)    return 'just now';
+  if (d < 3600)  return Math.floor(d/60) + 'm ago';
+  if (d < 86400) return Math.floor(d/3600) + 'h ago';
+  return Math.floor(d/86400) + 'd ago';
+}
 
-    ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-dashboard'].forEach(selector => {
-      const el = document.querySelector(selector);
-      if (el) el.scrollTop = 0;
-    });
-  }
+const STATUS_COLOR = {
+  submitted:'#c58a17', under_review:'#0f766e', needs_revision:'#d97706',
+  committee_evaluation:'#7c3aed', accepted:'#2e7d42', archived:'#6b7280',
+  rejected:'#b42318', draft:'#9ca3af'
+};
+const STATUS_LABEL = {
+  submitted:'Submitted', under_review:'Under Review', needs_revision:'Needs Revision',
+  committee_evaluation:'In Evaluation', accepted:'Accepted',
+  archived:'Archived', rejected:'Rejected', draft:'Draft'
+};
+const TYPE_ORDER  = ['web','mobile','ai','software_engineering','security','databases','other'];
+const TYPE_LABELS = {web:'Web',mobile:'Mobile',ai:'AI',software_engineering:'Software Eng.',security:'Security',databases:'Databases',other:'Other'};
+const TYPE_COLORS = {web:'#2e7d42',mobile:'#0f766e',ai:'#7c3aed',software_engineering:'#1d4ed8',security:'#b42318',databases:'#c58a17',other:'#6b7280'};
 
-  function showDashSection(id, btn) {
-    document.querySelectorAll('#pg-dashboard .dash-section').forEach(section => {
-      section.classList.remove('active');
-    });
+let _typeChart = null;
 
-    const selected = document.getElementById(id);
-    if (selected) {
-      selected.classList.add('active');
+/* ── Load dashboard data ── */
+async function loadDashboard() {
+  try {
+    const r = await fetch('/api/coordinator/dashboard-data');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    const s   = d.stats   || {};
+    const sem = d.semester || {};
+    const abt = d.archive_by_type || {};
+
+    setEl('statTotal',      s.total_projects   ?? 0);
+    setEl('statAwaiting',   s.awaiting_review  ?? 0);
+    setEl('statEvaluation', s.under_evaluation ?? 0);
+    setEl('statStudents',   s.active_students  ?? 0);
+    setEl('miniAccepted',   s.accepted         ?? 0);
+    setEl('miniSections',   s.total_sections   ?? 0);
+    setEl('miniRejected',   s.rejected         ?? 0);
+    setEl('miniCommittees', s.committees       ?? 0);
+
+    const semTxt = sem.academic_year ? sem.academic_year + ' · S' + (sem.semester_number||'') : '—';
+    setEl('semLabel', semTxt);
+    setEl('semName',  semTxt);
+    setEl('semComm',  s.committees ?? 0);
+
+    const regEl = document.getElementById('regStatus');
+    if (regEl) {
+      regEl.textContent = d.distribution_open ? 'Open' : 'Closed';
+      regEl.className = 'sem-val ' + (d.distribution_open ? 'open' : 'closed');
     }
 
-    document.querySelectorAll('#pg-dashboard .dash-tab').forEach(tab => {
-      tab.classList.remove('on');
-    });
+    /* legacy */
+    ({dashTotalProjects:s.total_projects, dashAwaitingReview:s.awaiting_review,
+      dashUnderEvaluation:s.under_evaluation, dashAccepted:s.accepted, dashRejected:s.rejected
+    }) && Object.entries({dashTotalProjects:s.total_projects, dashAwaitingReview:s.awaiting_review,
+      dashUnderEvaluation:s.under_evaluation, dashAccepted:s.accepted, dashRejected:s.rejected
+    }).forEach(([id,val])=>{ const e=document.getElementById(id); if(e) e.textContent=String(val??0); });
 
-    if (btn) {
-      btn.classList.add('on');
-    }
-
-    setTimeout(function () {
-      createDashboardCharts();
-      resetDashboardScroll();
-    }, 60);
+    renderProjects(d.latest_projects || []);
+    renderTypeChart(abt);
+    renderWorkflow(s);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('projList').innerHTML =
+      '<div class="dash-empty"><div class="dash-empty-icon">⚠️</div>Could not load data.</div>';
   }
+}
 
-  function dashGetNum(id, fallback) {
-    const el = document.getElementById(id);
-    if (!el) return fallback;
-
-    const n = parseInt(String(el.textContent || '').replace(/[^\d-]/g, ''), 10);
-    return Number.isFinite(n) ? n : fallback;
+/* ── Projects list ── */
+function renderProjects(list) {
+  const el = document.getElementById('projList');
+  if (!el) return;
+  if (!list.length) {
+    el.innerHTML = `<div class="dash-empty">
+      <div class="dash-empty-icon">📁</div>
+      No projects this semester yet
+      <div class="dash-empty-hint">Projects will appear here once students submit.</div>
+    </div>`;
+    return;
   }
+  el.innerHTML = list.map(p => {
+    const color = STATUS_COLOR[p.status] || '#9ca3af';
+    const label = STATUS_LABEL[p.status] || p.status;
+    const meta  = [p.supervisor_name, p.team_members].filter(Boolean).join(' · ');
+    return `<div class="proj-row" onclick="window.location.href='/coordinator/review'">
+      <div class="proj-info">
+        <div class="proj-title">${esc(p.title)}</div>
+        <div class="proj-meta">${esc(meta||'—')}</div>
+      </div>
+      <span class="proj-badge" style="background:${color}18;color:${color}">${esc(label)}</span>
+    </div>`;
+  }).join('');
+}
 
-  function dashCreateChart(canvasId, config) {
-    const canvas = document.getElementById(canvasId);
-
-    if (!canvas || typeof Chart === 'undefined') {
-      return null;
-    }
-
-    if (canvas._chartInstance) {
-      canvas._chartInstance.destroy();
-    }
-
-    canvas._chartInstance = new Chart(canvas, config);
-    return canvas._chartInstance;
-  }
-
-  function createDashboardCharts() {
-    const total = dashGetNum('dashTotalProjects', 49);
-    const awaiting = dashGetNum('dashAwaitingReview', 8);
-    const underEvaluation = dashGetNum('dashUnderEvaluation', 6);
-    const accepted = dashGetNum('dashAccepted', 27);
-    const rejected = dashGetNum('dashRejected', 4);
-
-    const green = '#2e7d42';
-    const lightGreen = '#7ac58a';
-    const yellow = '#c58a17';
-    const red = '#b42318';
-    const teal = '#0f766e';
-    const gray = '#64748b';
-
-    dashCreateChart('dashStatusChart', {
-      type: 'doughnut',
-      data: {
-        labels: ['Accepted / Archived', 'Awaiting Review', 'Under Evaluation', 'Rejected'],
-        datasets: [{
-          data: [accepted, awaiting, underEvaluation, rejected],
-          backgroundColor: [green, yellow, teal, red],
-          borderWidth: 0
-        }]
+/* ── Bar chart ── */
+function renderTypeChart(abt) {
+  const canvas = document.getElementById('typeBarChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const total = abt._total || 0;
+  const badge = document.getElementById('archiveTotalBadge');
+  if (badge) badge.textContent = total > 0 ? total + ' archived total' : 'from archive';
+  const keys = TYPE_ORDER.filter(k => (abt[k]||0) > 0);
+  const display = keys.length ? keys : TYPE_ORDER;
+  display.sort((a,b) => (abt[b]||0)-(abt[a]||0));
+  if (_typeChart) { _typeChart.destroy(); _typeChart = null; }
+  _typeChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: display.map(k => TYPE_LABELS[k]),
+      datasets: [{
+        data: display.map(k => abt[k]||0),
+        backgroundColor: display.map(k => TYPE_COLORS[k]+'cc'),
+        borderColor:     display.map(k => TYPE_COLORS[k]),
+        borderWidth: 1.5, borderRadius: 6, borderSkipped: false
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const pct = total > 0 ? Math.round((ctx.raw/total)*100) : 0;
+          return ` ${ctx.raw} projects (${pct}%)`;
+        }}}
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: {
-            position: 'bottom'
-          }
-        }
+      scales: {
+        x: { beginAtZero:true, ticks:{precision:0,font:{size:11}}, grid:{color:'#f0f4f1'} },
+        y: { ticks:{font:{size:12,weight:'600'},color:'#374151'}, grid:{display:false} }
       }
-    });
-
-    dashCreateChart('dashTypeChart', {
-      type: 'bar',
-      data: {
-        labels: ['Web', 'Mobile', 'AI', 'Security', 'Database', 'Other'],
-        datasets: [{
-          label: 'Projects',
-          data: [12, 8, 10, 5, 7, 4],
-          backgroundColor: [green, lightGreen, teal, yellow, gray, '#173b24'],
-          borderRadius: 10
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              precision: 0
-            }
-          }
-        }
-      }
-    });
-
-    dashCreateChart('dashReviewBarChart', {
-      type: 'bar',
-      data: {
-        labels: ['Awaiting', 'Evaluation', 'Accepted', 'Rejected'],
-        datasets: [{
-          label: 'Projects',
-          data: [awaiting, underEvaluation, accepted, rejected],
-          backgroundColor: [yellow, teal, green, red],
-          borderRadius: 10
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              precision: 0
-            }
-          }
-        }
-      }
-    });
-  }
-
-  if ('scrollRestoration' in history) {
-    history.scrollRestoration = 'manual';
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    createDashboardCharts();
-
-    setTimeout(createDashboardCharts, 600);
-    setTimeout(createDashboardCharts, 1200);
-
-    setTimeout(resetDashboardScroll, 0);
-    setTimeout(resetDashboardScroll, 100);
-  });
-
-  window.addEventListener('load', function () {
-    createDashboardCharts();
-    setTimeout(createDashboardCharts, 800);
-  });
-
-  function goToCoordinatorPage(page) {
-    if (!page) return;
-    window.location.href = `/coordinator/${page}`;
-  }
-
-  document.addEventListener('click', function (e) {
-    const goBtn = e.target.closest('[data-go]');
-
-    if (goBtn) {
-      e.preventDefault();
-      goToCoordinatorPage(goBtn.dataset.go);
     }
   });
+}
+
+/* ── Workflow bars ── */
+function renderWorkflow(s) {
+  const el = document.getElementById('workflowBars');
+  if (!el) return;
+  const total = Math.max(s.total_projects||1, 1);
+  const items = [
+    { label:'Awaiting review',     val:s.awaiting_review ||0, color:'#c58a17' },
+    { label:'Under evaluation',    val:s.under_evaluation||0, color:'#7c3aed' },
+    { label:'Accepted / Archived', val:s.accepted        ||0, color:'#2e7d42' },
+  ];
+  el.innerHTML = items.map(item => {
+    const pct = Math.round((item.val/total)*100);
+    return `<div class="progress-item">
+      <div class="progress-row">
+        <span class="progress-lbl">${item.label}</span>
+        <span class="progress-pct">${pct}%</span>
+      </div>
+      <div class="progress-bg">
+        <div class="progress-fill" style="width:${pct}%;background:${item.color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Notifications ── */
+async function loadNotifications() {
+  try {
+    const r = await fetch('/api/coordinator/notifications/inbox');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    const all    = d.notifications || [];
+    const latest = all.slice(0, 2);
+    const unread = all.filter(n => !n.is_read).length;
+    const badge  = document.getElementById('notifUnreadBadge');
+    if (badge) {
+      badge.textContent = unread + ' new';
+      badge.style.display = unread > 0 ? 'inline' : 'none';
+    }
+    const el = document.getElementById('notifList');
+    if (!el) return;
+    if (!latest.length) {
+      el.innerHTML = '<div class="dash-empty" style="padding:16px 18px;font-size:13px">No notifications yet.</div>';
+      return;
+    }
+    el.innerHTML = latest.map(n => {
+      const isUnread = !n.is_read;
+      const from = n.sender_name ? 'From: ' + n.sender_name : '';
+      const when = timeAgo(n.created_at);
+      return `<div class="notif-item${isUnread?' unread':''}" onclick="window.location.href='/coordinator/notifs'">
+        <div class="notif-dot${isUnread?'':' read'}"></div>
+        <div class="notif-body">
+          <div class="notif-title">${esc(n.title||'Notification')}</div>
+          <div class="notif-meta">${esc(from)}${from&&when?' · ':''}${esc(when)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    const el = document.getElementById('notifList');
+    if (el) el.innerHTML = '<div class="dash-empty" style="padding:16px 18px;font-size:13px">Could not load.</div>';
+  }
+}
+
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+document.addEventListener('DOMContentLoaded', () => {
+  loadDashboard();
+  loadNotifications();
+  window.scrollTo(0, 0);
+});
 </script>
 {% endblock %}
