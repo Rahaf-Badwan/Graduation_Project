@@ -4783,3 +4783,33 @@ SELECT * FROM vw_graduation_section_results ORDER BY reference_id DESC;
 
 SET FOREIGN_KEY_CHECKS = 1;
 SET SQL_SAFE_UPDATES = 1;
+
+
+
+
+USE apms_db;
+
+SET SQL_SAFE_UPDATES = 0;
+
+SET @col_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'faculty'
+      AND COLUMN_NAME = 'office_number'
+);
+
+SET @sql = IF(
+    @col_exists = 0,
+    'ALTER TABLE faculty ADD COLUMN office_number VARCHAR(120) NULL AFTER title',
+    'SELECT "office_number already exists"'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+UPDATE faculty
+SET office_number = COALESCE(office_number, 'Science Building — 214');
+
+SET SQL_SAFE_UPDATES = 1;
