@@ -14,11 +14,12 @@ from db import get_db
 from auth import login_required
 from routes.add_student import add_student_bp
 from routes.assign_rols import assign_rols_bp
+from routes.promote import promote_bp
 
 head_bp = Blueprint("head", __name__, url_prefix="/head")
 head_bp.register_blueprint(add_student_bp)
 head_bp.register_blueprint(assign_rols_bp)
-
+head_bp.register_blueprint(promote_bp)
 
 # ─── Dashboard ──────────────────────────────────────────────
 @head_bp.route("/")

@@ -42,8 +42,95 @@
         <div id="add-feedback" style="display:none; margin-top:12px;"></div>
       </div>
     </div>
-
+    
     <div>
+      <div style="
+      display: flex;
+      gap:10px;
+      padding:12px 16px;
+      border-bottom: 0.5px solid var(--color-border-tertiary);
+      background: #fafafa;
+      border-radius: 5px;
+      margin-bottom: 5px;">
+      <button class="btn btn.outline" onclick="openPromoteModal()"
+           style="font-size: 12px; padding: 6px 14px; display: flex; align-items: center; gap: 5px; border-radius: 5px; background: #fafafa">
+          
+       <span class="material-symbols-outlined icon-inline">upgrade</span>
+        Promote & Archive   
+      </button>
+      <div class="ann-overlay" id="promote-overlay" onclick="closePromoteModal(event)">
+  <div class="ann-modal" style="max-width:500px;">
+
+    <div class="ann-modal-hd">
+      <span class="material-symbols-outlined icon-inline">upgrade</span>
+      <span style="font-size:13px; font-weight:700;">Promote & Archive</span>
+      <button class="ann-close-btn"
+        onclick="document.getElementById('promote-overlay').classList.remove('open')">
+        <span class="material-symbols-outlined icon-inline">close</span>
+      </button>
+    </div>
+
+    <div class="ann-modal-body">
+
+      <div style="margin-bottom:18px;">
+        <div style="font-size:13px; font-weight:600; color:var(--color-text-primary); margin-bottom:8px;
+          display:flex; align-items:center; gap:6px;">
+          <span class="material-symbols-outlined" style="font-size:16px; color:#2d6a38;">school</span>
+          COMP4200 → COMP4300
+        </div>
+        <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:10px;">
+          Promote all passed COMP4200 students to COMP4300.
+        </div>
+
+        <div id="passed-students-list" style="
+          max-height:160px; overflow-y:auto;
+          border:0.5px solid var(--color-border-tertiary);
+          border-radius:8px; margin-bottom:10px;
+          font-size:12px;">
+          <div style="padding:12px; color:var(--color-text-tertiary);">Loading...</div>
+        </div>
+
+        <button class="btn btn-primary" id="promoteBtn" onclick="promoteAll()"
+          style="font-size:12px; padding:7px 16px; width:100%;">
+          <span class="material-symbols-outlined icon-inline">upgrade</span>
+          Promote All to COMP4300
+        </button>
+        <div id="promote-feedback" style="display:none; margin-top:10px;"></div>
+      </div>
+
+      <div style="height:0.5px; background:var(--color-border-tertiary); margin-bottom:18px;"></div>
+
+      <div>
+        <div style="font-size:13px; font-weight:600; color:var(--color-text-primary); margin-bottom:8px;
+          display:flex; align-items:center; gap:6px;">
+          <span class="material-symbols-outlined" style="font-size:16px; color:#dc2626;">archive</span>
+          COMP4300 → Archive
+        </div>
+        <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:10px;">
+          Archive all active COMP4300 projects.
+        </div>
+
+        <div id="comp4300-students-list" style="
+          max-height:160px; overflow-y:auto;
+          border:0.5px solid var(--color-border-tertiary);
+          border-radius:8px; margin-bottom:10px;
+          font-size:12px;">
+          <div style="padding:12px; color:var(--color-text-tertiary);">Loading...</div>
+        </div>
+
+        <button class="btn btn-outline" id="archiveBtn" onclick="archiveAll()"
+          style="font-size:12px; padding:7px 16px; width:100%;
+          color:#dc2626; border-color:#dc2626;">
+          <span class="material-symbols-outlined icon-inline">archive</span>
+          Archive All COMP4300 Projects
+        </button>
+        <div id="archive-feedback" style="display:none; margin-top:10px;"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+    </div>
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Activate Students</span>

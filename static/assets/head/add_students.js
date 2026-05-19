@@ -211,6 +211,23 @@ async function loadCurrentAnn(){
   }catch(e){}
 }
 
+function copyLink(){
+  var link = window.location.origin + '/activate';
+
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(link).then(function(){
+      showFeedback_ann('Link copied!', 'success');
+    });
+  }else{
+    var el = document.createElement('textarea');
+    el.value = link;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showFeedback_ann('Link copied!', 'success');
+  }
+}
 function openAnnModal(){
   document.getElementById('ann-overlay').classList.add('open');
 }
@@ -295,4 +312,111 @@ function showFeedback_ann(msg, type){
 function hideFeedback_ann(){
   var el = document.getElementById('ann-feedback');
   if (el) el.style.display = 'none';
+}
+
+/*  Promote and Archive Modal  */
+function openPromoteModal(){
+  document.getElementById('promote-overlay').classList.add('open');
+  loadPassedStudents();
+  loadComp4300Students();
+}
+
+function closePromoteModal(e){
+  if(e && e.target !== document.getElementById('promote-overlay')) return;
+  document.getElementById('promote-overlay').classList.remove('open');
+}
+
+async function loadPassedStudents(){
+  var list = document.getElementById('passed-student-list');
+  list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">Loading...</div>';
+
+  try{
+    var res = await fetch('/head/api/students/comp4300');
+    var data = await res.json();
+    var students = data.students || [];
+
+    if(!students.length){
+      list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">No active COMP4300 projects found.</div>';
+      return;
+    }
+
+    list.innerHTML  = students.map(function(s){
+      return '<div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">' +
+      '<div style="width:28px; height:28px; border-radius:50%; background:var(--color-background-info); display:grid; place-items:center; font-size:11px; font-weight:600; color:car(--color-text-info); flex-shrink:0;:>' +
+        (s.avatar_initials || s.full_name.substring(0,2).toUpperCase()) +
+        '</div>' +
+        '<div style="flex:1; min-width:0;">' +
+          '<div style="font-size:13px; font-weight:500;"' + s.full_name + '</div>' +
+          '<div style="font-size:11px; color:var(--color-text-secondary);">' + s.university_id + '</div>' +
+        '</div>' +
+        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-info); color:var(--color-text-info); border: 0.5px solid var(--color-border-tertiary);">COMP4300</span>' +
+      '</div>';
+      }).join('');
+  }catch(e){
+    list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">Could not load students.</div>';
+  }
+}
+
+async function promoteAll(){
+  var btn = document.getElementById('promoreBtn');
+  btn.disabled = true;
+  btn.textContent = 'Promoting...';
+
+  try{
+    var res = await fetch('/head/api/students/promote-all', {method: 'POST'});
+    var data = await res.json();
+
+    if(res.ok){
+      showFeedback_promote('promote-feedback', data.message, 'success');
+      loadPassedStudents();
+    }else{
+      showFeedback_promote('promote-feedback', data.error || 'something want wrong.', 'error');
+
+    }
+  }catch(e){
+    showFeedback_promote('promote-feedback', 'Could not reach the server.', 'error');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined icon-inline">upgrade</span>';
+  }
+}
+
+async function archiveAll(){
+  var btn = document.getElementById('archiveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Archiving...';
+
+  try{
+    var res = await fetch('/head/api/students/archive-all', {method: 'POST'});
+    var data = await res.json();
+
+    if(res.ok){
+      showFeedback_promote('archive-feedback', data.message, 'success');
+      loadComp4300Students();
+    }else{
+      showFeedback_promote('archive-feedback', data.error || 'Something went wrong.', 'error');
+    }
+  }catch(e){
+    showFeedback_promote('archive-feddback', 'Could not reach the server.', 'error');
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlines icon-inline">archive</span>';
+  }
+}
+
+function showFeedback_promote(id, message, type){
+  var el = document.getElementById(id);
+  var s = {
+    success: {color:'var(--color-text-success)', bg:'var(--color-background-success)', border:'var(--color-border-success)'},
+    error: {color:'var(--color-text-danger)', bg:'var(--color-background-danger)', border:'var(--color-border-danger)'}
+  }[type] || {};
+  el.removeAttribute('style');
+  el.style.display = 'block';
+  el.style.padding = '10px 14px';
+  el.style.borderRadius = '8px';
+  el.style.fontSize = '12px';
+  el.style.color = s.color;
+  el.style.background = s.bg;
+  el.style.border = '0.5px solid ' + s.border;
+  el.textContent = msg
 }
