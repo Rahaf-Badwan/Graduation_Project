@@ -6,53 +6,259 @@
 
 {% block content %}
 <div class="page page-single on" id="pg-profile">
+  <style>
+    #pg-profile .profile-msg {
+      display: none;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    #pg-profile .profile-msg.ok {
+      display: block;
+      color: #027a48;
+      background: #ecfdf3;
+      border: 1px solid #abefc6;
+    }
+
+    #pg-profile .profile-msg.error {
+      display: block;
+      color: #b42318;
+      background: #fef3f2;
+      border: 1px solid #fecdca;
+    }
+
+    #pg-profile .profile-msg.loading {
+      display: block;
+      color: #344054;
+      background: #f9fafb;
+      border: 1px solid #eaecf0;
+    }
+
+    #pg-profile .field-input:disabled {
+      background: #f5f7f6;
+      cursor: not-allowed;
+    }
+  </style>
+
+  <div id="profileMsg" class="profile-msg"></div>
+
   <div class="profile-header">
-    <div class="profile-avatar-lg">AS</div>
+    <div class="profile-avatar-lg" id="profileAvatar">--</div>
+
     <div class="u-d5e8c5f3">
-      <div class="u-01c72404">Dr. Ahmad Abu Sneineh</div>
-      <div class="u-be9d84ea">Coordinator of COMP4200 · Computer Science Department</div>
+      <div class="u-01c72404" id="profileName">Loading...</div>
+      <div class="u-be9d84ea" id="profileSubtitle">Coordinator · Computer Science Department</div>
+
       <div class="u-fa567a25">
-        <span class="pill p-review">Active Coordinator</span>
-        <span class="u-6107fe4d">COMP4200</span>
+        <span class="pill p-review" id="profileRole">Active Coordinator</span>
+        <span class="u-6107fe4d" id="profileCourse">COMP4200</span>
       </div>
     </div>
-    <button class="btn btn-outline" type="button">Edit Profile</button>
+
+    <button class="btn btn-outline" type="button" onclick="enableProfileEdit()">
+      Edit Profile
+    </button>
   </div>
+
   <div class="two-col">
     <div class="card">
-      <div class="card-hd"><span class="card-title">Personal Information</span></div>
-      <div class="field-wrap">
-        <div class="field-label">Full Name</div><input class="field-input" value="Dr. Ahmad Abu Sneineh" />
+      <div class="card-hd">
+        <span class="card-title">Personal Information</span>
       </div>
+
       <div class="field-wrap">
-        <div class="field-label">Email</div><input class="field-input" value="abuseneina@birzeit.edu" />
+        <div class="field-label">Full Name</div>
+        <input class="field-input" id="fullName" disabled />
       </div>
+
       <div class="field-wrap">
-        <div class="field-label">Office Number</div><input class="field-input" value="Science Building — 214" />
+        <div class="field-label">Email</div>
+        <input class="field-input" id="email" disabled />
       </div>
-      <div class="btn-row"><button class="btn btn-primary" type="button">Save Changes</button></div>
+
+      <div class="field-wrap">
+        <div class="field-label">Office Number</div>
+        <input class="field-input" id="officeNumber" placeholder="Science Building — 214" disabled />
+      </div>
+
+      <div class="field-wrap">
+        <div class="field-label">Specialization</div>
+        <input class="field-input" id="specialization" disabled />
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="saveProfileBtn" type="button" onclick="saveProfile()" disabled>
+          Save Changes
+        </button>
+
+        <button class="btn btn-outline" id="cancelProfileBtn" type="button" onclick="loadProfile()" disabled>
+          Cancel
+        </button>
+      </div>
     </div>
+
     <div class="card">
-      <div class="card-hd"><span class="card-title">My Statistics as Coordinator</span></div>
+      <div class="card-hd">
+        <span class="card-title">My Statistics as Coordinator</span>
+      </div>
+
       <div class="u-e1357c22">
         <div class="stat">
-          <div class="stat-num u-8351a61a">312</div>
+          <div class="stat-num u-8351a61a" id="projectsOverseen">0</div>
           <div class="stat-label">Projects Overseen</div>
         </div>
+
         <div class="stat">
-          <div class="stat-num u-33340b68">95%</div>
+          <div class="stat-num u-33340b68" id="acceptanceRate">0%</div>
           <div class="stat-label">Acceptance Rate</div>
         </div>
+
         <div class="stat">
-          <div class="stat-num u-c0077588">18</div>
+          <div class="stat-num u-c0077588" id="committeesFormed">0</div>
           <div class="stat-label">Committees Formed</div>
         </div>
+
         <div class="stat">
-          <div class="stat-num u-a28c35c7">83.4</div>
+          <div class="stat-num u-a28c35c7" id="averageScore">0</div>
           <div class="stat-label">Average Scores</div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+  let originalProfile = null;
+
+  function setProfileMsg(message, type) {
+    const box = document.getElementById('profileMsg');
+    if (!box) return;
+
+    box.textContent = message || '';
+    box.className = 'profile-msg';
+
+    if (type) {
+      box.classList.add(type);
+    }
+  }
+
+  function safe(value) {
+    return value === null || value === undefined ? '' : String(value);
+  }
+
+  function initials(name) {
+    const parts = safe(name).trim().split(/\s+/).filter(Boolean);
+
+    if (!parts.length) return '--';
+
+    const first = parts[0][0] || '';
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+
+    return (first + last).toUpperCase();
+  }
+
+  function setEditMode(enabled) {
+    ['fullName', 'email', 'officeNumber', 'specialization'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !enabled;
+    });
+
+    document.getElementById('saveProfileBtn').disabled = !enabled;
+    document.getElementById('cancelProfileBtn').disabled = !enabled;
+  }
+
+  function enableProfileEdit() {
+    setEditMode(true);
+    setProfileMsg('You can now edit your profile information.', 'loading');
+  }
+
+  async function loadProfile() {
+    setProfileMsg('Loading profile...', 'loading');
+    setEditMode(false);
+
+    try {
+      const res = await fetch('/api/coordinator/profile');
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || 'Failed to load profile.');
+      }
+
+      originalProfile = data.profile || {};
+      const stats = data.stats || {};
+
+      document.getElementById('fullName').value = safe(originalProfile.full_name);
+      document.getElementById('email').value = safe(originalProfile.email);
+      document.getElementById('officeNumber').value = safe(originalProfile.office_number || 'Science Building — 214');
+      document.getElementById('specialization').value = safe(originalProfile.specialization || 'software_engineering');
+
+      document.getElementById('profileName').textContent = safe(originalProfile.full_name || 'Coordinator');
+      document.getElementById('profileAvatar').textContent = safe(originalProfile.avatar_initials || initials(originalProfile.full_name));
+      document.getElementById('profileSubtitle').textContent =
+        'Coordinator of ' + safe(originalProfile.course_code || 'COMP4200') + ' · Computer Science Department';
+      document.getElementById('profileCourse').textContent = safe(originalProfile.course_code || 'COMP4200');
+
+      document.getElementById('projectsOverseen').textContent = stats.projects_overseen || 0;
+      document.getElementById('acceptanceRate').textContent = (stats.acceptance_rate || 0) + '%';
+      document.getElementById('committeesFormed').textContent = stats.committees_formed || 0;
+      document.getElementById('averageScore').textContent = stats.average_score || 0;
+
+      setProfileMsg('', '');
+    } catch (err) {
+      setProfileMsg(err.message || 'Profile loading error.', 'error');
+    }
+  }
+
+  async function saveProfile() {
+    const payload = {
+      full_name: document.getElementById('fullName').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      office_number: document.getElementById('officeNumber').value.trim(),
+      specialization: document.getElementById('specialization').value.trim()
+    };
+
+    if (!payload.full_name) {
+      setProfileMsg('Full name is required.', 'error');
+      return;
+    }
+
+    if (!payload.email) {
+      setProfileMsg('Email is required.', 'error');
+      return;
+    }
+
+    setProfileMsg('Saving profile...', 'loading');
+
+    try {
+      const res = await fetch('/api/coordinator/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || 'Failed to save profile.');
+      }
+
+      setEditMode(false);
+      await loadProfile();
+      setProfileMsg(data.message || 'Profile updated successfully.', 'ok');
+
+      setTimeout(function () {
+        setProfileMsg('', '');
+      }, 2500);
+    } catch (err) {
+      setProfileMsg(err.message || 'Profile save error.', 'error');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
 {% endblock %}

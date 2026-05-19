@@ -1,6 +1,70 @@
 {% extends 'coordinator/base.html' %}
 
-{% block page_title %}Create Evaluation Committee{% endblock %}
+{% block page_title %}Create Evaluation Committee
+
+<script>
+  /* Supervisor UI lock: the supervisor is fixed from the project supervisor.
+     This hides the old Responsible Doctor picker and renames any remaining
+     Responsible label to Supervisor. */
+  function lockCommitteeSupervisorUi() {
+    const root = document.getElementById('pg-committee') || document.body;
+
+    root.querySelectorAll('*').forEach(function (el) {
+      const text = (el.textContent || '').trim();
+
+      if (text === 'Responsible Doctor') {
+        el.textContent = 'Supervisor';
+      }
+
+      if (text === 'Save Responsible') {
+        const row = el.closest('.btn-row, .form-grid, div');
+        if (row) {
+          row.style.display = 'none';
+        } else {
+          el.style.display = 'none';
+        }
+      }
+
+      if (text === 'Responsible') {
+        el.textContent = 'Supervisor';
+      }
+    });
+
+    root.querySelectorAll('select').forEach(function (select) {
+      const optionText = Array.from(select.options || [])
+        .map(function (opt) { return opt.textContent || ''; })
+        .join(' ');
+
+      const nextButton = select.parentElement
+        ? select.parentElement.querySelector('button')
+        : null;
+
+      if (optionText.includes('Dr.') && nextButton && (nextButton.textContent || '').includes('Save Responsible')) {
+        select.disabled = true;
+        select.style.display = 'none';
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    lockCommitteeSupervisorUi();
+    setTimeout(lockCommitteeSupervisorUi, 300);
+    setTimeout(lockCommitteeSupervisorUi, 1000);
+
+    const target = document.getElementById('pg-committee') || document.body;
+    const observer = new MutationObserver(function () {
+      lockCommitteeSupervisorUi();
+    });
+
+    observer.observe(target, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  });
+</script>
+
+{% endblock %}
 {% block page_id %}committee{% endblock %}
 {% block topbar_title %}Create Evaluation Committee{% endblock %}
 

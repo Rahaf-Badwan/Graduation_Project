@@ -74,9 +74,53 @@
     border: 1px solid #eaecf0;
   }
 
+  .section-card {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .section-card-title {
+    font-weight: 900;
+    color: #1d2733;
+    margin-bottom: 5px;
+  }
+
+  .section-card-meta {
+    font-size: 12px;
+    color: #667587;
+    line-height: 1.5;
+  }
+
+  .section-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .btn-danger {
+    background: #b42318 !important;
+    color: #fff !important;
+    border: 1px solid #b42318 !important;
+  }
+
+  .btn-danger:hover {
+    background: #912018 !important;
+  }
+
   @media(max-width:980px) {
     .reg-split {
       grid-template-columns: 1fr;
+    }
+
+    .section-card {
+      flex-direction: column;
     }
   }
 </style>
@@ -96,6 +140,9 @@
     </button>
   </div>
 
+  <!-- =========================
+       TAB 1: SUBMISSIONS
+  ========================== -->
   <section class="reg-tab-pane active" id="reg-tab-submissions">
     <div class="card">
       <div class="card-hd">
@@ -138,16 +185,20 @@
     </div>
   </section>
 
+  <!-- =========================
+       TAB 2: UNASSIGNED + SECTIONS
+  ========================== -->
   <section class="reg-tab-pane" id="reg-tab-unassigned">
     <div class="reg-split">
+      <!-- LEFT: UNASSIGNED STUDENTS -->
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Unassigned Students</span>
         </div>
 
         <div class="u-e284fbe5">
-          Students who do not have a group yet are shown here as checkboxes. Select up to 3 students, choose a
-          supervisor, then create a section for them.
+          Students who do not have a group yet are shown here as checkboxes.
+          Select students, then create a new section or add them to an existing section.
         </div>
 
         <div style="font-size:12px;color:#667587;margin-bottom:10px">
@@ -159,19 +210,20 @@
         </div>
       </div>
 
+      <!-- RIGHT: CREATE / ADD / DELETE SECTIONS -->
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Create Section for Unassigned Students</span>
+          <span class="card-title">Create or Update Section</span>
         </div>
 
         <div class="u-cebcb327">
-          Choose a unique section name, choose a supervisor, and create a section using the checked
-          students from the left panel.
+          You can create a new section from selected students, or add selected students to an existing section
+          if the section has fewer than 3 students.
         </div>
 
         <div class="form-grid" style="margin-bottom:12px">
           <div class="field-wrap">
-            <div class="field-label">Section Name</div>
+            <div class="field-label">New Section Name</div>
             <input class="field-input" id="sectionName" placeholder="Section 01" />
           </div>
 
@@ -188,7 +240,14 @@
             class="btn btn-primary u-9bd93d36"
             type="button"
             onclick="createSectionNoDuplicate()">
-            + Create Section From Selected Students
+            + Create New Section
+          </button>
+
+          <button
+            class="btn btn-outline u-9bd93d36"
+            type="button"
+            onclick="addSelectedToExistingSection()">
+            + Add To Existing Section
           </button>
 
           <button
@@ -197,6 +256,13 @@
             onclick="window.location.href='/api/coordinator/export-sections'">
             Export Excel
           </button>
+        </div>
+
+        <div class="field-wrap" style="margin-top:12px">
+          <div class="field-label">Existing Section</div>
+          <select class="field-select" id="existingSectionSelect">
+            <option value="">Select existing section...</option>
+          </select>
         </div>
 
         <div id="sectionMsg" class="reg-message"></div>
@@ -208,6 +274,9 @@
     </div>
   </section>
 
+  <!-- =========================
+       TAB 3: WINDOW CONTROL
+  ========================== -->
   <section class="reg-tab-pane" id="reg-tab-window">
     <div class="card" style="max-width:760px">
       <div class="card-hd">
@@ -215,8 +284,8 @@
       </div>
 
       <div style="font-size:13px;color:#667587;margin-bottom:12px">
-        Open the student registration page and choose an automatic close date. When the close date passes, registration
-        closes automatically.
+        Open the student registration page and choose an automatic close date.
+        When the close date passes, registration closes automatically.
       </div>
 
       <div class="field-wrap" style="margin-bottom:12px">
@@ -268,21 +337,12 @@
       return names;
     }
 
-    /*
-      This checks visible section names rendered inside sectionsList.
-      It supports many possible HTML shapes from app.js:
-      - data-section-name
-      - .section-name
-      - .section-title
-      - first strong/b element
-      - text before supervisor/students info
-    */
     sectionsList.querySelectorAll('[data-section-name]').forEach(function (el) {
       const name = normalizeSectionName(el.getAttribute('data-section-name'));
       if (name) names.add(name);
     });
 
-    sectionsList.querySelectorAll('.section-name, .section-title').forEach(function (el) {
+    sectionsList.querySelectorAll('.section-name, .section-title, .section-card-title').forEach(function (el) {
       const name = normalizeSectionName(el.textContent);
       if (name) names.add(name);
     });
@@ -310,15 +370,48 @@
       return true;
     }
 
-    /*
-      Fallback check:
-      If sectionsList text contains the exact section name.
-      This helps when app.js renders sections without special classes.
-    */
     const sectionsList = document.getElementById('sectionsList');
     const allText = normalizeSectionName(sectionsList ? sectionsList.textContent : '');
 
     return allText.includes(wanted);
+  }
+
+  function getSelectedStudentIds() {
+    const checked = document.querySelectorAll('#unassignedStudentsBox input[type="checkbox"]:checked');
+
+    return Array.from(checked)
+      .map(function (cb) {
+        return cb.value;
+      })
+      .filter(Boolean);
+  }
+
+  function updateSelectedStudentsCount() {
+    const countBox = document.getElementById('selectedStudentsCount');
+    const selected = getSelectedStudentIds();
+
+    if (countBox) {
+      countBox.textContent = selected.length;
+    }
+  }
+
+  async function apiJson(url, options) {
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      ...(options || {})
+    });
+
+    const data = await res.json().catch(function () {
+      return {};
+    });
+
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || data.message || 'Request failed');
+    }
+
+    return data;
   }
 
   async function createSectionNoDuplicate() {
@@ -350,18 +443,198 @@
         await result;
       }
 
-      setTimeout(function () {
-        const stillRepeated = isSectionNameAlreadyUsed(sectionName);
-        if (stillRepeated) {
-          setSectionMessage('Section created successfully.', 'ok');
-        } else {
-          setSectionMessage('', '');
-        }
-      }, 600);
+      setSectionMessage('Section created successfully.', 'ok');
+
+      setTimeout(async function () {
+        await refreshRegistrationSectionData();
+      }, 500);
+
     } catch (error) {
       setSectionMessage(error.message || 'Failed to create section.', 'error');
     }
   }
+
+  async function loadExistingSectionsForSelect() {
+    const select = document.getElementById('existingSectionSelect');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Loading sections...</option>';
+
+    try {
+      const data = await apiJson('/api/coordinator/sections');
+
+      const sections = data.sections || [];
+
+      select.innerHTML = '<option value="">Select existing section...</option>';
+
+      sections.forEach(function (section) {
+        const count = Number(section.student_count || 0);
+        const sectionId = section.section_id || section.id;
+        const sectionName = section.section_name || section.name || ('Section ' + sectionId);
+
+        const option = document.createElement('option');
+        option.value = sectionId;
+        option.textContent = sectionName + ' — ' + count + '/3 students';
+
+        if (count >= 3) {
+          option.disabled = true;
+          option.textContent += ' (Full)';
+        }
+
+        select.appendChild(option);
+      });
+
+    } catch (err) {
+      select.innerHTML = '<option value="">Failed to load sections</option>';
+      console.error(err);
+    }
+  }
+
+  async function renderSectionsListFromApi() {
+    const box = document.getElementById('sectionsList');
+    if (!box) return;
+
+    box.innerHTML = '<div>Loading...</div>';
+
+    try {
+      const data = await apiJson('/api/coordinator/sections');
+      const sections = data.sections || [];
+
+      if (!sections.length) {
+        box.innerHTML = '<div class="empty-box">No sections created yet.</div>';
+        return;
+      }
+
+      box.innerHTML = sections.map(function (section) {
+        const sectionId = section.section_id || section.id;
+        const sectionName = section.section_name || section.name || ('Section ' + sectionId);
+        const supervisorName = section.supervisor_name || section.supervisor || 'Not assigned';
+        const count = Number(section.student_count || 0);
+
+        return `
+          <div class="section-card" data-section-name="${escapeHtml(sectionName)}">
+            <div>
+              <div class="section-card-title">${escapeHtml(sectionName)}</div>
+              <div class="section-card-meta">
+                Supervisor: ${escapeHtml(supervisorName)}
+              </div>
+              <div class="section-card-meta">
+                Students: ${count}/3
+              </div>
+            </div>
+
+            <div class="section-actions">
+              <button
+                class="btn btn-danger"
+                type="button"
+                onclick="deleteSection('${sectionId}')">
+                Delete
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+    } catch (err) {
+      box.innerHTML = '<div class="empty-box">Sections error: ' + escapeHtml(err.message || 'Request failed') + '</div>';
+    }
+  }
+
+  async function addSelectedToExistingSection() {
+    const sectionSelect = document.getElementById('existingSectionSelect');
+    const sectionId = sectionSelect ? sectionSelect.value : '';
+    const studentIds = getSelectedStudentIds();
+
+    if (!sectionId) {
+      setSectionMessage('Please choose an existing section.', 'error');
+      return;
+    }
+
+    if (studentIds.length === 0) {
+      setSectionMessage('Please select at least one student.', 'error');
+      return;
+    }
+
+    if (studentIds.length > 3) {
+      setSectionMessage('You cannot select more than 3 students.', 'error');
+      return;
+    }
+
+    setSectionMessage('Adding students to section...', 'loading');
+
+    try {
+      const data = await apiJson('/api/coordinator/sections/add-students', {
+        method: 'POST',
+        body: JSON.stringify({
+          section_id: sectionId,
+          student_ids: studentIds
+        })
+      });
+
+      setSectionMessage(data.message || 'Students added successfully.', 'ok');
+
+      await refreshRegistrationSectionData();
+
+    } catch (err) {
+      setSectionMessage(err.message || 'Failed to add students.', 'error');
+    }
+  }
+
+  async function deleteSection(sectionId) {
+    if (!sectionId) return;
+
+    const confirmed = confirm('Are you sure you want to delete this section? Students will become unassigned again.');
+
+    if (!confirmed) return;
+
+    setSectionMessage('Deleting section...', 'loading');
+
+    try {
+      const data = await apiJson('/api/coordinator/sections/delete', {
+        method: 'POST',
+        body: JSON.stringify({
+          section_id: sectionId
+        })
+      });
+
+      setSectionMessage(data.message || 'Section deleted successfully.', 'ok');
+
+      await refreshRegistrationSectionData();
+
+    } catch (err) {
+      setSectionMessage(err.message || 'Failed to delete section.', 'error');
+    }
+  }
+
+  async function refreshRegistrationSectionData() {
+    if (typeof loadUnassignedStudents === 'function') {
+      await loadUnassignedStudents();
+    }
+
+    if (typeof loadSections === 'function') {
+      await loadSections();
+    } else {
+      await renderSectionsListFromApi();
+    }
+
+    await loadExistingSectionsForSelect();
+    updateSelectedStudentsCount();
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  document.addEventListener('change', function (event) {
+    if (event.target && event.target.closest('#unassignedStudentsBox')) {
+      updateSelectedStudentsCount();
+    }
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.reg-main-tab').forEach(function (btn) {
@@ -382,8 +655,14 @@
         }
 
         window.scrollTo(0, 0);
+
+        if (tab === 'unassigned') {
+          setTimeout(refreshRegistrationSectionData, 300);
+        }
       });
     });
+
+    setTimeout(refreshRegistrationSectionData, 700);
   });
 </script>
 {% endblock %}

@@ -98,6 +98,22 @@ def _json_safe(value):
     return value
 
 
+
+def _db_column_exists_student(cursor, table_name, column_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+        """,
+        (table_name, column_name),
+    )
+    row = cursor.fetchone() or {}
+    return int(row.get("cnt") or 0) > 0
+
+
 def _notify_project_team(
     cursor,
     project_id,
@@ -1737,6 +1753,7 @@ def api_submit_project():
     data = request.get_json(force=True) or {}
 
     title = (data.get("title") or "").strip()
+    group_name = (data.get("group_name") or "").strip()
     abstract = (data.get("abstract") or "").strip() or None
     keywords = (data.get("keywords") or "").strip() or None
     # Project type is no longer entered by the student in the submit form.
@@ -3055,6 +3072,7 @@ def api_student_distribution_window_status():
 def api_student_distribution_submit():
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
+    group_name = (data.get("group_name") or "").strip()
     abstract = (data.get("abstract") or "").strip()
     keywords = (data.get("keywords") or "").strip()
     preferred = data.get("preferred_supervisors") or []
@@ -3120,23 +3138,45 @@ def api_student_distribution_submit():
         while len(pref_ids) < 3:
             pref_ids.append(None)
 
-        cursor.execute(
-            """
-            INSERT INTO projects
-                (title, abstract, keywords, project_type, semester_id, status, submission_date,
-                 preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
-            VALUES (%s, %s, %s, 'software_engineering', %s, 'submitted', CURDATE(), %s, %s, %s)
-        """,
-            (
-                title,
-                abstract or None,
-                keywords or None,
-                semester["semester_id"],
-                pref_ids[0],
-                pref_ids[1],
-                pref_ids[2],
-            ),
-        )
+        has_group_name = _db_column_exists_student(cursor, "projects", "group_name")
+
+        if has_group_name:
+            cursor.execute(
+                """
+                INSERT INTO projects
+                    (group_name, title, abstract, keywords, project_type, semester_id, status, submission_date,
+                     preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
+                VALUES (%s, %s, %s, %s, 'software_engineering', %s, 'submitted', CURDATE(), %s, %s, %s)
+                """,
+                (
+                    group_name or None,
+                    title,
+                    abstract or None,
+                    keywords or None,
+                    semester["semester_id"],
+                    pref_ids[0],
+                    pref_ids[1],
+                    pref_ids[2],
+                ),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO projects
+                    (title, abstract, keywords, project_type, semester_id, status, submission_date,
+                     preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
+                VALUES (%s, %s, %s, 'software_engineering', %s, 'submitted', CURDATE(), %s, %s, %s)
+                """,
+                (
+                    title,
+                    abstract or None,
+                    keywords or None,
+                    semester["semester_id"],
+                    pref_ids[0],
+                    pref_ids[1],
+                    pref_ids[2],
+                ),
+            )
         project_id = cursor.lastrowid
 
         for i, uid in enumerate(member_ids):

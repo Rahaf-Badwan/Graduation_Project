@@ -1,4 +1,9 @@
 -- ============================================================
+--  APMS FULL SQL — CLEANED VERSION
+--  Fixed by ChatGPT: safe rerun, no project deletion, views for real projects
+-- ============================================================
+
+-- ============================================================
 --  APMS — Academic Project Management System
 --  Birzeit University · Department of Computer Science
 --  Full MySQL Database Schema + Sample Data
@@ -12,10 +17,30 @@ CREATE DATABASE IF NOT EXISTS apms_db
 
 USE apms_db;
 
+SET SQL_SAFE_UPDATES = 0;
 SET FOREIGN_KEY_CHECKS = 0;
 SET NAMES utf8mb4;
 
 -- Drop all tables if they exist (safe re-run)
+-- Extra drops added for tables that appear later in this full file.
+-- FOREIGN_KEY_CHECKS is already OFF, so rerun will not fail on dependencies.
+DROP TABLE IF EXISTS project_report_readers;
+DROP TABLE IF EXISTS project_final_evaluation_results;
+DROP TABLE IF EXISTS project_grade_entries;
+DROP TABLE IF EXISTS project_evaluation_windows;
+DROP TABLE IF EXISTS grade_entries;
+DROP TABLE IF EXISTS grade_entry_sessions;
+DROP TABLE IF EXISTS committee_plan_projects;
+DROP TABLE IF EXISTS committee_plan_members;
+DROP TABLE IF EXISTS committee_plans;
+DROP TABLE IF EXISTS discussion_rooms;
+DROP TABLE IF EXISTS announcements;
+DROP TABLE IF EXISTS system_notices;
+DROP TABLE IF EXISTS section_students;
+DROP TABLE IF EXISTS student_distribution_sections;
+DROP TABLE IF EXISTS faculty_load_settings;
+DROP TABLE IF EXISTS student_groups;
+
 DROP TABLE IF EXISTS milestone_submissions;
 DROP TABLE IF EXISTS comp4200_timeline_items;
 DROP TABLE IF EXISTS comp4200_timelines;
@@ -666,15 +691,15 @@ INSERT IGNORE INTO semesters (academic_year, semester_number, course_code, start
 -- Faculty IDs are 4 digits (1001–1007); student IDs start from 1220000
 INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active) VALUES
 -- Head of Department  (ID: 1001)
-('1001', 'Prof. Raed Al-Qadi',     '1001@birzeit.edu', '$2b$12$EbPsSfvh6ScacL2l4uCkdOMwbfukrx0EdkL/0GBk/ntRtwRapvvBu',  'head_of_department', 'RQ', TRUE),
+('1001', 'Dr. Iyad Jaber',          '1001@birzeit.edu', '$2b$12$EbPsSfvh6ScacL2l4uCkdOMwbfukrx0EdkL/0GBk/ntRtwRapvvBu',  'head_of_department', 'IJ', TRUE),
 -- Coordinator         (ID: 1002)
-('1002', 'Dr. Ahmad Abu Sneina',   '1002@birzeit.edu', '$2b$12$l9Jz.shLtccTVJh5r700w.kCUlmwlba4YgUvs2HZGs2UBwuoonMci', 'coordinator',        'AA', TRUE),
--- Supervisors         (IDs: 1003–1007)
-('1003', 'Dr. Naima Harbawi',      '1003@birzeit.edu', '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.',   'supervisor',         'NH', TRUE),
-('1004', 'Dr. Mahmoud Salem',      '1004@birzeit.edu', '$2b$12$ctwodGi2uo7.QC.r7Qlt.u5n6wVvy280mQ/LtyaIlIjQLIVpgB/MW',   'supervisor',         'MS', TRUE),
-('1005', 'Dr. Lina Haddad',        '1005@birzeit.edu', '$2b$12$aKMFBXAIvKSNsOAUpU9N8.oYnCqeu07VJc/PBgyB.H7WIxxc4ew9C',   'supervisor',         'LH', TRUE),
-('1006', 'Dr. Samer Darwish',      '1006@birzeit.edu', '$2b$12$ljZY7r8ALYi62IyesXQ84uieyNMz2MXVJK.QI4Eu7ot9abWAa7TAG',   'supervisor',         'SD', TRUE),
-('1007', 'Dr. Osama Arikat',       '1007@birzeit.edu', '$2b$12$.Uge.NmsvHbi9uSDgc1rhOYjO3Q1HAtYCLeN3YL1ctrGUKeRKo1ti',   'supervisor',         'OA', TRUE),
+('1002', 'Dr. Ruba Awadallah',      '1002@birzeit.edu', '$2b$12$l9Jz.shLtccTVJh5r700w.kCUlmwlba4YgUvs2HZGs2UBwuoonMci', 'coordinator',        'RA', TRUE),
+-- Supervisors from the provided doctors list
+('1003', 'Dr. Sobhi Ahmad',         '1003@birzeit.edu', '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.',   'supervisor',         'SA', TRUE),
+('1004', 'Dr. Radi Jarrar',         '1004@birzeit.edu', '$2b$12$ctwodGi2uo7.QC.r7Qlt.u5n6wVvy280mQ/LtyaIlIjQLIVpgB/MW',   'supervisor',         'RJ', TRUE),
+('1005', 'Dr. Abdullah Krakeh',     '1005@birzeit.edu', '$2b$12$aKMFBXAIvKSNsOAUpU9N8.oYnCqeu07VJc/PBgyB.H7WIxxc4ew9C',   'supervisor',         'AK', TRUE),
+('1006', 'Dr. Mamoun Nawahdah',     '1006@birzeit.edu', '$2b$12$ljZY7r8ALYi62IyesXQ84uieyNMz2MXVJK.QI4Eu7ot9abWAa7TAG',   'supervisor',         'MN', TRUE),
+('1007', 'Dr. Hafez Barghouthi',    '1007@birzeit.edu', '$2b$12$.Uge.NmsvHbi9uSDgc1rhOYjO3Q1HAtYCLeN3YL1ctrGUKeRKo1ti',   'supervisor',         'HB', TRUE),
 -- Students            (IDs: 1220xxx)
 ('1220654', 'Rahaf Badwan',         '1220654@students.birzeit.edu', '$2b$12$eJmEAFs2Cci7.foj61N6tOthlgHqqs0XccNvIRuzvkK70jQixoWb.', 'student', 'RB', TRUE),
 ('1220670', 'Amna Abu Muslim',      '1220670@students.birzeit.edu', '$2b$12$1ONCgGY62binf5lUfYs6qekRIUhkUObqIs55tu.89rGMGOAsp0Llu', 'student', 'AM', TRUE),
@@ -700,13 +725,13 @@ ADD COLUMN distribution_closed_at DATETIME NULL;
 
 -- Faculty records (user_ids 1–7 match insertion order above)
 INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title) VALUES
-(1, 'software_engineering',    15, 'Prof.'),
-(2, 'software_engineering',    10, 'Dr.'),
-(3, 'software_engineering',     6, 'Dr.'),
-(4, 'artificial_intelligence', 12, 'Dr.'),
-(5, 'web_development',          8, 'Dr.'),
-(6, 'databases',                9, 'Dr.'),
-(7, 'security_networks',        7, 'Dr.');
+(1, 'software_engineering',    15, 'Dr.'),
+(2, 'web_development',         10, 'Dr.'),
+(3, 'software_engineering',     8, 'Dr.'),
+(4, 'software_engineering',     8, 'Dr.'),
+(5, 'databases',                8, 'Dr.'),
+(6, 'mobile',                   8, 'Dr.'),
+(7, 'security_networks',        8, 'Dr.');
 
 -- Student records (user_ids 8–17)
 INSERT IGNORE INTO students (user_id, enrollment_year) VALUES
@@ -860,7 +885,7 @@ INSERT IGNORE INTO deadlines (semester_id, project_id, deadline_type, deadline_d
 -- Notifications
 INSERT IGNORE INTO notifications (recipient_id, sender_id, notification_type, title, message, related_project_id, is_read) VALUES
 -- Student (Rahaf, user 8) notifications
-(8, 3,    'feedback_received',  'Your project has been reviewed',          'Dr. Naima Harbawi has submitted new feedback on your project.',             1, FALSE),
+(8, 3,    'feedback_received',  'Your project has been reviewed',          'Dr. Sobhi Ahmad has submitted new feedback on your project.',             1, FALSE),
 (8, 2,    'committee_assigned', 'Committee discussion scheduled',          'Your project discussion is scheduled for February 20 at 10:00 AM.',         1, FALSE),
 (8, NULL, 'deadline_reminder',  'Reminder: Upload source code',            'Please upload the source code files before February 15.',                   1, FALSE),
 -- Supervisor (Dr. Naima, user 3) notifications
@@ -869,7 +894,7 @@ INSERT IGNORE INTO notifications (recipient_id, sender_id, notification_type, ti
 (3, NULL, 'urgent_alert',       'Karim Odeh — urgent follow-up needed',   'Karim Odeh has not uploaded any files for two weeks.',                       3, FALSE),
 -- Coordinator (Dr. Ahmad, user 2) notifications
 (2, NULL, 'file_uploaded',      'New project pending your review',         'Electronic Student Records Management System — Salma Al-Khatib.',            2, FALSE),
-(2, 4,    'project_reviewed',   'Dr. Mahmoud Salem completed evaluations', 'Dr. Mahmoud Salem completed 3 project evaluations — avg score: 89.3.',      NULL, FALSE),
+(2, 4,    'project_reviewed',   'Dr. Radi Jarrar completed evaluations', 'Dr. Radi Jarrar completed 3 project evaluations — avg score: 89.3.',      NULL, FALSE),
 (2, NULL, 'deadline_reminder',  '7 projects awaiting your decision',       '7 projects are pending coordinator review — some exceeded 48 hours.',       NULL, TRUE);
 
 -- ============================================================
@@ -1029,7 +1054,7 @@ JOIN (
     ) expired_sessions
 ) expired ON expired.session_id = ac.session_id;
 
-SET SQL_SAFE_UPDATES = 1;
+SET SQL_SAFE_UPDATES = 0;
 
 -- Optional: Scheduled Event for automatic monthly cleanup
 -- Uncomment the block below if your MySQL server has the Event Scheduler enabled
@@ -1071,7 +1096,7 @@ SET SQL_SAFE_UPDATES = 1;
 INSERT IGNORE INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active)
 VALUES ('2025/2026', 2, 'COMP4300', '2026-03-01', '2026-07-01', TRUE);
 
--- ── 2. Coordinator for COMP4300 (Dr. Lina Haddad, faculty_id=5) ─────────
+-- ── 2. Coordinator for COMP4300 (Dr. Abdullah Krakeh, faculty_id=5) ─────────
 --       Assigned by Prof. Raed (user_id=1). Skipped if already assigned.
 INSERT IGNORE INTO coordinator_assignments (faculty_id, semester_id, assigned_by, notes)
 SELECT
@@ -1091,7 +1116,7 @@ LIMIT 1;
 
 -- ── 3. Sample Projects for COMP4300 (doctors overview panel) ─────────────
 
--- Dr. Mahmoud Salem (faculty_id = 4)
+-- Dr. Radi Jarrar (faculty_id = 4)
 INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT
     'Advanced AI Decision System', 'ai', s.semester_id, 4, 'submitted', CURDATE()
@@ -1106,7 +1131,7 @@ WHERE s.course_code   = 'COMP4300'
   )
 LIMIT 1;
 
--- Dr. Lina Haddad (faculty_id = 5)
+-- Dr. Abdullah Krakeh (faculty_id = 5)
 INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT
     'Enterprise Web Platform', 'web', s.semester_id, 5, 'submitted', CURDATE()
@@ -1121,7 +1146,7 @@ WHERE s.course_code   = 'COMP4300'
   )
 LIMIT 1;
 
--- Dr. Osama Arikat (faculty_id = 7)
+-- Dr. Hafez Barghouthi (faculty_id = 7)
 INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
 SELECT
     'Cyber Security Audit Platform', 'security', s.semester_id, 7, 'submitted', CURDATE()
@@ -1349,46 +1374,78 @@ CREATE TABLE IF NOT EXISTS faculty_load_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 5) Add CS doctors to users/faculty
---    Temporary IDs/emails; edit later if needed.
+-- 5) ONLY COMP4200 + COMP4300 DOCTORS IN ENGLISH
+--    Names are taken from the COMP4200 / COMP4300 schedule list.
+--    Safe re-run: inserts only if the doctor does not already exist.
 -- ============================================================
 
 SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
 
-INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+INSERT IGNORE INTO users
+(university_id, full_name, email, password_hash, role, avatar_initials, is_active)
 SELECT * FROM (
-    SELECT '2101' AS university_id, 'Dr. Iyad Jaber' AS full_name, 'iyad.jaber.temp@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'IJ' AS avatar_initials, TRUE AS is_active
-    UNION ALL SELECT '2102', 'Dr. Adel Taweel', 'adel.taweel.temp@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
-    UNION ALL SELECT '2103', 'Dr. Mustafa Jarrar', 'mustafa.jarrar.temp@birzeit.edu', @pwd, 'supervisor', 'MJ', TRUE
-    UNION ALL SELECT '2104', 'Dr. Majdi Mafarja', 'majdi.mafarja.temp@birzeit.edu', @pwd, 'supervisor', 'MM', TRUE
-    UNION ALL SELECT '2105', 'Dr. Radi Jarrar', 'radi.jarrar.temp@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
-    UNION ALL SELECT '2106', 'Dr. Mohammad Alkhanafseh', 'mohammad.alkhanafseh.temp@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
-    UNION ALL SELECT '2107', 'Dr. Ahmed Abusnaina', 'ahmed.abusnaina.temp@birzeit.edu', @pwd, 'supervisor', 'AA', TRUE
-    UNION ALL SELECT '2108', 'Dr. Ali Jaber', 'ali.jaber.temp@birzeit.edu', @pwd, 'supervisor', 'AJ', TRUE
-    UNION ALL SELECT '2109', 'Dr. Mohammed Helal', 'mohammed.helal.temp@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
-    UNION ALL SELECT '2110', 'Dr. Tamer Alkhouli', 'tamer.alkhouli.temp@birzeit.edu', @pwd, 'supervisor', 'TA', TRUE
-    UNION ALL SELECT '2111', 'Dr. Mohammed Khalilia', 'mohammed.khalilia.temp@birzeit.edu', @pwd, 'supervisor', 'MK', TRUE
-) AS new_users
+    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, 'sobhi.ahmad@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'SA' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', 'radi.jarrar@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
+    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', 'abdullah.krakeh@birzeit.edu', @pwd, 'supervisor', 'AK', TRUE
+    UNION ALL SELECT '3006', 'Dr. Murad Njoum', 'murad.njoum@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3007', 'Dr. Adel Taweel', 'adel.taweel@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
+    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', 'yousef.hassouneh@birzeit.edu', @pwd, 'supervisor', 'YH', TRUE
+    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', 'ahmad.abusneina@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', 'bassem.alserafi@birzeit.edu', @pwd, 'supervisor', 'BA', TRUE
+    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', 'mamoun.nawahdah@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', 'tasneem.zayt@birzeit.edu', @pwd, 'supervisor', 'TZ', TRUE
+    UNION ALL SELECT '3013', 'Dr. Samer Zein', 'samer.zein@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
+    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', 'hafez.barghouthi@birzeit.edu', @pwd, 'supervisor', 'HB', TRUE
+    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', 'abdullah.alnatsheh@birzeit.edu', @pwd, 'supervisor', 'AN', TRUE
+    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', 'alaa.hasheesh@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
+    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', 'faisal.shehadeh@birzeit.edu', @pwd, 'supervisor', 'FS', TRUE
+    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', 'fadi.khalil@birzeit.edu', @pwd, 'supervisor', 'FK', TRUE
+    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', 'mohammad.helal@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
+    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', 'rashid.yousef@birzeit.edu', @pwd, 'supervisor', 'RY', TRUE
+    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', 'ehab.alshaer@birzeit.edu', @pwd, 'supervisor', 'EA', TRUE
+    UNION ALL SELECT '3022', 'Dr. Sobhi Ahmad', 'naima.harbawi@birzeit.edu', @pwd, 'supervisor', 'NH', TRUE
+    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', 'ahmad.fahl@birzeit.edu', @pwd, 'supervisor', 'AF', TRUE
+    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', 'ahmad.sabbah@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', 'mohammad.alkhanafseh@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
+) AS doctors
 WHERE NOT EXISTS (
     SELECT 1
     FROM users u
-    WHERE u.full_name = new_users.full_name
+    WHERE u.full_name = doctors.full_name
+       OR u.email = doctors.email
+       OR u.university_id = doctors.university_id
 );
 
-INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title)
+INSERT IGNORE INTO faculty
+(user_id, specialization, years_experience, title)
 SELECT
     u.user_id,
     CASE u.full_name
-        WHEN 'Dr. Mustafa Jarrar' THEN 'artificial_intelligence'
-        WHEN 'Dr. Majdi Mafarja' THEN 'artificial_intelligence'
-        WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
-        WHEN 'Dr. Adel Taweel' THEN 'software_engineering'
+        WHEN 'Dr. Iyad Jaber' THEN 'software_engineering'
+        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
         WHEN 'Dr. Radi Jarrar' THEN 'software_engineering'
-        WHEN 'Dr. Ahmed Abusnaina' THEN 'software_engineering'
-        WHEN 'Dr. Ali Jaber' THEN 'software_engineering'
-        WHEN 'Dr. Mohammed Helal' THEN 'software_engineering'
-        WHEN 'Dr. Tamer Alkhouli' THEN 'artificial_intelligence'
-        WHEN 'Dr. Mohammed Khalilia' THEN 'artificial_intelligence'
+        WHEN 'Dr. Abdullah Krakeh' THEN 'databases'
+        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'
+        WHEN 'Dr. Murad Njoum' THEN 'databases'
+        WHEN 'Dr. Adel Taweel' THEN 'software_engineering'
+        WHEN 'Dr. Yousef Hassouneh' THEN 'web_development'
+        WHEN 'Dr. Ruba Awadallah' THEN 'software_engineering'
+        WHEN 'Dr. Bassem Alserafi' THEN 'databases'
+        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'
+        WHEN 'Dr. Tasneem Zayt' THEN 'software_engineering'
+        WHEN 'Dr. Samer Zein' THEN 'software_engineering'
+        WHEN 'Dr. Hafez Barghouthi' THEN 'security_networks'
+        WHEN 'Dr. Abdullah Al-Natsheh' THEN 'software_engineering'
+        WHEN 'Dr. Alaa Hasheesh' THEN 'software_engineering'
+        WHEN 'Dr. Faisal Shehadeh' THEN 'mobile'
+        WHEN 'Dr. Fadi Khalil' THEN 'web_development'
+        WHEN 'Dr. Mohammad Helal' THEN 'artificial_intelligence'
+        WHEN 'Dr. Rashid Yousef' THEN 'software_engineering'
+        WHEN 'Dr. Ehab Alshaer' THEN 'software_engineering'
+        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Ahmad Fahl' THEN 'software_engineering'
+        WHEN 'Dr. Ahmad Sabbah' THEN 'artificial_intelligence'
+        WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
         ELSE 'software_engineering'
     END AS specialization,
     8 AS years_experience,
@@ -1397,192 +1454,137 @@ FROM users u
 LEFT JOIN faculty f ON f.user_id = u.user_id
 WHERE u.full_name IN (
     'Dr. Iyad Jaber',
-    'Dr. Adel Taweel',
-    'Dr. Mustafa Jarrar',
-    'Dr. Majdi Mafarja',
+    'Dr. Sobhi Ahmad',
     'Dr. Radi Jarrar',
-    'Dr. Mohammad Alkhanafseh',
-    'Dr. Ahmed Abusnaina',
-    'Dr. Ali Jaber',
-    'Dr. Mohammed Helal',
-    'Dr. Tamer Alkhouli',
-    'Dr. Mohammed Khalilia'
+    'Dr. Abdullah Krakeh',
+    'Dr. Ruba Awadallah',
+    'Dr. Murad Njoum',
+    'Dr. Adel Taweel',
+    'Dr. Yousef Hassouneh',
+    'Dr. Ruba Awadallah',
+    'Dr. Bassem Alserafi',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Tasneem Zayt',
+    'Dr. Samer Zein',
+    'Dr. Hafez Barghouthi',
+    'Dr. Abdullah Al-Natsheh',
+    'Dr. Alaa Hasheesh',
+    'Dr. Faisal Shehadeh',
+    'Dr. Fadi Khalil',
+    'Dr. Mohammad Helal',
+    'Dr. Rashid Yousef',
+    'Dr. Ehab Alshaer',
+    'Dr. Sobhi Ahmad',
+    'Dr. Ahmad Fahl',
+    'Dr. Ahmad Sabbah',
+    'Dr. Mohammad Alkhanafseh'
 )
 AND f.user_id IS NULL;
+
+-- Keep existing rows aligned if the doctor already existed before this import.
+UPDATE faculty f
+JOIN users u ON u.user_id = f.user_id
+SET f.specialization = CASE u.full_name
+        WHEN 'Dr. Iyad Jaber' THEN 'software_engineering'
+        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Radi Jarrar' THEN 'software_engineering'
+        WHEN 'Dr. Abdullah Krakeh' THEN 'databases'
+        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'
+        WHEN 'Dr. Murad Njoum' THEN 'databases'
+        WHEN 'Dr. Adel Taweel' THEN 'software_engineering'
+        WHEN 'Dr. Yousef Hassouneh' THEN 'web_development'
+        WHEN 'Dr. Ruba Awadallah' THEN 'software_engineering'
+        WHEN 'Dr. Bassem Alserafi' THEN 'databases'
+        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'
+        WHEN 'Dr. Tasneem Zayt' THEN 'software_engineering'
+        WHEN 'Dr. Samer Zein' THEN 'software_engineering'
+        WHEN 'Dr. Hafez Barghouthi' THEN 'security_networks'
+        WHEN 'Dr. Abdullah Al-Natsheh' THEN 'software_engineering'
+        WHEN 'Dr. Alaa Hasheesh' THEN 'software_engineering'
+        WHEN 'Dr. Faisal Shehadeh' THEN 'mobile'
+        WHEN 'Dr. Fadi Khalil' THEN 'web_development'
+        WHEN 'Dr. Mohammad Helal' THEN 'artificial_intelligence'
+        WHEN 'Dr. Rashid Yousef' THEN 'software_engineering'
+        WHEN 'Dr. Ehab Alshaer' THEN 'software_engineering'
+        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Ahmad Fahl' THEN 'software_engineering'
+        WHEN 'Dr. Ahmad Sabbah' THEN 'artificial_intelligence'
+        WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
+        ELSE f.specialization
+    END,
+    f.title = 'Dr.'
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Sobhi Ahmad',
+    'Dr. Radi Jarrar',
+    'Dr. Abdullah Krakeh',
+    'Dr. Ruba Awadallah',
+    'Dr. Murad Njoum',
+    'Dr. Adel Taweel',
+    'Dr. Yousef Hassouneh',
+    'Dr. Ruba Awadallah',
+    'Dr. Bassem Alserafi',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Tasneem Zayt',
+    'Dr. Samer Zein',
+    'Dr. Hafez Barghouthi',
+    'Dr. Abdullah Al-Natsheh',
+    'Dr. Alaa Hasheesh',
+    'Dr. Faisal Shehadeh',
+    'Dr. Fadi Khalil',
+    'Dr. Mohammad Helal',
+    'Dr. Rashid Yousef',
+    'Dr. Ehab Alshaer',
+    'Dr. Sobhi Ahmad',
+    'Dr. Ahmad Fahl',
+    'Dr. Ahmad Sabbah',
+    'Dr. Mohammad Alkhanafseh'
+);
 
 -- ============================================================
 -- 6) Helpful verification
 -- ============================================================
 
-SELECT 'Migration completed successfully' AS status;
+SELECT 'COMP4200/COMP4300 doctors migration completed successfully' AS status;
 
-SELECT full_name, role, university_id, email
-FROM users
-WHERE full_name IN (
-    'Dr. Iyad Jaber',
-    'Dr. Adel Taweel',
-    'Dr. Mustafa Jarrar',
-    'Dr. Majdi Mafarja',
-    'Dr. Radi Jarrar',
-    'Dr. Mohammad Alkhanafseh',
-    'Dr. Ahmed Abusnaina',
-    'Dr. Ali Jaber',
-    'Dr. Mohammed Helal',
-    'Dr. Tamer Alkhouli',
-    'Dr. Mohammed Khalilia'
-)
-ORDER BY full_name;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
--- ============================================================
---  ADDITIONAL BZU CS FACULTY / ACADEMIC STAFF MIGRATION
---  Safe re-run: uses NOT EXISTS guards and updates existing rows.
---  No faculty specialization is stored as 'other'.
--- ============================================================
-
-USE apms_db;
-
-SET FOREIGN_KEY_CHECKS = 0;
-SET NAMES utf8mb4;
-
--- Reuse an existing bcrypt hash as temporary password.
--- Change passwords later from the application/admin panel.
-SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
-
--- ============================================================
--- 1) Add missing users
---    university_id/emails are temporary placeholders.
--- ============================================================
-INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
-SELECT * FROM (
-    SELECT '2112' AS university_id, 'Dr. Ruba Awadallah' AS full_name, 'ruba.awadallah.temp@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'RA' AS avatar_initials, TRUE AS is_active
-    UNION ALL SELECT '2113', 'Dr. Samer Zein', 'samer.zein.temp@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
-    UNION ALL SELECT '2114', 'Dr. Abualseoud Hanani', 'abualseoud.hanani.temp@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
-    UNION ALL SELECT '2115', 'Dr. Ahmad Alsadeh', 'ahmad.alsadeh.temp@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
-    UNION ALL SELECT '2116', 'Dr. Mamoun Nawahdah', 'mamoun.nawahdah.temp@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
-    UNION ALL SELECT '2117', 'Dr. Ola Surakhi', 'ola.surakhi.temp@birzeit.edu', @pwd, 'supervisor', 'OS', TRUE
-    UNION ALL SELECT '2118', 'Murad Njoum', 'murad.njoum.temp@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
-    UNION ALL SELECT '2119', 'Nael Qaraeen', 'nael.qaraeen.temp@birzeit.edu', @pwd, 'supervisor', 'NQ', TRUE
-) AS new_users
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM users u
-    WHERE u.full_name = new_users.full_name
-       OR u.university_id = new_users.university_id
-       OR u.email = new_users.email
-);
-
--- ============================================================
--- 2) Add faculty rows with CS specializations only
---    Allowed enum values in your schema:
---    software_engineering, artificial_intelligence, web_development,
---    mobile, security_networks, databases, other
---    We intentionally do NOT use 'other'.
--- ============================================================
-INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title)
-SELECT
-    u.user_id,
-    CASE u.full_name
-        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'             -- General CS mapped to web/app systems
-        WHEN 'Dr. Samer Zein' THEN 'software_engineering'            -- General CS / department leadership
-        WHEN 'Dr. Abualseoud Hanani' THEN 'artificial_intelligence'  -- Speech and language technology
-        WHEN 'Dr. Ahmad Alsadeh' THEN 'security_networks'            -- Network Security and IPv6
-        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'                     -- Interactive and mobile computing
-        WHEN 'Dr. Ola Surakhi' THEN 'artificial_intelligence'        -- Biometrics and Genetic Algorithms
-        WHEN 'Murad Njoum' THEN 'databases'                          -- CS instructor mapped to databases
-        WHEN 'Nael Qaraeen' THEN 'software_engineering'              -- CS lecturer mapped to software engineering
-        ELSE 'software_engineering'
-    END AS specialization,
-    8 AS years_experience,
-    CASE u.full_name
-        WHEN 'Dr. Samer Zein' THEN 'Assoc. Prof.'
-        WHEN 'Dr. Abualseoud Hanani' THEN 'Assoc. Prof.'
-        WHEN 'Murad Njoum' THEN 'Instructor'
-        WHEN 'Nael Qaraeen' THEN 'Lecturer'
-        ELSE 'Dr.'
-    END AS title
-FROM users u
-LEFT JOIN faculty f ON f.user_id = u.user_id
-WHERE u.full_name IN (
-    'Dr. Ruba Awadallah',
-    'Dr. Samer Zein',
-    'Dr. Abualseoud Hanani',
-    'Dr. Ahmad Alsadeh',
-    'Dr. Mamoun Nawahdah',
-    'Dr. Ola Surakhi',
-    'Murad Njoum',
-    'Nael Qaraeen'
-)
-AND f.user_id IS NULL;
-
--- ============================================================
--- 3) If an older migration already inserted them as 'other', fix it.
---    This also removes 'other' from previously added CS doctors.
--- ============================================================
-UPDATE faculty f
-JOIN users u ON u.user_id = f.user_id
-SET
-    f.specialization = CASE u.full_name
-        WHEN 'Dr. Iyad Jaber' THEN 'software_engineering'
-        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'
-        WHEN 'Dr. Samer Zein' THEN 'software_engineering'
-        WHEN 'Dr. Abualseoud Hanani' THEN 'artificial_intelligence'
-        WHEN 'Dr. Ahmad Alsadeh' THEN 'security_networks'
-        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'
-        WHEN 'Dr. Ola Surakhi' THEN 'artificial_intelligence'
-        WHEN 'Murad Njoum' THEN 'databases'
-        WHEN 'Nael Qaraeen' THEN 'software_engineering'
-        ELSE f.specialization
-    END,
-    f.title = CASE u.full_name
-        WHEN 'Dr. Samer Zein' THEN 'Assoc. Prof.'
-        WHEN 'Dr. Abualseoud Hanani' THEN 'Assoc. Prof.'
-        WHEN 'Murad Njoum' THEN 'Instructor'
-        WHEN 'Nael Qaraeen' THEN 'Lecturer'
-        ELSE f.title
-    END
-WHERE u.full_name IN (
-    'Dr. Iyad Jaber',
-    'Dr. Ruba Awadallah',
-    'Dr. Samer Zein',
-    'Dr. Abualseoud Hanani',
-    'Dr. Ahmad Alsadeh',
-    'Dr. Mamoun Nawahdah',
-    'Dr. Ola Surakhi',
-    'Murad Njoum',
-    'Nael Qaraeen'
-);
-
--- ============================================================
--- 4) Verification
--- ============================================================
-SELECT
-    u.full_name,
-    u.university_id,
-    u.email,
-    u.role,
-    f.title,
-    f.specialization
+SELECT u.full_name, u.role, u.university_id, u.email, f.specialization
 FROM users u
 JOIN faculty f ON f.user_id = u.user_id
 WHERE u.full_name IN (
     'Dr. Iyad Jaber',
+    'Dr. Sobhi Ahmad',
+    'Dr. Radi Jarrar',
+    'Dr. Abdullah Krakeh',
     'Dr. Ruba Awadallah',
-    'Dr. Samer Zein',
-    'Dr. Abualseoud Hanani',
-    'Dr. Ahmad Alsadeh',
+    'Dr. Murad Njoum',
+    'Dr. Adel Taweel',
+    'Dr. Yousef Hassouneh',
+    'Dr. Ruba Awadallah',
+    'Dr. Bassem Alserafi',
     'Dr. Mamoun Nawahdah',
-    'Dr. Ola Surakhi',
-    'Murad Njoum',
-    'Nael Qaraeen'
+    'Dr. Tasneem Zayt',
+    'Dr. Samer Zein',
+    'Dr. Hafez Barghouthi',
+    'Dr. Abdullah Al-Natsheh',
+    'Dr. Alaa Hasheesh',
+    'Dr. Faisal Shehadeh',
+    'Dr. Fadi Khalil',
+    'Dr. Mohammad Helal',
+    'Dr. Rashid Yousef',
+    'Dr. Ehab Alshaer',
+    'Dr. Sobhi Ahmad',
+    'Dr. Ahmad Fahl',
+    'Dr. Ahmad Sabbah',
+    'Dr. Mohammad Alkhanafseh'
 )
 ORDER BY u.full_name;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
---  END OF ADDITIONAL FACULTY MIGRATION
+--  ADDITIONAL FACULTY MIGRATION REMOVED
+--  Replaced by the COMP4200 + COMP4300 doctors-only English list above.
+-- ============================================================
 
 -- ============================================================
 --  MIGRATION: student_course_results
@@ -1963,7 +1965,7 @@ CREATE TABLE IF NOT EXISTS committee_plan_members (
     id INT PRIMARY KEY AUTO_INCREMENT,
     plan_id INT NOT NULL,
     faculty_id INT NOT NULL,
-    role ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    role ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member',
     UNIQUE KEY uq_committee_plan_member (plan_id, faculty_id),
     FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
@@ -2033,10 +2035,10 @@ CREATE TABLE IF NOT EXISTS committee_plans (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS committee_plan_members (
-    cpm_id       INT PRIMARY KEY AUTO_INCREMENT,
+    id       INT PRIMARY KEY AUTO_INCREMENT,
     plan_id      INT NOT NULL,
     faculty_id   INT NOT NULL,
-    role         ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    role         ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member',
     UNIQUE KEY uq_plan_faculty (plan_id, faculty_id),
     FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
@@ -2410,10 +2412,10 @@ CREATE TABLE IF NOT EXISTS committee_plans (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS committee_plan_members (
-    cpm_id       INT PRIMARY KEY AUTO_INCREMENT,
+    id       INT PRIMARY KEY AUTO_INCREMENT,
     plan_id      INT NOT NULL,
     faculty_id   INT NOT NULL,
-    role         ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    role         ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member',
     UNIQUE KEY uq_plan_faculty (plan_id, faculty_id),
     FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
@@ -2922,10 +2924,10 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS committee_plan_members (
-    cpm_id       INT PRIMARY KEY AUTO_INCREMENT,
+    id       INT PRIMARY KEY AUTO_INCREMENT,
     plan_id      INT NOT NULL,
     faculty_id   INT NOT NULL,
-    role         ENUM('member','responsible') NOT NULL DEFAULT 'member',
+    role         ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member',
     UNIQUE KEY uq_plan_faculty (plan_id, faculty_id),
     FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
     FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
@@ -3859,3 +3861,925 @@ CREATE TABLE IF NOT EXISTS coordinator_deliverable_submissions (
         REFERENCES students(student_id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+UPDATE committee_plans cp
+JOIN (
+    SELECT 
+        cpp.plan_id,
+        MIN(p.supervisor_id) AS supervisor_id
+    FROM committee_plan_projects cpp
+    JOIN projects p ON p.project_id = cpp.project_id
+    WHERE p.supervisor_id IS NOT NULL
+    GROUP BY cpp.plan_id
+) x ON x.plan_id = cp.plan_id
+SET cp.responsible_faculty_id = x.supervisor_id
+WHERE cp.plan_id > 0;
+
+
+
+
+INSERT INTO committee_plan_members (plan_id, faculty_id, role)
+SELECT 
+    cp.plan_id,
+    cp.responsible_faculty_id,
+    'member'
+FROM committee_plans cp
+WHERE cp.plan_id > 0
+  AND cp.responsible_faculty_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM committee_plan_members cpm
+      WHERE cpm.plan_id = cp.plan_id
+        AND cpm.faculty_id = cp.responsible_faculty_id
+  );
+
+
+-- ============================================================
+-- ============================================================
+-- APMS FINAL ADDED EDITS — Committee Supervisor Distribution
+-- Uses ONLY the COMP4200 + COMP4300 doctors in English.
+-- Rules supported by the updated backend:
+--   * Each generated committee is grouped by one project supervisor.
+--   * The project supervisor is included in the committee and displayed as Supervisor.
+--   * The project supervisor is NOT manually assigned as Responsible.
+--   * Other doctors are displayed as Member.
+--   * If a supervisor has 1 project, the committee has 1 project.
+--   * If a supervisor has 2+ projects, they stay together in one committee.
+-- ============================================================
+
+USE apms_db;
+SET NAMES utf8mb4;
+SET SQL_SAFE_UPDATES = 0;
+
+-- ------------------------------------------------------------
+-- 0) Make sure there is an active semester
+-- ------------------------------------------------------------
+INSERT INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active)
+SELECT '2025/2026', 2, 'COMP4300', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 120 DAY), TRUE
+WHERE NOT EXISTS (SELECT 1 FROM semesters WHERE is_active = TRUE);
+
+SET @target_semester_id := (
+    SELECT semester_id
+    FROM semesters
+    WHERE is_active = TRUE
+    ORDER BY semester_id DESC
+    LIMIT 1
+);
+
+-- ------------------------------------------------------------
+-- 1) Clear active generated committee plans so doctors/projects become available
+-- ------------------------------------------------------------
+UPDATE projects p
+JOIN committee_plan_projects cpp ON cpp.project_id = p.project_id
+JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+SET p.status = 'submitted'
+WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress')
+  AND p.status = 'committee_evaluation';
+
+DELETE cpm
+FROM committee_plan_members cpm
+JOIN committee_plans cp ON cp.plan_id = cpm.plan_id
+WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress');
+
+DELETE cpp
+FROM committee_plan_projects cpp
+JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress');
+
+DELETE FROM committee_plans
+WHERE status IN ('draft', 'scheduled', 'ongoing', 'in_progress')
+  AND plan_id > 0;
+
+-- ------------------------------------------------------------
+-- 2) Make sure committee_plan_members can store Supervisor label
+-- ------------------------------------------------------------
+SET @role_column_exists := (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'committee_plan_members'
+      AND COLUMN_NAME = 'role'
+);
+SET @sql := IF(
+    @role_column_exists > 0,
+    'ALTER TABLE committee_plan_members MODIFY COLUMN role ENUM(''member'',''supervisor'',''responsible'') NOT NULL DEFAULT ''member''',
+    'SELECT "committee_plan_members.role does not exist"'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+UPDATE committee_plan_members
+SET role = 'supervisor'
+WHERE role = 'responsible';
+
+-- ------------------------------------------------------------
+-- 3) Ensure the COMP4200 + COMP4300 doctors exist
+-- ------------------------------------------------------------
+SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
+
+INSERT IGNORE INTO users
+(university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+SELECT * FROM (
+    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, 'sobhi.ahmad@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'SA' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', 'radi.jarrar@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
+    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', 'abdullah.krakeh@birzeit.edu', @pwd, 'supervisor', 'AK', TRUE
+    UNION ALL SELECT '3006', 'Dr. Murad Njoum', 'murad.njoum@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3007', 'Dr. Adel Taweel', 'adel.taweel@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
+    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', 'yousef.hassouneh@birzeit.edu', @pwd, 'supervisor', 'YH', TRUE
+    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', 'ahmad.abusneina@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', 'bassem.alserafi@birzeit.edu', @pwd, 'supervisor', 'BA', TRUE
+    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', 'mamoun.nawahdah@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', 'tasneem.zayt@birzeit.edu', @pwd, 'supervisor', 'TZ', TRUE
+    UNION ALL SELECT '3013', 'Dr. Samer Zein', 'samer.zein@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
+    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', 'hafez.barghouthi@birzeit.edu', @pwd, 'supervisor', 'HB', TRUE
+    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', 'abdullah.alnatsheh@birzeit.edu', @pwd, 'supervisor', 'AN', TRUE
+    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', 'alaa.hasheesh@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
+    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', 'faisal.shehadeh@birzeit.edu', @pwd, 'supervisor', 'FS', TRUE
+    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', 'fadi.khalil@birzeit.edu', @pwd, 'supervisor', 'FK', TRUE
+    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', 'mohammad.helal@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
+    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', 'rashid.yousef@birzeit.edu', @pwd, 'supervisor', 'RY', TRUE
+    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', 'ehab.alshaer@birzeit.edu', @pwd, 'supervisor', 'EA', TRUE
+    UNION ALL SELECT '3022', 'Dr. Sobhi Ahmad', 'naima.harbawi@birzeit.edu', @pwd, 'supervisor', 'NH', TRUE
+    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', 'ahmad.fahl@birzeit.edu', @pwd, 'supervisor', 'AF', TRUE
+    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', 'ahmad.sabbah@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', 'mohammad.alkhanafseh@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
+) AS doctors
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM users u
+    WHERE u.full_name = doctors.full_name
+       OR u.email = doctors.email
+       OR u.university_id = doctors.university_id
+);
+
+INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title)
+SELECT
+    u.user_id,
+    CASE u.full_name
+        WHEN 'Dr. Iyad Jaber' THEN 'software_engineering'
+        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Radi Jarrar' THEN 'software_engineering'
+        WHEN 'Dr. Abdullah Krakeh' THEN 'databases'
+        WHEN 'Dr. Ruba Awadallah' THEN 'web_development'
+        WHEN 'Dr. Murad Njoum' THEN 'databases'
+        WHEN 'Dr. Adel Taweel' THEN 'software_engineering'
+        WHEN 'Dr. Yousef Hassouneh' THEN 'web_development'
+        WHEN 'Dr. Ruba Awadallah' THEN 'software_engineering'
+        WHEN 'Dr. Bassem Alserafi' THEN 'databases'
+        WHEN 'Dr. Mamoun Nawahdah' THEN 'mobile'
+        WHEN 'Dr. Tasneem Zayt' THEN 'software_engineering'
+        WHEN 'Dr. Samer Zein' THEN 'software_engineering'
+        WHEN 'Dr. Hafez Barghouthi' THEN 'security_networks'
+        WHEN 'Dr. Abdullah Al-Natsheh' THEN 'software_engineering'
+        WHEN 'Dr. Alaa Hasheesh' THEN 'software_engineering'
+        WHEN 'Dr. Faisal Shehadeh' THEN 'mobile'
+        WHEN 'Dr. Fadi Khalil' THEN 'web_development'
+        WHEN 'Dr. Mohammad Helal' THEN 'artificial_intelligence'
+        WHEN 'Dr. Rashid Yousef' THEN 'software_engineering'
+        WHEN 'Dr. Ehab Alshaer' THEN 'software_engineering'
+        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Ahmad Fahl' THEN 'software_engineering'
+        WHEN 'Dr. Ahmad Sabbah' THEN 'artificial_intelligence'
+        WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
+        ELSE 'software_engineering'
+    END AS specialization,
+    8 AS years_experience,
+    'Dr.' AS title
+FROM users u
+LEFT JOIN faculty f ON f.user_id = u.user_id
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Sobhi Ahmad',
+    'Dr. Radi Jarrar',
+    'Dr. Abdullah Krakeh',
+    'Dr. Ruba Awadallah',
+    'Dr. Murad Njoum',
+    'Dr. Adel Taweel',
+    'Dr. Yousef Hassouneh',
+    'Dr. Ruba Awadallah',
+    'Dr. Bassem Alserafi',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Tasneem Zayt',
+    'Dr. Samer Zein',
+    'Dr. Hafez Barghouthi',
+    'Dr. Abdullah Al-Natsheh',
+    'Dr. Alaa Hasheesh',
+    'Dr. Faisal Shehadeh',
+    'Dr. Fadi Khalil',
+    'Dr. Mohammad Helal',
+    'Dr. Rashid Yousef',
+    'Dr. Ehab Alshaer',
+    'Dr. Sobhi Ahmad',
+    'Dr. Ahmad Fahl',
+    'Dr. Ahmad Sabbah',
+    'Dr. Mohammad Alkhanafseh'
+)
+AND f.user_id IS NULL;
+
+-- ------------------------------------------------------------
+-- 4) Add eligible projects grouped by real supervisors from the schedule
+-- ------------------------------------------------------------
+SET @sup_ai  := (SELECT f.faculty_id FROM faculty f JOIN users u ON u.user_id=f.user_id WHERE u.full_name='Dr. Mohammad Helal' LIMIT 1);
+SET @sup_web := (SELECT f.faculty_id FROM faculty f JOIN users u ON u.user_id=f.user_id WHERE u.full_name='Dr. Ruba Awadallah' LIMIT 1);
+SET @sup_se  := (SELECT f.faculty_id FROM faculty f JOIN users u ON u.user_id=f.user_id WHERE u.full_name='Dr. Iyad Jaber' LIMIT 1);
+SET @sup_sec := (SELECT f.faculty_id FROM faculty f JOIN users u ON u.user_id=f.user_id WHERE u.full_name='Dr. Hafez Barghouthi' LIMIT 1);
+SET @sup_db  := (SELECT f.faculty_id FROM faculty f JOIN users u ON u.user_id=f.user_id WHERE u.full_name='Dr. Abdullah Krakeh' LIMIT 1);
+SET @sup_mob := (SELECT f.faculty_id FROM faculty f JOIN users u ON u.user_id=f.user_id WHERE u.full_name='Dr. Mamoun Nawahdah' LIMIT 1);
+
+INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT * FROM (
+    SELECT 'Committee Demo AI Project 01' AS title, 'ai' AS project_type, @target_semester_id AS semester_id, @sup_ai AS supervisor_id, 'submitted' AS status, CURDATE() AS submission_date
+    UNION ALL SELECT 'Committee Demo AI Project 02', 'ai', @target_semester_id, @sup_ai, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Web Project 01', 'web', @target_semester_id, @sup_web, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Web Project 02', 'web', @target_semester_id, @sup_web, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo SE Project 01', 'software_engineering', @target_semester_id, @sup_se, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo SE Project 02', 'software_engineering', @target_semester_id, @sup_se, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Security Project 01', 'security', @target_semester_id, @sup_sec, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Security Project 02', 'security', @target_semester_id, @sup_sec, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Database Project 01', 'databases', @target_semester_id, @sup_db, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Database Project 02', 'databases', @target_semester_id, @sup_db, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Mobile Project 01', 'mobile', @target_semester_id, @sup_mob, 'submitted', CURDATE()
+    UNION ALL SELECT 'Committee Demo Mobile Project 02', 'mobile', @target_semester_id, @sup_mob, 'submitted', CURDATE()
+) AS new_projects
+WHERE new_projects.semester_id IS NOT NULL
+  AND new_projects.supervisor_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1
+      FROM projects p
+      WHERE p.semester_id = new_projects.semester_id
+        AND p.title = new_projects.title
+  );
+
+UPDATE projects
+SET status = 'submitted'
+WHERE semester_id = @target_semester_id
+  AND title LIKE 'Committee Demo % Project %'
+  AND status IN ('committee_evaluation', 'under_review', 'needs_revision', 'draft');
+
+-- ------------------------------------------------------------
+-- 5) Verification
+-- ------------------------------------------------------------
+SELECT
+    'Available active doctors from COMP4200/COMP4300 list' AS check_name,
+    COUNT(*) AS total_doctors
+FROM faculty f
+JOIN users u ON u.user_id = f.user_id
+WHERE u.full_name IN (
+    'Dr. Iyad Jaber',
+    'Dr. Sobhi Ahmad',
+    'Dr. Radi Jarrar',
+    'Dr. Abdullah Krakeh',
+    'Dr. Ruba Awadallah',
+    'Dr. Murad Njoum',
+    'Dr. Adel Taweel',
+    'Dr. Yousef Hassouneh',
+    'Dr. Ruba Awadallah',
+    'Dr. Bassem Alserafi',
+    'Dr. Mamoun Nawahdah',
+    'Dr. Tasneem Zayt',
+    'Dr. Samer Zein',
+    'Dr. Hafez Barghouthi',
+    'Dr. Abdullah Al-Natsheh',
+    'Dr. Alaa Hasheesh',
+    'Dr. Faisal Shehadeh',
+    'Dr. Fadi Khalil',
+    'Dr. Mohammad Helal',
+    'Dr. Rashid Yousef',
+    'Dr. Ehab Alshaer',
+    'Dr. Sobhi Ahmad',
+    'Dr. Ahmad Fahl',
+    'Dr. Ahmad Sabbah',
+    'Dr. Mohammad Alkhanafseh'
+)
+  AND u.is_active = TRUE;
+
+SELECT
+    f.faculty_id,
+    u.full_name AS supervisor_name,
+    f.specialization,
+    COUNT(p.project_id) AS eligible_projects
+FROM projects p
+JOIN faculty f ON f.faculty_id = p.supervisor_id
+JOIN users u ON u.user_id = f.user_id
+WHERE p.semester_id = @target_semester_id
+  AND p.status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
+  AND p.title LIKE 'Committee Demo % Project %'
+GROUP BY f.faculty_id, u.full_name, f.specialization
+ORDER BY u.full_name;
+
+SELECT
+    'Demo projects ready' AS check_name,
+    COUNT(*) AS total_demo_projects
+FROM projects
+WHERE semester_id = @target_semester_id
+  AND status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
+  AND title LIKE 'Committee Demo % Project %';
+
+SET SQL_SAFE_UPDATES = 0;
+
+
+
+CREATE TABLE IF NOT EXISTS grade_entry_sessions (
+    session_id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NULL,
+    section_id INT NULL,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    status ENUM('closed','open','completed') NOT NULL DEFAULT 'open',
+    opened_by INT NOT NULL,
+    opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    closed_at DATETIME NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
+    FOREIGN KEY (opened_by) REFERENCES users(user_id)
+);
+
+CREATE TABLE IF NOT EXISTS grade_entries (
+    entry_id INT PRIMARY KEY AUTO_INCREMENT,
+    session_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    project_id INT NULL,
+    section_id INT NULL,
+
+    grade_type ENUM(
+        'report_reader',
+        'coordinator',
+        'supervisor',
+        'discussion_member',
+        'committee_member'
+    ) NOT NULL,
+
+    max_mark DECIMAL(5,2) NOT NULL,
+    mark DECIMAL(5,2) NULL,
+    comments TEXT NULL,
+
+    submitted_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uq_grade_entry (session_id, faculty_id, grade_type),
+
+    FOREIGN KEY (session_id) REFERENCES grade_entry_sessions(session_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE
+);
+
+
+
+CREATE TABLE IF NOT EXISTS project_evaluation_windows (
+    window_id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    is_open TINYINT(1) NOT NULL DEFAULT 0,
+    opened_by INT NULL,
+    opened_at DATETIME NULL,
+    closed_at DATETIME NULL,
+    due_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_eval_window_project_course (project_id, course_scope),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (opened_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS project_grade_entries (
+    grade_id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    component ENUM(
+        'intro_report_reader',
+        'intro_coordinator',
+        'intro_supervisor',
+        'intro_discussion_member',
+        'grad_report_reader',
+        'grad_supervisor',
+        'grad_committee_member'
+    ) NOT NULL,
+    evaluator_user_id INT NOT NULL,
+    evaluator_faculty_id INT NULL,
+    mark DECIMAL(6,2) NULL,
+    max_mark DECIMAL(6,2) NOT NULL,
+    notes TEXT NULL,
+    is_submitted TINYINT(1) NOT NULL DEFAULT 0,
+    submitted_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_grade_once (project_id, course_scope, component, evaluator_user_id),
+    INDEX idx_grade_project_course (project_id, course_scope),
+    INDEX idx_grade_evaluator (evaluator_user_id),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (evaluator_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (evaluator_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS project_final_evaluation_results (
+    result_id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    report_score DECIMAL(6,2) NULL,
+    supervisor_score DECIMAL(6,2) NULL,
+    coordinator_score DECIMAL(6,2) NULL,
+    discussion_score DECIMAL(6,2) NULL,
+    committee_score DECIMAL(6,2) NULL,
+    final_score DECIMAL(6,2) NULL,
+    decision ENUM('pending','accepted','rejected','archived') NOT NULL DEFAULT 'pending',
+    notes TEXT NULL,
+    published_by INT NULL,
+    published_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_eval_result_project_course (project_id, course_scope),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (published_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+
+
+-- Add group_name to projects so the coordinator sees the group name written by students.
+SET @db := DATABASE();
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE projects ADD COLUMN group_name VARCHAR(120) NULL AFTER project_id',
+        'SELECT "projects.group_name already exists"'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'projects'
+      AND COLUMN_NAME = 'group_name'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+
+
+
+-- Allow committee members to be labeled as supervisor / responsible / member.
+ALTER TABLE committee_plan_members
+MODIFY COLUMN role ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member';
+
+-- Two report readers for each project.
+CREATE TABLE IF NOT EXISTS project_report_readers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    reader_order TINYINT NOT NULL,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_project_reader_order (project_id, reader_order),
+    UNIQUE KEY uq_project_reader_faculty (project_id, faculty_id),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Mark the current responsible doctor as responsible in committee_plan_members,
+-- without removing the supervisor label where it already exists.
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE committee_plan_members cpm
+JOIN (
+    SELECT cpm2.id
+    FROM committee_plan_members cpm2
+    JOIN committee_plans cp2 ON cp2.plan_id = cpm2.plan_id
+    WHERE cp2.responsible_faculty_id = cpm2.faculty_id
+      AND cpm2.role <> 'supervisor'
+) x ON x.id = cpm.id
+SET cpm.role = 'responsible';
+
+SET SQL_SAFE_UPDATES = 0;
+
+
+-- Optional cleanup: remove committee demo projects that were only test data.
+-- Keep this commented if you still need them for committee testing.
+-- DELETE FROM projects
+-- WHERE title LIKE 'Committee Demo % Project %'
+--   AND project_id NOT IN (SELECT DISTINCT project_id FROM project_members);
+
+-- ============================================================
+--  END OF FILE
+-- ============================================================
+
+
+
+
+-- Add group_name to projects so the coordinator sees the group name written by students.
+SET @db := DATABASE();
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE projects ADD COLUMN group_name VARCHAR(120) NULL AFTER project_id',
+        'SELECT "projects.group_name already exists"'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'projects'
+      AND COLUMN_NAME = 'group_name'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+
+-- Allow committee members to be labeled as supervisor / responsible / member.
+ALTER TABLE committee_plan_members
+MODIFY COLUMN role ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member';
+
+-- Two report readers for each project.
+CREATE TABLE IF NOT EXISTS project_report_readers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    reader_order TINYINT NOT NULL,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_project_reader_order (project_id, reader_order),
+    UNIQUE KEY uq_project_reader_faculty (project_id, faculty_id),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Mark the current responsible doctor as responsible in committee_plan_members,
+-- without removing the supervisor label where it already exists.
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE committee_plan_members cpm
+JOIN (
+    SELECT cpm2.id
+    FROM committee_plan_members cpm2
+    JOIN committee_plans cp2 ON cp2.plan_id = cpm2.plan_id
+    WHERE cp2.responsible_faculty_id = cpm2.faculty_id
+      AND cpm2.role <> 'supervisor'
+) x ON x.id = cpm.id
+SET cpm.role = 'responsible';
+
+SET SQL_SAFE_UPDATES = 0;
+
+
+-- Optional cleanup: remove committee demo projects that were only test data.
+-- Keep this commented if you still need them for committee testing.
+-- DELETE FROM projects
+-- WHERE title LIKE 'Committee Demo % Project %'
+--   AND project_id NOT IN (SELECT DISTINCT project_id FROM project_members);
+
+CREATE TABLE IF NOT EXISTS project_report_readers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    reader_order TINYINT NOT NULL,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_project_reader_order (project_id, reader_order),
+    UNIQUE KEY uq_project_reader_faculty (project_id, faculty_id),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Mark the current responsible doctor as responsible in committee_plan_members,
+-- without removing the supervisor label where it already exists.
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE committee_plan_members cpm
+JOIN (
+    SELECT cpm2.id
+    FROM committee_plan_members cpm2
+    JOIN committee_plans cp2 ON cp2.plan_id = cpm2.plan_id
+    WHERE cp2.responsible_faculty_id = cpm2.faculty_id
+      AND cpm2.role <> 'supervisor'
+) x ON x.id = cpm.id
+SET cpm.role = 'responsible';
+
+SET SQL_SAFE_UPDATES = 0;
+  
+  
+  
+  -- Allow committee members to be labeled as supervisor / responsible / member.
+ALTER TABLE committee_plan_members
+MODIFY COLUMN role ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member';
+
+-- Two report readers for each project.
+CREATE TABLE IF NOT EXISTS project_report_readers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    reader_order TINYINT NOT NULL,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_project_reader_order (project_id, reader_order),
+    UNIQUE KEY uq_project_reader_faculty (project_id, faculty_id),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Mark the current responsible doctor as responsible in committee_plan_members,
+-- without removing the supervisor label where it already exists.
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE committee_plan_members cpm
+JOIN (
+    SELECT cpm2.id
+    FROM committee_plan_members cpm2
+    JOIN committee_plans cp2 ON cp2.plan_id = cpm2.plan_id
+    WHERE cp2.responsible_faculty_id = cpm2.faculty_id
+      AND cpm2.role <> 'supervisor'
+) x ON x.id = cpm.id
+SET cpm.role = 'responsible';
+
+SET SQL_SAFE_UPDATES = 0;
+
+
+
+
+
+
+
+
+-- ============================================================
+--  FINAL SAFE PROJECT READING FIX — NO DELETE VERSION
+-- ============================================================
+-- This block fixes the pages that were reading demo/empty projects.
+-- It DOES NOT delete any project.
+-- It only marks demo/empty projects as draft and creates views that the backend can read.
+
+USE apms_db;
+SET NAMES utf8mb4;
+SET SQL_SAFE_UPDATES = 0;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- 1) Keep Committee Demo projects in the database, but do not let them appear as real graduation groups.
+UPDATE projects p
+LEFT JOIN project_members pm ON pm.project_id = p.project_id
+SET p.status = 'draft'
+WHERE p.title LIKE 'Committee Demo%'
+  AND pm.project_id IS NULL;
+
+-- 2) Keep any zero-student project in the DB, but hide it from pages that require real students.
+UPDATE projects p
+LEFT JOIN project_members pm ON pm.project_id = p.project_id
+SET p.status = 'draft'
+WHERE pm.project_id IS NULL;
+
+-- 3) View used by Student Distribution / Section Results / Committee pages.
+-- Real graduation projects = projects that have at least one student in project_members.
+CREATE OR REPLACE VIEW vw_real_graduation_projects AS
+SELECT
+    p.project_id,
+    COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id)) AS section_name,
+    p.title,
+    p.title_en,
+    p.project_type,
+    p.semester_id,
+    p.supervisor_id,
+    u_sup.full_name AS supervisor_name,
+    p.status,
+    p.submission_date,
+    COUNT(DISTINCT pm.student_id) AS student_count,
+    GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', ') AS students
+FROM projects p
+JOIN project_members pm ON pm.project_id = p.project_id
+JOIN students st ON st.student_id = pm.student_id
+JOIN users u_st ON u_st.user_id = st.user_id
+LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+WHERE p.title NOT LIKE 'Committee Demo%'
+GROUP BY
+    p.project_id,
+    p.group_name,
+    p.title,
+    p.title_en,
+    p.project_type,
+    p.semester_id,
+    p.supervisor_id,
+    u_sup.full_name,
+    p.status,
+    p.submission_date;
+
+-- 4) View for Coordinator Section Results page.
+CREATE OR REPLACE VIEW vw_graduation_section_results AS
+SELECT
+    'graduation_project' AS course_scope,
+    v.project_id AS reference_id,
+    v.section_name,
+    v.supervisor_id,
+    v.supervisor_name,
+    v.student_count,
+    v.students,
+    COALESCE(scs.status, 'pending') AS result_status,
+    scs.notes,
+    scs.marked_at,
+    marker.full_name AS marked_by_name
+FROM vw_real_graduation_projects v
+LEFT JOIN section_completion_status scs
+       ON scs.course_scope = 'graduation_project'
+      AND scs.reference_id = v.project_id
+LEFT JOIN users marker ON marker.user_id = scs.marked_by;
+
+-- 5) View for Student Distribution page.
+CREATE OR REPLACE VIEW vw_distribution_real_groups AS
+SELECT
+    v.project_id,
+    v.section_name AS group_name,
+    v.students AS team_members,
+    v.title AS idea_title,
+    v.supervisor_id AS final_supervisor_id,
+    v.supervisor_name AS final_supervisor_name,
+    v.status,
+    v.student_count
+FROM vw_real_graduation_projects v;
+
+SET FOREIGN_KEY_CHECKS = 1;
+SET SQL_SAFE_UPDATES = 0;
+
+-- Final check: only real projects with real students should appear here.
+SELECT
+    project_id,
+    section_name,
+    title,
+    supervisor_name,
+    student_count,
+    students
+FROM vw_real_graduation_projects
+ORDER BY project_id;
+
+-- ============================================================
+--  END OF CLEAN FULL SQL FILE
+-- ============================================================
+
+-- Re-enable safe update mode after the full import.
+SET SQL_SAFE_UPDATES = 1;
+
+
+
+
+SET SQL_SAFE_UPDATES = 0;
+SET FOREIGN_KEY_CHECKS = 0;
+SET NAMES utf8mb4;
+
+-- ============================================================
+-- 1) Make sure section_completion_status has the correct column names
+--    Frontend expects result_status, but the table column is status.
+--    Views below expose it as result_status.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS section_completion_status (
+    status_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    reference_id INT NOT NULL,
+    status ENUM('pending','succeeded','not_succeeded') NOT NULL DEFAULT 'pending',
+    notes TEXT NULL,
+    marked_by INT NULL,
+    marked_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_section_completion (course_scope, reference_id),
+    INDEX idx_section_completion_status (status),
+    INDEX idx_section_completion_scope_status (course_scope, status),
+    FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 2) Make sure Project Introduction sections tables exist
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS student_distribution_sections (
+    section_id     INT PRIMARY KEY AUTO_INCREMENT,
+    section_name   VARCHAR(100) NOT NULL,
+    supervisor_id  INT NOT NULL,
+    entered_by     INT NULL,
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (entered_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS section_students (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    section_id  INT NOT NULL,
+    student_id  INT NOT NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_section_student (section_id, student_id),
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 3) Optional safe seed:
+--    If after the full reset there are ZERO intro sections,
+--    create three COMP4200 introduction sections using your real doctors.
+--    This does NOT delete or overwrite anything.
+-- ============================================================
+
+INSERT INTO student_distribution_sections (section_name, supervisor_id, entered_by)
+SELECT x.section_name, f.faculty_id, NULL
+FROM (
+    SELECT 'COMP4200 Introduction Section 1' AS section_name, 'Dr. Ruba Awadallah' AS doctor_name
+    UNION ALL SELECT 'COMP4200 Introduction Section 2', 'Dr. Iyad Jaber'
+    UNION ALL SELECT 'COMP4200 Introduction Section 3', 'Dr. Abdullah Krakeh'
+) x
+JOIN users u ON u.full_name = x.doctor_name
+JOIN faculty f ON f.user_id = u.user_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM student_distribution_sections
+);
+
+-- ============================================================
+-- 4) Real Graduation Project view
+--    Keeps demo projects in DB, but hides them from section results.
+-- ============================================================
+
+CREATE OR REPLACE VIEW vw_real_graduation_projects AS
+SELECT
+    p.project_id,
+    CONCAT('Group ', p.project_id) AS section_name,
+    p.supervisor_id,
+    u_sup.full_name AS supervisor_name,
+    COUNT(DISTINCT pm.student_id) AS student_count,
+    GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', ') AS students
+FROM projects p
+JOIN semesters sem ON sem.semester_id = p.semester_id
+JOIN project_members pm ON pm.project_id = p.project_id
+JOIN students st ON st.student_id = pm.student_id
+JOIN users u_st ON u_st.user_id = st.user_id
+LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+WHERE sem.course_code IN ('COMP4300', 'COMP4201')
+  AND p.title NOT LIKE 'Committee Demo%'
+GROUP BY
+    p.project_id,
+    p.supervisor_id,
+    u_sup.full_name;
+
+-- ============================================================
+-- 5) Graduation section results view
+--    IMPORTANT: reads scs.status and exposes result_status.
+-- ============================================================
+
+CREATE OR REPLACE VIEW vw_graduation_section_results AS
+SELECT
+    'graduation_project' AS course_scope,
+    v.project_id AS reference_id,
+    v.section_name,
+    v.supervisor_id,
+    v.supervisor_name,
+    v.student_count,
+    v.students,
+    COALESCE(scs.status, 'pending') AS result_status,
+    scs.notes,
+    scs.marked_at,
+    marker.full_name AS marked_by_name
+FROM vw_real_graduation_projects v
+LEFT JOIN section_completion_status scs
+       ON scs.course_scope = 'graduation_project'
+      AND scs.reference_id = v.project_id
+LEFT JOIN users marker ON marker.user_id = scs.marked_by;
+
+-- ============================================================
+-- 6) Project Introduction section results view
+--    This is the part that fixes the broken Introduction tab.
+--    It reads from student_distribution_sections, NOT projects.
+-- ============================================================
+
+CREATE OR REPLACE VIEW vw_introduction_section_results AS
+SELECT
+    'introduction' AS course_scope,
+    sds.section_id AS reference_id,
+    sds.section_name,
+    sds.supervisor_id,
+    u_sup.full_name AS supervisor_name,
+    COUNT(DISTINCT ss.student_id) AS student_count,
+    COALESCE(
+        GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '),
+        ''
+    ) AS students,
+    COALESCE(scs.status, 'pending') AS result_status,
+    scs.notes,
+    scs.marked_at,
+    marker.full_name AS marked_by_name
+FROM student_distribution_sections sds
+JOIN faculty f_sup ON f_sup.faculty_id = sds.supervisor_id
+JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+LEFT JOIN section_students ss ON ss.section_id = sds.section_id
+LEFT JOIN students st ON st.student_id = ss.student_id
+LEFT JOIN users u_st ON u_st.user_id = st.user_id
+LEFT JOIN section_completion_status scs
+       ON scs.course_scope = 'introduction'
+      AND scs.reference_id = sds.section_id
+LEFT JOIN users marker ON marker.user_id = scs.marked_by
+GROUP BY
+    sds.section_id,
+    sds.section_name,
+    sds.supervisor_id,
+    u_sup.full_name,
+    scs.status,
+    scs.notes,
+    scs.marked_at,
+    marker.full_name;
+
+-- ============================================================
+-- 7) Quick test queries
+-- ============================================================
+
+SELECT * FROM vw_introduction_section_results ORDER BY reference_id;
+SELECT * FROM vw_graduation_section_results ORDER BY reference_id DESC;
+
+SET FOREIGN_KEY_CHECKS = 1;
+SET SQL_SAFE_UPDATES = 1;

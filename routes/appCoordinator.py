@@ -293,7 +293,33 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
 
     project_groups = int(project_row.get("project_groups") or 0)
     project_students = int(project_row.get("project_students") or 0)
-    used_hours = project_students * 0.5
+
+    intro_sections = 0
+    intro_students = 0
+
+    if (
+        _table_exists(cursor, "student_distribution_sections")
+        and _table_exists(cursor, "section_students")
+    ):
+        cursor.execute(
+            """
+            SELECT
+                COUNT(DISTINCT sec.section_id) AS intro_sections,
+                COUNT(DISTINCT ss.student_id) AS intro_students
+            FROM student_distribution_sections sec
+            LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+            WHERE sec.supervisor_id = %s
+            """,
+            (faculty_id,),
+        )
+        intro_row = cursor.fetchone() or {}
+        intro_sections = int(intro_row.get("intro_sections") or 0)
+        intro_students = int(intro_row.get("intro_students") or 0)
+
+    graduation_used_hours = project_students * 0.5
+    introduction_used_hours = intro_students * 0.5
+
+    used_hours = graduation_used_hours + introduction_used_hours
     remaining_hours = wanted_hours - used_hours
 
     if wanted_hours <= 0:
@@ -310,8 +336,12 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
         "wanted_hours": wanted_hours,
         "project_groups": project_groups,
         "project_students": project_students,
-        "supervised_groups": project_groups,
-        "supervised_students": project_students,
+        "intro_sections": intro_sections,
+        "intro_students": intro_students,
+        "supervised_groups": project_groups + intro_sections,
+        "supervised_students": project_students + intro_students,
+        "graduation_used_hours": graduation_used_hours,
+        "introduction_used_hours": introduction_used_hours,
         "used_hours": used_hours,
         "student_load_hours": used_hours,
         "remaining_hours": remaining_hours,
@@ -2484,11 +2514,17 @@ def api_coordinator_distribution_data():
             db.close()
             return jsonify({"error": "No active semester found."}), 400
 
+        group_name_expr = (
+            "COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id)) AS group_name"
+            if _db_column_exists(cursor, "projects", "group_name")
+            else "CONCAT('Group ', p.project_id) AS group_name"
+        )
+
         cursor.execute(
-            """
+            f"""
             SELECT
                    p.project_id,
-                   CONCAT('Group ', p.project_id) AS group_name,
+                   {group_name_expr},
                    p.title,
                    p.status,
                    p.supervisor_id,
@@ -2499,8 +2535,12 @@ def api_coordinator_distribution_data():
                    COALESCE(
                        GROUP_CONCAT(DISTINCT u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
                        ''
-                   ) AS team_members
+                   ) AS team_members,
+                   COUNT(DISTINCT pm.student_id) AS member_count
             FROM projects p
+            JOIN project_members pm ON pm.project_id = p.project_id
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users u ON u.user_id = st.user_id
             LEFT JOIN faculty f1 ON f1.faculty_id = p.preferred_supervisor_1
             LEFT JOIN users pref1 ON pref1.user_id = f1.user_id
             LEFT JOIN faculty f2 ON f2.faculty_id = p.preferred_supervisor_2
@@ -2509,9 +2549,6 @@ def api_coordinator_distribution_data():
             LEFT JOIN users pref3 ON pref3.user_id = f3.user_id
             LEFT JOIN faculty fsup ON fsup.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = fsup.user_id
-            LEFT JOIN project_members pm ON pm.project_id = p.project_id
-            LEFT JOIN students st ON st.student_id = pm.student_id
-            LEFT JOIN users u ON u.user_id = st.user_id
             WHERE p.semester_id = %s
             GROUP BY
                 p.project_id,
@@ -2522,6 +2559,7 @@ def api_coordinator_distribution_data():
                 pref2.full_name,
                 pref3.full_name,
                 u_sup.full_name
+            HAVING member_count > 0
             ORDER BY p.project_id DESC
             """,
             (semester["semester_id"],),
@@ -2934,33 +2972,56 @@ def api_coordinator_section_results():
                 """)
             introduction_sections = cursor.fetchall()
 
-        grad_where = "WHERE p.semester_id = %s" if semester_id else ""
-        grad_params = (semester_id,) if semester_id else ()
+        # Graduation Project groups must come from REAL registered projects only.
+        # Do NOT read every row from projects, because the database contains demo/seed projects
+        # such as "Committee Demo ..." with no students, which makes this page look wrong.
+        grad_where_parts = []
+        grad_params_list = []
+        if semester_id:
+            grad_where_parts.append("p.semester_id = %s")
+            grad_params_list.append(semester_id)
+
+        # A real graduation group must have at least one student in project_members.
+        grad_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
+
+        # Hide generated demo projects if they still exist in the database.
+        grad_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
+
+        grad_where = "WHERE " + " AND ".join(grad_where_parts)
+        grad_params = tuple(grad_params_list)
+
+        group_name_select = (
+            "COALESCE(NULLIF(p.group_name, ''), NULLIF(p.title, ''), CONCAT('Project ', p.project_id))"
+            if _db_column_exists(cursor, "projects", "group_name")
+            else "COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id))"
+        )
+
         cursor.execute(
             f"""
             SELECT p.project_id AS reference_id,
-                   COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS section_name,
+                   {group_name_select} AS section_name,
                    'graduation_project' AS course_scope,
                    COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
                    COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
-                   COUNT(DISTINCT st.student_id) AS student_count,
+                   COUNT(DISTINCT pm.student_id) AS student_count,
                    p.status AS project_status,
                    COALESCE(scs.status, 'pending') AS result_status,
                    scs.notes,
                    scs.marked_at,
                    u_mark.full_name AS marked_by_name
             FROM projects p
+            JOIN project_members pm ON pm.project_id = p.project_id
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users u_st ON u_st.user_id = st.user_id
             LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
-            LEFT JOIN project_members pm ON pm.project_id = p.project_id
-            LEFT JOIN students st ON st.student_id = pm.student_id
-            LEFT JOIN users u_st ON u_st.user_id = st.user_id
             LEFT JOIN section_completion_status scs
               ON scs.course_scope = 'graduation_project' AND scs.reference_id = p.project_id
             LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
             {grad_where}
             GROUP BY p.project_id, p.title, p.status, u_sup.full_name,
                      scs.status, scs.notes, scs.marked_at, u_mark.full_name
+            HAVING student_count > 0
             ORDER BY p.project_id DESC
             """,
             grad_params,
@@ -3059,21 +3120,28 @@ def api_export_groups():
         db.close()
         return jsonify({"error": "No active semester found."}), 400
 
+    group_name_expr = (
+        "COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id)) AS group_name"
+        if _db_column_exists(cursor, "projects", "group_name")
+        else "CONCAT('Group ', p.project_id) AS group_name"
+    )
+
     cursor.execute(
-        """
+        f"""
         SELECT
-               CONCAT('Group ', p.project_id) AS group_name,
+               {group_name_expr},
                p.title,
                COALESCE(GROUP_CONCAT(DISTINCT u.full_name ORDER BY u.full_name SEPARATOR ', '), '') AS team_members,
                COALESCE(pref1.full_name, '') AS preferred_1,
                COALESCE(pref2.full_name, '') AS preferred_2,
                COALESCE(pref3.full_name, '') AS preferred_3,
                COALESCE(u_sup.full_name, '') AS final_supervisor,
-               p.status
+               p.status,
+               COUNT(DISTINCT pm.student_id) AS member_count
         FROM projects p
-        LEFT JOIN project_members pm ON pm.project_id = p.project_id
-        LEFT JOIN students st ON st.student_id = pm.student_id
-        LEFT JOIN users u ON u.user_id = st.user_id
+        JOIN project_members pm ON pm.project_id = p.project_id
+        JOIN students st ON st.student_id = pm.student_id
+        JOIN users u ON u.user_id = st.user_id
         LEFT JOIN faculty f1 ON f1.faculty_id = p.preferred_supervisor_1
         LEFT JOIN users pref1 ON pref1.user_id = f1.user_id
         LEFT JOIN faculty f2 ON f2.faculty_id = p.preferred_supervisor_2
@@ -3084,6 +3152,7 @@ def api_export_groups():
         LEFT JOIN users u_sup ON u_sup.user_id = fsup.user_id
         WHERE p.semester_id = %s
         GROUP BY p.project_id, p.title, pref1.full_name, pref2.full_name, pref3.full_name, u_sup.full_name, p.status
+        HAVING member_count > 0
         ORDER BY p.project_id DESC
         """,
         (semester["semester_id"],),
@@ -3747,6 +3816,113 @@ def _committee_pick_members(groups, used_faculty_ids=None, rotation_index=0):
     return chosen_members
 
 
+
+def _committee_find_faculty_in_groups(groups, faculty_id):
+    for members in groups.values():
+        for member in members:
+            if int(member["faculty_id"]) == int(faculty_id):
+                return member
+    return None
+
+
+def _committee_pick_members_for_supervisor(
+    groups,
+    supervisor_id,
+    used_faculty_ids=None,
+    rotation_index=0,
+    reserved_supervisor_ids=None,
+):
+    """
+    Build one discussion committee.
+
+    Required: project supervisor + 3 other doctors.
+    Preferred: the 3 other doctors are unused and from different majors.
+    Fallback: if the database does not have enough free/different-major doctors,
+    the system still generates the committee by reusing the least-loaded available
+    doctors instead of stopping the coordinator with an error.
+    """
+    if used_faculty_ids is None:
+        used_faculty_ids = set()
+
+    used_faculty_ids = {int(x) for x in used_faculty_ids}
+
+    supervisor = _committee_find_faculty_in_groups(groups, supervisor_id)
+    if not supervisor:
+        raise ValueError(
+            "The project supervisor is not available for committee generation. "
+            "Check that the supervisor has a faculty record and an active user account."
+        )
+
+    supervisor_id = int(supervisor_id)
+    supervisor_spec = supervisor.get("specialization") or "General"
+
+    chosen_members = [supervisor]
+    chosen_ids = {supervisor_id}
+    chosen_specs = {supervisor_spec}
+
+    # Flatten all doctors except the current project supervisor.
+    all_candidates = []
+    for spec, members in groups.items():
+        for member in members:
+            fid = int(member["faculty_id"])
+            if fid == supervisor_id:
+                continue
+            item = dict(member)
+            item["specialization"] = item.get("specialization") or "General"
+            all_candidates.append(item)
+
+    if len(all_candidates) < 3:
+        raise ValueError(
+            "You need at least 4 doctors in the faculty table: the project supervisor plus 3 committee members."
+        )
+
+    def sort_key(member):
+        fid = int(member["faculty_id"])
+        return (
+            fid in used_faculty_ids,                 # unused first
+            int(member.get("active_committee_count") or 0),
+            -int(member.get("years_experience") or 0),
+            member.get("full_name") or "",
+        )
+
+    def add_from(candidates, require_new_major=False):
+        nonlocal chosen_members, chosen_ids, chosen_specs
+        for member in sorted(candidates, key=sort_key):
+            fid = int(member["faculty_id"])
+            spec = member.get("specialization") or "General"
+            if fid in chosen_ids:
+                continue
+            if require_new_major and spec in chosen_specs:
+                continue
+            chosen_members.append(member)
+            chosen_ids.add(fid)
+            chosen_specs.add(spec)
+            used_faculty_ids.add(fid)
+            if len(chosen_members) == 4:
+                return True
+        return len(chosen_members) == 4
+
+    # 1) Best case: unused doctors, different majors from each other/supervisor.
+    unused_candidates = [m for m in all_candidates if int(m["faculty_id"]) not in used_faculty_ids]
+    add_from(unused_candidates, require_new_major=True)
+
+    # 2) If majors are limited, fill with unused doctors even if major repeats.
+    if len(chosen_members) < 4:
+        add_from(unused_candidates, require_new_major=False)
+
+    # 3) Last fallback: reuse doctors from other committees to avoid blocking the workflow.
+    # This is intentionally allowed only after all strict options fail.
+    if len(chosen_members) < 4:
+        add_from(all_candidates, require_new_major=False)
+
+    if len(chosen_members) < 4:
+        raise ValueError(
+            "Could not create a complete committee. Please add at least 3 doctors beside the supervisor."
+        )
+
+    return chosen_members
+
+
 def _committee_fetch_eligible_projects(cursor, semester_id):
     cursor.execute(
         """
@@ -3755,16 +3931,27 @@ def _committee_fetch_eligible_projects(cursor, semester_id):
             p.title,
             p.status,
             p.project_type,
+            p.supervisor_id,
+            sup_u.full_name AS supervisor_name,
+            sup_f.specialization AS supervisor_specialization,
             COALESCE(
                 GROUP_CONCAT(DISTINCT u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
                 ''
             ) AS team_members
         FROM projects p
+        LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+        LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
         LEFT JOIN project_members pm ON pm.project_id = p.project_id
         LEFT JOIN students st ON st.student_id = pm.student_id
         LEFT JOIN users u ON u.user_id = st.user_id
         WHERE p.semester_id = %s
+          AND p.supervisor_id IS NOT NULL
           AND p.status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
+          AND EXISTS (
+              SELECT 1
+              FROM project_members pmx
+              WHERE pmx.project_id = p.project_id
+          )
           AND NOT EXISTS (
               SELECT 1
               FROM committee_plan_projects cpp
@@ -3772,8 +3959,9 @@ def _committee_fetch_eligible_projects(cursor, semester_id):
               WHERE cpp.project_id = p.project_id
                 AND cp.status <> 'cancelled'
           )
-        GROUP BY p.project_id, p.title, p.status, p.project_type
-        ORDER BY p.project_id DESC
+        GROUP BY p.project_id, p.title, p.status, p.project_type,
+                 p.supervisor_id, sup_u.full_name, sup_f.specialization
+        ORDER BY p.supervisor_id ASC, p.project_id DESC
         """,
         (semester_id,),
     )
@@ -3812,6 +4000,7 @@ def _committee_fetch_members_for_plan(cursor, plan_id, responsible_faculty_id=No
         """
         SELECT
             cpm.faculty_id,
+            cpm.role,
             u.full_name,
             f.specialization,
             COALESCE(f.years_experience, 0) AS years_experience
@@ -3819,19 +4008,25 @@ def _committee_fetch_members_for_plan(cursor, plan_id, responsible_faculty_id=No
         JOIN faculty f ON f.faculty_id = cpm.faculty_id
         JOIN users u ON u.user_id = f.user_id
         WHERE cpm.plan_id = %s
-        ORDER BY u.full_name
+        ORDER BY
+            CASE
+                WHEN cpm.role = 'supervisor' THEN 0
+                WHEN %s IS NOT NULL AND cpm.faculty_id = %s THEN 1
+                WHEN cpm.role = 'responsible' THEN 1
+                ELSE 2
+            END,
+            u.full_name
         """,
-        (plan_id,),
+        (plan_id, responsible_faculty_id, responsible_faculty_id),
     )
     rows = cursor.fetchall()
     result = []
     for row in rows:
-        role = (
-            "responsible"
-            if responsible_faculty_id
+        is_responsible = (
+            responsible_faculty_id is not None
             and int(row["faculty_id"]) == int(responsible_faculty_id)
-            else "member"
         )
+        role = row.get("role") or "member"
         result.append(
             {
                 "faculty_id": row["faculty_id"],
@@ -3839,30 +4034,71 @@ def _committee_fetch_members_for_plan(cursor, plan_id, responsible_faculty_id=No
                 "specialization": row["specialization"],
                 "years_experience": row["years_experience"],
                 "role": role,
+                "is_supervisor": role == "supervisor",
+                "is_responsible": is_responsible,
             }
         )
     return result
 
 
+def _committee_ensure_report_readers_table(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS project_report_readers (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            project_id INT NOT NULL,
+            faculty_id INT NOT NULL,
+            reader_order TINYINT NOT NULL,
+            assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_project_reader_order (project_id, reader_order),
+            UNIQUE KEY uq_project_reader_faculty (project_id, faculty_id),
+            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+            FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
+
 def _committee_fetch_projects_for_plan(cursor, plan_id):
+    _committee_ensure_report_readers_table(cursor)
     cursor.execute(
         """
         SELECT
             cpp.slot_order,
             TIME_FORMAT(cpp.slot_start, '%H:%i') AS slot_start,
             TIME_FORMAT(cpp.slot_end, '%H:%i') AS slot_end,
+            p.project_id,
             p.title,
+            p.supervisor_id,
+            sup_u.full_name AS supervisor_name,
             COALESCE(
                 GROUP_CONCAT(DISTINCT u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
                 ''
-            ) AS team_members
+            ) AS team_members,
+            r1.faculty_id AS reader1_id,
+            r1_u.full_name AS reader1_name,
+            r2.faculty_id AS reader2_id,
+            r2_u.full_name AS reader2_name
         FROM committee_plan_projects cpp
         JOIN projects p ON p.project_id = cpp.project_id
+        LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+        LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
         LEFT JOIN project_members pm ON pm.project_id = p.project_id
         LEFT JOIN students st ON st.student_id = pm.student_id
         LEFT JOIN users u ON u.user_id = st.user_id
+        LEFT JOIN project_report_readers r1
+            ON r1.project_id = p.project_id AND r1.reader_order = 1
+        LEFT JOIN faculty r1_f ON r1_f.faculty_id = r1.faculty_id
+        LEFT JOIN users r1_u ON r1_u.user_id = r1_f.user_id
+        LEFT JOIN project_report_readers r2
+            ON r2.project_id = p.project_id AND r2.reader_order = 2
+        LEFT JOIN faculty r2_f ON r2_f.faculty_id = r2.faculty_id
+        LEFT JOIN users r2_u ON r2_u.user_id = r2_f.user_id
         WHERE cpp.plan_id = %s
-        GROUP BY cpp.slot_order, cpp.slot_start, cpp.slot_end, p.project_id, p.title
+        GROUP BY
+            cpp.slot_order, cpp.slot_start, cpp.slot_end,
+            p.project_id, p.title, p.supervisor_id, sup_u.full_name,
+            r1.faculty_id, r1_u.full_name, r2.faculty_id, r2_u.full_name
         ORDER BY cpp.slot_order ASC
         """,
         (plan_id,),
@@ -3871,6 +4107,7 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
 
 
 def _committee_dashboard_payload(cursor):
+    _committee_ensure_report_readers_table(cursor)
     active_semester = _get_active_semester(cursor)
     eligible_projects = (
         _committee_fetch_eligible_projects(cursor, active_semester["semester_id"])
@@ -3892,6 +4129,8 @@ def _committee_dashboard_payload(cursor):
                 "status": row["status"],
                 "responsible_faculty_id": row["responsible_faculty_id"],
                 "responsible_name": row["responsible_name"],
+                "supervisor_faculty_id": row["responsible_faculty_id"],
+                "supervisor_name": row["responsible_name"],
                 "projects_count": row["projects_count"],
                 "members": _committee_fetch_members_for_plan(
                     cursor, row["plan_id"], row["responsible_faculty_id"]
@@ -3920,6 +4159,7 @@ def _committee_dashboard_payload(cursor):
             "status": p["status"],
             "projects_count": p["projects_count"],
             "responsible_name": p["responsible_name"],
+            "supervisor_name": p.get("supervisor_name") or p.get("responsible_name"),
         }
         for p in plans
     ]
@@ -4027,15 +4267,35 @@ def _committee_generate_internal(
         ORDER BY sort_order ASC, room_name ASC
         """)
     rooms = cursor.fetchall()
-    committee_count = math.ceil(len(eligible_projects) / projects_per_committee)
 
-    available_doctors_count = sum(len(members) for members in faculty_groups.values())
-    if available_doctors_count < committee_count * 4:
+    projects_by_supervisor = defaultdict(list)
+    for project in eligible_projects:
+        supervisor_id = project.get("supervisor_id")
+        if supervisor_id:
+            projects_by_supervisor[int(supervisor_id)].append(project)
+
+    if not projects_by_supervisor:
         raise ValueError(
-            f"Not enough available doctors. Required doctors: {committee_count * 4}, "
-            f"available doctors: {available_doctors_count}. "
-            f"A doctor cannot be assigned to more than one active committee."
+            "No eligible projects with assigned supervisors were found. "
+            "Assign a supervisor to each project before generating committees."
         )
+
+    committee_groups = []
+    for supervisor_id, supervisor_projects in projects_by_supervisor.items():
+        random.shuffle(supervisor_projects)
+        # One committee is created for each supervisor. If that supervisor has fewer
+        # projects than Projects Per Committee, the committee is created with the
+        # available project count. If they have more, all their projects stay together
+        # so the same supervisor is not assigned to multiple active committees.
+        committee_groups.append(
+            {
+                "supervisor_id": supervisor_id,
+                "projects": supervisor_projects,
+            }
+        )
+
+    random.shuffle(committee_groups)
+    committee_count = len(committee_groups)
 
     if len(rooms) < committee_count:
         raise ValueError(
@@ -4043,17 +4303,25 @@ def _committee_generate_internal(
         )
 
     used_faculty_ids = set()
+    reserved_supervisor_ids = set(projects_by_supervisor.keys())
 
-    for idx in range(committee_count):
-        chunk = eligible_projects[
-            idx * projects_per_committee : (idx + 1) * projects_per_committee
-        ]
+    for idx, committee_group in enumerate(committee_groups):
+        chunk = committee_group["projects"]
+        supervisor_id = committee_group["supervisor_id"]
+
         if not chunk:
             continue
 
-        members = _committee_pick_members(faculty_groups, used_faculty_ids, idx)
+        members = _committee_pick_members_for_supervisor(
+            faculty_groups,
+            supervisor_id,
+            used_faculty_ids,
+            idx,
+            reserved_supervisor_ids,
+        )
         room = rooms[idx]
-        committee_name = f"Committee {idx + 1}"
+        supervisor_name = chunk[0].get("supervisor_name") or "Supervisor"
+        committee_name = f"Committee {idx + 1} — {supervisor_name}"
         last_slot_end = start_time
 
         for slot_index in range(len(chunk)):
@@ -4066,8 +4334,8 @@ def _committee_generate_internal(
             insert_cursor.execute(
                 """
                 INSERT INTO committee_plans
-                    (committee_name, academic_year, discussion_date, start_time, end_time, room_id, status, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    (committee_name, academic_year, discussion_date, start_time, end_time, room_id, responsible_faculty_id, status, created_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     committee_name,
@@ -4076,6 +4344,7 @@ def _committee_generate_internal(
                     start_time,
                     last_slot_end,
                     room["room_id"],
+                    supervisor_id,
                     "scheduled",
                     session.get("user_id"),
                 ),
@@ -4084,8 +4353,8 @@ def _committee_generate_internal(
             insert_cursor.execute(
                 """
                 INSERT INTO committee_plans
-                    (committee_name, discussion_date, start_time, end_time, room_id, status, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    (committee_name, discussion_date, start_time, end_time, room_id, responsible_faculty_id, status, created_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     committee_name,
@@ -4093,6 +4362,7 @@ def _committee_generate_internal(
                     start_time,
                     last_slot_end,
                     room["room_id"],
+                    supervisor_id,
                     "scheduled",
                     session.get("user_id"),
                 ),
@@ -4103,9 +4373,9 @@ def _committee_generate_internal(
             insert_cursor.execute(
                 """
                 INSERT INTO committee_plan_members (plan_id, faculty_id, role)
-                VALUES (%s, %s, 'member')
+                VALUES (%s, %s, %s)
                 """,
-                (plan_id, member["faculty_id"]),
+                (plan_id, member["faculty_id"], "supervisor" if int(member["faculty_id"]) == int(supervisor_id) else "member"),
             )
 
         for slot_index, project in enumerate(chunk, start=1):
@@ -4128,9 +4398,9 @@ def _committee_generate_internal(
     payload = _committee_dashboard_payload(cursor)
     return {
         "message": (
-            "Committees were generated successfully. Projects were selected automatically and distributed randomly across committees."
+            "Committees were generated successfully. The system preferred different majors and unused doctors; when the database was limited, it used the safest available fallback."
             if not clear_existing
-            else "Committees were reset and redistributed successfully."
+            else "Committees were reset and redistributed successfully. The system preferred different majors and unused doctors; when the database was limited, it used the safest available fallback."
         ),
         "plans": _json_safe_rows(payload["plans"]),
         "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
@@ -4152,6 +4422,337 @@ def api_committee_dashboard():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+
+# ─── Coordinator Sections: list / add students / delete ──────────────────
+
+@coordinator_bp.route("/api/coordinator/sections", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_sections_list():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        if not _table_exists(cursor, "student_distribution_sections"):
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": True,
+                "sections": []
+            })
+
+        cursor.execute("""
+            SELECT 
+                sec.section_id,
+                sec.section_name,
+                sec.supervisor_id,
+                u_sup.full_name AS supervisor_name,
+                COUNT(DISTINCT ss.student_id) AS student_count,
+                COALESCE(
+                    GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '),
+                    ''
+                ) AS assigned_students
+            FROM student_distribution_sections sec
+            JOIN faculty f ON f.faculty_id = sec.supervisor_id
+            JOIN users u_sup ON u_sup.user_id = f.user_id
+            LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+            LEFT JOIN students st ON st.student_id = ss.student_id
+            LEFT JOIN users u_st ON u_st.user_id = st.user_id
+            GROUP BY sec.section_id, sec.section_name, sec.supervisor_id, u_sup.full_name
+            ORDER BY sec.section_id DESC
+        """)
+
+        sections = cursor.fetchall()
+
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            "ok": True,
+            "sections": _json_safe_value(sections)
+        })
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
+
+
+@coordinator_bp.route("/api/coordinator/sections/add-students", methods=["POST"])
+@login_required(role="coordinator")
+def api_add_students_to_existing_section():
+    data = request.get_json(silent=True) or {}
+
+    section_id = data.get("section_id")
+    student_ids = data.get("student_ids") or []
+
+    if not section_id:
+        return jsonify({
+            "ok": False,
+            "error": "Please choose a section."
+        }), 400
+
+    if not student_ids:
+        return jsonify({
+            "ok": False,
+            "error": "Please select at least one student."
+        }), 400
+
+    try:
+        section_id = int(section_id)
+        student_ids = [int(sid) for sid in student_ids]
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "error": "Invalid section or student id."
+        }), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        active_semester = _get_active_semester(cursor)
+
+        if not active_semester:
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "No active semester found."
+            }), 400
+
+        if not _table_exists(cursor, "student_distribution_sections"):
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "student_distribution_sections table not found."
+            }), 500
+
+        if not _table_exists(cursor, "section_students"):
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "section_students table not found."
+            }), 500
+
+        cursor.execute("""
+            SELECT section_id, section_name, supervisor_id
+            FROM student_distribution_sections
+            WHERE section_id = %s
+            LIMIT 1
+        """, (section_id,))
+
+        section = cursor.fetchone()
+
+        if not section:
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "Section not found."
+            }), 404
+
+        cursor.execute("""
+            SELECT COUNT(DISTINCT student_id) AS current_count
+            FROM section_students
+            WHERE section_id = %s
+        """, (section_id,))
+
+        current_count = int((cursor.fetchone() or {}).get("current_count") or 0)
+
+        if current_count >= 3:
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "This section is already full."
+            }), 400
+
+        if current_count + len(student_ids) > 3:
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": f"This section has {current_count} student(s). You can add only {3 - current_count} more."
+            }), 400
+
+        placeholders = ",".join(["%s"] * len(student_ids))
+
+        cursor.execute(f"""
+            SELECT st.student_id, u.full_name
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE st.student_id IN ({placeholders})
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM project_members pm
+                  JOIN projects p ON p.project_id = pm.project_id
+                  WHERE pm.student_id = st.student_id
+                    AND p.semester_id = %s
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM section_students ss
+                  WHERE ss.student_id = st.student_id
+              )
+        """, tuple(student_ids) + (active_semester["semester_id"],))
+
+        valid_students = cursor.fetchall()
+
+        if len(valid_students) != len(student_ids):
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "One or more selected students are already assigned."
+            }), 400
+
+        for student_id in student_ids:
+            cursor.execute("""
+                INSERT INTO section_students (section_id, student_id)
+                VALUES (%s, %s)
+            """, (section_id, student_id))
+
+        db.commit()
+
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            "ok": True,
+            "message": "Students added to existing section successfully."
+        })
+
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
+
+
+@coordinator_bp.route("/api/coordinator/sections/delete", methods=["POST"])
+@login_required(role="coordinator")
+def api_delete_distribution_section():
+    data = request.get_json(silent=True) or {}
+
+    section_id = data.get("section_id")
+
+    if not section_id:
+        return jsonify({
+            "ok": False,
+            "error": "Section ID is required."
+        }), 400
+
+    try:
+        section_id = int(section_id)
+    except Exception:
+        return jsonify({
+            "ok": False,
+            "error": "Invalid section id."
+        }), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        if not _table_exists(cursor, "student_distribution_sections"):
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "student_distribution_sections table not found."
+            }), 500
+
+        cursor.execute("""
+            SELECT 
+                sec.section_id,
+                sec.section_name,
+                sec.supervisor_id,
+                u.full_name AS supervisor_name
+            FROM student_distribution_sections sec
+            JOIN faculty f ON f.faculty_id = sec.supervisor_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE sec.section_id = %s
+            LIMIT 1
+        """, (section_id,))
+
+        section = cursor.fetchone()
+
+        if not section:
+            cursor.close()
+            db.close()
+            return jsonify({
+                "ok": False,
+                "error": "Section not found."
+            }), 404
+
+        student_count = 0
+
+        if _table_exists(cursor, "section_students"):
+            cursor.execute("""
+                SELECT COUNT(DISTINCT student_id) AS student_count
+                FROM section_students
+                WHERE section_id = %s
+            """, (section_id,))
+
+            student_count = int((cursor.fetchone() or {}).get("student_count") or 0)
+
+            cursor.execute("""
+                DELETE FROM section_students
+                WHERE section_id = %s
+            """, (section_id,))
+
+        if _table_exists(cursor, "section_completion_status"):
+            cursor.execute("""
+                DELETE FROM section_completion_status
+                WHERE course_scope = 'introduction'
+                  AND reference_id = %s
+            """, (section_id,))
+
+        cursor.execute("""
+            DELETE FROM student_distribution_sections
+            WHERE section_id = %s
+        """, (section_id,))
+
+        db.commit()
+
+        cursor.close()
+        db.close()
+
+        removed_hours = student_count * 0.5
+
+        return jsonify({
+            "ok": True,
+            "message": (
+                f"Section deleted successfully. "
+                f"{student_count} student(s) returned to unassigned. "
+                f"Doctor load decreased by {removed_hours:g} hour(s)."
+            ),
+            "returned_students": student_count,
+            "removed_hours": removed_hours,
+            "supervisor_id": section.get("supervisor_id"),
+            "supervisor_name": section.get("supervisor_name")
+        })
+
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
+    
 
 @coordinator_bp.route("/api/coordinator/committee-generate", methods=["POST"])
 @login_required(role="coordinator")
@@ -4239,56 +4840,348 @@ def api_committee_save_responsible(plan_id):
         return jsonify({"error": "faculty_id is required."}), 400
 
     try:
+        faculty_id = int(faculty_id)
+    except Exception:
+        return jsonify({"error": "Invalid faculty_id."}), 400
+
+    try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
+        cursor.execute("SELECT plan_id FROM committee_plans WHERE plan_id = %s", (plan_id,))
+        if not cursor.fetchone():
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Committee plan was not found."}), 404
+
         cursor.execute(
             """
-            SELECT 1
+            SELECT faculty_id, role
             FROM committee_plan_members
             WHERE plan_id = %s AND faculty_id = %s
-            LIMIT 1
             """,
             (plan_id, faculty_id),
         )
-        exists = cursor.fetchone()
-        if not exists:
+        member_row = cursor.fetchone()
+        if not member_row:
             cursor.close()
             db.close()
-            return (
-                jsonify(
-                    {"error": "The selected doctor is not a member of this committee."}
-                ),
-                400,
-            )
+            return jsonify({"error": "Responsible doctor must be one of the committee members."}), 400
 
-        update_cursor = db.cursor()
-        update_cursor.execute(
+        if (member_row.get("role") or "").lower() == "supervisor":
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Responsible doctor must be different from the project supervisor."}), 400
+
+        cursor.execute(
             "UPDATE committee_plans SET responsible_faculty_id = %s WHERE plan_id = %s",
             (faculty_id, plan_id),
         )
-        update_cursor.execute(
-            "UPDATE committee_plan_members SET role = 'member' WHERE plan_id = %s",
+
+        cursor.execute(
+            """
+            UPDATE committee_plan_members
+            SET role = CASE
+                WHEN role = 'supervisor' THEN 'supervisor'
+                ELSE 'member'
+            END
+            WHERE plan_id = %s
+            """,
             (plan_id,),
         )
-        update_cursor.execute(
-            "UPDATE committee_plan_members SET role = 'responsible' WHERE plan_id = %s AND faculty_id = %s",
+        cursor.execute(
+            """
+            UPDATE committee_plan_members
+            SET role = 'responsible'
+            WHERE plan_id = %s
+              AND faculty_id = %s
+              AND role <> 'supervisor'
+            """,
             (plan_id, faculty_id),
         )
-        db.commit()
-        update_cursor.close()
 
+        db.commit()
         payload = _committee_dashboard_payload(cursor)
         cursor.close()
         db.close()
 
-        return jsonify(
-            {
-                "message": "Responsible doctor saved successfully.",
-                "plans": _json_safe_rows(payload["plans"]),
-                "current_committees": _json_safe_rows(payload["current_committees"]),
-                "stats": _json_safe_value(payload["stats"]),
-            }
-        )
+        return jsonify({
+            "message": "Responsible doctor saved successfully.",
+            "plans": _json_safe_rows(payload["plans"]),
+            "current_committees": _json_safe_rows(payload["current_committees"]),
+            "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
+            "stats": _json_safe_value(payload["stats"]),
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route(
+    "/api/coordinator/committee/<int:plan_id>/project/<int:project_id>/readers",
+    methods=["POST"],
+)
+@login_required(role="coordinator")
+def api_committee_save_project_readers(plan_id, project_id):
+    data = request.get_json(silent=True) or {}
+    reader1_id = data.get("reader1_id")
+    reader2_id = data.get("reader2_id")
+
+    if not reader1_id or not reader2_id:
+        return jsonify({"error": "Choose Reader 1 and Reader 2."}), 400
+
+    try:
+        reader1_id = int(reader1_id)
+        reader2_id = int(reader2_id)
+    except Exception:
+        return jsonify({"error": "Invalid reader id."}), 400
+
+    if reader1_id == reader2_id:
+        return jsonify({"error": "Reader 1 and Reader 2 must be different doctors."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _committee_ensure_report_readers_table(cursor)
+
+        cursor.execute(
+            """
+            SELECT cpp.project_id
+            FROM committee_plan_projects cpp
+            WHERE cpp.plan_id = %s AND cpp.project_id = %s
+            """,
+            (plan_id, project_id),
+        )
+        if not cursor.fetchone():
+            cursor.close()
+            db.close()
+            return jsonify({"error": "This project does not belong to this committee."}), 404
+
+        placeholders = "%s,%s"
+        cursor.execute(
+            f"""
+            SELECT faculty_id
+            FROM committee_plan_members
+            WHERE plan_id = %s
+              AND faculty_id IN ({placeholders})
+            """,
+            (plan_id, reader1_id, reader2_id),
+        )
+        found = {int(row["faculty_id"]) for row in cursor.fetchall()}
+        if reader1_id not in found or reader2_id not in found:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Report readers must be selected from this committee members."}), 400
+
+        cursor.execute("DELETE FROM project_report_readers WHERE project_id = %s", (project_id,))
+        cursor.execute(
+            """
+            INSERT INTO project_report_readers (project_id, faculty_id, reader_order)
+            VALUES (%s, %s, 1), (%s, %s, 2)
+            """,
+            (project_id, reader1_id, project_id, reader2_id),
+        )
+
+        db.commit()
+        payload = _committee_dashboard_payload(cursor)
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            "message": "Report readers saved successfully.",
+            "plans": _json_safe_rows(payload["plans"]),
+            "current_committees": _json_safe_rows(payload["current_committees"]),
+            "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
+            "stats": _json_safe_value(payload["stats"]),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@coordinator_bp.route("/api/coordinator/profile", methods=["GET"])
+@login_required(role="coordinator")
+def coordinator_profile_api():
+    user_id = session.get("user_id")
+
+    conn = get_db()
+    cur = conn.cursor(dictionary=True)
+
+    try:
+        has_office_number = _db_column_exists(cur, "faculty", "office_number")
+        office_select = (
+            "COALESCE(f.office_number, 'Science Building — 214') AS office_number"
+            if has_office_number
+            else "'Science Building — 214' AS office_number"
+        )
+
+        cur.execute(f"""
+            SELECT
+                u.user_id,
+                u.full_name,
+                u.email,
+                u.avatar_initials,
+                u.role,
+                f.faculty_id,
+                f.specialization,
+                {office_select},
+                COALESCE(s.course_code, 'COMP4200') AS course_code
+            FROM users u
+            LEFT JOIN faculty f ON f.user_id = u.user_id
+            LEFT JOIN coordinator_assignments ca ON ca.faculty_id = f.faculty_id
+            LEFT JOIN semesters s ON s.semester_id = ca.semester_id
+            WHERE u.user_id = %s
+            ORDER BY s.is_active DESC, ca.assigned_at DESC
+            LIMIT 1
+        """, (user_id,))
+
+        profile = cur.fetchone()
+
+        if not profile:
+            return jsonify({"ok": False, "error": "Profile not found"}), 404
+
+        cur.execute("""
+            SELECT COUNT(*) AS total_projects
+            FROM projects
+        """)
+        projects_overseen = cur.fetchone()["total_projects"] or 0
+
+        cur.execute("""
+            SELECT COUNT(*) AS accepted_projects
+            FROM projects
+            WHERE status IN ('accepted', 'archived')
+        """)
+        accepted_projects = cur.fetchone()["accepted_projects"] or 0
+
+        cur.execute("""
+            SELECT COUNT(*) AS committees_formed
+            FROM committees
+        """)
+        committees_formed = cur.fetchone()["committees_formed"] or 0
+
+        cur.execute("""
+            SELECT ROUND(AVG(final_score), 1) AS average_score
+            FROM projects
+            WHERE final_score IS NOT NULL
+        """)
+        avg_row = cur.fetchone()
+        average_score = (
+            avg_row["average_score"]
+            if avg_row and avg_row["average_score"] is not None
+            else 0
+        )
+
+        acceptance_rate = 0
+        if projects_overseen:
+            acceptance_rate = round((accepted_projects / projects_overseen) * 100)
+
+        return jsonify({
+            "ok": True,
+            "profile": _json_safe_value(profile),
+            "stats": {
+                "projects_overseen": int(projects_overseen),
+                "acceptance_rate": int(acceptance_rate),
+                "committees_formed": int(committees_formed),
+                "average_score": float(average_score or 0)
+            }
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+@coordinator_bp.route("/api/coordinator/profile", methods=["POST"])
+@login_required(role="coordinator")
+def coordinator_profile_update_api():
+    user_id = session.get("user_id")
+    data = request.get_json(silent=True) or {}
+
+    full_name = (data.get("full_name") or "").strip()
+    email = (data.get("email") or "").strip()
+    office_number = (data.get("office_number") or "").strip()
+    specialization = (data.get("specialization") or "").strip()
+
+    if not full_name:
+        return jsonify({"ok": False, "error": "Full name is required"}), 400
+
+    if not email:
+        return jsonify({"ok": False, "error": "Email is required"}), 400
+
+    allowed_specs = {
+        "software_engineering",
+        "artificial_intelligence",
+        "web_development",
+        "mobile",
+        "security_networks",
+        "databases",
+        "other"
+    }
+
+    if specialization not in allowed_specs:
+        specialization = "software_engineering"
+
+    initials = "".join([part[0].upper() for part in full_name.split()[:2] if part])[:5]
+
+    conn = get_db()
+    cur = conn.cursor(dictionary=True)
+
+    try:
+        has_office_number = _db_column_exists(cur, "faculty", "office_number")
+
+        cur.execute("""
+            SELECT user_id
+            FROM users
+            WHERE email = %s AND user_id <> %s
+            LIMIT 1
+        """, (email, user_id))
+
+        if cur.fetchone():
+            return jsonify({"ok": False, "error": "This email is already used by another user"}), 400
+
+        cur.execute("""
+            UPDATE users
+            SET full_name = %s,
+                email = %s,
+                avatar_initials = %s
+            WHERE user_id = %s
+        """, (full_name, email, initials, user_id))
+
+        cur.execute("""
+            SELECT faculty_id
+            FROM faculty
+            WHERE user_id = %s
+            LIMIT 1
+        """, (user_id,))
+
+        faculty = cur.fetchone()
+
+        if faculty:
+            if has_office_number:
+                cur.execute("""
+                    UPDATE faculty
+                    SET specialization = %s,
+                        office_number = %s
+                    WHERE user_id = %s
+                """, (specialization, office_number, user_id))
+            else:
+                cur.execute("""
+                    UPDATE faculty
+                    SET specialization = %s
+                    WHERE user_id = %s
+                """, (specialization, user_id))
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    finally:
+        cur.close()
+        conn.close()
+
+    return jsonify({
+        "ok": True,
+        "message": "Profile updated successfully"
+    })

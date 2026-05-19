@@ -635,29 +635,71 @@ function renderCommitteePlans(plans) {
       '<option value="">Choose responsible doctor...</option>',
       ...plan.members.map(member => {
         const selected = String(member.faculty_id) === String(plan.responsible_faculty_id || '') ? 'selected' : '';
-        return `<option value="${member.faculty_id}" ${selected}>${committeeEscapeHtml(member.full_name)} — ${committeeEscapeHtml(member.specialization)}</option>`;
+        const isSupervisor = Boolean(member.is_supervisor || member.role === 'supervisor');
+        const disabled = isSupervisor ? 'disabled' : '';
+        const suffix = isSupervisor ? ' — Supervisor (cannot be responsible)' : ` — ${committeeEscapeHtml(member.specialization)}`;
+        return `<option value="${member.faculty_id}" ${selected} ${disabled}>${committeeEscapeHtml(member.full_name)}${suffix}</option>`;
       })
     ].join('');
 
-    const membersHtml = plan.members.map(member => `
-      <div class="member-row" style="margin-bottom:8px">
-        <div class="member-avatar">${committeeEscapeHtml((member.full_name || '').split(' ').map(x => x[0]).slice(0, 2).join('') || '--')}</div>
-        <div style="flex:1">
-          <div class="u-2e61148f">${committeeEscapeHtml(member.full_name)}</div>
-          <div class="u-7d16b22c">${committeeEscapeHtml(member.specialization)} · ${committeeEscapeHtml(member.years_experience)} yrs</div>
+    const membersHtml = plan.members.map(member => {
+      const badges = [];
+      if (member.is_supervisor || member.role === 'supervisor') {
+        badges.push('<span class="pill p-accepted">Supervisor</span>');
+      }
+      if (member.is_responsible || member.role === 'responsible') {
+        badges.push('<span class="pill p-pending">Responsible</span>');
+      }
+      if (!badges.length) {
+        badges.push('<span class="pill p-review">Member</span>');
+      }
+
+      return `
+        <div class="member-row" style="margin-bottom:8px">
+          <div class="member-avatar">${committeeEscapeHtml((member.full_name || '').split(' ').map(x => x[0]).slice(0, 2).join('') || '--')}</div>
+          <div style="flex:1">
+            <div class="u-2e61148f">${committeeEscapeHtml(member.full_name)}</div>
+            <div class="u-7d16b22c">${committeeEscapeHtml(member.specialization)} · ${committeeEscapeHtml(member.years_experience)} yrs</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            ${badges.join('')}
+          </div>
         </div>
-        <span class="pill ${member.role === 'responsible' ? 'p-accepted' : 'p-review'}">
-          ${member.role === 'responsible' ? 'Responsible' : 'Member'}
-        </span>
-      </div>
-    `).join('');
+      `;
+    }).join('');
+
+    const readerOptions = (selectedId) => [
+      '<option value="">Choose reader...</option>',
+      ...plan.members.map(member => {
+        const selected = String(member.faculty_id) === String(selectedId || '') ? 'selected' : '';
+        return `<option value="${member.faculty_id}" ${selected}>${committeeEscapeHtml(member.full_name)} — ${committeeEscapeHtml(member.specialization)}</option>`;
+      })
+    ].join('');
 
     const projectsHtml = (plan.projects || []).map(project => `
       <tr>
         <td>${committeeEscapeHtml(project.slot_order)}</td>
         <td>${committeeEscapeHtml(project.slot_start)} - ${committeeEscapeHtml(project.slot_end)}</td>
-        <td>${committeeEscapeHtml(project.title)}</td>
+        <td>
+          <div style="font-weight:800">${committeeEscapeHtml(project.title)}</div>
+          <div style="font-size:12px;color:#667587">Supervisor: ${committeeEscapeHtml(project.supervisor_name || '—')}</div>
+        </td>
         <td>${committeeEscapeHtml(project.team_members || '—')}</td>
+        <td>
+          <select class="field-select" id="reader1_${plan.plan_id}_${project.project_id}" style="min-width:170px">
+            ${readerOptions(project.reader1_id)}
+          </select>
+        </td>
+        <td>
+          <select class="field-select" id="reader2_${plan.plan_id}_${project.project_id}" style="min-width:170px">
+            ${readerOptions(project.reader2_id)}
+          </select>
+        </td>
+        <td>
+          <button class="btn btn-outline" type="button" onclick="saveProjectReaders(${plan.plan_id}, ${project.project_id})">
+            Save Readers
+          </button>
+        </td>
       </tr>
     `).join('');
 
@@ -698,10 +740,13 @@ function renderCommitteePlans(plans) {
                 <th>Slot</th>
                 <th>Project</th>
                 <th>Team Members</th>
+                <th>Report Reader 1</th>
+                <th>Report Reader 2</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              ${projectsHtml || '<tr><td colspan="4">No projects assigned.</td></tr>'}
+              ${projectsHtml || '<tr><td colspan="7">No projects assigned.</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -791,6 +836,13 @@ async function saveResponsibleDoctor(planId) {
     return;
   }
 
+  const selectedOption = select ? select.options[select.selectedIndex] : null;
+  if (selectedOption && selectedOption.disabled) {
+    setCommitteeMessage('Responsible doctor must be different from the project supervisor.', true);
+    alert('Responsible doctor must be different from the project supervisor.');
+    return;
+  }
+
   try {
     const res = await fetch(`/api/coordinator/committee/${planId}/responsible`, {
       method: 'POST',
@@ -816,6 +868,47 @@ async function saveResponsibleDoctor(planId) {
 function initCommitteePage() {
   if (!document.getElementById('pg-committee')) return;
   loadCommitteeDashboard();
+}
+
+async function saveProjectReaders(planId, projectId) {
+  const reader1 = document.getElementById(`reader1_${planId}_${projectId}`)?.value || '';
+  const reader2 = document.getElementById(`reader2_${planId}_${projectId}`)?.value || '';
+
+  if (!reader1 || !reader2) {
+    setCommitteeMessage('Please choose two report readers.', true);
+    alert('Please choose two report readers.');
+    return;
+  }
+
+  if (String(reader1) === String(reader2)) {
+    setCommitteeMessage('Reader 1 and Reader 2 must be different doctors.', true);
+    alert('Reader 1 and Reader 2 must be different doctors.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/coordinator/committee/${planId}/project/${projectId}/readers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reader1_id: reader1,
+        reader2_id: reader2
+      })
+    });
+
+    const data = await readApiJson(res);
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to save report readers.');
+    }
+
+    setCommitteeMessage(data.message || 'Report readers saved successfully.');
+    renderCommitteePlans(data.plans || []);
+    await loadCommitteeDashboard();
+  } catch (err) {
+    setCommitteeMessage(err.message || 'Failed to save report readers.', true);
+    alert(err.message || 'Failed to save report readers.');
+  }
 }
 
 async function resetAndRedistributeCommittees() {
@@ -985,6 +1078,52 @@ function showLectureSection(scope, btn) {
   });
 
   setTimeout(resetLectureScroll, 0);
+}
+
+function calculateIntroFinal(data) {
+  const reportFinal = (Number(data.reader1) + Number(data.reader2)) / 2;
+
+  const discussionFinal =
+    Number(data.discussion1) +
+    Number(data.discussion2) +
+    Number(data.discussion3) +
+    Number(data.discussion4);
+
+  const finalGrade =
+    reportFinal +
+    Number(data.coordinator) +
+    Number(data.supervisor) +
+    discussionFinal;
+
+  return {
+    reportFinal,
+    discussionFinal,
+    finalGrade
+  };
+}
+
+function calculateGraduationFinal(data) {
+  const reportFinal = (Number(data.reader1) + Number(data.reader2)) / 2;
+
+  const committeeRaw =
+    Number(data.committee1) +
+    Number(data.committee2) +
+    Number(data.committee3) +
+    Number(data.committee4);
+
+  const committeeFinal = committeeRaw / 2;
+
+  const finalGrade =
+    reportFinal +
+    Number(data.supervisor) +
+    committeeFinal;
+
+  return {
+    reportFinal,
+    committeeRaw,
+    committeeFinal,
+    finalGrade
+  };
 }
 
 

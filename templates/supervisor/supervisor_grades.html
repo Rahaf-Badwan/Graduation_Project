@@ -1,0 +1,50 @@
+{% extends 'supervisor/base.html' %}
+
+{% block page_title %}Grade Entry{% endblock %}
+{% block page_id %}evaluation{% endblock %}
+{% block topbar_title %}Grade Entry{% endblock %}
+
+{% block content %}
+<div class="page page-single on" id="pg-grades">
+  <style>
+    #pg-grades{display:block!important;padding:20px 22px 90px!important}.grade-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.badge{background:#2e7d42;color:#fff;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:800}.task-card{border:1px solid #e7eee9;border-radius:16px;background:#fff;padding:14px;margin-bottom:12px}.task-title{font-weight:850;color:#1f2937}.task-sub{font-size:12px;color:#667085;margin-top:5px}.pill{display:inline-flex;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800}.p-open{background:#ecfdf3;color:#027a48}.p-closed{background:#fef3f2;color:#b42318}.p-done{background:#e8f1ff;color:#175cd3}.p-pending{background:#fff7e6;color:#b54708}.grade-form{display:grid;grid-template-columns:150px 1fr auto;gap:8px;margin-top:12px;align-items:start}.grade-form input,.grade-form textarea{border:1px solid #d7e3dc;border-radius:12px;padding:10px;background:#fff}.grade-form textarea{min-height:44px}.btn{border:0;border-radius:12px;padding:10px 14px;font-weight:850;cursor:pointer}.green{background:#2e7d42;color:#fff}.gray{background:#eef2f0;color:#344054}.empty{padding:18px;border:1px dashed #d7e3dc;border-radius:14px;color:#667085;background:#fbfdfb}@media(max-width:750px){.grade-form{grid-template-columns:1fr}}
+  </style>
+  <div class="grade-head">
+    <div><span class="badge">Grade Entry System</span><div style="font-size:12px;color:#667085;margin-top:6px">Enter only the grade assigned to you. The coordinator calculates the final result.</div></div>
+    <button class="btn gray" onclick="loadTasks()">Refresh</button>
+  </div>
+  <div id="tasksBox" class="card"><div class="empty">Loading your grade tasks...</div></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let tasks=[];
+function toastMsg(msg){const t=document.getElementById('toast'); if(t){t.textContent=msg;t.className='toast show';setTimeout(()=>t.className='toast',2200)}else alert(msg)}
+async function api(url, options={}){const res=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const data=await res.json().catch(()=>({error:'Invalid server response'}));if(!res.ok)throw new Error(data.error||'Request failed');return data;}
+function scopeLabel(s){return s==='introduction'?'Project Introduction':'Graduation Project'}
+function render(){
+  const box=document.getElementById('tasksBox');
+  if(!tasks.length){box.innerHTML='<div class="empty">No grade tasks assigned yet.</div>';return;}
+  box.innerHTML=tasks.map(t=>`
+    <div class="task-card">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div><div class="task-title">${t.project_title}</div><div class="task-sub">${scopeLabel(t.course_scope)} · ${t.component_label}<br>Students: ${t.students || '—'}</div></div>
+        <div>${Number(t.is_open)?'<span class="pill p-open">Open</span>':'<span class="pill p-closed">Closed</span>'} ${Number(t.is_submitted)?'<span class="pill p-done">Submitted</span>':'<span class="pill p-pending">Waiting</span>'}</div>
+      </div>
+      <div class="grade-form">
+        <input type="number" min="0" max="${t.max_mark}" step="0.01" id="mark-${t.grade_id}" placeholder="0 - ${t.max_mark}" value="${t.mark ?? ''}" ${Number(t.is_open)?'':'disabled'}>
+        <textarea id="notes-${t.grade_id}" placeholder="Notes optional" ${Number(t.is_open)?'':'disabled'}>${t.notes || ''}</textarea>
+        <button class="btn green" onclick="submitGrade(${t.grade_id})" ${Number(t.is_open)?'':'disabled'}>Submit Grade</button>
+      </div>
+    </div>`).join('');
+}
+async function loadTasks(){try{const d=await api('/api/evaluation/my-tasks');tasks=d.tasks||[];render();}catch(e){document.getElementById('tasksBox').innerHTML=`<div class="empty">${e.message}</div>`}}
+async function submitGrade(id){
+  const mark=document.getElementById(`mark-${id}`).value;
+  const notes=document.getElementById(`notes-${id}`).value;
+  try{await api('/api/evaluation/submit-grade',{method:'POST',body:JSON.stringify({grade_id:id,mark,notes})});toastMsg('Grade submitted successfully.');await loadTasks();}catch(e){toastMsg(e.message)}
+}
+document.addEventListener('DOMContentLoaded', loadTasks);
+</script>
+{% endblock %}
