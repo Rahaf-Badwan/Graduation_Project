@@ -270,10 +270,10 @@ async function createAnnModal(){
       var box = document.getElementById('ann-current-info');
       box.style.display = 'block';
       box.innerHTML =
-      '<strong>Active:</strong' + msg + '<br>' +
-      '<span style="opacity:.8;"> <span class="material-symbols-outlined">hourglass_bottom</span> ' + data.days_left +
-      'day' + (data.days_left !== 1 ? 's' : '') + 'remaining-expires' +
-      data.expires_at + '</span>';
+      '<strong>Active:</strong' + ann.msg + '<br>' +
+      '<span style="opacity:.8;"> <span class="material-symbols-outlined icon-inline">hourglass_bottom</span> ' + ann.days_left +
+      'day' + (ann.days_left !== 1 ? 's' : '') + 'remaining-expires' +
+      ann.expires_at + '</span>';
 
       document.getElementById('ann-msg').value = '';
     }else{
