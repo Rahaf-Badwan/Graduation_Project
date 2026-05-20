@@ -90,10 +90,10 @@ def api_get_comp4300_students():
             JOIN students st ON st.user_id = u.user_id
             JOIN project_members pm ON pm.student_id = st.student_id
             JOIN projects p ON p.project_id = pm.project_id
-            JOIN semesters s ON s.semester_id = p.semester_id
+            JOIN semesters sem ON sem.semester_id = p.semester_id
             WHERE u.role = 'student'
                 AND u.is_active = TRUE
-                AND  sem.course_code = 'COMP4300'
+                AND sem.course_code = 'COMP4300'
                 AND p.status != 'archived'
             ORDER BY u.full_name 
             """)
