@@ -21,57 +21,12 @@ SET SQL_SAFE_UPDATES = 0;
 SET FOREIGN_KEY_CHECKS = 0;
 SET NAMES utf8mb4;
 
--- Drop all tables if they exist (safe re-run)
--- Extra drops added for tables that appear later in this full file.
--- FOREIGN_KEY_CHECKS is already OFF, so rerun will not fail on dependencies.
-DROP TABLE IF EXISTS project_report_readers;
-DROP TABLE IF EXISTS project_final_evaluation_results;
-DROP TABLE IF EXISTS project_grade_entries;
-DROP TABLE IF EXISTS project_evaluation_windows;
-DROP TABLE IF EXISTS grade_entries;
-DROP TABLE IF EXISTS grade_entry_sessions;
-DROP TABLE IF EXISTS committee_plan_projects;
-DROP TABLE IF EXISTS committee_plan_members;
-DROP TABLE IF EXISTS committee_plans;
-DROP TABLE IF EXISTS discussion_rooms;
-DROP TABLE IF EXISTS announcements;
-DROP TABLE IF EXISTS system_notices;
-DROP TABLE IF EXISTS section_students;
-DROP TABLE IF EXISTS student_distribution_sections;
-DROP TABLE IF EXISTS faculty_load_settings;
-DROP TABLE IF EXISTS student_groups;
+-- Safety switch for rerunning this file on a database that already has real data.
+-- Keep this at 0. Set it to 1 manually only when you intentionally want cleanup/repair
+-- blocks to modify or remove existing application data.
+SET @APMS_ALLOW_DATA_MAINTENANCE := 0;
 
-DROP TABLE IF EXISTS milestone_submissions;
-DROP TABLE IF EXISTS comp4200_timeline_items;
-DROP TABLE IF EXISTS comp4200_timelines;
-DROP TABLE IF EXISTS coordinator_deliverable_submissions;
-DROP TABLE IF EXISTS coordinator_deliverables;
-DROP TABLE IF EXISTS coordinator_lectures;
-DROP TABLE IF EXISTS section_completion_status;
-DROP TABLE IF EXISTS ai_conversations;
-DROP TABLE IF EXISTS challenges_reflections;
-DROP TABLE IF EXISTS supervisor_assignments;
-DROP TABLE IF EXISTS notifications;
-DROP TABLE IF EXISTS student_course_results;
-DROP TABLE IF EXISTS deadlines;
-DROP TABLE IF EXISTS supervisor_notes;
-DROP TABLE IF EXISTS final_decisions;
-DROP TABLE IF EXISTS coordinator_decisions;
-DROP TABLE IF EXISTS committee_members;
-DROP TABLE IF EXISTS committees;
-DROP TABLE IF EXISTS feedback_improvement_points;
-DROP TABLE IF EXISTS feedback;
-DROP TABLE IF EXISTS project_lifecycle;
-DROP TABLE IF EXISTS project_progress;
-DROP TABLE IF EXISTS project_files;
-DROP TABLE IF EXISTS project_members;
-DROP TABLE IF EXISTS projects;
-DROP TABLE IF EXISTS coordinator_assignments;
-DROP TABLE IF EXISTS students;
-DROP TABLE IF EXISTS faculty;
-DROP TABLE IF EXISTS semesters;
-DROP TABLE IF EXISTS password_reset_tokens;
-DROP TABLE IF EXISTS users;
+
 
 -- ============================================================
 --  TABLE 1 — users
@@ -583,17 +538,40 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ============================================================
 --  INDEXES
 -- ============================================================
-CREATE INDEX idx_projects_semester   ON projects(semester_id);
-CREATE INDEX idx_projects_supervisor ON projects(supervisor_id);
-CREATE INDEX idx_projects_status     ON projects(status);
-CREATE INDEX idx_feedback_project    ON feedback(project_id);
-CREATE INDEX idx_feedback_reviewer   ON feedback(reviewer_id);
-CREATE INDEX idx_notif_recipient     ON notifications(recipient_id, is_read);
-CREATE INDEX idx_notif_project       ON notifications(related_project_id);
-CREATE INDEX idx_members_project     ON project_members(project_id);
-CREATE INDEX idx_members_student     ON project_members(student_id);
-CREATE INDEX idx_files_project       ON project_files(project_id, file_type);
-CREATE INDEX idx_lifecycle_project   ON project_lifecycle(project_id, stage);
+SET @db := DATABASE();
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_projects_semester ON projects(semester_id)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='projects' AND INDEX_NAME='idx_projects_semester');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_projects_supervisor ON projects(supervisor_id)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='projects' AND INDEX_NAME='idx_projects_supervisor');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_projects_status ON projects(status)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='projects' AND INDEX_NAME='idx_projects_status');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_feedback_project ON feedback(project_id)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='feedback' AND INDEX_NAME='idx_feedback_project');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_feedback_reviewer ON feedback(reviewer_id)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='feedback' AND INDEX_NAME='idx_feedback_reviewer');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_notif_recipient ON notifications(recipient_id, is_read)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND INDEX_NAME='idx_notif_recipient');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_notif_project ON notifications(related_project_id)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND INDEX_NAME='idx_notif_project');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_members_project ON project_members(project_id)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_members' AND INDEX_NAME='idx_members_project');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_members_student ON project_members(student_id)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_members' AND INDEX_NAME='idx_members_student');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_files_project ON project_files(project_id, file_type)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_files' AND INDEX_NAME='idx_files_project');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_lifecycle_project ON project_lifecycle(project_id, stage)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_lifecycle' AND INDEX_NAME='idx_lifecycle_project');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ============================================================
 --  VIEWS
@@ -713,14 +691,16 @@ INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, 
 ('1220900', 'Mona Nassar',          '1220900@students.birzeit.edu', '$2b$12$m/RTVrKRx.lsECFuFa6yguuR1rRxZO8i0QAxQun/7ojQZjq6M7D3G', 'student', 'MN', TRUE);
 
 
-ALTER TABLE semesters
-ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0;
+SET @db := DATABASE();
 
-ALTER TABLE semesters
-ADD COLUMN distribution_opened_at DATETIME NULL;
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_open TINYINT(1) NOT NULL DEFAULT 0', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_open');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-ALTER TABLE semesters
-ADD COLUMN distribution_closed_at DATETIME NULL;
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_opened_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_opened_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE semesters ADD COLUMN distribution_closed_at DATETIME NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='semesters' AND COLUMN_NAME='distribution_closed_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 
 -- Faculty records (user_ids 1–7 match insertion order above)
@@ -903,7 +883,7 @@ INSERT IGNORE INTO notifications (recipient_id, sender_id, notification_type, ti
 
 DELIMITER $$
 
--- Drop procedures if they exist
+-- Safe routine refresh only. These do not delete tables or application data.
 DROP PROCEDURE IF EXISTS sp_calculate_committee_average$$
 DROP PROCEDURE IF EXISTS sp_submit_committee_evaluation$$
 DROP PROCEDURE IF EXISTS sp_get_project_details$$
@@ -982,7 +962,7 @@ DELIMITER ;
 
 DELIMITER $$
 
--- Drop triggers if they exist
+-- Safe trigger refresh only. These do not delete tables or application data.
 DROP TRIGGER IF EXISTS trg_notify_on_feedback$$
 DROP TRIGGER IF EXISTS trg_notify_on_status_change$$
 
@@ -1051,8 +1031,9 @@ JOIN (
         FROM ai_conversations
         GROUP BY session_id
         HAVING MIN(created_at) < (UTC_TIMESTAMP() - INTERVAL 30 DAY)
-    ) expired_sessions
-) expired ON expired.session_id = ac.session_id;
+) expired_sessions
+) expired ON expired.session_id = ac.session_id
+WHERE @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 SET SQL_SAFE_UPDATES = 0;
 
@@ -1060,7 +1041,6 @@ SET SQL_SAFE_UPDATES = 0;
 -- Uncomment the block below if your MySQL server has the Event Scheduler enabled
 -- (SET GLOBAL event_scheduler = ON;)
 --
--- DROP EVENT IF EXISTS evt_cleanup_ai_conversations;
 -- DELIMITER $$
 -- CREATE EVENT evt_cleanup_ai_conversations
 --   ON SCHEDULE EVERY 1 DAY
@@ -1484,7 +1464,9 @@ AND f.user_id IS NULL;
 -- Keep existing rows aligned if the doctor already existed before this import.
 UPDATE faculty f
 JOIN users u ON u.user_id = f.user_id
-SET f.specialization = CASE u.full_name
+SET f.specialization = CASE
+        WHEN f.specialization IS NOT NULL AND f.specialization <> '' THEN f.specialization
+        ELSE CASE u.full_name
         WHEN 'Dr. Iyad Jaber' THEN 'software_engineering'
         WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
         WHEN 'Dr. Radi Jarrar' THEN 'software_engineering'
@@ -1511,8 +1493,9 @@ SET f.specialization = CASE u.full_name
         WHEN 'Dr. Ahmad Sabbah' THEN 'artificial_intelligence'
         WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
         ELSE f.specialization
+    END
     END,
-    f.title = 'Dr.'
+    f.title = COALESCE(f.title, 'Dr.')
 WHERE u.full_name IN (
     'Dr. Iyad Jaber',
     'Dr. Sobhi Ahmad',
@@ -1641,11 +1624,13 @@ CREATE TABLE IF NOT EXISTS student_course_results (
 -- ============================================================
 -- 2) Indexes
 -- ============================================================
-CREATE INDEX idx_scr_semester
-    ON student_course_results(semester_id, status);
+SET @db := DATABASE();
 
-CREATE INDEX idx_scr_passed_not_promoted
-    ON student_course_results(status, promoted_at);
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_scr_semester ON student_course_results(semester_id, status)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='student_course_results' AND INDEX_NAME='idx_scr_semester');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_scr_passed_not_promoted ON student_course_results(status, promoted_at)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='student_course_results' AND INDEX_NAME='idx_scr_passed_not_promoted');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ============================================================
 -- 3) View for Coordinator: All students + their results
@@ -1707,9 +1692,11 @@ ORDER BY u.full_name;
 -- ============================================================
 -- 5) Stored Procedure: Coordinator records a student's result
 -- ============================================================
-DROP PROCEDURE IF EXISTS sp_coordinator_set_result;
 
 DELIMITER $$
+
+-- Safe routine refresh only. This does not delete tables or application data.
+DROP PROCEDURE IF EXISTS sp_coordinator_set_result$$
 
 CREATE PROCEDURE sp_coordinator_set_result (
     IN  p_student_id     INT,
@@ -1756,9 +1743,11 @@ DELIMITER ;
 -- ============================================================
 -- 6) Stored Procedure: Head promotes a passed student to COMP4300
 -- ============================================================
-DROP PROCEDURE IF EXISTS sp_head_promote_student;
 
 DELIMITER $$
+
+-- Safe routine refresh only. This does not delete tables or application data.
+DROP PROCEDURE IF EXISTS sp_head_promote_student$$
 
 CREATE PROCEDURE sp_head_promote_student (
     IN  p_result_id             INT,
@@ -3875,7 +3864,8 @@ JOIN (
     GROUP BY cpp.plan_id
 ) x ON x.plan_id = cp.plan_id
 SET cp.responsible_faculty_id = x.supervisor_id
-WHERE cp.plan_id > 0;
+WHERE cp.plan_id > 0
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 
 
@@ -3936,21 +3926,25 @@ JOIN committee_plan_projects cpp ON cpp.project_id = p.project_id
 JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
 SET p.status = 'submitted'
 WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress')
-  AND p.status = 'committee_evaluation';
+  AND p.status = 'committee_evaluation'
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 DELETE cpm
 FROM committee_plan_members cpm
 JOIN committee_plans cp ON cp.plan_id = cpm.plan_id
-WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress');
+WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress')
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 DELETE cpp
 FROM committee_plan_projects cpp
 JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
-WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress');
+WHERE cp.status IN ('draft', 'scheduled', 'ongoing', 'in_progress')
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 DELETE FROM committee_plans
 WHERE status IN ('draft', 'scheduled', 'ongoing', 'in_progress')
-  AND plan_id > 0;
+  AND plan_id > 0
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 -- ------------------------------------------------------------
 -- 2) Make sure committee_plan_members can store Supervisor label
@@ -3973,7 +3967,8 @@ DEALLOCATE PREPARE stmt;
 
 UPDATE committee_plan_members
 SET role = 'supervisor'
-WHERE role = 'responsible';
+WHERE role = 'responsible'
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 -- ------------------------------------------------------------
 -- 3) Ensure the COMP4200 + COMP4300 doctors exist
@@ -4117,7 +4112,8 @@ UPDATE projects
 SET status = 'submitted'
 WHERE semester_id = @target_semester_id
   AND title LIKE 'Committee Demo % Project %'
-  AND status IN ('committee_evaluation', 'under_review', 'needs_revision', 'draft');
+  AND status IN ('committee_evaluation', 'under_review', 'needs_revision', 'draft')
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 -- ------------------------------------------------------------
 -- 5) Verification
@@ -4348,7 +4344,8 @@ JOIN (
     WHERE cp2.responsible_faculty_id = cpm2.faculty_id
       AND cpm2.role <> 'supervisor'
 ) x ON x.id = cpm.id
-SET cpm.role = 'responsible';
+SET cpm.role = 'responsible'
+WHERE @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 SET SQL_SAFE_UPDATES = 0;
 
@@ -4413,7 +4410,8 @@ JOIN (
     WHERE cp2.responsible_faculty_id = cpm2.faculty_id
       AND cpm2.role <> 'supervisor'
 ) x ON x.id = cpm.id
-SET cpm.role = 'responsible';
+SET cpm.role = 'responsible'
+WHERE @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 SET SQL_SAFE_UPDATES = 0;
 
@@ -4448,7 +4446,8 @@ JOIN (
     WHERE cp2.responsible_faculty_id = cpm2.faculty_id
       AND cpm2.role <> 'supervisor'
 ) x ON x.id = cpm.id
-SET cpm.role = 'responsible';
+SET cpm.role = 'responsible'
+WHERE @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 SET SQL_SAFE_UPDATES = 0;
   
@@ -4483,7 +4482,8 @@ JOIN (
     WHERE cp2.responsible_faculty_id = cpm2.faculty_id
       AND cpm2.role <> 'supervisor'
 ) x ON x.id = cpm.id
-SET cpm.role = 'responsible';
+SET cpm.role = 'responsible'
+WHERE @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 SET SQL_SAFE_UPDATES = 0;
 
@@ -4511,13 +4511,15 @@ UPDATE projects p
 LEFT JOIN project_members pm ON pm.project_id = p.project_id
 SET p.status = 'draft'
 WHERE p.title LIKE 'Committee Demo%'
-  AND pm.project_id IS NULL;
+  AND pm.project_id IS NULL
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 -- 2) Keep any zero-student project in the DB, but hide it from pages that require real students.
 UPDATE projects p
 LEFT JOIN project_members pm ON pm.project_id = p.project_id
 SET p.status = 'draft'
-WHERE pm.project_id IS NULL;
+WHERE pm.project_id IS NULL
+  AND @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 -- 3) View used by Student Distribution / Section Results / Committee pages.
 -- Real graduation projects = projects that have at least one student in project_members.
