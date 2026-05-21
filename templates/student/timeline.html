@@ -507,16 +507,15 @@
 
   async function loadFinalProjectStatus() {
     try {
+      finalProjectStatus = { submitted: false, submitted_by_me: false, submitted_by: '' };
       const res = await fetch('/student/api/submit-info');
       const data = await res.json();
       const files = data.files || [];
       const report = files.find(f => f.file_type === 'final_report' && f.upload_status === 'uploaded');
       if (report) {
         finalProjectStatus.submitted = true;
-        // Check if submitted by me via project status
-        const project = data.project || {};
-        finalProjectStatus.submitted_by_me = bool(project.status);
-        finalProjectStatus.submitted_by_me = true; // same team so can update
+        finalProjectStatus.submitted_by_me = !!report.uploaded_by_me;
+        finalProjectStatus.submitted_by = report.uploaded_by_name || '';
       }
     } catch (_) { }
   }
@@ -638,6 +637,10 @@
       if (!data.timeline) {
         empty.style.display = '';
         list.style.display = 'none';
+        if (data.target_course === 'COMP4300') {
+          document.getElementById('timelineTitle').textContent = 'COMP4300 Project Stage';
+          document.getElementById('timelineStatus').textContent = 'COMP4300';
+        }
         document.getElementById('timelineNote').textContent = data.message || 'Not published yet.';
         return;
       }
@@ -646,14 +649,14 @@
       document.getElementById('timelineNote').textContent = data.timeline.note || 'Follow the posted milestones and deadlines.';
       document.getElementById('timelineStatus').textContent = data.timeline.published_at
         ? ('Published ' + formatDate(String(data.timeline.published_at).slice(0, 10)))
-        : 'Published';
+        : data.target_course === 'COMP4300' ? 'COMP4300' : 'Published';
 
       empty.style.display = 'none';
       list.style.display = '';
 
       const items = data.items || [];
       if (!items.length) {
-        list.innerHTML = '<div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">No timeline items found.</div>';
+        list.innerHTML = `<div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">${safeText(data.message || 'No timeline items found.')}</div>`;
         return;
       }
 
@@ -678,7 +681,7 @@
 
         /* Final report → go to submit project page; others → upload modal */
         const finalLink = (label, icon, style = '') =>
-          `<a href="/student/submit?milestone_id=${item.item_id}" class="timeline-submit-link"
+          `<a href="/student/submit?timeline_item_id=${item.item_id}" class="timeline-submit-link"
                style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;${style}">
                <span class="material-symbols-outlined" style="font-size:15px">${icon}</span>${label}
              </a>`;
@@ -695,9 +698,10 @@
 
         let actionBtn;
         if (isFinalReport) {
+          const finalSubmitted = finalProjectStatus.submitted || !!prev;
           if (!isOpen) {
             actionBtn = `<button class="timeline-submit-link disabled" disabled>${win.button}</button>`;
-          } else if (finalProjectStatus.submitted) {
+          } else if (finalSubmitted) {
             actionBtn = finalLink('Update Submission', 'edit', 'background:linear-gradient(135deg,#0369a1,#0284c7);');
           } else {
             actionBtn = finalLink('Submit Final Project', 'upload_file');
@@ -714,9 +718,9 @@
           }
         }
 
-        const showBadge = isFinalReport ? finalProjectStatus.submitted : !!prev;
+        const showBadge = isFinalReport ? (finalProjectStatus.submitted || !!prev) : !!prev;
         const badgeText = isFinalReport
-          ? '✓ Submitted'
+          ? (finalProjectStatus.submitted_by ? '✓ Submitted by ' + safeText(finalProjectStatus.submitted_by) : '✓ Submitted')
           : (prev && prev.submitted_by_me ? '✓ Submitted by you' : '✓ Submitted by ' + safeText((prev || {}).submitted_by || 'teammate'));
         const badgeColor = 'var(--green)';
         const badgeBg = '#e8f5ee';
