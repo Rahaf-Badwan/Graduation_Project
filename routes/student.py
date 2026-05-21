@@ -114,6 +114,95 @@ def _db_column_exists_student(cursor, table_name, column_name):
     return int(row.get("cnt") or 0) > 0
 
 
+def _table_exists_student(cursor, table_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+        """,
+        (table_name,),
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _cleanup_comp4200_state_for_promoted_student(cursor, student_id, promoted_at=None):
+    """Clear old COMP4200 student-facing state once a student is promoted."""
+    if not student_id:
+        return
+
+    cursor.execute(
+        """
+        SELECT DISTINCT p.project_id
+        FROM project_members pm
+        JOIN projects p ON p.project_id = pm.project_id
+        JOIN semesters s ON s.semester_id = p.semester_id
+        WHERE pm.student_id = %s
+          AND s.course_code = 'COMP4200'
+        """,
+        (student_id,),
+    )
+    project_ids = [row["project_id"] for row in cursor.fetchall()]
+    if not project_ids:
+        return
+
+    project_placeholders = ",".join(["%s"] * len(project_ids))
+    cursor.execute(
+        f"""
+        SELECT DISTINCT pm.student_id, u.user_id
+        FROM project_members pm
+        JOIN students st ON st.student_id = pm.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE pm.project_id IN ({project_placeholders})
+        """,
+        project_ids,
+    )
+    team_rows = cursor.fetchall()
+    team_student_ids = [row["student_id"] for row in team_rows if row.get("student_id")]
+    team_user_ids = [row["user_id"] for row in team_rows if row.get("user_id")]
+    if not team_student_ids:
+        team_student_ids = [student_id]
+
+    if _table_exists_student(cursor, "milestone_submissions"):
+        student_placeholders = ",".join(["%s"] * len(team_student_ids))
+        cursor.execute(
+            f"""
+            DELETE ms
+            FROM milestone_submissions ms
+            JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+            JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
+            JOIN semesters sem ON sem.semester_id = tl.semester_id
+            WHERE sem.course_code = 'COMP4200'
+              AND (
+                    ms.project_id IN ({project_placeholders})
+                 OR ms.student_id IN ({student_placeholders})
+              )
+            """,
+            [*project_ids, *team_student_ids],
+        )
+
+    if team_user_ids:
+        user_placeholders = ",".join(["%s"] * len(team_user_ids))
+        params = [*team_user_ids, *project_ids]
+        created_filter = ""
+        if promoted_at:
+            created_filter = " OR n.created_at < %s"
+            params.append(promoted_at)
+        cursor.execute(
+            f"""
+            DELETE n
+            FROM notifications n
+            WHERE n.recipient_id IN ({user_placeholders})
+              AND (
+                    n.related_project_id IN ({project_placeholders})
+                    {created_filter}
+              )
+            """,
+            params,
+        )
+
+
 def _notify_project_team(
     cursor,
     project_id,
@@ -241,7 +330,9 @@ def api_dashboard_data():
         # 2. الكورس الصح (COMP4200 أو COMP4300)
         cursor.execute(
             """
-            SELECT scr.status AS course_status
+            SELECT scr.status AS course_status,
+                   scr.promoted_to_semester_id,
+                   scr.promoted_at
             FROM   student_course_results scr
             JOIN   semesters s ON s.semester_id = scr.semester_id
             WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
@@ -250,9 +341,21 @@ def api_dashboard_data():
             (student_id,),
         )
         r = cursor.fetchone()
-        target_course = (
-            "COMP4300" if (r or {}).get("course_status") == "passed" else "COMP4200"
+        promoted_to = (r or {}).get("promoted_to_semester_id")
+        is_promoted = bool(
+            promoted_to or (r or {}).get("promoted_at")
         )
+        target_course = (
+            "COMP4300"
+            if (r or {}).get("course_status") == "passed" and is_promoted
+            else "COMP4200"
+        )
+        result["target_course"] = target_course
+        if target_course == "COMP4300":
+            _cleanup_comp4200_state_for_promoted_student(
+                cursor, student_id, promoted_at=(r or {}).get("promoted_at")
+            )
+            db.commit()
 
         # 3. السمستر الأكتف
         cursor.execute(
@@ -265,6 +368,17 @@ def api_dashboard_data():
             (target_course,),
         )
         sem = cursor.fetchone()
+        if target_course == "COMP4300" and promoted_to:
+            cursor.execute(
+                """
+                SELECT semester_id, academic_year, start_date, end_date
+                FROM semesters
+                WHERE semester_id = %s AND course_code = 'COMP4300'
+                LIMIT 1
+                """,
+                (promoted_to,),
+            )
+            sem = cursor.fetchone() or sem
         if not sem:
             return jsonify(_json_safe(result))
 
@@ -308,18 +422,94 @@ def api_dashboard_data():
             LEFT JOIN faculty  f ON f.faculty_id  = p.supervisor_id
             LEFT JOIN users    u ON u.user_id      = f.user_id
             WHERE  st.user_id = %s
+              AND  p.semester_id = %s
             ORDER  BY p.project_id DESC LIMIT 1
             """,
-            (user_id,),
+            (user_id, semester_id),
         )
         project = cursor.fetchone()
         if not project:
-            milestone = _student_dashboard_milestone_progress(
-                cursor, student_id, project_id=None, final_report_uploaded=False
+            if target_course == "COMP4300":
+                cursor.execute(
+                    """
+                    SELECT p.project_id, p.title, p.status, p.project_type,
+                           pm.joined_at, pm.is_primary_contact,
+                           u.full_name AS supervisor_name
+                    FROM project_members pm
+                    JOIN students st ON st.student_id = pm.student_id
+                    JOIN projects p ON p.project_id = pm.project_id
+                    JOIN semesters s ON s.semester_id = p.semester_id
+                    LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+                    LEFT JOIN users u ON u.user_id = f.user_id
+                    WHERE st.user_id = %s
+                      AND s.course_code = 'COMP4200'
+                    ORDER BY p.project_id DESC
+                    LIMIT 1
+                    """,
+                    (user_id,),
+                )
+                previous_project = cursor.fetchone()
+                if previous_project:
+                    project_id = previous_project["project_id"]
+                    result["project"] = {
+                        "project_id": project_id,
+                        "title": previous_project["title"] or "",
+                        "status": "promoted_to_comp4300",
+                        "project_type": _project_type_text(
+                            previous_project.get("project_type")
+                        ),
+                        "is_primary_contact": bool(
+                            previous_project.get("is_primary_contact")
+                        ),
+                        "final_score": None,
+                    }
+                    result["supervisor_name"] = previous_project["supervisor_name"] or "-"
+                    result["registration_date"] = _fmt_date(
+                        previous_project.get("joined_at")
+                    )
+                    cursor.execute(
+                        """
+                        SELECT u.full_name, u.university_id,
+                               (st2.user_id = %s) AS is_me
+                        FROM project_members pm
+                        JOIN students st2 ON st2.student_id = pm.student_id
+                        JOIN users u ON u.user_id = st2.user_id
+                        WHERE pm.project_id = %s
+                        """,
+                        (user_id, project_id),
+                    )
+                    result["team_members"] = [
+                        {
+                            "full_name": m["full_name"],
+                            "university_id": m["university_id"],
+                            "is_me": bool(m["is_me"]),
+                            "initials": (
+                                m["full_name"][:2].upper()
+                                if m["full_name"]
+                                else "??"
+                            ),
+                        }
+                        for m in cursor.fetchall()
+                    ]
+            milestone = (
+                {
+                    "submitted": 0,
+                    "total": 0,
+                    "final_report_uploaded": False,
+                    "last_submission": "",
+                    "last_submission_title": "",
+                    "overall": 0,
+                }
+                if target_course == "COMP4300"
+                else _student_dashboard_milestone_progress(
+                    cursor, student_id, project_id=None, final_report_uploaded=False
+                )
             )
             result["milestone_progress"] = milestone
             result["progress"]["overall"] = milestone["overall"]
-            result["deadlines"] = _student_intro_timeline_deadlines(cursor)
+            result["deadlines"] = (
+                [] if target_course == "COMP4300" else _student_intro_timeline_deadlines(cursor)
+            )
             return jsonify(_json_safe(result))
 
         project_id = project["project_id"]
@@ -402,11 +592,22 @@ def api_dashboard_data():
         result["file_status"] = file_status
 
         final_report_uploaded = bool(file_status["final_report"]["uploaded"])
-        result["milestone_progress"] = _student_dashboard_milestone_progress(
-            cursor,
-            student_id,
-            project_id=project_id,
-            final_report_uploaded=final_report_uploaded,
+        result["milestone_progress"] = (
+            {
+                "submitted": 0,
+                "total": 0,
+                "final_report_uploaded": final_report_uploaded,
+                "last_submission": "",
+                "last_submission_title": "",
+                "overall": 100 if final_report_uploaded else 0,
+            }
+            if target_course == "COMP4300"
+            else _student_dashboard_milestone_progress(
+                cursor,
+                student_id,
+                project_id=project_id,
+                final_report_uploaded=final_report_uploaded,
+            )
         )
         result["progress"]["overall"] = result["milestone_progress"]["overall"]
 
@@ -434,20 +635,25 @@ def api_dashboard_data():
                     "_sort": _as_date(dd),
                 }
             )
+        if target_course == "COMP4300":
+            deadlines = []
 
         # جيب timeline items كـ deadlines — بدون فلتر semester_id
         # لأن التايملاين مرتبط بأي سمستر أكتف وليس بالضرورة نفس سمستر الطالب
         try:
+            if target_course == "COMP4300":
+                raise RuntimeError("Skip COMP4200 timeline deadlines after promotion.")
             cursor.execute("""
                 SELECT ti.title, ti.due_date
                 FROM   comp4200_timeline_items ti
                 JOIN   comp4200_timelines t ON t.timeline_id = ti.timeline_id
-                WHERE  t.is_published = TRUE
+                WHERE  %s <> 'COMP4300'
+                  AND  t.is_published = TRUE
                   AND  ti.is_deadline = TRUE
                   AND  COALESCE(ti.is_archived, FALSE) = FALSE
                   AND  ti.due_date   >= CURDATE()
                 ORDER  BY ti.due_date ASC
-                """)
+                """, (target_course,))
             for ti in cursor.fetchall():
                 dd = ti["due_date"]
                 deadlines.append(
@@ -485,6 +691,8 @@ def api_dashboard_data():
 
             # قارن مع أقرب timeline item
             try:
+                if target_course == "COMP4300":
+                    raise RuntimeError("Skip COMP4200 timeline nearest deadline after promotion.")
                 cursor.execute("""
                     SELECT MIN(ti.due_date) AS nearest
                     FROM   comp4200_timeline_items ti
@@ -625,6 +833,56 @@ def _student_active_semester(cursor):
         LIMIT 1
         """)
     return cursor.fetchone()
+
+
+def _target_semester_for_submission(cursor, student_id, timeline_item_id=None):
+    cursor.execute(
+        """
+        SELECT scr.status AS course_status,
+               scr.promoted_to_semester_id,
+               scr.promoted_at
+        FROM   student_course_results scr
+        JOIN   semesters s ON s.semester_id = scr.semester_id
+        WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
+        ORDER  BY scr.semester_id DESC LIMIT 1
+        """,
+        (student_id,),
+    )
+    result_row = cursor.fetchone()
+    course_status = (result_row or {}).get("course_status", "pending")
+    promoted_to = (result_row or {}).get("promoted_to_semester_id")
+    promoted_at = (result_row or {}).get("promoted_at")
+    is_promoted = bool(promoted_to or promoted_at)
+    target_course = "COMP4300" if course_status == "passed" and is_promoted else "COMP4200"
+    if target_course == "COMP4300":
+        _cleanup_comp4200_state_for_promoted_student(
+            cursor, student_id, promoted_at=promoted_at
+        )
+
+    if target_course == "COMP4300" and promoted_to:
+        cursor.execute(
+            """
+            SELECT semester_id, academic_year, course_code
+            FROM semesters
+            WHERE semester_id = %s AND course_code = 'COMP4300'
+            LIMIT 1
+            """,
+            (promoted_to,),
+        )
+        promoted_semester = cursor.fetchone()
+        if promoted_semester:
+            return promoted_semester, target_course, course_status
+
+    cursor.execute(
+        """
+        SELECT semester_id, academic_year, course_code, start_date, end_date
+        FROM semesters
+        WHERE is_active = TRUE AND course_code = %s
+        ORDER BY semester_id DESC LIMIT 1
+        """,
+        (target_course,),
+    )
+    return cursor.fetchone(), target_course, course_status
 
 
 def _student_published_intro_timeline(cursor):
@@ -803,6 +1061,40 @@ def api_student_intro_timeline():
                     "message": "The coordinator has not published the timeline yet.",
                 }
             )
+        cursor.execute(
+            "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
+            (session["user_id"],),
+        )
+        student_row = cursor.fetchone()
+        if not student_row:
+            cursor.close()
+            db.close()
+            return jsonify(
+                {"timeline": None, "items": [], "message": "No student profile found."}
+            )
+
+        _, target_course, _ = _target_semester_for_submission(
+            cursor, student_row["student_id"]
+        )
+        if target_course == "COMP4300":
+            db.commit()
+            cursor.close()
+            db.close()
+            return jsonify(
+                {
+                    "timeline": {
+                        "timeline_id": None,
+                        "semester_id": None,
+                        "title": "COMP4300 Project Timeline",
+                        "note": "COMP4200 milestone items were cleared after promotion.",
+                        "is_published": True,
+                        "published_at": None,
+                    },
+                    "items": [],
+                    "message": "No COMP4300 timeline items are published yet.",
+                    "target_course": target_course,
+                }
+            )
         semester = _student_active_semester(cursor)
         if not semester:
             cursor.close()
@@ -863,6 +1155,7 @@ def registration():
 @login_required(role="student")
 def submit():
     user_id = session["user_id"]
+    timeline_item_id = request.args.get("timeline_item_id") or request.args.get("milestone_id")
     academic_year = None
     supervisor_name = None
     team_members = []
@@ -885,7 +1178,9 @@ def submit():
         # تحديد الكورس الصح بناءً على نتيجة الطالب
         cursor.execute(
             """
-            SELECT scr.status AS course_status
+            SELECT scr.status AS course_status,
+                   scr.promoted_to_semester_id,
+                   scr.promoted_at
             FROM   student_course_results scr
             JOIN   semesters s ON s.semester_id = scr.semester_id
             WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
@@ -895,7 +1190,15 @@ def submit():
         )
         result_row = cursor.fetchone()
         course_status = (result_row or {}).get("course_status", "pending")
-        target_course = "COMP4300" if course_status == "passed" else "COMP4200"
+        promoted_to = (result_row or {}).get("promoted_to_semester_id")
+        is_promoted = bool(
+            promoted_to or (result_row or {}).get("promoted_at")
+        )
+        target_course = "COMP4300" if course_status == "passed" and is_promoted else "COMP4200"
+        if target_course == "COMP4300":
+            _cleanup_comp4200_state_for_promoted_student(
+                cursor, student_id, promoted_at=(result_row or {}).get("promoted_at")
+            )
 
         # جيب السمستر الأكتف للكورس الصح
         cursor.execute(
@@ -903,8 +1206,18 @@ def submit():
             (target_course,),
         )
         sem_row = cursor.fetchone()
+        if target_course == "COMP4300" and promoted_to:
+            cursor.execute(
+                """
+                SELECT semester_id
+                FROM semesters
+                WHERE semester_id = %s AND course_code = 'COMP4300'
+                LIMIT 1
+                """,
+                (promoted_to,),
+            )
+            sem_row = cursor.fetchone() or sem_row
         active_semester_id = sem_row["semester_id"] if sem_row else None
-
         # جيب المشروع الخاص بهذا السمستر تحديداً
         cursor.execute(
             """
@@ -936,12 +1249,12 @@ def submit():
             proj_title = project["title"] or ""
             proj_abstract = project["abstract"] or ""
             proj_keywords = project["keywords"] or ""
-            proj_type = ""  # student must choose manually
+            proj_type = _project_type_text(project.get("project_type"))
         elif active_semester_id:
             # ما في مشروع بالسمستر الجديد → جيب السوبرفايزر والفريق من آخر مشروع قديم
             cursor.execute(
                 """
-                SELECT p.project_id, p.title, p.project_type,
+                SELECT p.project_id, p.title, p.abstract, p.keywords, p.project_type,
                        s.academic_year,
                        sup_u.full_name AS supervisor_name
                 FROM   project_members pm
@@ -951,7 +1264,7 @@ def submit():
                 LEFT JOIN faculty f      ON f.faculty_id = p.supervisor_id
                 LEFT JOIN users sup_u    ON sup_u.user_id = f.user_id
                 WHERE  st.user_id = %s
-                ORDER  BY p.project_id DESC
+                ORDER  BY (s.course_code = 'COMP4200') DESC, p.project_id DESC
                 LIMIT  1
                 """,
                 (user_id,),
@@ -961,7 +1274,9 @@ def submit():
                 supervisor_name = prev["supervisor_name"]
                 academic_year = prev["academic_year"]
                 proj_title = prev["title"] or ""
-                proj_type = ""  # student must choose manually
+                proj_abstract = prev["abstract"] or ""
+                proj_keywords = prev["keywords"] or ""
+                proj_type = _project_type_text(prev.get("project_type"))
                 # جيب الفريق من مشروع COMP4200 القديم — هم نفسهم
                 cursor.execute(
                     """
@@ -1091,6 +1406,8 @@ def result():
                 scr.result_id,
                 scr.status AS course_status,
                 scr.notes,
+                scr.promoted_to_semester_id,
+                scr.promoted_at,
                 scr.updated_at AS result_updated_at,
                 s.semester_id,
                 s.academic_year,
@@ -1186,7 +1503,11 @@ def result():
                 SELECT
                     scr.result_id,
                     scr.status AS course_status,
+                    scr.notes,
+                    scr.promoted_to_semester_id,
+                    scr.promoted_at,
                     scr.updated_at AS result_updated_at,
+                    s.semester_id,
                     s.academic_year,
                     s.semester_number,
                     s.course_code,
@@ -1220,6 +1541,91 @@ def result():
             for item in history:
                 if item.get("final_score") is not None:
                     item["final_score"] = float(item["final_score"])
+
+            promoted_source = next(
+                (
+                    item
+                    for item in history
+                    if item.get("course_code") == "COMP4200"
+                    and item.get("course_status") == "passed"
+                    and item.get("promoted_to_semester_id")
+                ),
+                None,
+            )
+            if promoted_source and not any(
+                item.get("course_code") == "COMP4300" for item in history
+            ):
+                cursor.execute(
+                    """
+                    SELECT semester_id, academic_year, semester_number, course_code
+                    FROM semesters
+                    WHERE semester_id = %s AND course_code = 'COMP4300'
+                    LIMIT 1
+                    """,
+                    (promoted_source["promoted_to_semester_id"],),
+                )
+                comp4300_semester = cursor.fetchone()
+                if comp4300_semester:
+                    cursor.execute(
+                        """
+                        SELECT p.project_id, p.title, p.status AS project_status,
+                               COALESCE(fd.final_score, p.final_score) AS final_score,
+                               fd.decision AS final_decision,
+                               fd.decided_at,
+                               sup_u.full_name AS supervisor_name
+                        FROM project_members pm
+                        JOIN projects p ON p.project_id = pm.project_id
+                        LEFT JOIN final_decisions fd ON fd.project_id = p.project_id
+                        LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                        LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
+                        WHERE pm.student_id = %s
+                          AND p.semester_id = %s
+                        ORDER BY p.project_id DESC
+                        LIMIT 1
+                        """,
+                        (student["student_id"], comp4300_semester["semester_id"]),
+                    )
+                    comp4300_project = cursor.fetchone() or {}
+                    final_score = comp4300_project.get("final_score")
+                    final_decision = (comp4300_project.get("final_decision") or "").lower()
+                    comp4300_status = "pending"
+                    if final_decision == "accepted":
+                        comp4300_status = "passed"
+                    elif final_decision == "rejected":
+                        comp4300_status = "failed"
+
+                    comp4300_result = {
+                        "result_id": None,
+                        "course_status": comp4300_status,
+                        "notes": "COMP4300 is in progress after promotion."
+                        if comp4300_status == "pending"
+                        else "",
+                        "promoted_to_semester_id": None,
+                        "promoted_at": promoted_source.get("promoted_at"),
+                        "result_updated_at": comp4300_project.get("decided_at")
+                        or promoted_source.get("promoted_at"),
+                        "semester_id": comp4300_semester["semester_id"],
+                        "academic_year": comp4300_semester.get("academic_year"),
+                        "semester_number": comp4300_semester.get("semester_number"),
+                        "course_code": "COMP4300",
+                        "end_date": None,
+                        "project_id": comp4300_project.get("project_id"),
+                        "project_title": comp4300_project.get("title")
+                        or promoted_source.get("project_title"),
+                        "project_status": comp4300_project.get("project_status"),
+                        "final_score": float(final_score)
+                        if final_score is not None
+                        else None,
+                        "final_decision": comp4300_project.get("final_decision"),
+                        "decided_at": comp4300_project.get("decided_at"),
+                        "supervisor_name": comp4300_project.get("supervisor_name")
+                        or result_data.get("supervisor_name"),
+                        "student_name": student["full_name"],
+                        "university_id": student["university_id"],
+                        "is_virtual_comp4300": True,
+                    }
+                    history.insert(0, comp4300_result)
+                    result_data = comp4300_result
 
         cursor.close()
         db.close()
@@ -1593,6 +1999,7 @@ def api_challenges_delete(challenge_id):
 def api_submit_info():
     """Return current project data + student course result status."""
     user_id = session["user_id"]
+    timeline_item_id = request.args.get("timeline_item_id") or request.args.get("milestone_id")
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -1624,20 +2031,25 @@ def api_submit_info():
         result_row = cursor.fetchone()
 
         course_status = (result_row or {}).get("course_status", "pending")
-        promoted = bool((result_row or {}).get("promoted_at"))
+        promoted_to = (result_row or {}).get("promoted_to_semester_id")
+        promoted = bool(promoted_to or (result_row or {}).get("promoted_at"))
 
         # Determine target course
         # passed + already promoted → COMP4300 semester
         # everything else           → COMP4200 semester (active)
-        if course_status == "passed":
+        if course_status == "passed" and promoted:
             target_course = "COMP4300"
         else:
             target_course = "COMP4200"
+        if target_course == "COMP4300":
+            _cleanup_comp4200_state_for_promoted_student(
+                cursor, student_id, promoted_at=(result_row or {}).get("promoted_at")
+            )
 
         # Get the active semester for the target course
         cursor.execute(
             """
-            SELECT semester_id, academic_year, course_code
+            SELECT semester_id, academic_year, course_code, start_date, end_date
             FROM   semesters
             WHERE  is_active = TRUE
               AND  course_code = %s
@@ -1647,7 +2059,6 @@ def api_submit_info():
             (target_course,),
         )
         target_sem = cursor.fetchone()
-
         if not target_sem:
             cursor.close()
             db.close()
@@ -1699,17 +2110,22 @@ def api_submit_info():
         if project:
             cursor.execute(
                 """
-                SELECT file_id, file_type, file_name, upload_status, uploaded_at, file_size_mb
-                FROM   project_files
-                WHERE  project_id = %s
+                SELECT pf.file_id, pf.file_type, pf.file_name, pf.upload_status,
+                       pf.uploaded_at, pf.file_size_mb, pf.uploaded_by,
+                       (pf.uploaded_by = %s) AS uploaded_by_me,
+                       u.full_name AS uploaded_by_name
+                FROM   project_files pf
+                LEFT JOIN users u ON u.user_id = pf.uploaded_by
+                WHERE  pf.project_id = %s
                 ORDER  BY uploaded_at DESC
                 """,
-                (project["project_id"],),
+                (user_id, project["project_id"]),
             )
             files = cursor.fetchall()
             for f in files:
                 if f.get("uploaded_at"):
                     f["uploaded_at"] = _fmt_date(f["uploaded_at"])
+                f["uploaded_by_me"] = bool(f.get("uploaded_by_me"))
 
         cursor.close()
         db.close()
@@ -1741,6 +2157,196 @@ def api_submit_info():
 
 
 # ─── API: submit / update project (final submission) ────────
+def _coerce_positive_int(value):
+    value = str(value or "").strip()
+    if not value.isdigit():
+        return None
+    parsed = int(value)
+    return parsed if parsed > 0 else None
+
+
+def _ensure_milestone_submissions_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS milestone_submissions (
+            submission_id  INT          PRIMARY KEY AUTO_INCREMENT,
+            item_id        INT          NOT NULL,
+            student_id     INT          NOT NULL,
+            project_id     INT          NULL,
+            file_name      VARCHAR(255) NOT NULL,
+            file_data      LONGBLOB     NOT NULL,
+            file_mime      VARCHAR(120) NOT NULL,
+            file_size_mb   DECIMAL(6,2) NULL,
+            submitted_to   ENUM('supervisor','coordinator','both')
+                           NOT NULL DEFAULT 'supervisor',
+            submitted_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            item_title     VARCHAR(255) NULL,
+            item_label     VARCHAR(180) NULL,
+            INDEX idx_ms_item    (item_id),
+            INDEX idx_ms_student (student_id),
+            FOREIGN KEY (item_id)
+                REFERENCES comp4200_timeline_items(item_id)
+                ON DELETE CASCADE,
+            FOREIGN KEY (student_id)
+                REFERENCES students(student_id)
+                ON DELETE CASCADE,
+            FOREIGN KEY (project_id)
+                REFERENCES projects(project_id)
+                ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+    for col_name, col_def in [
+        ("project_id", "INT NULL"),
+        ("item_title", "VARCHAR(255) NULL"),
+        ("item_label", "VARCHAR(180) NULL"),
+    ]:
+        try:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'milestone_submissions'
+                  AND COLUMN_NAME = %s
+                """,
+                (col_name,),
+            )
+            if not int((cursor.fetchone() or {}).get("cnt") or 0):
+                cursor.execute(
+                    f"ALTER TABLE milestone_submissions ADD COLUMN {col_name} {col_def}"
+                )
+        except Exception:
+            pass
+
+
+def _sync_final_report_timeline_submission(
+    cursor,
+    *,
+    timeline_item_id,
+    student_id,
+    project_id,
+    file_name,
+    file_bytes,
+    mime_type,
+    size_mb,
+):
+    item_id = _coerce_positive_int(timeline_item_id)
+    if not item_id or not project_id or not file_bytes:
+        return None
+
+    _ensure_milestone_submissions_table(cursor)
+    cursor.execute(
+        """
+        SELECT item_id, title, milestone_label, submitted_to, start_date,
+               start_time, due_date, due_time
+        FROM comp4200_timeline_items
+        WHERE item_id = %s
+        """,
+        (item_id,),
+    )
+    item = cursor.fetchone()
+    if not item:
+        return None
+
+    title_lower = (item.get("title") or "").lower()
+    if "final report" not in title_lower and "final submission" not in title_lower:
+        return None
+
+    from datetime import datetime as _datetime
+
+    now = _datetime.now()
+    start_date_val = _as_date(item.get("start_date"))
+    start_time_str = (item.get("start_time") or "").strip()
+    due_date_val = _as_date(item.get("due_date"))
+    due_time_str = (item.get("due_time") or "").strip()
+
+    if start_date_val and start_time_str:
+        try:
+            start_dt = _datetime.strptime(
+                f"{start_date_val} {start_time_str}", "%Y-%m-%d %H:%M"
+            )
+        except ValueError:
+            start_dt = _datetime(
+                start_date_val.year, start_date_val.month, start_date_val.day, 0, 0
+            )
+    elif start_date_val:
+        start_dt = _datetime(
+            start_date_val.year, start_date_val.month, start_date_val.day, 0, 0
+        )
+    else:
+        start_dt = None
+
+    if due_date_val and due_time_str:
+        try:
+            due_dt = _datetime.strptime(
+                f"{due_date_val} {due_time_str}", "%Y-%m-%d %H:%M"
+            )
+        except ValueError:
+            due_dt = _datetime(
+                due_date_val.year, due_date_val.month, due_date_val.day, 23, 59
+            )
+    elif due_date_val:
+        due_dt = _datetime(
+            due_date_val.year, due_date_val.month, due_date_val.day, 23, 59
+        )
+    else:
+        due_dt = None
+
+    if start_dt and now < start_dt:
+        raise PermissionError("The submission window has not opened yet.")
+    if due_dt and now > due_dt:
+        raise PermissionError("The submission window has closed. No more uploads are allowed.")
+
+    cursor.execute(
+        """
+        SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
+        FROM milestone_submissions ms
+        JOIN students st ON st.student_id = ms.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE ms.item_id = %s AND ms.project_id = %s
+        ORDER BY ms.submitted_at DESC
+        LIMIT 1
+        """,
+        (item_id, project_id),
+    )
+    existing = cursor.fetchone()
+    if existing and existing.get("student_id") != student_id:
+        submitted_by = existing.get("submitted_by") or "a teammate"
+        raise PermissionError(
+            f"This timeline milestone has already been submitted by {submitted_by}."
+        )
+
+    cursor.execute(
+        "DELETE FROM milestone_submissions WHERE item_id = %s AND project_id = %s",
+        (item_id, project_id),
+    )
+    submitted_to = (item.get("submitted_to") or "coordinator").strip().lower()
+    if submitted_to not in ("supervisor", "coordinator", "both"):
+        submitted_to = "coordinator"
+
+    cursor.execute(
+        """
+        INSERT INTO milestone_submissions
+            (item_id, student_id, project_id, file_name, file_data,
+             file_mime, file_size_mb, submitted_to, item_title, item_label)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            item_id,
+            student_id,
+            project_id,
+            file_name,
+            file_bytes,
+            mime_type or "application/octet-stream",
+            size_mb,
+            submitted_to,
+            item.get("title") or "",
+            item.get("milestone_label") or "",
+        ),
+    )
+    return cursor.lastrowid
+
+
 @student_bp.route("/api/submit-project", methods=["POST"])
 @login_required(role="student")
 def api_submit_project():
@@ -1756,6 +2362,7 @@ def api_submit_project():
     group_name = (data.get("group_name") or "").strip()
     abstract = (data.get("abstract") or "").strip() or None
     keywords = (data.get("keywords") or "").strip() or None
+    timeline_item_id = data.get("timeline_item_id") or data.get("milestone_id")
     # Project type is no longer entered by the student in the submit form.
     # The database column is NOT NULL, so the backend keeps the existing DB value
     # when updating a draft/submission. For a brand-new project, it silently uses
@@ -1804,7 +2411,9 @@ def api_submit_project():
         # ── Determine target semester based on course result ──
         cursor.execute(
             """
-            SELECT scr.status AS course_status
+            SELECT scr.status AS course_status,
+                   scr.promoted_to_semester_id,
+                   scr.promoted_at
             FROM   student_course_results scr
             JOIN   semesters s ON s.semester_id = scr.semester_id
             WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
@@ -1814,12 +2423,18 @@ def api_submit_project():
         )
         result_row = cursor.fetchone()
         course_status = (result_row or {}).get("course_status", "pending")
+        promoted_to = (result_row or {}).get("promoted_to_semester_id")
+        is_promoted = bool(promoted_to or (result_row or {}).get("promoted_at"))
 
-        target_course = "COMP4300" if course_status == "passed" else "COMP4200"
+        target_course = "COMP4300" if course_status == "passed" and is_promoted else "COMP4200"
+        if target_course == "COMP4300":
+            _cleanup_comp4200_state_for_promoted_student(
+                cursor, student_id, promoted_at=(result_row or {}).get("promoted_at")
+            )
 
         cursor.execute(
             """
-            SELECT semester_id, academic_year, course_code
+            SELECT semester_id, academic_year, course_code, start_date, end_date
             FROM   semesters
             WHERE  is_active = TRUE AND course_code = %s
             ORDER  BY semester_id DESC LIMIT 1
@@ -1827,7 +2442,17 @@ def api_submit_project():
             (target_course,),
         )
         target_sem = cursor.fetchone()
-
+        if target_course == "COMP4300" and promoted_to:
+            cursor.execute(
+                """
+                SELECT semester_id, academic_year, course_code, start_date, end_date
+                FROM semesters
+                WHERE semester_id = %s AND course_code = 'COMP4300'
+                LIMIT 1
+                """,
+                (promoted_to,),
+            )
+            target_sem = cursor.fetchone() or target_sem
         if not target_sem:
             cursor.close()
             db.close()
@@ -2091,6 +2716,32 @@ def api_submit_project():
             action = "created"
 
         # ── Sync lifecycle after registration ──
+        if timeline_item_id:
+            cursor.execute(
+                """
+                SELECT file_name, file_data, file_mime, file_size_mb
+                FROM project_files
+                WHERE project_id = %s
+                  AND file_type = 'final_report'
+                  AND upload_status = 'uploaded'
+                ORDER BY uploaded_at DESC
+                LIMIT 1
+                """,
+                (project_id,),
+            )
+            final_file = cursor.fetchone()
+            if final_file and final_file.get("file_data"):
+                _sync_final_report_timeline_submission(
+                    cursor,
+                    timeline_item_id=timeline_item_id,
+                    student_id=student_id,
+                    project_id=project_id,
+                    file_name=final_file.get("file_name") or "final_report.pdf",
+                    file_bytes=final_file.get("file_data"),
+                    mime_type=final_file.get("file_mime"),
+                    size_mb=final_file.get("file_size_mb"),
+                )
+
         _sync_lifecycle(cursor, project_id)
 
         db.commit()
@@ -2107,6 +2758,8 @@ def api_submit_project():
                 "academic_year": target_sem["academic_year"],
             }
         )
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2121,6 +2774,9 @@ def api_upload_file():
     """
     user_id = session["user_id"]
     file_type = request.form.get("file_type", "").strip()
+    timeline_item_id = request.form.get("timeline_item_id") or request.form.get(
+        "milestone_id"
+    )
 
     if file_type not in ALLOWED_EXTENSIONS:
         return jsonify({"error": "Invalid file type."}), 400
@@ -2163,7 +2819,9 @@ def api_upload_file():
         # تحديد الكورس الصح بناءً على نتيجة الطالب
         cursor.execute(
             """
-            SELECT scr.status AS course_status
+            SELECT scr.status AS course_status,
+                   scr.promoted_to_semester_id,
+                   scr.promoted_at
             FROM   student_course_results scr
             JOIN   semesters s ON s.semester_id = scr.semester_id
             WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
@@ -2173,7 +2831,13 @@ def api_upload_file():
         )
         result_row = cursor.fetchone()
         course_status = (result_row or {}).get("course_status", "pending")
-        target_course = "COMP4300" if course_status == "passed" else "COMP4200"
+        promoted_to = (result_row or {}).get("promoted_to_semester_id")
+        is_promoted = bool(promoted_to or (result_row or {}).get("promoted_at"))
+        target_course = "COMP4300" if course_status == "passed" and is_promoted else "COMP4200"
+        if target_course == "COMP4300":
+            _cleanup_comp4200_state_for_promoted_student(
+                cursor, student_id, promoted_at=(result_row or {}).get("promoted_at")
+            )
 
         # جيب السمستر الأكتف للكورس الصح
         cursor.execute(
@@ -2185,6 +2849,17 @@ def api_upload_file():
             (target_course,),
         )
         sem_row = cursor.fetchone()
+        if target_course == "COMP4300" and promoted_to:
+            cursor.execute(
+                """
+                SELECT semester_id
+                FROM semesters
+                WHERE semester_id = %s AND course_code = 'COMP4300'
+                LIMIT 1
+                """,
+                (promoted_to,),
+            )
+            sem_row = cursor.fetchone() or sem_row
 
         if not sem_row:
             cursor.close()
@@ -2283,6 +2958,18 @@ def api_upload_file():
             (project_id, file_type, safe_name, file_bytes, mime_type, size_mb, user_id),
         )
 
+        if file_type == "final_report" and timeline_item_id:
+            _sync_final_report_timeline_submission(
+                cursor,
+                timeline_item_id=timeline_item_id,
+                student_id=student_id,
+                project_id=project_id,
+                file_name=safe_name,
+                file_bytes=file_bytes,
+                mime_type=mime_type,
+                size_mb=size_mb,
+            )
+
         if file_type == "final_report" and not had_final_submission:
             actor_name = session.get("full_name") or "A teammate"
             _notify_project_team(
@@ -2310,6 +2997,8 @@ def api_upload_file():
                 "size_mb": size_mb,
             }
         )
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2400,6 +3089,26 @@ def api_clear_submission():
 
         # احذف الملفات بس
         cursor.execute("DELETE FROM project_files WHERE project_id = %s", (project_id,))
+        cursor.execute("""
+            SELECT COUNT(*) AS tbl_exists
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'milestone_submissions'
+        """)
+        if int((cursor.fetchone() or {}).get("tbl_exists") or 0):
+            cursor.execute(
+                """
+                DELETE ms
+                FROM milestone_submissions ms
+                JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                WHERE ms.project_id = %s
+                  AND (
+                    LOWER(ti.title) LIKE '%%final report%%'
+                    OR LOWER(ti.title) LIKE '%%final submission%%'
+                  )
+                """,
+                (project_id,),
+            )
 
         # رجّع المشروع لـ draft وامسح البيانات اللي كتبها الطالب
         # بس خلّي: project_members (الفريق) + supervisor_id (السوبرفايزر) + semester_id (السنة)
@@ -2768,6 +3477,11 @@ def api_milestone_submissions_list():
             db.close()
             return jsonify({"submissions": []})
         student_id = st_row["student_id"]
+        _, target_course, _ = _target_semester_for_submission(cursor, student_id)
+        if target_course == "COMP4300":
+            cursor.close()
+            db.close()
+            return jsonify({"submissions": []})
 
         cursor.execute("""
             SELECT COUNT(*) AS tbl_exists
@@ -2902,6 +3616,33 @@ def api_student_registration_check():
                 {"registered": False, "project": None, "distribution_open": False}
             )
 
+        target_course = "COMP4200"
+        cursor.execute(
+            "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
+            (user_id,),
+        )
+        student_row = cursor.fetchone()
+        if student_row:
+            cursor.execute(
+                """
+                SELECT scr.status AS course_status,
+                       scr.promoted_to_semester_id,
+                       scr.promoted_at
+                FROM student_course_results scr
+                JOIN semesters s ON s.semester_id = scr.semester_id
+                WHERE scr.student_id = %s AND s.course_code = 'COMP4200'
+                ORDER BY scr.semester_id DESC
+                LIMIT 1
+                """,
+                (student_row["student_id"],),
+            )
+            result_row = cursor.fetchone() or {}
+            if result_row.get("course_status") == "passed" and (
+                result_row.get("promoted_to_semester_id")
+                or result_row.get("promoted_at")
+            ):
+                target_course = "COMP4300"
+
         cursor.execute(
             """
             SELECT
@@ -2947,6 +3688,8 @@ def api_student_registration_check():
                     "registered": True,
                     "project": project,
                     "distribution_open": bool(semester.get("distribution_open")),
+                    "target_course": target_course,
+                    "timeline_available": target_course != "COMP4300",
                 }
             )
         return jsonify(
@@ -2954,6 +3697,8 @@ def api_student_registration_check():
                 "registered": False,
                 "project": None,
                 "distribution_open": bool(semester.get("distribution_open")),
+                "target_course": target_course,
+                "timeline_available": target_course != "COMP4300",
             }
         )
     except Exception as e:
@@ -2984,6 +3729,21 @@ def api_final_submission_window():
             cursor.close()
             db.close()
             return jsonify({"is_active": False, "item_id": None})
+
+        cursor.execute(
+            "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
+            (session["user_id"],),
+        )
+        student_row = cursor.fetchone()
+        if student_row:
+            _, target_course, _ = _target_semester_for_submission(
+                cursor, student_row["student_id"]
+            )
+            if target_course == "COMP4300":
+                db.commit()
+                cursor.close()
+                db.close()
+                return jsonify({"is_active": False, "item_id": None})
 
         now = _dt.now()
         cursor.execute("""
@@ -3327,7 +4087,9 @@ def api_student_topbar_info():
         # Determine course (COMP4200 or COMP4300)
         cursor.execute(
             """
-            SELECT scr.status AS course_status
+            SELECT scr.status AS course_status,
+                   scr.promoted_to_semester_id,
+                   scr.promoted_at
             FROM   student_course_results scr
             JOIN   semesters s ON s.semester_id = scr.semester_id
             WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
@@ -3336,8 +4098,13 @@ def api_student_topbar_info():
             (student_id,),
         )
         r = cursor.fetchone()
+        is_promoted = bool(
+            (r or {}).get("promoted_to_semester_id") or (r or {}).get("promoted_at")
+        )
         course_code = (
-            "COMP4300" if (r or {}).get("course_status") == "passed" else "COMP4200"
+            "COMP4300"
+            if (r or {}).get("course_status") == "passed" and is_promoted
+            else "COMP4200"
         )
 
         # Get active semester academic_year
