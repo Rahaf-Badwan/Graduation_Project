@@ -327,7 +327,38 @@ function closePromoteModal(e){
 }
 
 async function loadPassedStudents(){
-  var list = document.getElementById('passed-student-list');
+  var list = document.getElementById('passed-students-list');
+  list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">Loading...</div>';
+
+  try{
+    var res = await fetch('/head/api/students/passes');
+    var data = await res.json();
+    var students = data.students || [];
+
+    if(!students.length){
+      list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">No passed COMP4200 students waiting for promotion.</div>';
+      return;
+    }
+
+    list.innerHTML = students.map(function(s){
+      return '<div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">' +
+      '<div style="width:28px; height:28px; border-radius:50%; background:var(--color-background-info); display:grid; place-items:center; font-size:11px; font-weight:600; color:var(--color-text-info); flex-shrink:0;">' +
+        (s.avatar_initials || s.full_name.substring(0,2).toUpperCase()) +
+        '</div>' +
+        '<div style="flex:1; min-width:0;">' +
+          '<div style="font-size:13px; font-weight:500;">' + s.full_name + '</div>' +
+          '<div style="font-size:11px; color:var(--color-text-secondary);">' + s.university_id + '</div>' +
+        '</div>' +
+        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-success); color:var(--color-text-success); border: 0.5px solid var(--color-border-tertiary);">Passed COMP4200</span>' +
+      '</div>';
+    }).join('');
+  }catch(e){
+    list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">Could not load students.</div>';
+  }
+}
+
+async function loadComp4300Students(){
+  var list = document.getElementById('comp4300-students-list');
   list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">Loading...</div>';
 
   try{
@@ -340,25 +371,25 @@ async function loadPassedStudents(){
       return;
     }
 
-    list.innerHTML  = students.map(function(s){
+    list.innerHTML = students.map(function(s){
       return '<div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">' +
-      '<div style="width:28px; height:28px; border-radius:50%; background:var(--color-background-info); display:grid; place-items:center; font-size:11px; font-weight:600; color:car(--color-text-info); flex-shrink:0;:>' +
-        (s.avatar_initials || s.full_name.substring(0,2).toUpperCase()) +
+        '<div style="width:28px; height:28px; border-radius:50%; background:var(--color-background-info); display:grid; place-items:center; font-size:11px; font-weight:600; color:var(--color-text-info); flex-shrink:0;">' +
+          (s.avatar_initials || s.full_name.substring(0,2).toUpperCase()) +
         '</div>' +
         '<div style="flex:1; min-width:0;">' +
-          '<div style="font-size:13px; font-weight:500;"' + s.full_name + '</div>' +
+          '<div style="font-size:13px; font-weight:500;">' + s.full_name + '</div>' +
           '<div style="font-size:11px; color:var(--color-text-secondary);">' + s.university_id + '</div>' +
         '</div>' +
         '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-info); color:var(--color-text-info); border: 0.5px solid var(--color-border-tertiary);">COMP4300</span>' +
       '</div>';
-      }).join('');
+    }).join('');
   }catch(e){
     list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">Could not load students.</div>';
   }
 }
 
 async function promoteAll(){
-  var btn = document.getElementById('promoreBtn');
+  var btn = document.getElementById('promoteBtn');
   btn.disabled = true;
   btn.textContent = 'Promoting...';
 
@@ -377,7 +408,7 @@ async function promoteAll(){
     showFeedback_promote('promote-feedback', 'Could not reach the server.', 'error');
   }finally{
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-outlined icon-inline">upgrade</span>';
+    btn.innerHTML = '<span class="material-symbols-outlined icon-inline">upgrade</span> Promote All to COMP4300';
   }
 }
 
@@ -397,10 +428,10 @@ async function archiveAll(){
       showFeedback_promote('archive-feedback', data.error || 'Something went wrong.', 'error');
     }
   }catch(e){
-    showFeedback_promote('archive-feddback', 'Could not reach the server.', 'error');
+    showFeedback_promote('archive-feedback', 'Could not reach the server.', 'error');
   }finally{
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-outlines icon-inline">archive</span>';
+    btn.innerHTML = '<span class="material-symbols-outlined icon-inline">archive</span> Archive All COMP4300 Projects';
   }
 }
 
@@ -418,5 +449,5 @@ function showFeedback_promote(id, message, type){
   el.style.color = s.color;
   el.style.background = s.bg;
   el.style.border = '0.5px solid ' + s.border;
-  el.textContent = msg
+  el.textContent = message;
 }
