@@ -7,7 +7,9 @@
 {% block content %}
 <div class="page on" id="pg-submit">
 
-  {% if request.args.get('timeline_item_id') %}
+  {% set timeline_item_id = request.args.get('timeline_item_id') or request.args.get('milestone_id') %}
+
+  {% if timeline_item_id %}
   <div
     style="display:flex;align-items:center;gap:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:14px;padding:14px 18px;margin-bottom:12px;color:#166534;">
     <span class="material-symbols-outlined" style="font-size:26px;color:#16a34a;flex-shrink:0">event_available</span>
@@ -237,6 +239,8 @@
     setTimeout(function () { t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 400); }, 3500);
   }
 
+  var TIMELINE_ITEM_ID = "{{ timeline_item_id or '' }}";
+
   // ── تحميل الملفات المرفوعة مسبقاً عند فتح الصفحة ─────────────
   var FILE_ZONE_MAP = {
     'final_report': { zone: 'zone-report', status: 'status-report' },
@@ -284,6 +288,9 @@
     var fd = new FormData();
     fd.append('file_type', fileType);
     fd.append('file', fileInput.files[0]);
+    if (fileType === 'final_report' && TIMELINE_ITEM_ID) {
+      fd.append('timeline_item_id', TIMELINE_ITEM_ID);
+    }
     return fetch('/student/api/upload-file', { method: 'POST', body: fd })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -335,7 +342,7 @@
     fetch('/student/api/submit-project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType })
+      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType, timeline_item_id: TIMELINE_ITEM_ID })
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -413,7 +420,7 @@
     fetch('/student/api/submit-project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType, status: 'draft' })
+      body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType, status: 'draft', timeline_item_id: TIMELINE_ITEM_ID })
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
