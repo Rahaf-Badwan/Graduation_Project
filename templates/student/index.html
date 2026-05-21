@@ -518,7 +518,9 @@
     const remainingMilestones = milestoneTotal ? Math.max(0, milestoneTotal - milestoneSubmitted) : 0;
     const finalUploaded = fileUploaded(files, 'final_report') || overall >= 100;
     const sourceUploaded = fileUploaded(files, 'source_code');
-    const deadlines = d.deadlines || [];
+    const targetCourse = d.target_course || 'COMP4200';
+    const isComp4300 = targetCourse === 'COMP4300';
+    const deadlines = (d.deadlines || []).filter(dl => !(isComp4300 && dl.deadline_type === 'timeline'));
     const readiness = Number(milestone.overall ?? overall ?? 0);
 
     document.getElementById('stat-student').textContent = safeText(d.student_name);
@@ -526,7 +528,7 @@
     document.getElementById('stat-team').textContent = members.length || '—';
 
     const focusStat = document.getElementById('stat-overall');
-    focusStat.textContent = finalUploaded ? 'Complete' : milestoneTotal ? `${readiness}%` : 'Timeline';
+    focusStat.textContent = finalUploaded ? 'Complete' : milestoneTotal ? `${readiness}%` : isComp4300 ? 'COMP4300' : 'Timeline';
     focusStat.style.color = finalUploaded ? 'var(--green)' : milestoneTotal ? 'var(--blue)' : 'var(--amber)';
 
     const pill = document.getElementById('pill-status');
@@ -548,6 +550,8 @@
     document.getElementById('overall-center').textContent = readiness + '%';
     document.getElementById('report-chip').textContent = finalUploaded
       ? 'Milestones: final report submitted'
+      : isComp4300
+        ? 'Final project: not submitted yet'
       : milestoneTotal
         ? `Milestones: ${milestoneSubmitted} of ${milestoneTotal} submitted`
         : 'Milestones: timeline not published yet';
@@ -556,12 +560,17 @@
       document.getElementById('next-action-title').textContent = 'Register your project group';
       document.getElementById('next-action-copy').textContent = 'Start by registering your group and supervisor preference so your dashboard can track the real work.';
       setActionLink('next-action-primary', '/student/registration', 'Register Project');
-      setActionLink('next-action-secondary', '/student/timeline', 'View Timeline');
+      setActionLink('next-action-secondary', isComp4300 ? '/student/submit' : '/student/timeline', isComp4300 ? 'Project Files' : 'View Timeline');
     } else if (finalUploaded) {
       document.getElementById('next-action-title').textContent = 'Final submission complete';
       document.getElementById('next-action-copy').textContent = 'The final report is submitted, so semester progress is complete. Keep your files organized for archive and review.';
-      setActionLink('next-action-primary', '/student/timeline', 'View Timeline');
+      setActionLink('next-action-primary', isComp4300 ? '/student/submit' : '/student/timeline', isComp4300 ? 'Project Files' : 'View Timeline');
       setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+    } else if (isComp4300) {
+      document.getElementById('next-action-title').textContent = 'Prepare final project files';
+      document.getElementById('next-action-copy').textContent = 'Your COMP4200 milestones are cleared after promotion. Use the project files page for COMP4300 submissions.';
+      setActionLink('next-action-primary', '/student/submit', 'Project Files');
+      setActionLink('next-action-secondary', '/student/registration', 'Team');
     } else if (milestoneTotal) {
       document.getElementById('next-action-title').textContent = 'Continue milestone submissions';
       document.getElementById('next-action-copy').textContent = `You submitted ${milestoneSubmitted} of ${milestoneTotal} timeline milestones. Each submitted milestone increases this progress until the final report closes it at 100%.`;
@@ -584,12 +593,14 @@
         waiting: !hasProject
       },
       {
-        title: 'Timeline submissions',
-        meta: milestoneTotal ? `${milestoneSubmitted} submitted from ${milestoneTotal} published milestones.` : 'Waiting for the coordinator to publish timeline milestones.',
-        tag: milestoneTotal ? `${readiness}%` : 'Waiting',
-        icon: milestoneTotal && milestoneSubmitted >= milestoneTotal ? 'task_alt' : 'flag',
-        done: milestoneTotal > 0 && milestoneSubmitted >= milestoneTotal,
-        waiting: milestoneTotal > 0 && milestoneSubmitted < milestoneTotal
+        title: isComp4300 ? 'COMP4300 workspace' : 'Timeline submissions',
+        meta: isComp4300
+          ? 'COMP4200 timeline milestones were cleared after promotion.'
+          : milestoneTotal ? `${milestoneSubmitted} submitted from ${milestoneTotal} published milestones.` : 'Waiting for the coordinator to publish timeline milestones.',
+        tag: isComp4300 ? 'Reset' : milestoneTotal ? `${readiness}%` : 'Waiting',
+        icon: isComp4300 ? 'sync_alt' : milestoneTotal && milestoneSubmitted >= milestoneTotal ? 'task_alt' : 'flag',
+        done: isComp4300 || (milestoneTotal > 0 && milestoneSubmitted >= milestoneTotal),
+        waiting: !isComp4300 && milestoneTotal > 0 && milestoneSubmitted < milestoneTotal
       },
       {
         title: 'Final report package',
