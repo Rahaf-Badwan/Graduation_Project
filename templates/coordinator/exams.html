@@ -214,10 +214,114 @@
       border: 1px solid #fecdca;
     }
 
+
+    #pg-exams .submission-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    #pg-exams .submission-toolbar input,
+    #pg-exams .submission-toolbar select {
+      border: 1px solid #d8e2dc;
+      border-radius: 12px;
+      padding: 9px 11px;
+      background: #fff;
+      outline: none;
+      font-size: 13px;
+    }
+
+    #pg-exams .submission-toolbar input:focus,
+    #pg-exams .submission-toolbar select:focus {
+      border-color: #2e7d42;
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.10);
+    }
+
+    #pg-exams .submission-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    #pg-exams .submission-stat {
+      border: 1px solid #e7eee9;
+      background: #fbfdfb;
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    #pg-exams .submission-stat b {
+      display: block;
+      font-size: 22px;
+      color: #243b2c;
+      line-height: 1;
+    }
+
+    #pg-exams .submission-stat span {
+      display: block;
+      margin-top: 5px;
+      font-size: 12px;
+      color: #667085;
+      font-weight: 700;
+    }
+
+    #pg-exams .submission-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    #pg-exams .submission-card {
+      border: 1px solid #e7eee9;
+      background: #fff;
+      border-radius: 16px;
+      padding: 13px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    #pg-exams .submission-title {
+      font-weight: 900;
+      color: #243b2c;
+      margin-bottom: 5px;
+    }
+
+    #pg-exams .submission-meta {
+      color: #667085;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    #pg-exams .submission-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 900;
+      background: #eef7f0;
+      color: #2e7d42;
+      margin-bottom: 5px;
+    }
+
+    #pg-exams .empty {
+      padding: 18px;
+      border: 1px dashed #d7e3dc;
+      border-radius: 14px;
+      color: #667085;
+      background: #fbfdfb;
+      line-height: 1.5;
+    }
+
     @media (max-width: 760px) {
 
       #pg-exams .exam-form-grid,
-      #pg-exams .grad-final-row {
+      #pg-exams .grad-final-row,
+      #pg-exams .submission-grid {
         grid-template-columns: 1fr;
       }
 
@@ -237,6 +341,11 @@
     <button class="exam-tab" type="button" role="tab" aria-selected="false"
       onclick="showExamSection('gradTimeline', this)">
       COMP4300 Timeline
+    </button>
+
+    <button class="exam-tab" type="button" role="tab" aria-selected="false"
+      onclick="showExamSection('studentSubmissions', this); loadSubmissionFiles();">
+      Student Submissions
     </button>
   </div>
 
@@ -382,6 +491,56 @@
 
         <div id="gradTimelineMsg" class="exam-msg"></div>
       </form>
+    </div>
+  </div>
+
+
+  <!-- =========================================================
+       TAB 3: Student Submissions
+  ========================================================== -->
+  <div id="studentSubmissions" class="exam-section" role="tabpanel">
+    <div class="card">
+      <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+          <span class="card-title">Student Submitted Files</span>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+            This tab reads student submissions from the database and displays COMP4200 and COMP4300 files.
+          </div>
+        </div>
+
+        <button class="btn btn-outline" type="button" onclick="loadSubmissionFiles()">Refresh</button>
+      </div>
+
+      <div class="exam-info-box">
+        هنا بتظهر تسليمات الطلاب التي وصلت للـ coordinator. إذا ما ظهر شيء، تأكدي أن الطالب سلّم فعلاً وأن الـ API
+        <b>/api/coordinator/submission-files</b> يرجع ملفات.
+      </div>
+
+      <div class="submission-toolbar">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select id="submissionCourseFilter" onchange="renderSubmissionFiles()">
+            <option value="all">All Courses</option>
+            <option value="COMP4200">COMP4200</option>
+            <option value="COMP4300">COMP4300</option>
+          </select>
+
+          <input id="submissionSearch" type="search" placeholder="Search student, project, file..."
+            oninput="renderSubmissionFiles()">
+        </div>
+
+        <div id="submissionStatus" style="font-size:12px;color:#667085;font-weight:800;">Loading...</div>
+      </div>
+
+      <div class="submission-grid">
+        <div class="submission-stat"><b id="subTotal">0</b><span>Total Files</span></div>
+        <div class="submission-stat"><b id="sub4200">0</b><span>COMP4200</span></div>
+        <div class="submission-stat"><b id="sub4300">0</b><span>COMP4300</span></div>
+        <div class="submission-stat"><b id="subOther">0</b><span>Other</span></div>
+      </div>
+
+      <div id="submissionFilesBox" class="submission-list">
+        <div class="empty">Loading student submissions...</div>
+      </div>
     </div>
   </div>
 
@@ -894,9 +1053,157 @@
     setGradMessage('Timeline cleared.', 'ok');
   }
 
+
+  let submissionFilesState = [];
+
+  function safeSubmissionText(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function normalizeCourseScope(file) {
+    const raw = String(file.course_scope || file.course_code || '').trim();
+    if (raw === 'COMP4200' || raw === 'introduction') return 'COMP4200';
+    if (raw === 'COMP4300' || raw === 'graduation_project') return 'COMP4300';
+    const label = String(file.course_label || '').toLowerCase();
+    if (label.includes('introduction')) return 'COMP4200';
+    if (label.includes('graduation')) return 'COMP4300';
+    return raw || 'Other';
+  }
+
+  function updateSubmissionStats(files) {
+    const total = files.length;
+    const c4200 = files.filter(f => normalizeCourseScope(f) === 'COMP4200').length;
+    const c4300 = files.filter(f => normalizeCourseScope(f) === 'COMP4300').length;
+    const other = total - c4200 - c4300;
+
+    document.getElementById('subTotal').textContent = total;
+    document.getElementById('sub4200').textContent = c4200;
+    document.getElementById('sub4300').textContent = c4300;
+    document.getElementById('subOther').textContent = other;
+  }
+
+  function renderSubmissionFiles() {
+    const box = document.getElementById('submissionFilesBox');
+    const status = document.getElementById('submissionStatus');
+    if (!box) return;
+
+    const course = document.getElementById('submissionCourseFilter')?.value || 'all';
+    const q = (document.getElementById('submissionSearch')?.value || '').trim().toLowerCase();
+
+    updateSubmissionStats(submissionFilesState);
+
+    let files = submissionFilesState.slice();
+
+    if (course !== 'all') {
+      files = files.filter(file => normalizeCourseScope(file) === course);
+    }
+
+    if (q) {
+      files = files.filter(file => {
+        const haystack = [
+          file.submission_title,
+          file.project_title,
+          file.submitted_by,
+          file.team_members,
+          file.supervisor_name,
+          file.file_name,
+          file.course_label,
+          file.course_scope
+        ].join(' ').toLowerCase();
+
+        return haystack.includes(q);
+      });
+    }
+
+    if (status) {
+      status.textContent = `${files.length} shown`;
+    }
+
+    if (!files.length) {
+      box.innerHTML = '<div class="empty">No submitted files found for this tab.</div>';
+      return;
+    }
+
+    box.innerHTML = files.map(file => {
+      const courseCode = normalizeCourseScope(file);
+      const downloadUrl = file.download_url || '';
+      const downloadButton = downloadUrl
+        ? `<a class="btn btn-primary" href="${safeSubmissionText(downloadUrl)}" target="_blank" rel="noopener">Download</a>`
+        : `<button class="btn btn-outline" type="button" disabled>No file</button>`;
+
+      return `
+        <div class="submission-card">
+          <div>
+            <span class="submission-badge">${safeSubmissionText(courseCode)} · ${safeSubmissionText(file.course_label || '')}</span>
+            <div class="submission-title">${safeSubmissionText(file.submission_title || file.file_type || 'Submission')}</div>
+            <div class="submission-meta">
+              <b>Project:</b> ${safeSubmissionText(file.project_title || '—')}<br>
+              <b>Submitted by:</b> ${safeSubmissionText(file.submitted_by || '—')}<br>
+              <b>Team:</b> ${safeSubmissionText(file.team_members || '—')}<br>
+              <b>Supervisor:</b> ${safeSubmissionText(file.supervisor_name || '—')}<br>
+              <b>File:</b> ${safeSubmissionText(file.file_name || '—')}
+              ${file.file_size_mb ? ` · ${safeSubmissionText(file.file_size_mb)} MB` : ''}<br>
+              <b>Uploaded at:</b> ${safeSubmissionText(file.uploaded_at || '—')}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;justify-content:flex-end;">
+            ${downloadButton}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function loadSubmissionFiles() {
+    const box = document.getElementById('submissionFilesBox');
+    const status = document.getElementById('submissionStatus');
+
+    if (box) {
+      box.innerHTML = '<div class="empty">Loading student submissions...</div>';
+    }
+
+    if (status) {
+      status.textContent = 'Loading...';
+    }
+
+    try {
+      const res = await fetch('/api/coordinator/submission-files');
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Could not load student submissions.');
+      }
+
+      submissionFilesState = data.files || [];
+      renderSubmissionFiles();
+
+      if (status) {
+        status.textContent = `${submissionFilesState.length} file(s) loaded`;
+      }
+    } catch (err) {
+      submissionFilesState = [];
+      updateSubmissionStats(submissionFilesState);
+
+      if (box) {
+        box.innerHTML = `<div class="empty">Submission files error: ${safeSubmissionText(err.message)}</div>`;
+      }
+
+      if (status) {
+        status.textContent = 'Error';
+      }
+    }
+  }
+
+
   document.addEventListener('DOMContentLoaded', function () {
     loadIntroTimeline();
     loadGradTimeline();
+    loadSubmissionFiles();
 
     const firstTab = document.querySelector('#pg-exams .exam-tab');
     showExamSection('introTimeline', firstTab);

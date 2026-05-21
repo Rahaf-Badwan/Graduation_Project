@@ -82,15 +82,43 @@ function setScope(scope){
   loadProjects();
 }
 async function loadAll(){
-  const f = await api('/api/evaluation/faculty');
-  faculty = f.faculty || [];
+  try{
+    const f = await api('/api/evaluation/faculty');
+    faculty = f.faculty || [];
+  }catch(e){
+    faculty = [];
+    console.warn('Faculty list could not be loaded:', e.message);
+  }
   await loadProjects();
 }
 async function loadProjects(){
-  document.getElementById('projectsBox').innerHTML = '<div class="empty">Loading evaluation projects...</div>';
-  const data = await api(`/api/coordinator/evaluation/projects?course_scope=${currentScope}`);
-  allProjects = data.projects || [];
-  renderProjects();
+  const box = document.getElementById('projectsBox');
+  if(box) box.innerHTML = '<div class="empty">Loading evaluation projects...</div>';
+
+  try{
+    const data = await api(`/api/coordinator/evaluation/projects?course_scope=${currentScope}`);
+    allProjects = data.projects || [];
+
+    if(!allProjects.length){
+      renderStats([]);
+      if(box){
+        const label = currentScope === 'introduction'
+          ? 'No Project Introduction / COMP4200 projects found.'
+          : 'No Graduation Project / COMP4300 projects found.';
+        box.innerHTML = `<div class="empty">${label}</div>`;
+      }
+      return;
+    }
+
+    renderProjects();
+  }catch(e){
+    allProjects = [];
+    renderStats([]);
+    if(box){
+      box.innerHTML = `<div class="empty">No projects found for this tab.</div>`;
+    }
+    console.warn('Evaluation projects could not be loaded:', e.message);
+  }
 }
 function renderStats(list){
   document.getElementById('statTotal').textContent = list.length;
@@ -103,7 +131,13 @@ function renderProjects(){
   const q = (document.getElementById('searchBox').value || '').toLowerCase();
   const list = allProjects.filter(p => `${p.title||''} ${p.students||''} ${p.supervisor_name||''}`.toLowerCase().includes(q));
   renderStats(list);
-  if(!list.length){ document.getElementById('projectsBox').innerHTML = '<div class="empty">No projects found for this tab.</div>'; return; }
+  if(!list.length){
+    const label = currentScope === 'introduction'
+      ? 'No Project Introduction / COMP4200 projects found.'
+      : 'No Graduation Project / COMP4300 projects found.';
+    document.getElementById('projectsBox').innerHTML = `<div class="empty">${label}</div>`;
+    return;
+  }
   document.getElementById('projectsBox').innerHTML = list.map(projectCard).join('');
 }
 function projectCard(p){

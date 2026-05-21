@@ -200,6 +200,37 @@
       text-align: center;
     }
   }
+
+  #pg-committee .main-course-tabs {
+    margin-bottom: 20px;
+    padding: 0;
+    background: transparent;
+    border: none !important;
+    border-radius: 0;
+  }
+
+  #pg-committee .tab {
+    border: none !important;
+    background: #fff;
+    color: #2d5137;
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.18s ease;
+    box-shadow: none !important;
+  }
+
+  #pg-committee .tab:hover {
+    background: #f3f7f4;
+  }
+
+  #pg-committee .tab.on {
+    background: #2e7d42;
+    color: #fff;
+    border: none !important;
+    box-shadow: none !important;
+  }
 </style>
 
 <div class="page page-single on" id="pg-committee">
@@ -216,10 +247,14 @@
 
     <div id="comp4200CommitteePage" class="course-committee-page active">
       <div class="tab-bar">
-        <button class="tab on" type="button" onclick="showCommitteeSection('committee4200Generator', this)">Auto Generator</button>
-        <button class="tab" type="button" onclick="showCommitteeSection('committee4200Eligible', this)">Eligible Sections</button>
-        <button class="tab" type="button" onclick="showCommitteeSection('committee4200Generated', this)">Generated Committees</button>
-        <button class="tab" type="button" onclick="showCommitteeSection('committee4200Current', this)">Current Committees</button>
+        <button class="tab on" type="button" onclick="showCommitteeSection('committee4200Generator', this)">Auto
+          Generator</button>
+        <button class="tab" type="button" onclick="showCommitteeSection('committee4200Eligible', this)">Eligible
+          Sections</button>
+        <button class="tab" type="button" onclick="showCommitteeSection('committee4200Generated', this)">Generated
+          Committees</button>
+        <button class="tab" type="button" onclick="showCommitteeSection('committee4200Current', this)">Current
+          Committees</button>
       </div>
 
       <div id="committee4200Generator" class="committee-section active">
@@ -278,8 +313,11 @@
       <div id="committee4200Eligible" class="committee-section">
         <div class="card">
           <div class="card-hd"><span class="card-title">COMP4200 Eligible Sections</span></div>
-          <div class="committee-info-box" style="margin-bottom:12px">These are Project Introduction sections ready for committee assignment.</div>
-          <div id="eligibleProjectsBox4200"><div class="committee-empty">Loading eligible sections...</div></div>
+          <div class="committee-info-box" style="margin-bottom:12px">These are Project Introduction sections ready for
+            committee assignment.</div>
+          <div id="eligibleProjectsBox4200">
+            <div class="committee-empty">Loading eligible sections...</div>
+          </div>
         </div>
       </div>
 
@@ -287,25 +325,34 @@
         <div class="card">
           <div class="card-hd"><span class="card-title">COMP4200 Generated Committees</span></div>
           <div class="committee-info-box" style="margin-bottom:12px">Review generated COMP4200 committees here.</div>
-          <div id="committeePlansBox4200"><div class="committee-empty">Loading generated committees...</div></div>
+          <div id="committeePlansBox4200">
+            <div class="committee-empty">Loading generated committees...</div>
+          </div>
         </div>
       </div>
 
       <div id="committee4200Current" class="committee-section">
         <div class="card">
           <div class="card-hd"><span class="card-title">COMP4200 Current Committees</span></div>
-          <div class="committee-info-box" style="margin-bottom:12px">These are the current COMP4200 committees saved in the system.</div>
-          <div id="currentCommitteesBox4200"><div class="committee-empty">Loading current committees...</div></div>
+          <div class="committee-info-box" style="margin-bottom:12px">These are the current COMP4200 committees saved in
+            the system.</div>
+          <div id="currentCommitteesBox4200">
+            <div class="committee-empty">Loading current committees...</div>
+          </div>
         </div>
       </div>
     </div>
 
     <div id="comp4300CommitteePage" class="course-committee-page">
       <div class="tab-bar">
-        <button class="tab on" type="button" onclick="showCommitteeSection('committee4300Generator', this)">Auto Generator</button>
-        <button class="tab" type="button" onclick="showCommitteeSection('committee4300Eligible', this)">Eligible Projects</button>
-        <button class="tab" type="button" onclick="showCommitteeSection('committee4300Generated', this)">Generated Committees</button>
-        <button class="tab" type="button" onclick="showCommitteeSection('committee4300Current', this)">Current Committees</button>
+        <button class="tab on" type="button" onclick="showCommitteeSection('committee4300Generator', this)">Auto
+          Generator</button>
+        <button class="tab" type="button" onclick="showCommitteeSection('committee4300Eligible', this)">Eligible
+          Projects</button>
+        <button class="tab" type="button" onclick="showCommitteeSection('committee4300Generated', this)">Generated
+          Committees</button>
+        <button class="tab" type="button" onclick="showCommitteeSection('committee4300Current', this)">Current
+          Committees</button>
       </div>
 
       <div id="committee4300Generator" class="committee-section active">
@@ -364,8 +411,11 @@
       <div id="committee4300Eligible" class="committee-section">
         <div class="card">
           <div class="card-hd"><span class="card-title">COMP4300 Eligible Projects</span></div>
-          <div class="committee-info-box" style="margin-bottom:12px">These are Graduation Projects ready for committee assignment.</div>
-          <div id="eligibleProjectsBox4300"><div class="committee-empty">Loading eligible projects...</div></div>
+          <div class="committee-info-box" style="margin-bottom:12px">These are Graduation Projects ready for committee
+            assignment.</div>
+          <div id="eligibleProjectsBox4300">
+            <div class="committee-empty">Loading eligible projects...</div>
+          </div>
         </div>
       </div>
 
@@ -373,15 +423,20 @@
         <div class="card">
           <div class="card-hd"><span class="card-title">COMP4300 Generated Committees</span></div>
           <div class="committee-info-box" style="margin-bottom:12px">Review generated COMP4300 committees here.</div>
-          <div id="committeePlansBox4300"><div class="committee-empty">Loading generated committees...</div></div>
+          <div id="committeePlansBox4300">
+            <div class="committee-empty">Loading generated committees...</div>
+          </div>
         </div>
       </div>
 
       <div id="committee4300Current" class="committee-section">
         <div class="card">
           <div class="card-hd"><span class="card-title">COMP4300 Current Committees</span></div>
-          <div class="committee-info-box" style="margin-bottom:12px">These are the current COMP4300 committees saved in the system.</div>
-          <div id="currentCommitteesBox4300"><div class="committee-empty">Loading current committees...</div></div>
+          <div class="committee-info-box" style="margin-bottom:12px">These are the current COMP4300 committees saved in
+            the system.</div>
+          <div id="currentCommitteesBox4300">
+            <div class="committee-empty">Loading current committees...</div>
+          </div>
         </div>
       </div>
     </div>
@@ -487,18 +542,19 @@
 
     try {
       setCourseCommitteeMessage(courseScope, `Generating ${courseLabel(courseScope)} committees...`, false);
-      const res = await fetch('/api/coordinator/committee-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setCourseCommitteeMessage(courseScope, data.error || 'Committee generation failed.', true);
-        return;
-      }
+
+      const data = await postCommitteeJson('/api/coordinator/committee-generate', body);
+
       setCourseCommitteeMessage(courseScope, data.message || 'Committees generated successfully.', false);
-      await loadCommitteeDashboard();
+
+      // IMPORTANT FIX:
+      // Render immediately from the POST response so the Generated Committees tab
+      // is not left on the old "Loading..." placeholder while the background refresh runs.
+      await renderCommitteeDashboardPayload(data, { allowFallback: false });
+      openGeneratedCommitteeTab(courseScope);
+
+      // Refresh again in the background from the database, but do not block the UI.
+      setTimeout(() => loadCommitteeDashboard({ silent: true }), 150);
     } catch (err) {
       setCourseCommitteeMessage(courseScope, err.message || 'Committee generation failed.', true);
     }
@@ -517,33 +573,113 @@
 
     try {
       setCourseCommitteeMessage(courseScope, `Resetting ${courseLabel(courseScope)} committees...`, false);
-      const res = await fetch('/api/coordinator/committee-reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setCourseCommitteeMessage(courseScope, data.error || 'Committee reset failed.', true);
-        return;
-      }
+
+      const data = await postCommitteeJson('/api/coordinator/committee-reset', body);
+
       setCourseCommitteeMessage(courseScope, data.message || 'Committees reset successfully.', false);
-      await loadCommitteeDashboard();
+
+      // Same immediate render fix for Reset & Redistribute.
+      await renderCommitteeDashboardPayload(data, { allowFallback: false });
+      openGeneratedCommitteeTab(courseScope);
+
+      setTimeout(() => loadCommitteeDashboard({ silent: true }), 150);
     } catch (err) {
       setCourseCommitteeMessage(courseScope, err.message || 'Committee reset failed.', true);
     }
   }
 
-  function filterByScope(items, courseScope) {
-    if (!Array.isArray(items)) return [];
-    return items.filter(item => (item.course_scope || 'graduation_project') === courseScope);
+  async function postCommitteeJson(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    const text = await res.text();
+    let data = {};
+
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (err) {
+      throw new Error(`${url} returned HTML/text instead of JSON. Check Flask route, login session, or backend error.`);
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `Request failed: ${url}`);
+    }
+
+    return data;
   }
+
+  function openGeneratedCommitteeTab(courseScope) {
+    const suffix = scopeSuffix(courseScope);
+    const coursePageId = courseScope === 'introduction' ? 'comp4200CommitteePage' : 'comp4300CommitteePage';
+    const generatedId = `committee${suffix}Generated`;
+    const courseTabIndex = courseScope === 'introduction' ? 0 : 1;
+
+    const courseTabs = document.querySelectorAll('#pg-committee .main-course-tabs .tab');
+    if (courseTabs[courseTabIndex]) {
+      showCourseCommitteePage(courseScope === 'introduction' ? 'comp4200' : 'comp4300', courseTabs[courseTabIndex]);
+    }
+
+    const page = document.getElementById(coursePageId);
+    const generatedSection = document.getElementById(generatedId);
+    if (!page || !generatedSection) return;
+
+    page.querySelectorAll('.committee-section').forEach(section => section.classList.remove('active'));
+    page.querySelectorAll('.tab-bar:not(.main-course-tabs) .tab').forEach(tab => tab.classList.remove('on'));
+
+    generatedSection.classList.add('active');
+
+    const tabs = page.querySelectorAll('.tab-bar:not(.main-course-tabs) .tab');
+    tabs.forEach(tab => {
+      if ((tab.getAttribute('onclick') || '').includes(generatedId)) {
+        tab.classList.add('on');
+      }
+    });
+
+    setTimeout(resetCommitteeScroll, 0);
+  }
+
+  function normalizeCourseScope(value) {
+    value = String(value || '').trim();
+
+    if (value === 'COMP4200') return 'introduction';
+    if (value === 'COMP4300') return 'graduation_project';
+    if (value === '4200') return 'introduction';
+    if (value === '4300') return 'graduation_project';
+
+    return value || 'graduation_project';
+  }
+
+  function filterByScope(items, courseScope) {
+  if (!Array.isArray(items)) return [];
+
+  return items.filter(item => {
+    const scope = normalizeCourseScope(item.course_scope);
+
+    if (scope === courseScope) return true;
+
+    if (courseScope === 'introduction') {
+      return item.section_id || item.section_name;
+    }
+
+    if (courseScope === 'graduation_project') {
+      return !item.section_id && scope !== 'introduction';
+    }
+
+    return false;
+  });
+}
 
   function renderEligibleProjects(courseScope, projects) {
     const suffix = scopeSuffix(courseScope);
     const box = document.getElementById(`eligibleProjectsBox${suffix}`);
     if (!box) return;
-    const rows = filterByScope(projects || [], courseScope);
+    const rows = Array.isArray(projects) ? projects : [];
     if (!rows.length) {
       box.innerHTML = `<div class="committee-empty">No eligible ${courseLabel(courseScope)} ${courseScope === 'introduction' ? 'sections' : 'projects'} found.</div>`;
       return;
@@ -633,24 +769,164 @@
     `).join('');
   }
 
-  async function loadCommitteeDashboard() {
-    try {
-      const res = await fetch('/api/coordinator/committee-dashboard');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load committee dashboard.');
 
-      renderEligibleProjects('introduction', data.eligible_projects || []);
-      renderEligibleProjects('graduation_project', data.eligible_projects || []);
-      renderCommitteePlans('introduction', data.plans || []);
-      renderCommitteePlans('graduation_project', data.plans || []);
-      renderCurrentCommittees('introduction', data.current_committees || []);
-      renderCurrentCommittees('graduation_project', data.current_committees || []);
+  async function fetchJsonSafe(url) {
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const text = await res.text();
+
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
     } catch (err) {
-      const errorHtml = `<div class="committee-empty">Committee data error: ${safeText(err.message)}</div>`;
-      ['eligibleProjectsBox4200', 'eligibleProjectsBox4300', 'committeePlansBox4200', 'committeePlansBox4300', 'currentCommitteesBox4200', 'currentCommitteesBox4300'].forEach(id => {
-        const box = document.getElementById(id);
-        if (box) box.innerHTML = errorHtml;
+      throw new Error(`${url} returned HTML/text instead of JSON. Check Flask login/session or route error.`);
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `Request failed: ${url}`);
+    }
+
+    return data;
+  }
+
+  function collectUsedIntroSectionIds(plans) {
+    const used = new Set();
+
+    (Array.isArray(plans) ? plans : []).forEach(plan => {
+      const planScope = normalizeCourseScope(plan.course_scope);
+      if (planScope !== 'introduction') return;
+
+      (Array.isArray(plan.projects) ? plan.projects : []).forEach(item => {
+        const id = item.section_id || item.project_id || item.reference_id;
+        if (id !== null && id !== undefined && id !== '') used.add(String(id));
       });
+    });
+
+    return used;
+  }
+
+  function normalizeIntroSectionRow(row) {
+    const count = Number(row.student_count ?? row.students_count ?? row.member_count ?? 0);
+    const sectionId = row.section_id ?? row.reference_id ?? row.project_id;
+
+    return {
+      project_id: sectionId,
+      section_id: sectionId,
+      title: row.section_name || row.title || `Section ${sectionId || ''}`,
+      section_name: row.section_name || row.title || `Section ${sectionId || ''}`,
+      status: row.status || row.result_status || 'submitted',
+      project_type: 'introduction',
+      course_scope: 'introduction',
+      supervisor_id: row.supervisor_id || null,
+      supervisor_name: row.supervisor_name || 'Not assigned',
+      team_members: row.assigned_students || row.team_members || row.students || '',
+      students: row.assigned_students || row.team_members || row.students || '',
+      student_count: count
+    };
+  }
+
+  async function loadComp4200SectionsFallback(usedSectionIds) {
+    let rows = [];
+
+    try {
+      const data = await fetchJsonSafe('/api/coordinator/sections');
+      rows = Array.isArray(data.sections) ? data.sections : [];
+    } catch (err) {
+      console.warn('COMP4200 /sections fallback failed:', err.message);
+    }
+
+    if (!rows.length) {
+      try {
+        const data = await fetchJsonSafe('/api/coordinator/section-results');
+        rows = Array.isArray(data.introduction_sections) ? data.introduction_sections : [];
+      } catch (err) {
+        console.warn('COMP4200 /section-results fallback failed:', err.message);
+      }
+    }
+
+    return rows
+      .map(normalizeIntroSectionRow)
+      .filter(row => Number(row.student_count || 0) > 0)
+      .filter(row => {
+        const id = row.section_id || row.project_id;
+        return !usedSectionIds.has(String(id));
+      });
+  }
+
+
+  async function renderCommitteeDashboardPayload(data, options = {}) {
+    const allowFallback = options.allowFallback !== false;
+
+    console.log('COMMITTEE DASHBOARD DATA:', data);
+
+    const rawEligible = Array.isArray(data.eligible_projects) ? data.eligible_projects : [];
+    const rawPlans = Array.isArray(data.plans) ? data.plans : [];
+    const rawCurrent = Array.isArray(data.current_committees) ? data.current_committees : rawPlans;
+
+    const usedIntroSectionIds = collectUsedIntroSectionIds(rawPlans);
+
+    let eligible4200 = [
+      ...(Array.isArray(data.eligible_sections_4200) ? data.eligible_sections_4200 : []),
+      ...rawEligible.filter(item => {
+        const scope = normalizeCourseScope(item.course_scope);
+        return scope === 'introduction' || item.section_id || item.section_name;
+      })
+    ].map(normalizeIntroSectionRow)
+     .filter(item => Number(item.student_count || 0) > 0)
+     .filter(item => {
+       const id = item.section_id || item.project_id || item.reference_id;
+       return !usedIntroSectionIds.has(String(id));
+     });
+
+    if (!eligible4200.length && allowFallback) {
+      eligible4200 = await loadComp4200SectionsFallback(usedIntroSectionIds);
+    }
+
+    const eligible4300 = [
+      ...(Array.isArray(data.eligible_projects_4300) ? data.eligible_projects_4300 : []),
+      ...rawEligible.filter(item => {
+        const scope = normalizeCourseScope(item.course_scope);
+        return scope === 'graduation_project' && !item.section_id;
+      })
+    ];
+
+    renderEligibleProjects('introduction', eligible4200);
+    renderEligibleProjects('graduation_project', eligible4300);
+
+    renderCommitteePlans('introduction', rawPlans);
+    renderCommitteePlans('graduation_project', rawPlans);
+
+    renderCurrentCommittees('introduction', rawCurrent);
+    renderCurrentCommittees('graduation_project', rawCurrent);
+  }
+
+  function showDashboardError(message, overwriteRendered = false) {
+    const errorHtml = `<div class="committee-empty">Committee data error: ${safeText(message)}</div>`;
+    [
+      'eligibleProjectsBox4200',
+      'eligibleProjectsBox4300',
+      'committeePlansBox4200',
+      'committeePlansBox4300',
+      'currentCommitteesBox4200',
+      'currentCommitteesBox4300'
+    ].forEach(id => {
+      const box = document.getElementById(id);
+      if (!box) return;
+
+      const text = (box.textContent || '').trim().toLowerCase();
+      const isPlaceholder = !text || text.includes('loading');
+
+      if (overwriteRendered || isPlaceholder) {
+        box.innerHTML = errorHtml;
+      }
+    });
+  }
+
+  async function loadCommitteeDashboard(options = {}) {
+    try {
+      const data = await fetchJsonSafe('/api/coordinator/committee-dashboard');
+      await renderCommitteeDashboardPayload(data, { allowFallback: true });
+    } catch (err) {
+      showDashboardError(err.message, !options.silent);
     }
   }
 

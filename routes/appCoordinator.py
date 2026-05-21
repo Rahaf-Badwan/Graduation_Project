@@ -1032,7 +1032,7 @@ def api_coordinator_submission_files():
         if _table_exists(cursor, "project_files"):
             params = []
             where = """
-                WHERE pf.upload_status = 'uploaded'
+                WHERE COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
                   AND EXISTS (
                       SELECT 1
                       FROM deadlines d
@@ -1114,12 +1114,7 @@ def api_coordinator_submission_files():
 
         if _table_exists(cursor, "milestone_submissions"):
             params = []
-            where = """WHERE ms.submitted_to IN ('coordinator', 'both')
-              AND (
-                ti.due_date IS NULL
-                OR (ti.due_time IS NOT NULL AND STR_TO_DATE(CONCAT(ti.due_date,' ',ti.due_time),'%Y-%m-%d %H:%i') <= NOW())
-                OR (ti.due_time IS NULL AND ti.due_date < CURDATE())
-              )"""
+            where = """WHERE ms.submitted_to IN ('coordinator', 'both')"""
             if academic_year:
                 where += " AND s.academic_year = %s"
                 params.append(academic_year)
@@ -1176,7 +1171,7 @@ def api_coordinator_submission_files():
 
         if _table_exists(cursor, "coordinator_deliverable_submissions"):
             params = []
-            where = "WHERE cd.due_date IS NOT NULL AND cd.due_date < CURDATE()"
+            where = "WHERE 1=1"
             if academic_year:
                 where += " AND s.academic_year = %s"
                 params.append(academic_year)
@@ -1252,30 +1247,25 @@ def api_coordinator_download_project_file(file_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+
         cursor.execute(
             """
             SELECT pf.file_name, pf.file_path, pf.file_data, pf.file_mime
             FROM project_files pf
-            JOIN projects p ON p.project_id = pf.project_id
-            JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.file_id = %s
-              AND EXISTS (
-                  SELECT 1
-                  FROM deadlines d
-                  WHERE d.semester_id = s.semester_id
-                    AND d.deadline_type = 'file_submission'
-                    AND (d.project_id IS NULL OR d.project_id = p.project_id)
-                    AND d.deadline_date < CURDATE()
-              )
+              AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
             """,
             (file_id,),
         )
+
         row = cursor.fetchone()
+
         cursor.close()
         db.close()
 
         if not row:
             return jsonify({"error": "File not found."}), 404
+
         if row.get("file_data"):
             return Response(
                 bytes(row["file_data"]),
@@ -1284,12 +1274,14 @@ def api_coordinator_download_project_file(file_id):
                     "Content-Disposition": f'attachment; filename="{row.get("file_name") or "project-file"}"'
                 },
             )
+
         if row.get("file_path"):
             return _download_static_path(row.get("file_path"))
+
         return jsonify({"error": "File content not found."}), 404
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @coordinator_bp.route(
     "/api/coordinator/milestone-submissions/<int:submission_id>/download"
@@ -3423,52 +3415,104 @@ def api_review_projects():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+
         semester = _get_active_semester(cursor)
         if not semester:
             cursor.close()
             db.close()
             return jsonify({"error": "No active semester found."}), 400
 
+        # لو جدول الملفات مش موجود، خلي files_count = 0
+        has_project_files = _table_exists(cursor, "project_files")
+
+        files_join = """
+            LEFT JOIN project_files pf
+              ON pf.project_id = p.project_id
+             AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+        """ if has_project_files else ""
+
+        files_count_select = (
+            "COUNT(DISTINCT pf.file_id) AS files_count"
+            if has_project_files
+            else "0 AS files_count"
+        )
+
         cursor.execute(
-            """
-            SELECT p.project_id, p.title, p.abstract, p.keywords, p.project_type,
-                   p.status, p.coordinator_notes, p.rejection_reason, p.submission_date,
-                   sup.full_name AS supervisor_name,
-                   COALESCE(GROUP_CONCAT(DISTINCT stu.full_name ORDER BY pm.is_primary_contact DESC, stu.full_name SEPARATOR ', '), '') AS team_members,
-                   COUNT(DISTINCT pf.file_id) AS files_count
+            f"""
+            SELECT
+                p.project_id,
+                p.title,
+                p.abstract,
+                p.keywords,
+                p.project_type,
+                p.status,
+                p.coordinator_notes,
+                p.rejection_reason,
+                p.submission_date,
+                sup.full_name AS supervisor_name,
+                COALESCE(
+                    GROUP_CONCAT(
+                        DISTINCT stu.full_name
+                        ORDER BY pm.is_primary_contact DESC, stu.full_name
+                        SEPARATOR ', '
+                    ),
+                    ''
+                ) AS team_members,
+                {files_count_select}
             FROM projects p
             LEFT JOIN faculty sf ON sf.faculty_id = p.supervisor_id
             LEFT JOIN users sup ON sup.user_id = sf.user_id
             LEFT JOIN project_members pm ON pm.project_id = p.project_id
             LEFT JOIN students st ON st.student_id = pm.student_id
             LEFT JOIN users stu ON stu.user_id = st.user_id
-            LEFT JOIN project_files pf ON pf.project_id = p.project_id
-             AND EXISTS (
-                  SELECT 1
-                  FROM deadlines d
-                  WHERE d.semester_id = p.semester_id
-                    AND d.deadline_type = 'file_submission'
-                    AND (d.project_id IS NULL OR d.project_id = p.project_id)
-                    AND d.deadline_date < CURDATE()
-             )
+            {files_join}
             WHERE p.semester_id = %s
-              AND p.status IN ('submitted','under_review','needs_revision','committee_evaluation','accepted','rejected')
-            GROUP BY p.project_id, p.title, p.abstract, p.keywords, p.project_type, p.status,
-                     p.coordinator_notes, p.rejection_reason, p.submission_date, sup.full_name
-            ORDER BY FIELD(p.status,'submitted','under_review','needs_revision','committee_evaluation','accepted','rejected'), p.project_id DESC
+              AND p.status IN (
+                  'submitted',
+                  'under_review',
+                  'needs_revision',
+                  'committee_evaluation',
+                  'accepted',
+                  'rejected'
+              )
+            GROUP BY
+                p.project_id,
+                p.title,
+                p.abstract,
+                p.keywords,
+                p.project_type,
+                p.status,
+                p.coordinator_notes,
+                p.rejection_reason,
+                p.submission_date,
+                sup.full_name
+            ORDER BY
+                FIELD(
+                    p.status,
+                    'submitted',
+                    'under_review',
+                    'needs_revision',
+                    'committee_evaluation',
+                    'accepted',
+                    'rejected'
+                ),
+                p.project_id DESC
             """,
             (semester["semester_id"],),
         )
+
         projects = cursor.fetchall()
 
         review_badge_count = sum(
             1
             for project in projects
             if project.get("status") in ("submitted", "under_review", "needs_revision")
+            and int(project.get("files_count") or 0) > 0
         )
 
         cursor.close()
         db.close()
+
         return jsonify(
             _json_safe_value(
                 {
@@ -3477,13 +3521,10 @@ def api_review_projects():
                 }
             )
         )
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-@coordinator_bp.route(
-    "/api/coordinator/project-files/<int:project_id>", methods=["GET"]
-)
+@coordinator_bp.route("/api/coordinator/project-files/<int:project_id>", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_project_files(project_id):
     try:
@@ -3497,23 +3538,24 @@ def api_coordinator_project_files(project_id):
 
         cursor.execute(
             """
-            SELECT pf.*
+            SELECT
+                pf.file_id,
+                pf.project_id,
+                pf.file_type,
+                pf.file_name,
+                pf.file_path,
+                pf.file_size_mb,
+                pf.uploaded_at,
+                pf.file_data IS NOT NULL AS has_file_data
             FROM project_files pf
             JOIN projects p ON p.project_id = pf.project_id
-            JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.project_id = %s
-              AND EXISTS (
-                  SELECT 1
-                  FROM deadlines d
-                  WHERE d.semester_id = s.semester_id
-                    AND d.deadline_type = 'file_submission'
-                    AND (d.project_id IS NULL OR d.project_id = p.project_id)
-                    AND d.deadline_date < CURDATE()
-              )
-            ORDER BY pf.file_id DESC
+              AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+            ORDER BY pf.uploaded_at DESC, pf.file_id DESC
             """,
             (project_id,),
         )
+
         rows = cursor.fetchall()
 
         cursor.close()
@@ -3522,34 +3564,22 @@ def api_coordinator_project_files(project_id):
         files = []
         for row in rows:
             file_id = row.get("file_id")
-            file_name = (
-                row.get("file_name")
-                or row.get("filename")
-                or row.get("original_filename")
-                or row.get("stored_name")
-                or f"File {file_id}"
-            )
-
-            file_path = (
-                row.get("file_path") or row.get("path") or row.get("stored_path") or ""
-            )
-
             files.append(
                 {
                     "file_id": file_id,
-                    "file_name": file_name,
-                    "file_path": file_path,
-                    "uploaded_at": str(
-                        row.get("uploaded_at") or row.get("created_at") or ""
-                    ),
+                    "file_name": row.get("file_name") or f"File {file_id}",
+                    "file_path": row.get("file_path") or "",
+                    "file_type": row.get("file_type") or "",
+                    "file_size_mb": float(row.get("file_size_mb") or 0),
+                    "uploaded_at": str(row.get("uploaded_at") or ""),
+                    "download_url": f"/api/coordinator/project-files/{file_id}/download",
                 }
             )
 
-        return jsonify({"files": files})
+        return jsonify({"files": _json_safe_value(files)})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @coordinator_bp.route(
     "/api/coordinator/review-project/<int:project_id>", methods=["POST"]
@@ -3806,6 +3836,9 @@ def _committee_time_add(start_hhmm, minutes_to_add):
 
 
 def _committee_fetch_faculty_pool(cursor):
+    # Do NOT filter by active_committee_count = 0.
+    # Include ALL active doctors so there are always >= 4 specialisations.
+    # _committee_pick_members_for_supervisor already prefers less-loaded doctors.
     cursor.execute("""
         SELECT
             f.faculty_id,
@@ -3822,7 +3855,7 @@ def _committee_fetch_faculty_pool(cursor):
         FROM faculty f
         JOIN users u ON u.user_id = f.user_id
         WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
-        HAVING active_committee_count = 0
+          AND u.is_active = TRUE
         ORDER BY f.specialization, u.full_name
         """)
     rows = cursor.fetchall()
@@ -4086,7 +4119,7 @@ def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="g
         LEFT JOIN students st ON st.student_id = pm.student_id
         LEFT JOIN users u ON u.user_id = st.user_id
         WHERE p.semester_id = %s
-          AND COALESCE(sem.course_code, 'COMP4300') = 'COMP4300'
+          AND COALESCE(sem.course_code, 'COMP4200') IN ('COMP4200', 'COMP4300')
           AND p.supervisor_id IS NOT NULL
           AND p.status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
           AND EXISTS (
