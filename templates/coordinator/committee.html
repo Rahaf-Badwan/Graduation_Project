@@ -557,6 +557,7 @@
       setTimeout(() => loadCommitteeDashboard({ silent: true }), 150);
     } catch (err) {
       setCourseCommitteeMessage(courseScope, err.message || 'Committee generation failed.', true);
+      loadCommitteeDashboard({ silent: true });
     }
   }
 
@@ -585,6 +586,7 @@
       setTimeout(() => loadCommitteeDashboard({ silent: true }), 150);
     } catch (err) {
       setCourseCommitteeMessage(courseScope, err.message || 'Committee reset failed.', true);
+      loadCommitteeDashboard({ silent: true });
     }
   }
 
@@ -674,6 +676,19 @@
     return false;
   });
 }
+
+  function uniqueCommitteeItems(items, keyPicker) {
+    const seen = new Set();
+    const result = [];
+    (Array.isArray(items) ? items : []).forEach(item => {
+      const key = keyPicker(item);
+      const safeKey = key === null || key === undefined || key === '' ? JSON.stringify(item) : String(key);
+      if (seen.has(safeKey)) return;
+      seen.add(safeKey);
+      result.push(item);
+    });
+    return result;
+  }
 
   function renderEligibleProjects(courseScope, projects) {
     const suffix = scopeSuffix(courseScope);
@@ -853,25 +868,75 @@
   }
 
 
+  function asArray(value) {
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== 'object') return [];
+    if (Array.isArray(value.items)) return value.items;
+    if (Array.isArray(value.rows)) return value.rows;
+    if (Array.isArray(value.data)) return value.data;
+    return [];
+  }
+
+  function collectArraysFromPayload(data, names) {
+    const result = [];
+    names.forEach(name => {
+      result.push(...asArray(data[name]));
+      if (data.data && typeof data.data === 'object') result.push(...asArray(data.data[name]));
+      if (data.payload && typeof data.payload === 'object') result.push(...asArray(data.payload[name]));
+    });
+    return result;
+  }
+
+  function normalizeGraduationProjectRow(row) {
+    const projectId = row.project_id ?? row.reference_id ?? row.id;
+    return {
+      ...row,
+      project_id: projectId,
+      section_id: null,
+      title: row.title || row.project_title || row.section_name || `Project ${projectId || ''}`,
+      status: row.status || row.project_status || 'submitted',
+      project_type: row.project_type || 'graduation_project',
+      course_scope: 'graduation_project',
+      supervisor_id: row.supervisor_id || null,
+      supervisor_name: row.supervisor_name || row.responsible_name || 'Not assigned',
+      team_members: row.team_members || row.students || row.assigned_students || '',
+      students: row.team_members || row.students || row.assigned_students || ''
+    };
+  }
+
   async function renderCommitteeDashboardPayload(data, options = {}) {
     const allowFallback = options.allowFallback !== false;
 
     console.log('COMMITTEE DASHBOARD DATA:', data);
 
-    const rawEligible = Array.isArray(data.eligible_projects) ? data.eligible_projects : [];
-    const rawPlans = Array.isArray(data.plans) ? data.plans : [];
-    const rawCurrent = Array.isArray(data.current_committees) ? data.current_committees : rawPlans;
+    const rawEligible = collectArraysFromPayload(data, [
+      'eligible_projects',
+      'eligible',
+      'items',
+      'rows',
+      'projects'
+    ]);
+    const rawPlans = collectArraysFromPayload(data, ['plans', 'generated_committees', 'committees']);
+    const rawCurrent = collectArraysFromPayload(data, ['current_committees']).length
+      ? collectArraysFromPayload(data, ['current_committees'])
+      : rawPlans;
 
     const usedIntroSectionIds = collectUsedIntroSectionIds(rawPlans);
 
     let eligible4200 = [
-      ...(Array.isArray(data.eligible_sections_4200) ? data.eligible_sections_4200 : []),
+      ...collectArraysFromPayload(data, [
+        'eligible_sections_4200',
+        'comp4200_sections',
+        'sections_4200',
+        'introduction_sections',
+        'sections'
+      ]),
       ...rawEligible.filter(item => {
-        const scope = normalizeCourseScope(item.course_scope);
+        const scope = normalizeCourseScope(item.course_scope || item.course || item.course_code);
         return scope === 'introduction' || item.section_id || item.section_name;
       })
     ].map(normalizeIntroSectionRow)
-     .filter(item => Number(item.student_count || 0) > 0)
+     .filter(item => Number(item.student_count || 0) > 0 || (item.students || item.team_members || '').trim())
      .filter(item => {
        const id = item.section_id || item.project_id || item.reference_id;
        return !usedIntroSectionIds.has(String(id));
@@ -881,13 +946,24 @@
       eligible4200 = await loadComp4200SectionsFallback(usedIntroSectionIds);
     }
 
-    const eligible4300 = [
-      ...(Array.isArray(data.eligible_projects_4300) ? data.eligible_projects_4300 : []),
+    eligible4200 = uniqueCommitteeItems(eligible4200, item => item.section_id || item.project_id || item.reference_id);
+
+    let eligible4300 = [
+      ...collectArraysFromPayload(data, [
+        'eligible_projects_4300',
+        'comp4300_projects',
+        'projects_4300',
+        'graduation_projects'
+      ]),
       ...rawEligible.filter(item => {
-        const scope = normalizeCourseScope(item.course_scope);
-        return scope === 'graduation_project' && !item.section_id;
+        const scope = normalizeCourseScope(item.course_scope || item.course || item.course_code);
+        const hasSection = Boolean(item.section_id || item.section_name);
+        return !hasSection && scope !== 'introduction';
       })
-    ];
+    ].map(normalizeGraduationProjectRow)
+     .filter(item => item.project_id || item.title);
+
+    eligible4300 = uniqueCommitteeItems(eligible4300, item => item.project_id || item.reference_id || item.title);
 
     renderEligibleProjects('introduction', eligible4200);
     renderEligibleProjects('graduation_project', eligible4300);

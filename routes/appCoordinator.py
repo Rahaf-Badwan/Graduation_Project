@@ -4118,8 +4118,12 @@ def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="g
         LEFT JOIN project_members pm ON pm.project_id = p.project_id
         LEFT JOIN students st ON st.student_id = pm.student_id
         LEFT JOIN users u ON u.user_id = st.user_id
-        WHERE p.semester_id = %s
-          AND COALESCE(sem.course_code, 'COMP4200') IN ('COMP4200', 'COMP4300')
+        WHERE sem.academic_year = (
+              SELECT s2.academic_year
+              FROM semesters s2
+              WHERE s2.semester_id = %s
+              LIMIT 1
+          )
           AND p.supervisor_id IS NOT NULL
           AND p.status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
           AND EXISTS (
@@ -4786,9 +4790,14 @@ def _committee_generate_internal(
         raise ValueError(f"No eligible {label} available for committee generation.")
 
     faculty_groups = _committee_fetch_faculty_pool(cursor)
-    if len([s for s, members in faculty_groups.items() if members]) < 4:
+
+    # We need 4 active doctors total. Different majors are preferred later inside
+    # _committee_pick_members_for_supervisor(), but they are NOT required.
+    # This avoids blocking generation when the department has fewer than 4 majors.
+    total_active_doctors = sum(len(members) for members in faculty_groups.values())
+    if total_active_doctors < 4:
         raise ValueError(
-            "At least 4 different available doctor majors are required to generate committees."
+            "At least 4 active doctors are required to generate committees."
         )
 
     cursor.execute("""
@@ -4950,6 +4959,8 @@ def _committee_generate_internal(
         ),
         "plans": _json_safe_rows(payload["plans"]),
         "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
+        "eligible_sections_4200": _json_safe_rows(payload.get("eligible_sections_4200", [])),
+        "eligible_projects_4300": _json_safe_rows(payload.get("eligible_projects_4300", [])),
         "current_committees": _json_safe_rows(payload["current_committees"]),
         "stats": _json_safe_value(payload["stats"]),
     }
@@ -5553,6 +5564,699 @@ def api_committee_save_project_readers(plan_id, project_id):
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+# ─── Coordinator Final Evaluation APIs ───────────────────────────────────
+def _ensure_evaluation_schema(cursor):
+    """Create evaluation tables used by coordinator/evaluation.html."""
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS evaluation_windows (
+            window_id INT PRIMARY KEY AUTO_INCREMENT,
+            course_scope ENUM('introduction','graduation_project') NOT NULL,
+            reference_id INT NOT NULL,
+            is_open BOOLEAN NOT NULL DEFAULT FALSE,
+            opened_by INT NULL,
+            opened_at DATETIME NULL,
+            closed_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_eval_window (course_scope, reference_id),
+            INDEX idx_eval_window_scope_open (course_scope, is_open)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS evaluation_grade_tasks (
+            task_id INT PRIMARY KEY AUTO_INCREMENT,
+            course_scope ENUM('introduction','graduation_project') NOT NULL,
+            reference_id INT NOT NULL,
+            component VARCHAR(60) NOT NULL,
+            evaluator_faculty_id INT NOT NULL,
+            max_mark DECIMAL(6,2) NOT NULL DEFAULT 0,
+            mark DECIMAL(6,2) NULL,
+            notes TEXT NULL,
+            is_submitted BOOLEAN NOT NULL DEFAULT FALSE,
+            created_by INT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            submitted_at DATETIME NULL,
+            UNIQUE KEY uq_eval_task (course_scope, reference_id, component, evaluator_faculty_id),
+            INDEX idx_eval_task_ref (course_scope, reference_id),
+            INDEX idx_eval_task_eval (evaluator_faculty_id),
+            FOREIGN KEY (evaluator_faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+
+def _evaluation_component_max_mark(component):
+    return {
+        "intro_report_reader": 40.0,
+        "intro_coordinator": 10.0,
+        "intro_supervisor": 10.0,
+        "intro_discussion_member": 10.0,
+        "grad_report_reader": 30.0,
+        "grad_supervisor": 20.0,
+        "grad_committee_member": 25.0,
+    }.get(component, 0.0)
+
+
+def _evaluation_default_required_count(course_scope):
+    # COMP4200: two report readers + coordinator + supervisor + four discussion members.
+    # COMP4300: two report readers + supervisor + four committee members.
+    return 8 if course_scope == "introduction" else 7
+
+
+def _evaluation_faculty_user_ids(cursor, faculty_ids):
+    faculty_ids = sorted({int(fid) for fid in faculty_ids if fid is not None})
+    if not faculty_ids:
+        return {}
+    placeholders = ",".join(["%s"] * len(faculty_ids))
+    cursor.execute(
+        f"""
+        SELECT f.faculty_id, u.user_id
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE f.faculty_id IN ({placeholders})
+          AND u.is_active = TRUE
+        """,
+        tuple(faculty_ids),
+    )
+    return {int(row["faculty_id"]): row["user_id"] for row in cursor.fetchall()}
+
+
+def _evaluation_section_student_user_ids(cursor, section_id):
+    if not (_table_exists(cursor, "section_students") and _table_exists(cursor, "student_distribution_sections")):
+        return []
+    cursor.execute(
+        """
+        SELECT DISTINCT u.user_id
+        FROM section_students ss
+        JOIN students st ON st.student_id = ss.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE ss.section_id = %s
+          AND u.role = 'student'
+          AND u.is_active = TRUE
+        """,
+        (section_id,),
+    )
+    return [row["user_id"] for row in cursor.fetchall()]
+
+
+def _evaluation_insert_task(cursor, course_scope, reference_id, component, faculty_id, created_by=None):
+    if not faculty_id:
+        return False
+    max_mark = _evaluation_component_max_mark(component)
+    if max_mark <= 0:
+        return False
+    cursor.execute(
+        """
+        INSERT INTO evaluation_grade_tasks
+            (course_scope, reference_id, component, evaluator_faculty_id, max_mark, created_by)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            max_mark = VALUES(max_mark)
+        """,
+        (course_scope, reference_id, component, faculty_id, max_mark, created_by),
+    )
+    return True
+
+
+def _evaluation_autocreate_tasks(cursor, course_scope, reference_id, created_by=None):
+    """Create common grade tasks from the supervisor, report readers, and committee members when available."""
+    created_faculty_ids = set()
+
+    if course_scope == "graduation_project":
+        cursor.execute("SELECT supervisor_id FROM projects WHERE project_id = %s", (reference_id,))
+        project = cursor.fetchone() or {}
+        supervisor_id = project.get("supervisor_id")
+        if supervisor_id:
+            _evaluation_insert_task(cursor, course_scope, reference_id, "grad_supervisor", supervisor_id, created_by)
+            created_faculty_ids.add(int(supervisor_id))
+
+        if _table_exists(cursor, "project_report_readers"):
+            cursor.execute(
+                """
+                SELECT faculty_id
+                FROM project_report_readers
+                WHERE project_id = %s
+                ORDER BY reader_order ASC, id ASC
+                LIMIT 2
+                """,
+                (reference_id,),
+            )
+            for row in cursor.fetchall():
+                fid = row.get("faculty_id")
+                if fid:
+                    _evaluation_insert_task(cursor, course_scope, reference_id, "grad_report_reader", fid, created_by)
+                    created_faculty_ids.add(int(fid))
+
+        if _table_exists(cursor, "committee_plan_projects") and _table_exists(cursor, "committee_plan_members"):
+            cursor.execute(
+                """
+                SELECT DISTINCT cpm.faculty_id
+                FROM committee_plan_projects cpp
+                JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+                JOIN committee_plan_members cpm ON cpm.plan_id = cp.plan_id
+                WHERE cpp.project_id = %s
+                  AND cp.status <> 'cancelled'
+                  AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+                ORDER BY CASE WHEN cpm.role = 'supervisor' THEN 0 ELSE 1 END, cpm.faculty_id
+                """,
+                (reference_id,),
+            )
+            for row in cursor.fetchall():
+                fid = row.get("faculty_id")
+                if fid:
+                    _evaluation_insert_task(cursor, course_scope, reference_id, "grad_committee_member", fid, created_by)
+                    created_faculty_ids.add(int(fid))
+    else:
+        if _table_exists(cursor, "student_distribution_sections"):
+            cursor.execute("SELECT supervisor_id FROM student_distribution_sections WHERE section_id = %s", (reference_id,))
+            section = cursor.fetchone() or {}
+            supervisor_id = section.get("supervisor_id")
+            if supervisor_id:
+                _evaluation_insert_task(cursor, course_scope, reference_id, "intro_supervisor", supervisor_id, created_by)
+                _evaluation_insert_task(cursor, course_scope, reference_id, "intro_coordinator", supervisor_id, created_by)
+                created_faculty_ids.add(int(supervisor_id))
+
+        if _table_exists(cursor, "committee_plan_sections") and _table_exists(cursor, "committee_plan_members"):
+            cursor.execute(
+                """
+                SELECT DISTINCT cpm.faculty_id, cpm.role
+                FROM committee_plan_sections cps
+                JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+                JOIN committee_plan_members cpm ON cpm.plan_id = cp.plan_id
+                WHERE cps.section_id = %s
+                  AND cp.status <> 'cancelled'
+                  AND COALESCE(cp.course_scope, 'graduation_project') = 'introduction'
+                ORDER BY CASE WHEN cpm.role = 'supervisor' THEN 0 ELSE 1 END, cpm.faculty_id
+                """,
+                (reference_id,),
+            )
+            members = cursor.fetchall()
+            for index, row in enumerate(members):
+                fid = row.get("faculty_id")
+                if not fid:
+                    continue
+                component = "intro_report_reader" if index < 2 else "intro_discussion_member"
+                _evaluation_insert_task(cursor, course_scope, reference_id, component, fid, created_by)
+                created_faculty_ids.add(int(fid))
+
+    return created_faculty_ids
+
+
+def _evaluation_fetch_grade_rows(cursor, course_scope, reference_id):
+    cursor.execute(
+        """
+        SELECT egt.task_id, egt.course_scope, egt.reference_id, egt.component,
+               egt.evaluator_faculty_id, u.full_name AS evaluator_name,
+               egt.max_mark, egt.mark, egt.notes, egt.is_submitted, egt.submitted_at
+        FROM evaluation_grade_tasks egt
+        JOIN faculty f ON f.faculty_id = egt.evaluator_faculty_id
+        JOIN users u ON u.user_id = f.user_id
+        WHERE egt.course_scope = %s AND egt.reference_id = %s
+        ORDER BY FIELD(egt.component,
+            'intro_report_reader','intro_coordinator','intro_supervisor','intro_discussion_member',
+            'grad_report_reader','grad_supervisor','grad_committee_member'),
+            u.full_name
+        """,
+        (course_scope, reference_id),
+    )
+    rows = cursor.fetchall()
+    for row in rows:
+        row["max_mark"] = float(row.get("max_mark") or 0)
+        row["mark"] = None if row.get("mark") is None else float(row.get("mark") or 0)
+        row["is_submitted"] = bool(row.get("is_submitted"))
+        if row.get("submitted_at") is not None:
+            row["submitted_at"] = str(row["submitted_at"])
+    return rows
+
+
+def _evaluation_scores_from_grades(course_scope, grades):
+    def submitted_marks(component):
+        result = []
+        for grade in grades:
+            if grade.get("component") != component or not grade.get("is_submitted"):
+                continue
+            if grade.get("mark") is None:
+                continue
+            result.append(float(grade.get("mark") or 0))
+        return result
+
+    def avg(values):
+        return (sum(values) / len(values)) if values else None
+
+    if course_scope == "graduation_project":
+        report_avg_30 = avg(submitted_marks("grad_report_reader"))
+        supervisor_avg_20 = avg(submitted_marks("grad_supervisor"))
+        committee_avg_25 = avg(submitted_marks("grad_committee_member"))
+        committee_score_50 = committee_avg_25 * 2 if committee_avg_25 is not None else None
+
+        final_score = None
+        if report_avg_30 is not None and supervisor_avg_20 is not None and committee_score_50 is not None:
+            final_score = report_avg_30 + supervisor_avg_20 + committee_score_50
+
+        return {
+            "report_score": round(report_avg_30, 2) if report_avg_30 is not None else None,
+            "supervisor_score": round(supervisor_avg_20, 2) if supervisor_avg_20 is not None else None,
+            "coordinator_score": None,
+            "discussion_score": None,
+            "committee_score": round(committee_score_50, 2) if committee_score_50 is not None else None,
+            "calculated_final_score": round(final_score, 2) if final_score is not None else None,
+            "final_score": round(final_score, 2) if final_score is not None else None,
+        }
+
+    report_avg_40 = avg(submitted_marks("intro_report_reader"))
+    coordinator_avg_10 = avg(submitted_marks("intro_coordinator"))
+    supervisor_avg_10 = avg(submitted_marks("intro_supervisor"))
+    discussion_sum_40_values = submitted_marks("intro_discussion_member")
+    discussion_sum_40 = sum(discussion_sum_40_values) if discussion_sum_40_values else None
+
+    final_score = None
+    if report_avg_40 is not None and coordinator_avg_10 is not None and supervisor_avg_10 is not None and discussion_sum_40 is not None:
+        final_score = report_avg_40 + coordinator_avg_10 + supervisor_avg_10 + discussion_sum_40
+
+    return {
+        "report_score": round(report_avg_40, 2) if report_avg_40 is not None else None,
+        "supervisor_score": round(supervisor_avg_10, 2) if supervisor_avg_10 is not None else None,
+        "coordinator_score": round(coordinator_avg_10, 2) if coordinator_avg_10 is not None else None,
+        "discussion_score": round(discussion_sum_40, 2) if discussion_sum_40 is not None else None,
+        "committee_score": None,
+        "calculated_final_score": round(final_score, 2) if final_score is not None else None,
+        "final_score": round(final_score, 2) if final_score is not None else None,
+    }
+
+
+def _evaluation_notify_faculty(cursor, course_scope, reference_id, title, message, sender_id):
+    cursor.execute(
+        """
+        SELECT DISTINCT evaluator_faculty_id
+        FROM evaluation_grade_tasks
+        WHERE course_scope = %s AND reference_id = %s
+        """,
+        (course_scope, reference_id),
+    )
+    faculty_ids = [row["evaluator_faculty_id"] for row in cursor.fetchall()]
+    user_map = _evaluation_faculty_user_ids(cursor, faculty_ids)
+    sent = 0
+    for user_id in user_map.values():
+        if not user_id or user_id == sender_id:
+            continue
+        _insert_notification(cursor, user_id, sender_id, "system", title, message, None, course_scope)
+        sent += 1
+    return sent
+
+
+def _evaluation_project_payload(cursor, course_scope, base_row):
+    reference_id = base_row["project_id"]
+    grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+    scores = _evaluation_scores_from_grades(course_scope, grades)
+
+    cursor.execute(
+        """
+        SELECT is_open, opened_at, closed_at
+        FROM evaluation_windows
+        WHERE course_scope = %s AND reference_id = %s
+        LIMIT 1
+        """,
+        (course_scope, reference_id),
+    )
+    window = cursor.fetchone() or {}
+
+    submitted_count = sum(1 for grade in grades if grade.get("is_submitted"))
+    required_count = max(_evaluation_default_required_count(course_scope), len(grades))
+
+    payload = dict(base_row)
+    payload.update(scores)
+    payload.update(
+        {
+            "is_open": bool(window.get("is_open") or False),
+            "opened_at": str(window.get("opened_at") or ""),
+            "closed_at": str(window.get("closed_at") or ""),
+            "grades": grades,
+            "submitted_count": submitted_count,
+            "required_count": required_count,
+        }
+    )
+    return payload
+
+
+@coordinator_bp.route("/api/evaluation/faculty", methods=["GET"])
+@login_required(role="coordinator")
+def api_evaluation_faculty_options():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT f.faculty_id,
+                   u.full_name AS name,
+                   u.full_name,
+                   f.specialization
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
+              AND u.is_active = TRUE
+            ORDER BY u.full_name
+        """)
+        faculty_rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+        return jsonify({"faculty": _json_safe_value(faculty_rows)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/projects", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_projects():
+    try:
+        course_scope = (request.args.get("course_scope") or "introduction").strip()
+        if course_scope not in {"introduction", "graduation_project"}:
+            return jsonify({"error": "Invalid course_scope."}), 400
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+        semester = _get_active_semester(cursor)
+        semester_id = semester["semester_id"] if semester else None
+
+        projects = []
+        if course_scope == "introduction":
+            if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
+                cursor.execute("""
+                    SELECT sec.section_id AS project_id,
+                           sec.section_name AS title,
+                           'introduction' AS course_scope,
+                           'COMP4200' AS course_code,
+                           'section' AS status,
+                           u_sup.full_name AS supervisor_name,
+                           COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '), '') AS students
+                    FROM student_distribution_sections sec
+                    JOIN faculty f ON f.faculty_id = sec.supervisor_id
+                    JOIN users u_sup ON u_sup.user_id = f.user_id
+                    LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+                    LEFT JOIN students st ON st.student_id = ss.student_id
+                    LEFT JOIN users u_st ON u_st.user_id = st.user_id
+                    GROUP BY sec.section_id, sec.section_name, u_sup.full_name
+                    HAVING COUNT(DISTINCT ss.student_id) > 0
+                    ORDER BY sec.section_id DESC
+                """)
+                projects = cursor.fetchall()
+        else:
+            if not semester_id:
+                cursor.close()
+                db.close()
+                return jsonify({"projects": []})
+            cursor.execute("""
+                SELECT p.project_id,
+                       p.title,
+                       'graduation_project' AS course_scope,
+                       'COMP4300' AS course_code,
+                       p.status,
+                       u_sup.full_name AS supervisor_name,
+                       COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students
+                FROM projects p
+                JOIN semesters s ON s.semester_id = p.semester_id
+                JOIN project_members pm ON pm.project_id = p.project_id
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users u_st ON u_st.user_id = st.user_id
+                LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+                LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
+                WHERE p.semester_id = %s
+                  AND COALESCE(s.course_code, 'COMP4300') = 'COMP4300'
+                  AND p.status IN ('submitted','under_review','needs_revision','committee_evaluation','accepted','rejected','archived')
+                  AND p.title NOT LIKE 'Committee Demo%%'
+                GROUP BY p.project_id, p.title, p.status, u_sup.full_name
+                ORDER BY FIELD(p.status,'committee_evaluation','submitted','under_review','needs_revision','accepted','archived','rejected'), p.project_id DESC
+            """, (semester_id,))
+            projects = cursor.fetchall()
+
+        result = [_evaluation_project_payload(cursor, course_scope, row) for row in projects]
+        cursor.close()
+        db.close()
+        return jsonify({"projects": _json_safe_value(result)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/open", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_open():
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "").strip()
+    reference_id = data.get("project_id") or data.get("reference_id")
+
+    if course_scope not in {"introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+    if not reference_id:
+        return jsonify({"error": "project_id/reference_id is required."}), 400
+
+    try:
+        reference_id = int(reference_id)
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+
+        if course_scope == "graduation_project":
+            cursor.execute("SELECT project_id, title FROM projects WHERE project_id = %s", (reference_id,))
+            item = cursor.fetchone()
+        else:
+            cursor.execute("SELECT section_id AS project_id, section_name AS title FROM student_distribution_sections WHERE section_id = %s", (reference_id,))
+            item = cursor.fetchone()
+        if not item:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Evaluation item not found."}), 404
+
+        _evaluation_autocreate_tasks(cursor, course_scope, reference_id, session.get("user_id"))
+        cursor.execute(
+            """
+            INSERT INTO evaluation_windows
+                (course_scope, reference_id, is_open, opened_by, opened_at, closed_at)
+            VALUES (%s, %s, TRUE, %s, NOW(), NULL)
+            ON DUPLICATE KEY UPDATE
+                is_open = TRUE,
+                opened_by = VALUES(opened_by),
+                opened_at = NOW(),
+                closed_at = NULL
+            """,
+            (course_scope, reference_id, session.get("user_id")),
+        )
+
+        label = "COMP4200" if course_scope == "introduction" else "COMP4300"
+        notifications_sent = _evaluation_notify_faculty(
+            cursor,
+            course_scope,
+            reference_id,
+            f"{label} Grade Entry Opened",
+            f"Grade entry is now open for {item.get('title') or 'the assigned item'}. Please enter your mark.",
+            session.get("user_id"),
+        )
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Grade entry opened successfully.", "notifications_sent": notifications_sent})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/assign", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_assign():
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "").strip()
+    reference_id = data.get("project_id") or data.get("reference_id")
+    assignments = data.get("assignments") or []
+
+    if course_scope not in {"introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+    if not reference_id:
+        return jsonify({"error": "project_id/reference_id is required."}), 400
+    if not assignments:
+        return jsonify({"error": "No assignments provided."}), 400
+
+    allowed_by_scope = {
+        "introduction": {"intro_report_reader", "intro_coordinator", "intro_supervisor", "intro_discussion_member"},
+        "graduation_project": {"grad_report_reader", "grad_supervisor", "grad_committee_member"},
+    }
+
+    try:
+        reference_id = int(reference_id)
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+
+        changed_faculty_ids = []
+        for item in assignments:
+            component = (item.get("component") or "").strip()
+            faculty_id = item.get("faculty_id")
+            if component not in allowed_by_scope[course_scope]:
+                cursor.close()
+                db.close()
+                return jsonify({"error": f"Invalid component for this course: {component}"}), 400
+            if not faculty_id:
+                cursor.close()
+                db.close()
+                return jsonify({"error": "faculty_id is required for every assignment."}), 400
+            faculty_id = int(faculty_id)
+            _evaluation_insert_task(cursor, course_scope, reference_id, component, faculty_id, session.get("user_id"))
+            changed_faculty_ids.append(faculty_id)
+
+        label = "COMP4200" if course_scope == "introduction" else "COMP4300"
+        user_map = _evaluation_faculty_user_ids(cursor, changed_faculty_ids)
+        notifications_sent = 0
+        for user_id in user_map.values():
+            if not user_id or user_id == session.get("user_id"):
+                continue
+            _insert_notification(
+                cursor,
+                user_id,
+                session.get("user_id"),
+                "system",
+                f"{label} Grade Task Assigned",
+                "You have been assigned a grade entry task. Please open your evaluation page and submit the mark.",
+                None,
+                course_scope,
+            )
+            notifications_sent += 1
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Evaluator assignment saved successfully.", "notifications_sent": notifications_sent})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/close", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_close():
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "").strip()
+    reference_id = data.get("project_id") or data.get("reference_id")
+
+    if course_scope not in {"introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+    if not reference_id:
+        return jsonify({"error": "project_id/reference_id is required."}), 400
+
+    try:
+        reference_id = int(reference_id)
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+
+        grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+        scores = _evaluation_scores_from_grades(course_scope, grades)
+
+        cursor.execute(
+            """
+            INSERT INTO evaluation_windows
+                (course_scope, reference_id, is_open, opened_by, opened_at, closed_at)
+            VALUES (%s, %s, FALSE, %s, NULL, NOW())
+            ON DUPLICATE KEY UPDATE
+                is_open = FALSE,
+                closed_at = NOW()
+            """,
+            (course_scope, reference_id, session.get("user_id")),
+        )
+
+        if course_scope == "graduation_project" and scores.get("final_score") is not None and _db_column_exists(cursor, "projects", "final_score"):
+            cursor.execute(
+                "UPDATE projects SET final_score = %s WHERE project_id = %s",
+                (scores["final_score"], reference_id),
+            )
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Grade entry closed and score calculated.", "scores": _json_safe_value(scores)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/finalize", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_finalize():
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "").strip()
+    reference_id = data.get("project_id") or data.get("reference_id")
+    decision = (data.get("decision") or "").strip()
+    notes = (data.get("notes") or "").strip() or None
+
+    if course_scope not in {"introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+    if not reference_id:
+        return jsonify({"error": "project_id/reference_id is required."}), 400
+    if decision not in {"accepted", "rejected", "archived"}:
+        return jsonify({"error": "decision must be accepted, rejected, or archived."}), 400
+
+    try:
+        reference_id = int(reference_id)
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+
+        grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+        scores = _evaluation_scores_from_grades(course_scope, grades)
+        final_score = scores.get("final_score")
+
+        if course_scope == "graduation_project":
+            new_status = "archived" if decision == "archived" else decision
+            if _db_column_exists(cursor, "projects", "final_score"):
+                cursor.execute(
+                    """
+                    UPDATE projects
+                    SET status = %s,
+                        final_score = %s,
+                        coordinator_notes = COALESCE(%s, coordinator_notes)
+                    WHERE project_id = %s
+                    """,
+                    (new_status, final_score, notes, reference_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE projects SET status = %s, coordinator_notes = COALESCE(%s, coordinator_notes) WHERE project_id = %s",
+                    (new_status, notes, reference_id),
+                )
+        else:
+            _ensure_section_results_schema(cursor)
+            status_value = "succeeded" if decision in {"accepted", "archived"} else "not_succeeded"
+            cursor.execute(
+                """
+                INSERT INTO section_completion_status
+                    (course_scope, reference_id, status, notes, marked_by, marked_at)
+                VALUES ('introduction', %s, %s, %s, %s, NOW())
+                ON DUPLICATE KEY UPDATE
+                    status = VALUES(status),
+                    notes = VALUES(notes),
+                    marked_by = VALUES(marked_by),
+                    marked_at = NOW(),
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (reference_id, status_value, notes, session.get("user_id")),
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO evaluation_windows
+                (course_scope, reference_id, is_open, opened_by, opened_at, closed_at)
+            VALUES (%s, %s, FALSE, %s, NULL, NOW())
+            ON DUPLICATE KEY UPDATE
+                is_open = FALSE,
+                closed_at = NOW()
+            """,
+            (course_scope, reference_id, session.get("user_id")),
+        )
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Final evaluation saved successfully.", "scores": _json_safe_value(scores)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @coordinator_bp.route("/api/coordinator/profile", methods=["GET"])
 @login_required(role="coordinator")
