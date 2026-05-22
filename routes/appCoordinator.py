@@ -62,8 +62,10 @@ def _get_active_semester(cursor):
     has_opened_at = _db_column_exists(cursor, "semesters", "distribution_opened_at")
     has_closed_at = _db_column_exists(cursor, "semesters", "distribution_closed_at")
     has_close_at = _db_column_exists(cursor, "semesters", "distribution_close_at")
+    has_course_code = _db_column_exists(cursor, "semesters", "course_code")
 
     fields = ["semester_id", "academic_year", "semester_number"]
+    fields.append("course_code" if has_course_code else "'COMP4200' AS course_code")
     fields.append(
         "COALESCE(distribution_open, 0) AS distribution_open"
         if has_distribution_open
@@ -297,6 +299,102 @@ def _deliverable_student_user_ids(cursor, semester_id, course_scope):
         FROM users
         WHERE role = 'student' AND is_active = TRUE
         """)
+    return [row["user_id"] for row in cursor.fetchall()]
+
+
+
+def _comp4200_student_user_ids_for_semester(cursor, semester_id=None):
+    """
+    Return active student user IDs that belong to COMP4200 / Project Introduction.
+
+    The function is defensive because different APMS database versions store the
+    COMP4200 enrollment in different places. It tries the most specific sources
+    first, then falls back safely.
+    """
+    recipients = []
+
+    # Best source: student_course_results table, when it exists.
+    if _table_exists(cursor, "student_course_results"):
+        conditions = ["u.role = 'student'", "u.is_active = TRUE"]
+        params = []
+
+        if semester_id and _db_column_exists(cursor, "student_course_results", "semester_id"):
+            conditions.append("scr.semester_id = %s")
+            params.append(semester_id)
+
+        if _db_column_exists(cursor, "student_course_results", "course_code"):
+            conditions.append("scr.course_code = 'COMP4200'")
+        elif _db_column_exists(cursor, "student_course_results", "course_scope"):
+            conditions.append("scr.course_scope = 'introduction'")
+
+        cursor.execute(
+            f"""
+            SELECT DISTINCT u.user_id
+            FROM student_course_results scr
+            JOIN students st ON st.student_id = scr.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE {' AND '.join(conditions)}
+            """,
+            tuple(params),
+        )
+        recipients = [row["user_id"] for row in cursor.fetchall()]
+
+    if recipients:
+        return recipients
+
+    # Some versions store course data directly on students.
+    if _table_exists(cursor, "students"):
+        student_conditions = ["u.role = 'student'", "u.is_active = TRUE"]
+        params = []
+
+        if _db_column_exists(cursor, "students", "course_code"):
+            student_conditions.append("st.course_code = 'COMP4200'")
+        elif _db_column_exists(cursor, "students", "course_scope"):
+            student_conditions.append("st.course_scope = 'introduction'")
+        else:
+            student_conditions = []
+
+        if student_conditions:
+            cursor.execute(
+                f"""
+                SELECT DISTINCT u.user_id
+                FROM students st
+                JOIN users u ON u.user_id = st.user_id
+                WHERE {' AND '.join(student_conditions)}
+                """,
+                tuple(params),
+            )
+            recipients = [row["user_id"] for row in cursor.fetchall()]
+
+    if recipients:
+        return recipients
+
+    # If COMP4200 sections already exist, notify their students only.
+    if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
+        cursor.execute(
+            """
+            SELECT DISTINCT u.user_id
+            FROM section_students ss
+            JOIN students st ON st.student_id = ss.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE u.role = 'student'
+              AND u.is_active = TRUE
+            """
+        )
+        recipients = [row["user_id"] for row in cursor.fetchall()]
+
+    if recipients:
+        return recipients
+
+    # Last fallback for older schemas that cannot distinguish courses.
+    # This keeps the page working, but the UI and API still label the window as COMP4200 only.
+    cursor.execute(
+        """
+        SELECT user_id
+        FROM users
+        WHERE role = 'student' AND is_active = TRUE
+        """
+    )
     return [row["user_id"] for row in cursor.fetchall()]
 
 
@@ -2400,6 +2498,14 @@ def api_coordinator_intro_timeline_publish():
 @coordinator_bp.route("/api/coordinator/distribution-window", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_distribution_window():
+    """
+    Coordinator opens/closes registration for COMP4200 only.
+
+    Important:
+    - This endpoint always reports course_scope='introduction' and course_code='COMP4200'.
+    - The same semester columns are reused for the registration window, but the UI/student
+      side should treat this window as Project Introduction registration only.
+    """
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -2435,6 +2541,9 @@ def api_coordinator_distribution_window():
                     "semester_id": semester["semester_id"],
                     "academic_year": semester["academic_year"],
                     "semester_number": semester["semester_number"],
+                    "course_scope": "introduction",
+                    "course_code": "COMP4200",
+                    "course_label": "Project Introduction",
                     "is_open": _active_distribution_is_open(semester),
                     "opened_at": semester.get("distribution_opened_at"),
                     "closed_at": semester.get("distribution_closed_at"),
@@ -2449,7 +2558,18 @@ def api_coordinator_distribution_window():
 @coordinator_bp.route("/api/coordinator/distribution-window", methods=["POST"])
 @login_required(role="coordinator")
 def api_coordinator_distribution_window_update():
+    """
+    Open/close registration for COMP4200 students only.
+
+    Any course_scope sent from the frontend is ignored unless it is 'introduction',
+    because the registration window must not open COMP4300.
+    """
     data = request.get_json(silent=True) or {}
+    requested_scope = (data.get("course_scope") or "introduction").strip()
+
+    if requested_scope not in ("", "introduction", "COMP4200"):
+        return jsonify({"error": "This registration window is only for COMP4200 / Project Introduction."}), 400
+
     is_open = 1 if bool(data.get("is_open")) else 0
     close_at_raw = (data.get("close_at") or "").strip()
 
@@ -2473,11 +2593,12 @@ def api_coordinator_distribution_window_update():
                 return (
                     jsonify(
                         {
-                            "error": "Please choose an automatic close date/time before opening registration."
+                            "error": "Please choose an automatic close date/time before opening COMP4200 registration."
                         }
                     ),
                     400,
                 )
+
             try:
                 close_at = datetime.strptime(
                     close_at_raw.replace("T", " "), "%Y-%m-%d %H:%M"
@@ -2489,6 +2610,7 @@ def api_coordinator_distribution_window_update():
                     jsonify({"error": "Close date format must be YYYY-MM-DD HH:MM."}),
                     400,
                 )
+
             if close_at <= datetime.now():
                 cursor.close()
                 db.close()
@@ -2505,36 +2627,36 @@ def api_coordinator_distribution_window_update():
                 """,
                 (close_at.strftime("%Y-%m-%d %H:%M:%S"), semester["semester_id"]),
             )
-            message = "Registration window opened successfully."
+
+            message = "COMP4200 registration window opened successfully."
 
             if not was_open:
-                cursor.execute("""
-                    SELECT user_id
-                    FROM users
-                    WHERE role = 'student' AND is_active = TRUE
-                    """)
                 recipients = [
-                    row["user_id"]
-                    for row in cursor.fetchall()
-                    if row.get("user_id") != session.get("user_id")
+                    uid
+                    for uid in _comp4200_student_user_ids_for_semester(cursor, semester["semester_id"])
+                    if uid != session.get("user_id")
                 ]
+
                 close_text = close_at.strftime("%Y-%m-%d %H:%M")
                 notif_message = (
-                    "Project registration is now open. "
-                    f"Please register your group before {close_text}."
+                    "COMP4200 Project Introduction registration is now open. "
+                    f"Please register your section/group before {close_text}."
                 )
-                for recipient_id in recipients:
+
+                for recipient_id in sorted(set(recipients)):
                     _insert_notification(
                         cursor,
                         recipient_id,
                         session.get("user_id"),
                         "system",
-                        "Project Registration Open",
+                        "COMP4200 Registration Open",
                         notif_message,
                         None,
-                        "graduation_project",
+                        "introduction",
                     )
-                notification_count = len(recipients)
+
+                notification_count = len(set(recipients))
+
         else:
             cursor.execute(
                 """
@@ -2545,14 +2667,24 @@ def api_coordinator_distribution_window_update():
                 """,
                 (semester["semester_id"],),
             )
-            message = "Registration window closed successfully."
+            message = "COMP4200 registration window closed successfully."
 
         db.commit()
         cursor.close()
         db.close()
+
         if notification_count:
-            message = f"{message} {notification_count} student notification(s) sent."
-        return jsonify({"message": message, "notifications_sent": notification_count})
+            message = f"{message} {notification_count} COMP4200 student notification(s) sent."
+
+        return jsonify(
+            {
+                "message": message,
+                "notifications_sent": notification_count,
+                "course_scope": "introduction",
+                "course_code": "COMP4200",
+            }
+        )
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

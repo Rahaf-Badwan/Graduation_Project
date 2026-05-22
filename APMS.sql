@@ -3046,8 +3046,8 @@ UPDATE semesters
 SET is_active = 1
 WHERE semester_id = (SELECT semester_id FROM (SELECT semester_id FROM semesters ORDER BY semester_id DESC LIMIT 1) AS newest)
   AND NOT EXISTS (SELECT 1 FROM (SELECT semester_id FROM semesters WHERE is_active = 1 LIMIT 1) AS active_sem);
-  
-  
+ 
+ 
 -- ============================================================
 -- Archived Projects from Uploads (44 projects)
 -- Run AFTER your main APMS.sql
@@ -3855,7 +3855,7 @@ CREATE TABLE IF NOT EXISTS coordinator_deliverable_submissions (
 
 UPDATE committee_plans cp
 JOIN (
-    SELECT 
+    SELECT
         cpp.plan_id,
         MIN(p.supervisor_id) AS supervisor_id
     FROM committee_plan_projects cpp
@@ -3871,7 +3871,7 @@ WHERE cp.plan_id > 0
 
 
 INSERT INTO committee_plan_members (plan_id, faculty_id, role)
-SELECT 
+SELECT
     cp.plan_id,
     cp.responsible_faculty_id,
     'member'
@@ -4450,9 +4450,9 @@ SET cpm.role = 'responsible'
 WHERE @APMS_ALLOW_DATA_MAINTENANCE = 1;
 
 SET SQL_SAFE_UPDATES = 0;
-  
-  
-  
+ 
+ 
+ 
   -- Allow committee members to be labeled as supervisor / responsible / member.
 ALTER TABLE committee_plan_members
 MODIFY COLUMN role ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member';
@@ -4828,3 +4828,229 @@ UPDATE faculty
 SET office_number = COALESCE(office_number, 'Science Building — 214');
 
 SET SQL_SAFE_UPDATES = 1;
+
+
+CREATE TABLE IF NOT EXISTS committee_plan_sections (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id INT NOT NULL,
+    section_id INT NOT NULL,
+    slot_order INT NOT NULL,
+    slot_start TIME NOT NULL,
+    slot_end TIME NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_committee_plan_section (plan_id, section_id),
+    UNIQUE KEY uq_unique_section_committee (section_id),
+    INDEX idx_committee_plan_sections_plan (plan_id),
+    INDEX idx_committee_plan_sections_section (section_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+
+SELECT 
+    sec.section_id,
+    sec.section_name,
+    sec.supervisor_id,
+    COUNT(ss.student_id) AS students_count
+FROM student_distribution_sections sec
+LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+GROUP BY sec.section_id, sec.section_name, sec.supervisor_id;
+
+
+CREATE TABLE IF NOT EXISTS committee_plan_sections (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    plan_id INT NOT NULL,
+    section_id INT NOT NULL,
+    slot_order INT NOT NULL,
+    slot_start TIME NOT NULL,
+    slot_end TIME NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_committee_plan_section (plan_id, section_id),
+    UNIQUE KEY uq_unique_section_committee (section_id),
+    INDEX idx_committee_plan_sections_plan (plan_id),
+    INDEX idx_committee_plan_sections_section (section_id),
+    FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+
+
+
+
+
+
+
+SELECT p.project_id, p.title, p.status, p.supervisor_id,
+       COUNT(pm.student_id) AS students_count
+FROM projects p
+LEFT JOIN project_members pm ON pm.project_id = p.project_id
+GROUP BY p.project_id, p.title, p.status, p.supervisor_id
+ORDER BY p.project_id DESC;
+
+
+-- ============================================================
+--  FILE COUNT FIX
+--  Adds projects.files_count and keeps it updated automatically
+--  whenever a project file is submitted/uploaded in project_files.
+-- ============================================================
+
+SET @db := DATABASE();
+
+-- 1) Add files_count to projects only if it does not already exist.
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE projects ADD COLUMN files_count INT NOT NULL DEFAULT 0 AFTER final_score',
+        'SELECT ''projects.files_count already exists'''
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'projects'
+      AND COLUMN_NAME = 'files_count'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 2) Fill the correct count for existing uploaded files.
+-- A file is counted as submitted if:
+--   upload_status = 'uploaded'
+--   OR uploaded_at is not null
+--   OR file_data exists
+--   OR file_path is not empty
+UPDATE projects p
+SET p.files_count = (
+    SELECT COUNT(*)
+    FROM project_files pf
+    WHERE pf.project_id = p.project_id
+      AND (
+          pf.upload_status = 'uploaded'
+          OR pf.uploaded_at IS NOT NULL
+          OR pf.file_data IS NOT NULL
+          OR COALESCE(pf.file_path, '') <> ''
+      )
+)
+WHERE p.project_id > 0;
+
+-- 3) View for easy checking from MySQL Workbench.
+CREATE OR REPLACE VIEW vw_project_file_counts AS
+SELECT
+    p.project_id,
+    p.title,
+    COALESCE(p.files_count, 0) AS files_count,
+    COUNT(pf.file_id) AS uploaded_files_count_from_table
+FROM projects p
+LEFT JOIN project_files pf
+       ON pf.project_id = p.project_id
+      AND (
+          pf.upload_status = 'uploaded'
+          OR pf.uploaded_at IS NOT NULL
+          OR pf.file_data IS NOT NULL
+          OR COALESCE(pf.file_path, '') <> ''
+      )
+GROUP BY p.project_id, p.title, p.files_count;
+
+-- 4) Optional summary view that includes files_count.
+CREATE OR REPLACE VIEW vw_project_summary_with_files AS
+SELECT
+    v.*,
+    COALESCE(p.files_count, 0) AS files_count
+FROM vw_project_summary v
+JOIN projects p ON p.project_id = v.project_id;
+
+-- 5) Triggers: keep files_count updated after insert/update/delete on project_files.
+DELIMITER $$
+
+DROP TRIGGER IF EXISTS trg_project_files_count_after_insert$$
+DROP TRIGGER IF EXISTS trg_project_files_count_after_update$$
+DROP TRIGGER IF EXISTS trg_project_files_count_after_delete$$
+
+CREATE TRIGGER trg_project_files_count_after_insert
+AFTER INSERT ON project_files
+FOR EACH ROW
+BEGIN
+    UPDATE projects p
+    SET p.files_count = (
+        SELECT COUNT(*)
+        FROM project_files pf
+        WHERE pf.project_id = NEW.project_id
+          AND (
+              pf.upload_status = 'uploaded'
+              OR pf.uploaded_at IS NOT NULL
+              OR pf.file_data IS NOT NULL
+              OR COALESCE(pf.file_path, '') <> ''
+          )
+    )
+    WHERE p.project_id = NEW.project_id;
+END$$
+
+CREATE TRIGGER trg_project_files_count_after_update
+AFTER UPDATE ON project_files
+FOR EACH ROW
+BEGIN
+    -- Recalculate the old project if the file moved from one project to another.
+    IF OLD.project_id <> NEW.project_id THEN
+        UPDATE projects p
+        SET p.files_count = (
+            SELECT COUNT(*)
+            FROM project_files pf
+            WHERE pf.project_id = OLD.project_id
+              AND (
+                  pf.upload_status = 'uploaded'
+                  OR pf.uploaded_at IS NOT NULL
+                  OR pf.file_data IS NOT NULL
+                  OR COALESCE(pf.file_path, '') <> ''
+              )
+        )
+        WHERE p.project_id = OLD.project_id;
+    END IF;
+
+    -- Recalculate the current project after upload_status/file_data/file_path changes.
+    UPDATE projects p
+    SET p.files_count = (
+        SELECT COUNT(*)
+        FROM project_files pf
+        WHERE pf.project_id = NEW.project_id
+          AND (
+              pf.upload_status = 'uploaded'
+              OR pf.uploaded_at IS NOT NULL
+              OR pf.file_data IS NOT NULL
+              OR COALESCE(pf.file_path, '') <> ''
+          )
+    )
+    WHERE p.project_id = NEW.project_id;
+END$$
+
+CREATE TRIGGER trg_project_files_count_after_delete
+AFTER DELETE ON project_files
+FOR EACH ROW
+BEGIN
+    UPDATE projects p
+    SET p.files_count = (
+        SELECT COUNT(*)
+        FROM project_files pf
+        WHERE pf.project_id = OLD.project_id
+          AND (
+              pf.upload_status = 'uploaded'
+              OR pf.uploaded_at IS NOT NULL
+              OR pf.file_data IS NOT NULL
+              OR COALESCE(pf.file_path, '') <> ''
+          )
+    )
+    WHERE p.project_id = OLD.project_id;
+END$$
+
+DELIMITER ;
+
+-- 6) Quick test after running this file:
+-- SELECT project_id, title, files_count FROM projects ORDER BY project_id DESC;
+-- SELECT * FROM vw_project_file_counts ORDER BY project_id DESC;
+
+-- ============================================================
+--  END OF MERGED SQL + FILE COUNT FIX
+-- ============================================================
+

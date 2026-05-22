@@ -114,6 +114,18 @@
     background: #912018 !important;
   }
 
+  .comp4200-note {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-size: 13px;
+    line-height: 1.6;
+    font-weight: 700;
+  }
+
   @media(max-width:980px) {
     .reg-split {
       grid-template-columns: 1fr;
@@ -126,17 +138,23 @@
 </style>
 
 <div class="page page-single on" id="pg-registration">
+
+  <div class="comp4200-note">
+    Registration window on this page is for COMP4200 students only — Project Introduction sections.
+    COMP4300 Graduation Project groups are not opened from this registration window.
+  </div>
+
   <div class="reg-main-tabs">
     <button class="reg-main-tab on" type="button" data-reg-tab="submissions">
-      Student submissions schedule
+      COMP4200 Student submissions schedule
     </button>
 
     <button class="reg-main-tab" type="button" data-reg-tab="unassigned">
-      Unassigned Students & Create Section
+      COMP4200 Unassigned Students & Create Section
     </button>
 
     <button class="reg-main-tab" type="button" data-reg-tab="window">
-      Distribution Window Control
+      COMP4200 Registration Window Control
     </button>
   </div>
 
@@ -146,7 +164,7 @@
   <section class="reg-tab-pane active" id="reg-tab-submissions">
     <div class="card">
       <div class="card-hd">
-        <span class="card-title">Student submissions schedule</span>
+        <span class="card-title">COMP4200 Student submissions schedule</span>
 
         <button
           class="card-action"
@@ -157,15 +175,15 @@
       </div>
 
       <div class="u-cebcb327">
-        This schedule reads the registered students directly from the database, shows each group with the preferred
-        doctors, and lets you decide the final supervisor for every group.
+        This schedule reads COMP4200 Project Introduction students directly from the database,
+        shows each section/group with preferred doctors, and lets you decide the final supervisor.
       </div>
 
       <div class="u-77c8140b">
         <table class="reg-table">
           <thead>
             <tr>
-              <th>Group</th>
+              <th>Group / Section</th>
               <th>Team Members</th>
               <th>Preferred Doctors</th>
               <th>Idea Title</th>
@@ -193,11 +211,11 @@
       <!-- LEFT: UNASSIGNED STUDENTS -->
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Unassigned Students</span>
+          <span class="card-title">COMP4200 Unassigned Students</span>
         </div>
 
         <div class="u-e284fbe5">
-          Students who do not have a group yet are shown here as checkboxes.
+          Only COMP4200 Project Introduction students who do not have a section yet are shown here as checkboxes.
           Select students, then create a new section or add them to an existing section.
         </div>
 
@@ -213,12 +231,12 @@
       <!-- RIGHT: CREATE / ADD / DELETE SECTIONS -->
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Create or Update Section</span>
+          <span class="card-title">Create or Update COMP4200 Section</span>
         </div>
 
         <div class="u-cebcb327">
-          You can create a new section from selected students, or add selected students to an existing section
-          if the section has fewer than 3 students.
+          You can create a new COMP4200 section from selected students, or add selected students
+          to an existing section if the section has fewer than 3 students.
         </div>
 
         <div class="form-grid" style="margin-bottom:12px">
@@ -280,11 +298,11 @@
   <section class="reg-tab-pane" id="reg-tab-window">
     <div class="card" style="max-width:760px">
       <div class="card-hd">
-        <span class="card-title">Distribution Window Control</span>
+        <span class="card-title">COMP4200 Registration Window Control</span>
       </div>
 
-      <div style="font-size:13px;color:#667587;margin-bottom:12px">
-        Open the student registration page and choose an automatic close date.
+      <div style="font-size:13px;color:#667587;margin-bottom:12px;line-height:1.6">
+        Open the registration page for COMP4200 Project Introduction students only and choose an automatic close date.
         When the close date passes, registration closes automatically.
       </div>
 
@@ -326,6 +344,22 @@
 
     if (type) {
       msg.classList.add(type);
+    }
+  }
+
+  function setWindowMessage(message, type) {
+    const msg = document.getElementById('windowMsg');
+    if (!msg) return;
+
+    msg.textContent = message || '';
+    msg.style.color = '';
+
+    if (type === 'ok') {
+      msg.style.color = '#027a48';
+    } else if (type === 'error') {
+      msg.style.color = '#b42318';
+    } else {
+      msg.style.color = '#667587';
     }
   }
 
@@ -501,7 +535,7 @@
       const sections = data.sections || [];
 
       if (!sections.length) {
-        box.innerHTML = '<div class="empty-box">No sections created yet.</div>';
+        box.innerHTML = '<div class="empty-box">No COMP4200 sections created yet.</div>';
         return;
       }
 
@@ -510,6 +544,7 @@
         const sectionName = section.section_name || section.name || ('Section ' + sectionId);
         const supervisorName = section.supervisor_name || section.supervisor || 'Not assigned';
         const count = Number(section.student_count || 0);
+        const assignedStudents = section.assigned_students || '';
 
         return `
           <div class="section-card" data-section-name="${escapeHtml(sectionName)}">
@@ -520,6 +555,9 @@
               </div>
               <div class="section-card-meta">
                 Students: ${count}/3
+              </div>
+              <div class="section-card-meta">
+                ${assignedStudents ? 'Names: ' + escapeHtml(assignedStudents) : 'No students listed'}
               </div>
             </div>
 
@@ -621,6 +659,90 @@
     updateSelectedStudentsCount();
   }
 
+  async function loadDistributionWindowStatus() {
+    const statusText = document.getElementById('windowStatusText');
+    const statusMeta = document.getElementById('windowStatusMeta');
+    const toggleBtn = document.getElementById('toggleWindowBtn');
+    const closeInput = document.getElementById('registrationCloseAt');
+
+    if (!statusText || !statusMeta || !toggleBtn) return;
+
+    try {
+      const data = await apiJson('/api/coordinator/distribution-window');
+
+      const isOpen = !!data.is_open;
+      const courseScope = data.course_scope || 'introduction';
+
+      if (isOpen) {
+        statusText.textContent = 'COMP4200 registration is open';
+        statusText.style.color = '#027a48';
+        toggleBtn.textContent = 'Close COMP4200 Registration';
+        toggleBtn.dataset.open = '1';
+      } else {
+        statusText.textContent = 'COMP4200 registration is closed';
+        statusText.style.color = '#b42318';
+        toggleBtn.textContent = 'Open COMP4200 Registration';
+        toggleBtn.dataset.open = '0';
+      }
+
+      statusMeta.textContent =
+        'Scope: ' + courseScope +
+        (data.close_at ? ' | Closes at: ' + data.close_at : '') +
+        (data.opened_at ? ' | Opened at: ' + data.opened_at : '') +
+        (data.closed_at ? ' | Closed at: ' + data.closed_at : '');
+
+      if (closeInput && data.close_at) {
+        const value = String(data.close_at).replace(' ', 'T').slice(0, 16);
+        closeInput.value = value;
+      }
+
+    } catch (err) {
+      statusText.textContent = 'Failed to load registration status';
+      statusText.style.color = '#b42318';
+      statusMeta.textContent = err.message || 'Request failed';
+      toggleBtn.textContent = 'Retry';
+      toggleBtn.dataset.open = '0';
+    }
+  }
+
+  async function toggleDistributionWindow() {
+    const toggleBtn = document.getElementById('toggleWindowBtn');
+    const closeInput = document.getElementById('registrationCloseAt');
+
+    const isCurrentlyOpen = toggleBtn && toggleBtn.dataset.open === '1';
+
+    let payload = {
+      is_open: !isCurrentlyOpen,
+      course_scope: 'introduction'
+    };
+
+    if (!isCurrentlyOpen) {
+      const closeAt = closeInput ? closeInput.value : '';
+
+      if (!closeAt) {
+        setWindowMessage('Please choose an automatic close date/time before opening COMP4200 registration.', 'error');
+        return;
+      }
+
+      payload.close_at = closeAt;
+    }
+
+    setWindowMessage(isCurrentlyOpen ? 'Closing COMP4200 registration...' : 'Opening COMP4200 registration...', 'loading');
+
+    try {
+      const data = await apiJson('/api/coordinator/distribution-window', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      setWindowMessage(data.message || 'Registration window updated successfully.', 'ok');
+      await loadDistributionWindowStatus();
+
+    } catch (err) {
+      setWindowMessage(err.message || 'Failed to update registration window.', 'error');
+    }
+  }
+
   function escapeHtml(value) {
     return String(value || '')
       .replace(/&/g, '&amp;')
@@ -659,10 +781,15 @@
         if (tab === 'unassigned') {
           setTimeout(refreshRegistrationSectionData, 300);
         }
+
+        if (tab === 'window') {
+          setTimeout(loadDistributionWindowStatus, 200);
+        }
       });
     });
 
     setTimeout(refreshRegistrationSectionData, 700);
+    setTimeout(loadDistributionWindowStatus, 700);
   });
 </script>
 {% endblock %}
