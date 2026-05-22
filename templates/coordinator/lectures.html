@@ -956,12 +956,31 @@
     });
 
     // ── Build inner project card (expandable) ─────────────
+    function projectTypeLabel(value) {
+      const labels = {
+        web: 'Web',
+        mobile: 'Mobile',
+        ai: 'Artificial Intelligence',
+        software_engineering: 'Software Engineering',
+        security: 'Security',
+        databases: 'Databases',
+        other: 'Other'
+      };
+      return String(value || '')
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean)
+        .map(v => labels[v.toLowerCase()] || v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
+        .join(', ');
+    }
+
     function buildProjectCard(g) {
       const pid = 'proj-' + g.project_id;
+      const typeText = projectTypeLabel(g.project_type);
       const typeLabel = g.project_type
         ? `<span style="font-size:11px;background:#f0f4f1;border:1px solid #d0ddd4;
                         border-radius:6px;padding:2px 8px;color:#2e7d42">
-             ${safe(g.project_type.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}
+             ${safe(typeText)}
            </span>` : '';
 
       const filesHtml = g.files.map(f => {
