@@ -557,9 +557,11 @@
         : 'Milestones: timeline not published yet';
 
     if (!hasProject) {
-      document.getElementById('next-action-title').textContent = 'Register your project group';
-      document.getElementById('next-action-copy').textContent = 'Start by registering your group and supervisor preference so your dashboard can track the real work.';
-      setActionLink('next-action-primary', '/student/registration', 'Register Project');
+      document.getElementById('next-action-title').textContent = isComp4300 ? 'Prepare final project files' : 'Register your project group';
+      document.getElementById('next-action-copy').textContent = isComp4300
+        ? 'Your COMP4300 workspace uses the promoted COMP4200 team data.'
+        : 'Start by registering your group and supervisor preference so your dashboard can track the real work.';
+      setActionLink('next-action-primary', isComp4300 ? '/student/submit' : '/student/registration', isComp4300 ? 'Project Files' : 'Register Project');
       setActionLink('next-action-secondary', isComp4300 ? '/student/submit' : '/student/timeline', isComp4300 ? 'Project Files' : 'View Timeline');
     } else if (finalUploaded) {
       document.getElementById('next-action-title').textContent = 'Final submission complete';
@@ -570,7 +572,7 @@
       document.getElementById('next-action-title').textContent = 'Prepare final project files';
       document.getElementById('next-action-copy').textContent = 'Your COMP4200 milestones are cleared after promotion. Use the project files page for COMP4300 submissions.';
       setActionLink('next-action-primary', '/student/submit', 'Project Files');
-      setActionLink('next-action-secondary', '/student/registration', 'Team');
+      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
     } else if (milestoneTotal) {
       document.getElementById('next-action-title').textContent = 'Continue milestone submissions';
       document.getElementById('next-action-copy').textContent = `You submitted ${milestoneSubmitted} of ${milestoneTotal} timeline milestones. Each submitted milestone increases this progress until the final report closes it at 100%.`;
