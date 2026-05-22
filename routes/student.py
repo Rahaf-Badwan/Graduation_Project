@@ -19,6 +19,15 @@ ALLOWED_EXTENSIONS = {
     "presentation": {"pdf", "pptx", "ppt"},
 }
 MAX_FILE_MB = 50
+PROJECT_TYPE_VALUES = {
+    "web",
+    "mobile",
+    "ai",
+    "software_engineering",
+    "security",
+    "databases",
+    "other",
+}
 
 student_bp = Blueprint("student", __name__, url_prefix="/student")
 
@@ -50,6 +59,21 @@ def _project_type_text(value):
     if isinstance(value, (set, list, tuple)):
         return ",".join(str(v) for v in value if v)
     return str(value)
+
+
+def _normalize_project_type_value(value, default=None):
+    if isinstance(value, (set, list, tuple)):
+        raw_items = value
+    else:
+        raw_items = str(value or "").split(",")
+
+    parts = []
+    for item in raw_items:
+        normalized = str(item or "").strip().lower()
+        if normalized in PROJECT_TYPE_VALUES and normalized not in parts:
+            parts.append(normalized)
+
+    return ",".join(parts) if parts else default
 
 
 def _split_project_types(value):
@@ -125,6 +149,45 @@ def _table_exists_student(cursor, table_name):
         (table_name,),
     )
     return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _student_course_context(cursor, user_id):
+    cursor.execute(
+        "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
+        (user_id,),
+    )
+    student_row = cursor.fetchone()
+    student_id = student_row["student_id"] if student_row else None
+
+    target_course = "COMP4200"
+    if student_id and _table_exists_student(cursor, "student_course_results"):
+        cursor.execute(
+            """
+            SELECT scr.status AS course_status,
+                   scr.promoted_to_semester_id,
+                   scr.promoted_at
+            FROM student_course_results scr
+            JOIN semesters s ON s.semester_id = scr.semester_id
+            WHERE scr.student_id = %s AND s.course_code = 'COMP4200'
+            ORDER BY scr.semester_id DESC
+            LIMIT 1
+            """,
+            (student_id,),
+        )
+        result_row = cursor.fetchone() or {}
+        is_promoted = bool(
+            result_row.get("promoted_to_semester_id")
+            or result_row.get("promoted_at")
+        )
+        if result_row.get("course_status") == "passed" and is_promoted:
+            target_course = "COMP4300"
+
+    return {
+        "student_id": student_id,
+        "target_course": target_course,
+        "can_use_comp4200_registration": bool(student_id)
+        and target_course == "COMP4200",
+    }
 
 
 def _cleanup_comp4200_state_for_promoted_student(cursor, student_id, promoted_at=None):
@@ -1147,6 +1210,16 @@ def api_student_intro_timeline():
 @student_bp.route("/registration")
 @login_required(role="student")
 def registration():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        context = _student_course_context(cursor, session.get("user_id"))
+        cursor.close()
+        db.close()
+        if context.get("target_course") == "COMP4300":
+            return redirect(url_for("student.dashboard"))
+    except Exception:
+        pass
     return render_template("student/registration.html")
 
 
@@ -2363,37 +2436,13 @@ def api_submit_project():
     abstract = (data.get("abstract") or "").strip() or None
     keywords = (data.get("keywords") or "").strip() or None
     timeline_item_id = data.get("timeline_item_id") or data.get("milestone_id")
-    # Project type is no longer entered by the student in the submit form.
-    # The database column is NOT NULL, so the backend keeps the existing DB value
-    # when updating a draft/submission. For a brand-new project, it silently uses
-    # a safe default value instead of asking the student.
-    proj_type = (data.get("project_type") or "").strip()
+    # The student submit form sends the selected type. If COMP4300 is created
+    # without a valid value, inherit the old COMP4200 type before using a default.
+    raw_proj_type = (data.get("project_type") or "").strip()
+    proj_type = _normalize_project_type_value(raw_proj_type)
 
     if not title:
         return jsonify({"error": "Project title is required."}), 400
-
-    valid_types = {
-        "web",
-        "mobile",
-        "ai",
-        "software_engineering",
-        "security",
-        "databases",
-        "other",
-    }
-
-    def normalize_project_type(value, default="web"):
-        if isinstance(value, set):
-            parts = [str(v).strip().lower() for v in value if str(v).strip()]
-            return ",".join(p for p in parts if p in valid_types) or default
-        value = str(value or "").strip().lower()
-        if not value:
-            return default
-        parts = [p.strip() for p in value.split(",") if p.strip()]
-        parts = [p for p in parts if p in valid_types]
-        return ",".join(parts) if parts else default
-
-    proj_type = normalize_project_type(proj_type, default="web")
 
     try:
         db = get_db()
@@ -2492,10 +2541,10 @@ def api_submit_project():
             )
             final_submission = cursor.fetchone()
 
-        # If the form did not send a project_type, keep the type already stored
-        # on the draft project instead of changing it.
-        if existing and not (data.get("project_type") or "").strip():
-            proj_type = normalize_project_type(
+        # If the form did not send a valid project_type, keep the type already
+        # stored on the draft/submission instead of changing it to Web.
+        if existing and not proj_type:
+            proj_type = _normalize_project_type_value(
                 existing.get("project_type"), default="web"
             )
 
@@ -2647,12 +2696,13 @@ def api_submit_project():
             # ── جيب السوبرفايزر والزملاء من آخر مشروع قديم للطالب ──
             cursor.execute(
                 """
-                SELECT p.project_id, p.supervisor_id
+                SELECT p.project_id, p.supervisor_id, p.project_type
                 FROM   project_members pm
                 JOIN   students st ON st.student_id = pm.student_id
                 JOIN   projects p  ON p.project_id  = pm.project_id
+                JOIN   semesters s ON s.semester_id = p.semester_id
                 WHERE  st.user_id = %s
-                ORDER  BY p.project_id DESC
+                ORDER  BY (s.course_code = 'COMP4200') DESC, p.project_id DESC
                 LIMIT  1
                 """,
                 (user_id,),
@@ -2660,6 +2710,11 @@ def api_submit_project():
             prev_project = cursor.fetchone()
             prev_supervisor_id = prev_project["supervisor_id"] if prev_project else None
             prev_project_id = prev_project["project_id"] if prev_project else None
+            if not proj_type:
+                proj_type = _normalize_project_type_value(
+                    prev_project.get("project_type") if prev_project else None,
+                    default="web",
+                )
 
             cursor.execute(
                 """
@@ -3589,15 +3644,43 @@ def api_student_supervisors():
 
 def _get_active_semester_st(cursor):
     """Local copy of _get_active_semester for student blueprint."""
-    cursor.execute("""
-        SELECT semester_id, academic_year, semester_number, course_code,
-               COALESCE(distribution_open, 0) AS distribution_open,
-               distribution_opened_at, distribution_closed_at
+    has_course_code = _db_column_exists_student(cursor, "semesters", "course_code")
+    fields = ["semester_id", "academic_year", "semester_number"]
+    fields.append("course_code" if has_course_code else "'COMP4200' AS course_code")
+    fields.append(
+        "COALESCE(distribution_open, 0) AS distribution_open"
+        if _db_column_exists_student(cursor, "semesters", "distribution_open")
+        else "0 AS distribution_open"
+    )
+    fields.append(
+        "distribution_opened_at"
+        if _db_column_exists_student(cursor, "semesters", "distribution_opened_at")
+        else "NULL AS distribution_opened_at"
+    )
+    fields.append(
+        "distribution_closed_at"
+        if _db_column_exists_student(cursor, "semesters", "distribution_closed_at")
+        else "NULL AS distribution_closed_at"
+    )
+    fields.append(
+        "distribution_close_at"
+        if _db_column_exists_student(cursor, "semesters", "distribution_close_at")
+        else "NULL AS distribution_close_at"
+    )
+
+    where = "is_active = TRUE"
+    params = []
+    if has_course_code:
+        where += " AND course_code = %s"
+        params.append("COMP4200")
+
+    cursor.execute(f"""
+        SELECT {', '.join(fields)}
         FROM semesters
-        WHERE is_active = TRUE
+        WHERE {where}
         ORDER BY semester_id DESC
         LIMIT 1
-    """)
+    """, tuple(params))
     return cursor.fetchone()
 
 
@@ -3616,32 +3699,16 @@ def api_student_registration_check():
                 {"registered": False, "project": None, "distribution_open": False}
             )
 
-        target_course = "COMP4200"
-        cursor.execute(
-            "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
-            (user_id,),
-        )
-        student_row = cursor.fetchone()
-        if student_row:
-            cursor.execute(
-                """
-                SELECT scr.status AS course_status,
-                       scr.promoted_to_semester_id,
-                       scr.promoted_at
-                FROM student_course_results scr
-                JOIN semesters s ON s.semester_id = scr.semester_id
-                WHERE scr.student_id = %s AND s.course_code = 'COMP4200'
-                ORDER BY scr.semester_id DESC
-                LIMIT 1
-                """,
-                (student_row["student_id"],),
-            )
-            result_row = cursor.fetchone() or {}
-            if result_row.get("course_status") == "passed" and (
-                result_row.get("promoted_to_semester_id")
-                or result_row.get("promoted_at")
-            ):
-                target_course = "COMP4300"
+        course_context = _student_course_context(cursor, user_id)
+        target_course = course_context["target_course"]
+        distribution_open = bool(semester.get("distribution_open"))
+        close_at = semester.get("distribution_close_at")
+        if close_at:
+            from datetime import datetime as _dt
+
+            distribution_open = distribution_open and _dt.now() < close_at
+        if target_course != "COMP4200":
+            distribution_open = False
 
         cursor.execute(
             """
@@ -3687,7 +3754,7 @@ def api_student_registration_check():
                 {
                     "registered": True,
                     "project": project,
-                    "distribution_open": bool(semester.get("distribution_open")),
+                    "distribution_open": distribution_open,
                     "target_course": target_course,
                     "timeline_available": target_course != "COMP4300",
                 }
@@ -3696,7 +3763,7 @@ def api_student_registration_check():
             {
                 "registered": False,
                 "project": None,
-                "distribution_open": bool(semester.get("distribution_open")),
+                "distribution_open": distribution_open,
                 "target_course": target_course,
                 "timeline_available": target_course != "COMP4300",
             }
@@ -3812,15 +3879,27 @@ def api_student_distribution_window_status():
         db = get_db()
         cursor = db.cursor(dictionary=True)
         semester = _get_active_semester_st(cursor)
+        course_context = _student_course_context(cursor, session.get("user_id"))
+        target_course = course_context["target_course"]
         cursor.close()
         db.close()
         if not semester:
             return jsonify({"error": "No active semester found."}), 400
+        is_open = bool(semester.get("distribution_open"))
+        close_at = semester.get("distribution_close_at")
+        if close_at:
+            from datetime import datetime as _dt
+
+            is_open = is_open and _dt.now() < close_at
+        if target_course != "COMP4200":
+            is_open = False
         return jsonify(
             {
-                "is_open": bool(semester.get("distribution_open")),
+                "is_open": is_open,
                 "opened_at": str(semester.get("distribution_opened_at") or ""),
                 "closed_at": str(semester.get("distribution_closed_at") or ""),
+                "course_code": "COMP4200",
+                "target_course": target_course,
             }
         )
     except Exception as e:
@@ -3859,10 +3938,58 @@ def api_student_distribution_submit():
             db.close()
             return jsonify({"error": "No active semester is configured."}), 400
 
-        if int(semester.get("distribution_open") or 0) != 1:
+        course_context = _student_course_context(cursor, user_id)
+        if course_context.get("target_course") != "COMP4200":
+            cursor.close()
+            db.close()
+            return (
+                jsonify(
+                    {
+                        "error": "COMP4300 students are already registered through their COMP4200 team and cannot use this registration window."
+                    }
+                ),
+                403,
+            )
+
+        is_open = int(semester.get("distribution_open") or 0) == 1
+        close_at = semester.get("distribution_close_at")
+        if close_at:
+            from datetime import datetime as _dt
+
+            is_open = is_open and _dt.now() < close_at
+        if not is_open:
             cursor.close()
             db.close()
             return jsonify({"error": "Student distribution is currently closed."}), 403
+
+        for uid in member_ids:
+            cursor.execute(
+                """
+                SELECT st.student_id
+                FROM students st
+                JOIN users u ON u.user_id = st.user_id
+                JOIN student_course_results scr ON scr.student_id = st.student_id
+                WHERE u.university_id = %s
+                  AND u.role = 'student'
+                  AND scr.semester_id = %s
+                  AND COALESCE(scr.status, 'pending') <> 'passed'
+                  AND scr.promoted_to_semester_id IS NULL
+                  AND scr.promoted_at IS NULL
+                LIMIT 1
+                """,
+                (uid, semester["semester_id"]),
+            )
+            if not cursor.fetchone():
+                cursor.close()
+                db.close()
+                return (
+                    jsonify(
+                        {
+                            "error": f"Student {uid} is not eligible for COMP4200 registration."
+                        }
+                    ),
+                    400,
+                )
 
         # Duplicate check
         for uid in member_ids:
