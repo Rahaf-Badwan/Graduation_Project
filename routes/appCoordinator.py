@@ -91,6 +91,51 @@ def _get_active_semester(cursor):
     return cursor.fetchone()
 
 
+def _get_active_comp4200_semester(cursor):
+    return _get_active_semester_by_course(cursor, "COMP4200")
+
+
+def _get_active_semester_by_course(cursor, course_code):
+    # Keep this helper safe even before running the migration.
+    has_distribution_open = _db_column_exists(cursor, "semesters", "distribution_open")
+    has_opened_at = _db_column_exists(cursor, "semesters", "distribution_opened_at")
+    has_closed_at = _db_column_exists(cursor, "semesters", "distribution_closed_at")
+    has_close_at = _db_column_exists(cursor, "semesters", "distribution_close_at")
+    has_course_code = _db_column_exists(cursor, "semesters", "course_code")
+
+    fields = ["semester_id", "academic_year", "semester_number"]
+    fields.append("course_code" if has_course_code else f"'{course_code}' AS course_code")
+    fields.append(
+        "COALESCE(distribution_open, 0) AS distribution_open"
+        if has_distribution_open
+        else "0 AS distribution_open"
+    )
+    fields.append(
+        "distribution_opened_at" if has_opened_at else "NULL AS distribution_opened_at"
+    )
+    fields.append(
+        "distribution_closed_at" if has_closed_at else "NULL AS distribution_closed_at"
+    )
+    fields.append(
+        "distribution_close_at" if has_close_at else "NULL AS distribution_close_at"
+    )
+
+    where = "is_active = TRUE"
+    params = []
+    if has_course_code:
+        where += " AND course_code = %s"
+        params.append(course_code)
+
+    cursor.execute(f"""
+        SELECT {', '.join(fields)}
+        FROM semesters
+        WHERE {where}
+        ORDER BY semester_id DESC
+        LIMIT 1
+        """, tuple(params))
+    return cursor.fetchone()
+
+
 def _get_anchor_semester_for_year(cursor, academic_year):
     cursor.execute(
         """
@@ -2539,7 +2584,7 @@ def api_coordinator_distribution_window():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        semester = _get_active_semester(cursor)
+        semester = _get_active_comp4200_semester(cursor)
 
         # Auto-close when the deadline passed.
         if (
@@ -2557,7 +2602,7 @@ def api_coordinator_distribution_window():
                 (semester["semester_id"],),
             )
             db.commit()
-            semester = _get_active_semester(cursor)
+            semester = _get_active_comp4200_semester(cursor)
 
         cursor.close()
         db.close()
@@ -2606,7 +2651,7 @@ def api_coordinator_distribution_window_update():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        semester = _get_active_semester(cursor)
+        semester = _get_active_comp4200_semester(cursor)
 
         if not semester:
             cursor.close()
@@ -2727,7 +2772,7 @@ def api_coordinator_distribution_data():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        semester = _get_active_semester(cursor)
+        semester = _get_active_comp4200_semester(cursor)
         if not semester:
             cursor.close()
             db.close()
@@ -2790,7 +2835,16 @@ def api_coordinator_distribution_data():
             SELECT st.student_id, u.university_id, u.full_name
             FROM students st
             JOIN users u ON u.user_id = st.user_id
-            WHERE NOT EXISTS (
+            WHERE EXISTS (
+                SELECT 1
+                FROM student_course_results scr
+                WHERE scr.student_id = st.student_id
+                  AND scr.semester_id = %s
+                  AND COALESCE(scr.status, 'pending') <> 'passed'
+                  AND scr.promoted_to_semester_id IS NULL
+                  AND scr.promoted_at IS NULL
+            )
+            AND NOT EXISTS (
                 SELECT 1
                 FROM project_members pm
                 JOIN projects p ON p.project_id = pm.project_id
@@ -2804,7 +2858,7 @@ def api_coordinator_distribution_data():
             )
             ORDER BY u.full_name
             """,
-            (semester["semester_id"],),
+            (semester["semester_id"], semester["semester_id"]),
         )
         unassigned = cursor.fetchall()
 
@@ -3016,7 +3070,7 @@ def api_add_section():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        semester = _get_active_semester(cursor)
+        semester = _get_active_comp4200_semester(cursor)
         if not semester:
             cursor.close()
             db.close()
@@ -3076,6 +3130,15 @@ def api_add_section():
             FROM students st
             JOIN users u ON u.user_id = st.user_id
             WHERE st.student_id IN ({placeholders})
+              AND EXISTS (
+                  SELECT 1
+                  FROM student_course_results scr
+                  WHERE scr.student_id = st.student_id
+                    AND scr.semester_id = %s
+                    AND COALESCE(scr.status, 'pending') <> 'passed'
+                    AND scr.promoted_to_semester_id IS NULL
+                    AND scr.promoted_at IS NULL
+              )
               AND NOT EXISTS (
                   SELECT 1
                   FROM project_members pm
@@ -3089,7 +3152,7 @@ def api_add_section():
                   WHERE ss.student_id = st.student_id
               )
         """
-        params = tuple(student_ids) + (semester["semester_id"],)
+        params = tuple(student_ids) + (semester["semester_id"], semester["semester_id"])
         cursor.execute(query, params)
         students = cursor.fetchall()
 
