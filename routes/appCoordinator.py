@@ -932,12 +932,42 @@ def api_coordinator_create_lecture():
                 session.get("user_id"),
             ),
         )
-        db.commit()
         lecture_id = cursor.lastrowid
+
+        # Send the lecture link/notice to the correct students immediately.
+        sent_count = 0
+        if semester_id:
+            recipients = sorted(set(_deliverable_student_user_ids(cursor, semester_id, course_scope)))
+            scope_label = "Project Introduction" if course_scope == "introduction" else "Graduation Project"
+            date_text = f" Date: {lecture_date}." if lecture_date else ""
+            details = (data.get("description") or "").strip()
+            link_text = "Open from your student timeline: /student/timeline"
+            message = f"A new lecture has been posted for {scope_label}: {title}.{date_text} {link_text}"
+            if details:
+                message += f" Details: {details}"
+
+            for recipient_id in recipients:
+                _insert_notification(
+                    cursor,
+                    recipient_id,
+                    session.get("user_id"),
+                    "system",
+                    f"New Lecture: {title}",
+                    message,
+                    None,
+                    course_scope,
+                )
+            sent_count = len(recipients)
+
+        db.commit()
         cursor.close()
         db.close()
         return jsonify(
-            {"message": "Lecture saved successfully.", "lecture_id": lecture_id}
+            {
+                "message": f"Lecture saved successfully. {sent_count} student notification(s) sent.",
+                "lecture_id": lecture_id,
+                "notifications_sent": sent_count,
+            }
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2968,6 +2998,10 @@ def api_add_section():
     section_name = " ".join(section_name.split())
     supervisor_id = data.get("supervisor_id")
     student_ids = data.get("student_ids") or []
+    try:
+        student_ids = sorted({int(sid) for sid in student_ids})
+    except Exception:
+        return jsonify({"error": "Invalid student id."}), 400
 
     if not section_name or not supervisor_id:
         return jsonify({"error": "section_name and supervisor_id are required."}), 400
@@ -5190,7 +5224,7 @@ def api_add_students_to_existing_section():
 
     try:
         section_id = int(section_id)
-        student_ids = [int(sid) for sid in student_ids]
+        student_ids = sorted({int(sid) for sid in student_ids})
     except Exception:
         return jsonify({
             "ok": False,

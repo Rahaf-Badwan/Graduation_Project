@@ -5054,3 +5054,94 @@ DELIMITER ;
 --  END OF MERGED SQL + FILE COUNT FIX
 -- ============================================================
 
+
+
+
+USE apms_db;
+
+-- 1) Evaluation window table used when coordinator opens/closes grading.
+CREATE TABLE IF NOT EXISTS evaluation_windows (
+    window_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    reference_id INT NOT NULL,
+    is_open BOOLEAN NOT NULL DEFAULT FALSE,
+    opened_by INT NULL,
+    opened_at DATETIME NULL,
+    closed_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_eval_window (course_scope, reference_id),
+    INDEX idx_eval_window_scope_open (course_scope, is_open)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 2) Grade tasks for supervisors/doctors/committee members.
+CREATE TABLE IF NOT EXISTS evaluation_grade_tasks (
+    task_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    reference_id INT NOT NULL,
+    component VARCHAR(60) NOT NULL,
+    evaluator_faculty_id INT NOT NULL,
+    max_mark DECIMAL(6,2) NOT NULL DEFAULT 0,
+    mark DECIMAL(6,2) NULL,
+    notes TEXT NULL,
+    is_submitted BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by INT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    submitted_at DATETIME NULL,
+    UNIQUE KEY uq_eval_task (course_scope, reference_id, component, evaluator_faculty_id),
+    INDEX idx_eval_task_ref (course_scope, reference_id),
+    INDEX idx_eval_task_eval (evaluator_faculty_id),
+    CONSTRAINT fk_eval_task_faculty
+        FOREIGN KEY (evaluator_faculty_id) REFERENCES faculty(faculty_id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 3) Remove duplicated student rows inside section_students before adding the unique key.
+SET SQL_SAFE_UPDATES = 0;
+
+DELETE FROM section_students
+WHERE section_id IN (
+    SELECT section_id FROM (
+        SELECT ss1.section_id
+        FROM section_students ss1
+        JOIN section_students ss2
+          ON ss1.student_id = ss2.student_id
+         AND ss1.section_id > ss2.section_id
+    ) AS duplicates
+);
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- 4) Prevent the same student from being added to more than one section.
+SET @db := DATABASE();
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE section_students ADD UNIQUE KEY uq_section_students_student (student_id)',
+        'SELECT 1'
+    )
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'section_students'
+      AND INDEX_NAME = 'uq_section_students_student'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 5) Make sure notification course_scope exists for scoped lecture/evaluation messages.
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE notifications ADD COLUMN course_scope ENUM(''introduction'',''graduation_project'',''both'') NOT NULL DEFAULT ''both'' AFTER message',
+        'SELECT 1'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'notifications'
+      AND COLUMN_NAME = 'course_scope'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+

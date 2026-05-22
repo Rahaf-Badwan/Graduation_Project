@@ -27,6 +27,7 @@ from routes.shared_ai import shared_ai_bp
 from routes.student import student_bp
 from routes.head import head_bp
 from routes.appCoordinator import coordinator_bp
+from routes.supervisor_evaluation import supervisor_evaluation_bp
 from ai_engine import ask_apms_ai, search_uploaded_semantic
 from activate_student import activate_bp
 from announcements import announcements_bp
@@ -54,6 +55,7 @@ app.register_blueprint(shared_ai_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(head_bp)
 app.register_blueprint(coordinator_bp)
+app.register_blueprint(supervisor_evaluation_bp)
 app.register_blueprint(activate_bp)
 app.register_blueprint(announcements_bp, url_prefix='/head')
 # ─── Helpers ─────────────────────────────────────────────────────────────
