@@ -11,9 +11,10 @@
     .eval-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.eval-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;border-radius:999px;padding:9px 14px;font-weight:800;cursor:pointer}.eval-tab.on{background:#2e7d42;border-color:#2e7d42;color:#fff;box-shadow:0 8px 18px rgba(46,125,66,.18)}
     .eval-toolbar{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:12px}.eval-toolbar input,.eval-toolbar select{border:1px solid #d7e3dc;border-radius:12px;padding:10px 12px;background:#fff;min-width:210px}
     .eval-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;margin:12px 0}.eval-stat{border:1px solid #e7eee9;background:#fbfdfb;border-radius:14px;padding:12px}.eval-stat b{font-size:22px;color:#2e7d42;display:block}.eval-stat span{font-size:12px;color:#667085}
-    .eval-card{border:1px solid #e7eee9;border-radius:16px;background:#fff;padding:14px;margin-bottom:12px}.eval-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.eval-title{font-weight:850;color:#1f2937}.eval-sub{font-size:12px;color:#667085;margin-top:4px}.grade-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}.grade-table th,.grade-table td{border-bottom:1px solid #edf2ef;padding:9px;text-align:left}.grade-table th{color:#475467;background:#f8fbf9;font-size:12px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800}.p-open{background:#ecfdf3;color:#027a48}.p-closed{background:#fef3f2;color:#b42318}.p-pending{background:#fff7e6;color:#b54708}.p-done{background:#e8f1ff;color:#175cd3}
-    .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.mini-btn{border:0;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer}.green{background:#2e7d42;color:white}.blue{background:#2563eb;color:white}.red{background:#dc2626;color:white}.gray{background:#eef2f0;color:#344054}.assign-box{display:none;border:1px dashed #b7d5c1;background:#fbfdfb;border-radius:14px;padding:12px;margin-top:12px}.assign-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px}.assign-row select{border:1px solid #d7e3dc;border-radius:10px;padding:9px;background:#fff}.notes-input{width:100%;min-height:70px;border:1px solid #d7e3dc;border-radius:12px;padding:10px;margin-top:10px}.empty{padding:18px;border:1px dashed #d7e3dc;border-radius:14px;color:#667085;background:#fbfdfb}.course-badge{background:#2e7d42;color:white;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:800}
-    @media(max-width:800px){.eval-grid{grid-template-columns:1fr 1fr}.assign-row{grid-template-columns:1fr}.eval-toolbar input,.eval-toolbar select{width:100%;min-width:0}}
+    .eval-card{border:1px solid #e7eee9;border-radius:16px;background:#fff;padding:14px;margin-bottom:12px}.eval-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.eval-title{font-weight:850;color:#1f2937}.eval-sub{font-size:12px;color:#667085;margin-top:4px}.grade-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}.grade-table th,.grade-table td{border-bottom:1px solid #edf2ef;padding:9px;text-align:left}.grade-table th{color:#475467;background:#f8fbf9;font-size:12px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800}.p-open{background:#ecfdf3;color:#027a48}.p-closed{background:#fef3f2;color:#b42318}.p-pending{background:#fff7e6;color:#b54708}.p-done{background:#e8f1ff;color:#175cd3}.p-flow{background:#f0f9ff;color:#026aa2}
+    .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.mini-btn{border:0;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer}.green{background:#2e7d42;color:white}.blue{background:#2563eb;color:white}.red{background:#dc2626;color:white}.gray{background:#eef2f0;color:#344054}.notes-input{width:100%;min-height:70px;border:1px solid #d7e3dc;border-radius:12px;padding:10px;margin-top:10px}.empty{padding:18px;border:1px dashed #d7e3dc;border-radius:14px;color:#667085;background:#fbfdfb}.course-badge{background:#2e7d42;color:white;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:800}
+    .workflow-box{border:1px solid #d7e3dc;background:#fbfdfb;border-radius:14px;padding:10px 12px;margin:10px 0;font-size:13px;color:#344054}.workflow-box b{color:#2e7d42}
+    @media(max-width:800px){.eval-grid{grid-template-columns:1fr 1fr}.eval-toolbar input,.eval-toolbar select{width:100%;min-width:0}}
   </style>
 
   <div class="eval-tabs">
@@ -32,10 +33,14 @@
     </div>
   </div>
 
+  <div class="workflow-box">
+    <b>New publishing flow:</b> Coordinator opens/closes grade entry → sends calculated result to Supervisor → Supervisor sends it to Head of Department → Head publishes it to students.
+  </div>
+
   <div class="eval-grid">
-    <div class="eval-stat"><b id="statTotal">0</b><span>Total Projects</span></div>
+    <div class="eval-stat"><b id="statTotal">0</b><span>Total Items</span></div>
     <div class="eval-stat"><b id="statOpen">0</b><span>Open Grade Entry</span></div>
-    <div class="eval-stat"><b id="statReady">0</b><span>Ready to Finalize</span></div>
+    <div class="eval-stat"><b id="statReady">0</b><span>Ready to Send Supervisor</span></div>
     <div class="eval-stat"><b id="statAvg">—</b><span>Average Final Score</span></div>
   </div>
 
@@ -47,7 +52,6 @@
 <script>
 let currentScope = 'introduction';
 let allProjects = [];
-let faculty = [];
 
 function toastMsg(msg, ok=true){
   const t = document.getElementById('toast');
@@ -62,14 +66,16 @@ async function api(url, options={}){
 }
 function money(v){ return (v===null || v===undefined || v==='') ? '—' : Number(v).toFixed(2); }
 function componentName(c){
-  return ({intro_report_reader:'Report reader /40', intro_coordinator:'Coordinator /10', intro_supervisor:'Supervisor /10', intro_discussion_member:'Discussion /10', grad_report_reader:'Report reader /30', grad_supervisor:'Supervisor /20', grad_committee_member:'Committee /25'})[c] || c;
+  return ({
+    intro_report_reader:'Report reader /40',
+    intro_coordinator:'Coordinator /10',
+    intro_supervisor:'Supervisor /10',
+    intro_discussion_member:'Discussion /10',
+    grad_report_reader:'Report reader /30',
+    grad_supervisor:'Supervisor /20',
+    grad_committee_member:'Committee /25'
+  })[c] || c;
 }
-function componentOptions(){
-  const intro = [['intro_report_reader','Report reader /40'],['intro_coordinator','Coordinator /10'],['intro_supervisor','Supervisor /10'],['intro_discussion_member','Discussion member /10']];
-  const grad = [['grad_report_reader','Report reader /30'],['grad_supervisor','Supervisor /20'],['grad_committee_member','Committee member /25']];
-  return (currentScope === 'introduction' ? intro : grad).map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
-}
-function facultyOptions(){ return faculty.map(f=>`<option value="${f.faculty_id}">${f.name} — ${f.specialization || ''}</option>`).join(''); }
 
 function setScope(scope){
   currentScope = scope;
@@ -77,18 +83,11 @@ function setScope(scope){
   document.getElementById('tabGrad').classList.toggle('on', scope==='graduation_project');
   document.getElementById('scopeBadge').textContent = scope === 'introduction' ? '◑ Project Introduction — COMP4200' : '◆ Graduation Projects — COMP4300';
   document.getElementById('formulaText').innerHTML = scope === 'introduction'
-    ? 'Formula: two report readers /40 average + coordinator /10 + supervisor /10 + four discussion marks /40 = final /100.'
-    : 'Formula: two report readers each /30, average = /30 + supervisor /20 + committee members average /25 converted to /50 = final /100.';
+    ? 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the section supervisor first.'
+    : 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the project supervisor first.';
   loadProjects();
 }
 async function loadAll(){
-  try{
-    const f = await api('/api/evaluation/faculty');
-    faculty = f.faculty || [];
-  }catch(e){
-    faculty = [];
-    console.warn('Faculty list could not be loaded:', e.message);
-  }
   await loadProjects();
 }
 async function loadProjects(){
@@ -103,7 +102,7 @@ async function loadProjects(){
       renderStats([]);
       if(box){
         const label = currentScope === 'introduction'
-          ? 'No Project Introduction / COMP4200 projects found.'
+          ? 'No Project Introduction / COMP4200 sections found.'
           : 'No Graduation Project / COMP4300 projects found.';
         box.innerHTML = `<div class="empty">${label}</div>`;
       }
@@ -123,7 +122,7 @@ async function loadProjects(){
 function renderStats(list){
   document.getElementById('statTotal').textContent = list.length;
   document.getElementById('statOpen').textContent = list.filter(p=>Number(p.is_open)).length;
-  document.getElementById('statReady').textContent = list.filter(p=>Number(p.submitted_count||0) >= Number(p.required_count||0)).length;
+  document.getElementById('statReady').textContent = list.filter(p=>Number(p.calculated_final_score) >= 0 && !Number.isNaN(Number(p.calculated_final_score))).length;
   const finals = list.map(p=>Number(p.calculated_final_score)).filter(v=>!Number.isNaN(v));
   document.getElementById('statAvg').textContent = finals.length ? (finals.reduce((a,b)=>a+b,0)/finals.length).toFixed(1) : '—';
 }
@@ -133,12 +132,26 @@ function renderProjects(){
   renderStats(list);
   if(!list.length){
     const label = currentScope === 'introduction'
-      ? 'No Project Introduction / COMP4200 projects found.'
+      ? 'No Project Introduction / COMP4200 sections found.'
       : 'No Graduation Project / COMP4300 projects found.';
     document.getElementById('projectsBox').innerHTML = `<div class="empty">${label}</div>`;
     return;
   }
   document.getElementById('projectsBox').innerHTML = list.map(projectCard).join('');
+}
+function scoreCards(p){
+  if(currentScope === 'introduction'){
+    return `
+      <div class="eval-stat"><b>${money(p.report_score)}</b><span>Report /40</span></div>
+      <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Supervisor /10</span></div>
+      <div class="eval-stat"><b>${money(p.discussion_score)}</b><span>Discussion /40</span></div>
+      <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
+  }
+  return `
+    <div class="eval-stat"><b>${money(p.report_score)}</b><span>Report Avg /30</span></div>
+    <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Supervisor /20</span></div>
+    <div class="eval-stat"><b>${money(p.committee_score)}</b><span>Committee /50</span></div>
+    <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
 }
 function projectCard(p){
   const grades = p.grades || [];
@@ -147,51 +160,49 @@ function projectCard(p){
       <td>${componentName(g.component)}</td><td>${g.evaluator_name || '—'}</td>
       <td>${money(g.mark)} / ${money(g.max_mark)}</td>
       <td>${g.is_submitted ? '<span class="pill p-done">Submitted</span>' : '<span class="pill p-pending">Waiting</span>'}</td>
-    </tr>`).join('') : `<tr><td colspan="4">No grade tasks yet. Open grade entry or assign evaluators.</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="4">No grade tasks yet. Open grade entry to notify the assigned doctors.</td></tr>`;
   return `<div class="eval-card" id="project-${p.project_id}">
     <div class="eval-card-head">
-      <div><div class="eval-title">${p.title}</div><div class="eval-sub">Students: ${p.students || '—'} · Supervisor: ${p.supervisor_name || '—'} · Status: ${p.status}</div></div>
-      <div>${Number(p.is_open) ? '<span class="pill p-open">Grade Entry Open</span>' : '<span class="pill p-closed">Closed</span>'}</div>
+      <div>
+        <div class="eval-title">${p.title}</div>
+        <div class="eval-sub">Students: ${p.students || '—'} · Supervisor: ${p.supervisor_name || '—'} · Status: ${p.status}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <span class="pill p-flow">Coordinator → Supervisor → Head → Students</span>
+        ${Number(p.is_open) ? '<span class="pill p-open">Grade Entry Open</span>' : '<span class="pill p-closed">Closed</span>'}
+      </div>
     </div>
     <table class="grade-table"><thead><tr><th>Component</th><th>Evaluator</th><th>Mark</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="eval-grid" style="grid-template-columns:repeat(5,minmax(100px,1fr));">
-      <div class="eval-stat"><b>${money(p.report_score)}</b><span>${currentScope==='introduction'?'Report /40':'Report Avg /30'}</span></div>
-      <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>${currentScope==='introduction'?'Supervisor /10':'Supervisor /20'}</span></div>
-      <div class="eval-stat"><b>${money(p.coordinator_score)}</b><span>${currentScope==='introduction'?'Coordinator /10':'—'}</span></div>
-      <div class="eval-stat"><b>${money(p.discussion_score || p.committee_score)}</b><span>${currentScope==='introduction'?'Discussion /40':'Committee /50'}</span></div>
-      <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>
-    </div>
-    <textarea class="notes-input" id="notes-${p.project_id}" placeholder="Final coordinator notes..."></textarea>
+    <div class="eval-grid">${scoreCards(p)}</div>
+    <textarea class="notes-input" id="notes-${p.project_id}" placeholder="Notes to supervisor..."></textarea>
     <div class="btn-row">
-      <button class="mini-btn green" onclick="openWindow(${p.project_id})">Open Grade Entry + Notify</button>
-      <button class="mini-btn gray" onclick="toggleAssign(${p.project_id})">Assign Readers / Committee</button>
+      <button class="mini-btn green" onclick="openWindow(${p.project_id})">Open Grade Entry + Notify Doctors</button>
       <button class="mini-btn gray" onclick="closeWindow(${p.project_id})">Close + Calculate</button>
-      <button class="mini-btn blue" onclick="finalizeProject(${p.project_id}, 'accepted')">Accept</button>
-      <button class="mini-btn red" onclick="finalizeProject(${p.project_id}, 'rejected')">Reject</button>
-      <button class="mini-btn gray" onclick="finalizeProject(${p.project_id}, 'archived')">Publish & Archive</button>
-    </div>
-    <div class="assign-box" id="assign-${p.project_id}">
-      <div class="assign-row"><select class="componentSel">${componentOptions()}</select><select class="facultySel">${facultyOptions()}</select><button class="mini-btn green" onclick="assignOne(${p.project_id}, this)">Add Task</button></div>
-      <div style="font-size:12px;color:#667085">Tip: add two report readers. For introduction add four discussion members. For graduation add committee members.</div>
+      <button class="mini-btn blue" onclick="sendToSupervisor(${p.project_id})">Send Result to Supervisor</button>
     </div>
   </div>`;
 }
-function toggleAssign(id){ const el=document.getElementById(`assign-${id}`); el.style.display = el.style.display==='block'?'none':'block'; }
 async function openWindow(projectId){
-  try{ const d=await api('/api/coordinator/evaluation/open',{method:'POST',body:JSON.stringify({project_id:projectId,course_scope:currentScope})}); toastMsg(`Grade entry opened. Notifications sent: ${d.notifications_sent}`); await loadProjects(); }catch(e){toastMsg(e.message,false)}
+  try{
+    const d = await api('/api/coordinator/evaluation/open', {method:'POST', body:JSON.stringify({project_id:projectId, course_scope:currentScope})});
+    toastMsg(`Grade entry opened. Notifications sent: ${d.notifications_sent}`);
+    await loadProjects();
+  }catch(e){ toastMsg(e.message,false); }
 }
 async function closeWindow(projectId){
-  try{ await api('/api/coordinator/evaluation/close',{method:'POST',body:JSON.stringify({project_id:projectId,course_scope:currentScope})}); toastMsg('Closed and calculated.'); await loadProjects(); }catch(e){toastMsg(e.message,false)}
+  try{
+    await api('/api/coordinator/evaluation/close', {method:'POST', body:JSON.stringify({project_id:projectId, course_scope:currentScope})});
+    toastMsg('Grade entry closed and score calculated.');
+    await loadProjects();
+  }catch(e){ toastMsg(e.message,false); }
 }
-async function assignOne(projectId, btn){
-  const box = btn.closest('.assign-row');
-  const component = box.querySelector('.componentSel').value;
-  const faculty_id = box.querySelector('.facultySel').value;
-  try{ const d=await api('/api/coordinator/evaluation/assign',{method:'POST',body:JSON.stringify({project_id:projectId,course_scope:currentScope,assignments:[{component,faculty_id}]})}); toastMsg(`Assigned. Notifications sent: ${d.notifications_sent}`); await loadProjects(); }catch(e){toastMsg(e.message,false)}
-}
-async function finalizeProject(projectId, decision){
+async function sendToSupervisor(projectId){
   const notes = document.getElementById(`notes-${projectId}`).value;
-  try{ const d=await api('/api/coordinator/evaluation/finalize',{method:'POST',body:JSON.stringify({project_id:projectId,course_scope:currentScope,decision,notes})}); toastMsg(`Saved ${decision}. Final score: ${money(d.scores.final_score)}`); await loadProjects(); }catch(e){toastMsg(e.message,false)}
+  try{
+    const d = await api('/api/coordinator/evaluation/send-to-supervisor', {method:'POST', body:JSON.stringify({project_id:projectId, course_scope:currentScope, notes})});
+    toastMsg(d.message || 'Result sent to supervisor.');
+    await loadProjects();
+  }catch(e){ toastMsg(e.message,false); }
 }
 document.addEventListener('DOMContentLoaded', ()=>{ setScope('introduction'); loadAll(); });
 </script>

@@ -5145,3 +5145,365 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+
+-- ============================================================
+--  APMS EVALUATION FLOW FIX
+--  Coordinator -> Supervisor -> Head of Department -> Students
+--  This block is safe to re-run.
+-- ============================================================
+
+USE apms_db;
+SET NAMES utf8mb4;
+SET SQL_SAFE_UPDATES = 0;
+SET FOREIGN_KEY_CHECKS = 0;
+SET @db := DATABASE();
+
+-- ------------------------------------------------------------
+-- A) Make sure scoped notifications exist.
+-- ------------------------------------------------------------
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE notifications ADD COLUMN course_scope ENUM(''introduction'',''graduation_project'',''both'') NOT NULL DEFAULT ''both'' AFTER message',
+        'SELECT 1'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'notifications'
+      AND COLUMN_NAME = 'course_scope'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- B) Generic final evaluation result table.
+--    It works for COMP4200 sections and COMP4300 projects.
+--    The result is NOT published by coordinator.
+--    Flow: coordinator sends to supervisor, supervisor sends to head, head publishes.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS evaluation_final_results (
+    result_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_scope ENUM('introduction','graduation_project') NOT NULL,
+    reference_id INT NOT NULL COMMENT 'COMP4200: section_id, COMP4300: project_id',
+
+    report_score DECIMAL(6,2) NULL,
+    supervisor_score DECIMAL(6,2) NULL,
+    discussion_score DECIMAL(6,2) NULL,
+    committee_score DECIMAL(6,2) NULL,
+    final_score DECIMAL(6,2) NULL,
+
+    decision ENUM('pending','accepted','rejected','archived') NOT NULL DEFAULT 'pending',
+    notes TEXT NULL,
+
+    workflow_status ENUM(
+        'draft',
+        'sent_to_supervisor',
+        'sent_to_head',
+        'published_to_students'
+    ) NOT NULL DEFAULT 'draft',
+
+    sent_by_coordinator INT NULL COMMENT 'coordinator user_id',
+    sent_to_supervisor_at DATETIME NULL,
+
+    supervisor_id INT NULL COMMENT 'supervisor faculty_id',
+    supervisor_sent_by INT NULL COMMENT 'supervisor user_id',
+    supervisor_sent_to_head_at DATETIME NULL,
+
+    head_published_by INT NULL COMMENT 'head_of_department user_id',
+    head_published_at DATETIME NULL,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uq_eval_final_result_ref (course_scope, reference_id),
+    INDEX idx_eval_final_workflow (course_scope, workflow_status),
+    INDEX idx_eval_final_supervisor (supervisor_id),
+
+    FOREIGN KEY (sent_by_coordinator) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+    FOREIGN KEY (supervisor_sent_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    FOREIGN KEY (head_published_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Add workflow columns to project_final_evaluation_results too, for older backend code
+-- that still reads that table for graduation projects.
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN workflow_status ENUM(''draft'',''sent_to_supervisor'',''sent_to_head'',''published_to_students'') NOT NULL DEFAULT ''draft'' AFTER decision',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='workflow_status');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN sent_by_coordinator INT NULL AFTER published_at',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='sent_by_coordinator');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN sent_to_supervisor_at DATETIME NULL AFTER sent_by_coordinator',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='sent_to_supervisor_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN supervisor_id INT NULL AFTER sent_to_supervisor_at',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='supervisor_id');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN supervisor_sent_by INT NULL AFTER supervisor_id',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='supervisor_sent_by');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN supervisor_sent_to_head_at DATETIME NULL AFTER supervisor_sent_by',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='supervisor_sent_to_head_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN head_published_by INT NULL AFTER supervisor_sent_to_head_at',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='head_published_by');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE project_final_evaluation_results ADD COLUMN head_published_at DATETIME NULL AFTER head_published_by',
+    'SELECT 1')
+    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='project_final_evaluation_results' AND COLUMN_NAME='head_published_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- C) Clean old/wrong evaluation tasks from the old coordinator flow.
+--    - No Coordinator /10 task.
+--    - Supervisor is not allowed to be report reader/discussion member for his section.
+--    - Keep only two report readers for COMP4200.
+-- ------------------------------------------------------------
+
+-- Remove old Coordinator /10 tasks from the new task table.
+DELETE FROM evaluation_grade_tasks
+WHERE course_scope = 'introduction'
+  AND component = 'intro_coordinator';
+
+-- Remove old Coordinator /10 grades from old project_grade_entries if that table exists.
+DELETE FROM project_grade_entries
+WHERE course_scope = 'introduction'
+  AND component = 'intro_coordinator';
+
+-- Supervisor must only grade Supervisor /10, not report reader or discussion for his/her own COMP4200 section.
+DELETE egt
+FROM evaluation_grade_tasks egt
+JOIN student_distribution_sections sec ON sec.section_id = egt.reference_id
+WHERE egt.course_scope = 'introduction'
+  AND egt.evaluator_faculty_id = sec.supervisor_id
+  AND egt.component IN ('intro_report_reader','intro_discussion_member');
+
+DELETE pge
+FROM project_grade_entries pge
+JOIN student_distribution_sections sec ON sec.section_id = pge.project_id
+WHERE pge.course_scope = 'introduction'
+  AND pge.evaluator_faculty_id = sec.supervisor_id
+  AND pge.component IN ('intro_report_reader','intro_discussion_member');
+
+-- Keep only 2 report readers per COMP4200 reference.
+DELETE egt
+FROM evaluation_grade_tasks egt
+JOIN (
+    SELECT task_id
+    FROM (
+        SELECT
+            task_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY course_scope, reference_id, component
+                ORDER BY is_submitted DESC, submitted_at IS NULL, submitted_at, task_id
+            ) AS rn
+        FROM evaluation_grade_tasks
+        WHERE course_scope = 'introduction'
+          AND component = 'intro_report_reader'
+    ) ranked
+    WHERE rn > 2
+) bad ON bad.task_id = egt.task_id;
+
+DELETE pge
+FROM project_grade_entries pge
+JOIN (
+    SELECT grade_id
+    FROM (
+        SELECT
+            grade_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY course_scope, project_id, component
+                ORDER BY is_submitted DESC, submitted_at IS NULL, submitted_at, grade_id
+            ) AS rn
+        FROM project_grade_entries
+        WHERE course_scope = 'introduction'
+          AND component = 'intro_report_reader'
+    ) ranked
+    WHERE rn > 2
+) bad ON bad.grade_id = pge.grade_id;
+
+-- Make project_grade_entries enum match the new rule: no intro_coordinator component.
+ALTER TABLE project_grade_entries
+MODIFY COLUMN component ENUM(
+    'intro_report_reader',
+    'intro_supervisor',
+    'intro_discussion_member',
+    'grad_report_reader',
+    'grad_supervisor',
+    'grad_committee_member'
+) NOT NULL;
+
+-- ------------------------------------------------------------
+-- D) Views for the new flow.
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_evaluation_results_for_supervisors AS
+SELECT
+    efr.result_id,
+    efr.course_scope,
+    efr.reference_id,
+    efr.report_score,
+    efr.supervisor_score,
+    efr.discussion_score,
+    efr.committee_score,
+    efr.final_score,
+    efr.decision,
+    efr.notes,
+    efr.workflow_status,
+    efr.sent_to_supervisor_at,
+    efr.supervisor_id,
+    u_sup.full_name AS supervisor_name,
+    CASE
+        WHEN efr.course_scope = 'introduction' THEN sec.section_name
+        ELSE p.title
+    END AS item_title
+FROM evaluation_final_results efr
+LEFT JOIN student_distribution_sections sec
+       ON efr.course_scope = 'introduction'
+      AND sec.section_id = efr.reference_id
+LEFT JOIN projects p
+       ON efr.course_scope = 'graduation_project'
+      AND p.project_id = efr.reference_id
+LEFT JOIN faculty f_sup ON f_sup.faculty_id = efr.supervisor_id
+LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+WHERE efr.workflow_status IN ('sent_to_supervisor','sent_to_head','published_to_students');
+
+CREATE OR REPLACE VIEW vw_evaluation_results_for_head AS
+SELECT
+    efr.result_id,
+    efr.course_scope,
+    efr.reference_id,
+    efr.report_score,
+    efr.supervisor_score,
+    efr.discussion_score,
+    efr.committee_score,
+    efr.final_score,
+    efr.decision,
+    efr.notes,
+    efr.workflow_status,
+    efr.supervisor_sent_to_head_at,
+    efr.head_published_at,
+    u_sup.full_name AS supervisor_name,
+    CASE
+        WHEN efr.course_scope = 'introduction' THEN sec.section_name
+        ELSE p.title
+    END AS item_title
+FROM evaluation_final_results efr
+LEFT JOIN student_distribution_sections sec
+       ON efr.course_scope = 'introduction'
+      AND sec.section_id = efr.reference_id
+LEFT JOIN projects p
+       ON efr.course_scope = 'graduation_project'
+      AND p.project_id = efr.reference_id
+LEFT JOIN faculty f_sup ON f_sup.faculty_id = efr.supervisor_id
+LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+WHERE efr.workflow_status IN ('sent_to_head','published_to_students');
+
+-- ------------------------------------------------------------
+-- E) Keep section_students clean: one student can appear in one section only.
+-- ------------------------------------------------------------
+DELETE ss1
+FROM section_students ss1
+JOIN section_students ss2
+  ON ss1.student_id = ss2.student_id
+ AND ss1.section_id > ss2.section_id;
+
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE section_students ADD UNIQUE KEY uq_section_students_student (student_id)',
+        'SELECT 1'
+    )
+    FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'section_students'
+      AND INDEX_NAME = 'uq_section_students_student'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET FOREIGN_KEY_CHECKS = 1;
+SET SQL_SAFE_UPDATES = 1;
+
+-- ============================================================
+--  END APMS EVALUATION FLOW FIX
+-- ============================================================
+
+
+
+
+USE apms_db;
+SET SQL_SAFE_UPDATES = 0;
+
+CREATE TABLE IF NOT EXISTS section_report_readers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    section_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    reader_order TINYINT NOT NULL,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_section_reader_order (section_id, reader_order),
+    UNIQUE KEY uq_section_reader_faculty (section_id, faculty_id),
+    FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS project_report_readers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    project_id INT NOT NULL,
+    faculty_id INT NOT NULL,
+    reader_order TINYINT NOT NULL,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_project_reader_order (project_id, reader_order),
+    UNIQUE KEY uq_project_reader_faculty (project_id, faculty_id),
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Remove old wrong coordinator grade tasks.
+DELETE FROM evaluation_grade_tasks
+WHERE component = 'intro_coordinator';
+
+-- Supervisor must not be a report reader for his/her own section/project.
+DELETE egt
+FROM evaluation_grade_tasks egt
+JOIN student_distribution_sections sec
+  ON sec.section_id = egt.reference_id
+WHERE egt.course_scope = 'introduction'
+  AND egt.component = 'intro_report_reader'
+  AND egt.evaluator_faculty_id = sec.supervisor_id;
+
+DELETE egt
+FROM evaluation_grade_tasks egt
+JOIN projects p
+  ON p.project_id = egt.reference_id
+WHERE egt.course_scope = 'graduation_project'
+  AND egt.component = 'grad_report_reader'
+  AND egt.evaluator_faculty_id = p.supervisor_id;
+
+-- Clear old report reader choices so the committee page can regenerate them correctly.
+DELETE FROM section_report_readers;
+DELETE prr
+FROM project_report_readers prr
+JOIN projects p ON p.project_id = prr.project_id
+WHERE prr.faculty_id = p.supervisor_id;
+
+SET SQL_SAFE_UPDATES = 1;

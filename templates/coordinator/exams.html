@@ -966,31 +966,26 @@
       : 'Draft saved — not visible to students yet';
   }
 
-  function loadGradTimeline() {
-    const saved = localStorage.getItem('apms_comp4300_final_submission');
-
-    if (!saved) {
-      updateGradMeta(false, null);
-      return;
-    }
-
+  async function loadGradTimeline() {
     try {
-      const data = JSON.parse(saved);
-
-      document.getElementById('gradTitle').value =
-        data.title || 'Graduation Project Final Submission';
-
-      document.getElementById('gradStartAt').value = data.start_at || '';
-      document.getElementById('gradDeadlineAt').value = data.deadline_at || '';
-      document.getElementById('gradNote').value = data.note || '';
-
-      updateGradMeta(Boolean(data.is_published), data.published_at);
+      const data = await timelineFetch('/api/coordinator/grad-final-submission');
+      const sub = data.submission || null;
+      if (!sub) {
+        updateGradMeta(false, null);
+        return;
+      }
+      document.getElementById('gradTitle').value = sub.title || 'Graduation Project Final Submission';
+      document.getElementById('gradStartAt').value = sub.start_at || '';
+      document.getElementById('gradDeadlineAt').value = sub.deadline_at || '';
+      document.getElementById('gradNote').value = sub.note || '';
+      updateGradMeta(Boolean(sub.is_published), sub.published_at);
     } catch (err) {
       updateGradMeta(false, null);
+      setGradMessage(err.message || 'Could not load COMP4300 final submission.', 'error');
     }
   }
 
-  function saveGradTimeline(publishAfter) {
+  async function saveGradTimeline(publishAfter) {
     const title = document.getElementById('gradTitle').value.trim();
     const startAt = document.getElementById('gradStartAt').value;
     const deadlineAt = document.getElementById('gradDeadlineAt').value;
@@ -1000,57 +995,44 @@
       setGradMessage('Please write a title.', 'error');
       return;
     }
-
     if (!startAt) {
       setGradMessage('Please choose the start date and time.', 'error');
       return;
     }
-
     if (!deadlineAt) {
       setGradMessage('Please choose the final deadline.', 'error');
       return;
     }
-
     if (new Date(deadlineAt) <= new Date(startAt)) {
       setGradMessage('Final deadline must be after the start date/time.', 'error');
       return;
     }
 
-    const payload = {
-      title,
-      start_at: startAt,
-      deadline_at: deadlineAt,
-      note,
-      is_published: publishAfter,
-      published_at: publishAfter ? new Date().toLocaleString() : null
-    };
-
-    localStorage.setItem('apms_comp4300_final_submission', JSON.stringify(payload));
-
-    updateGradMeta(payload.is_published, payload.published_at);
-
-    setGradMessage(
-      publishAfter
-        ? 'COMP4300 final submission timeline published.'
-        : 'COMP4300 final submission timeline saved as draft.',
-      'ok'
-    );
+    try {
+      const data = await timelineFetch('/api/coordinator/grad-final-submission', {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          start_at: startAt,
+          deadline_at: deadlineAt,
+          note,
+          publish: publishAfter
+        })
+      });
+      await loadGradTimeline();
+      setGradMessage(data.message || (publishAfter ? 'COMP4300 final submission published.' : 'COMP4300 final submission saved as draft.'), 'ok');
+    } catch (err) {
+      setGradMessage(err.message || 'Could not save COMP4300 final submission.', 'error');
+    }
   }
 
   function clearGradTimeline() {
-    if (!confirm('Clear COMP4300 final submission timeline?')) {
-      return;
-    }
-
-    localStorage.removeItem('apms_comp4300_final_submission');
-
     document.getElementById('gradTitle').value = 'Graduation Project Final Submission';
     document.getElementById('gradStartAt').value = '';
     document.getElementById('gradDeadlineAt').value = '';
     document.getElementById('gradNote').value = '';
-
     updateGradMeta(false, null);
-    setGradMessage('Timeline cleared.', 'ok');
+    setGradMessage('Form cleared. Click Save Draft or Save & Publish to update the database.', 'ok');
   }
 
 

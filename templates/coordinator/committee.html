@@ -264,7 +264,7 @@
               <div class="card-hd"><span class="card-title">COMP4200 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Project Introduction — COMP4200</b> sections.
-                It assigns doctors, chooses a room, and creates 30-minute slots with 10-minute breaks.
+                It assigns the supervisor + 3 doctors, chooses 2 report readers from those 3 doctors, chooses a room, and creates 30-minute slots with 10-minute breaks.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -296,8 +296,9 @@
               <div class="card-hd"><span class="card-title">COMP4200 Rules</span></div>
               <div class="committee-rule-box">
                 ✓ Uses <b>student_distribution_sections</b><br>
-                ✓ Each committee has <b>4 doctors</b><br>
-                ✓ The section supervisor is included<br>
+                ✓ Each committee has <b>4 doctors</b>: supervisor + 3 doctors<br>
+                ✓ The section supervisor is included in the discussion committee<br>
+                ✓ The <b>2 report readers</b> are chosen from the 3 non-supervisor doctors<br>
                 ✓ Each discussion is <b>30 minutes</b><br>
                 ✓ There is a <b>10 minute break</b> between discussions
               </div>
@@ -362,7 +363,7 @@
               <div class="card-hd"><span class="card-title">COMP4300 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Graduation Project — COMP4300</b> projects.
-                It assigns committee members, room, time slots, and report readers.
+                It assigns the supervisor + 3 doctors, room, time slots, and 2 report readers from the 3 non-supervisor doctors.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -394,9 +395,9 @@
               <div class="card-hd"><span class="card-title">COMP4300 Rules</span></div>
               <div class="committee-rule-box">
                 ✓ Uses <b>projects</b> table with COMP4300 semester<br>
-                ✓ Each committee has <b>4 doctors</b><br>
-                ✓ The project supervisor is included<br>
-                ✓ Report readers are assigned<br>
+                ✓ Each committee has <b>4 doctors</b>: supervisor + 3 doctors<br>
+                ✓ The project supervisor is included in the committee<br>
+                ✓ The <b>2 report readers</b> are chosen from the 3 non-supervisor doctors<br>
                 ✓ Each discussion is <b>30 minutes</b>
               </div>
             </div>
@@ -750,7 +751,7 @@
                 <div class="project-meta">
                   Time: ${safeText(project.slot_start || '')} - ${safeText(project.slot_end || '')}<br>
                   Students: ${safeText(project.team_members || project.students || '—')}<br>
-                  ${courseScope === 'graduation_project' ? `Readers: ${safeText(project.reader1_name || '—')} / ${safeText(project.reader2_name || '—')}` : ''}
+                  Readers: ${safeText(project.reader1_name || '—')} / ${safeText(project.reader2_name || '—')}
                 </div>
               </div>
             `).join('') : '<div class="committee-empty">No items found.</div>'}
