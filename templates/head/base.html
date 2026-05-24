@@ -6,12 +6,63 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>APMS — {% block page_title %}Dashboard{% endblock %}</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
     rel="stylesheet">
+
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/head/styles.css') }}" />
+
+  <style>
+    .tb-notif {
+      position: relative;
+    }
+
+    .tb-notif-dot {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 9px;
+      height: 9px;
+      background: #e5484d;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      display: none;
+    }
+
+    .sb-badge {
+      margin-left: auto;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: #e5484d;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .sidebar.collapsed .sb-badge {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      min-width: 18px;
+      height: 18px;
+      font-size: 10px;
+      padding: 0 5px;
+    }
+
+    .sb-item {
+      position: relative;
+    }
+  </style>
 </head>
 
 <body data-page="{% block page_id %}dashboard{% endblock %}">
@@ -27,14 +78,17 @@
               <div class="tb-title">{% block topbar_title %}Dashboard{% endblock %}</div>
             </div>
           </div>
+
           <div class="tb-right">
             <div class="tb-profile-btn" onclick="window.location.href='/head/profile'" title="My Profile">
               {{ session.avatar_initials }}
             </div>
+
             <div class="tb-notif" onclick="window.location.href='/head/notifs'" title="Notifications">
               <span class="material-symbols-outlined icon-inline">notifications</span>
-              <div class="tb-notif-dot"></div>
+              <div class="tb-notif-dot" id="headTopNotifDot"></div>
             </div>
+
             <div class="tb-logo">APMS</div>
           </div>
         </div>
@@ -51,8 +105,43 @@
   </div>
 
   <div id="toast" class="toast"></div>
+
   <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/head/app.js') }}"></script>
+
+  <script>
+    async function loadHeadUnreadNotificationsCount() {
+      try {
+        const res = await fetch('/head/api/notifications/unread-count', {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        const data = await res.json().catch(() => ({ count: 0 }));
+        const count = Number(data.count || 0);
+
+        const badge = document.getElementById('headNotifBadge');
+        const topDot = document.getElementById('headTopNotifDot');
+
+        if (badge) {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.style.display = count > 0 ? 'inline-flex' : 'none';
+        }
+
+        if (topDot) {
+          topDot.style.display = count > 0 ? 'block' : 'none';
+        }
+      } catch (err) {
+        console.warn('Head notification count error:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadHeadUnreadNotificationsCount);
+    window.addEventListener('focus', loadHeadUnreadNotificationsCount);
+    setInterval(loadHeadUnreadNotificationsCount, 30000);
+  </script>
+
   {% block extra_scripts %}{% endblock %}
 </body>
 
