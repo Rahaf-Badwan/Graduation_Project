@@ -34,9 +34,8 @@ def api_verify_student():
                      SELECT user_id, full_name, is_active
                        FROM users 
                        WHERE university_id = %s
-                            AND email = %s
                             AND role = 'student'
-                       """, (university_id, email))
+                       """, (university_id))
         student = cursor.fetchone()
         cursor.close()
         db.close()

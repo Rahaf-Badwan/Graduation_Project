@@ -1126,3 +1126,105 @@ a.sb-item {
 .sb-profile:hover {
   background: var(--color-background-secondary)
 }
+
+/* ── Announcement Modal ── */
+input[type="number"]{
+  direction: ltr;
+  text-align: left;
+  font-family: Arial, sans-serif;
+}
+.ann-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.ann-overlay.open {
+  display: flex;
+}
+
+.ann-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  width: 100%;
+  max-width: 520px;
+  padding: 5px;
+  overflow: hidden;
+  animation: modalIn 0.18s ease;
+}
+
+@keyframes modalIn {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.ann-modal-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+
+.ann-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.ann-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--color-text-tertiary);
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.ann-close-btn:hover {
+  background: #f3f4f6;
+  color: var(--color-text-primary);
+}
+
+.ann-modal-body {
+  padding: 18px;
+}
+
+.ann-link-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Spinner */
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

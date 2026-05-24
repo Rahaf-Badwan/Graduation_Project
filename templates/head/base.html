@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 
 <head>
   <meta charset="UTF-8" />
@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/head/styles.css') }}" />
 
   <style>
+    
     .tb-notif {
       position: relative;
     }
@@ -89,7 +90,15 @@
               <div class="tb-notif-dot" id="headTopNotifDot"></div>
             </div>
 
-            <div class="tb-logo">APMS</div>
+            <button class="btn btn-outline" onclick="openAnnModal()"
+              style="font-size:12px; padding:5px 12px; display: flex; align-items: center; gap:5px;">
+              <span class="material-symbols-outlined icon-inline">campaign</span>
+              Write Announcement
+            </button>
+
+            
+
+          <div class="tb-logo">APMS</div>
           </div>
         </div>
 
@@ -103,12 +112,61 @@
       © 2026 <strong>Birzeit University</strong> — Department of Computer Science · All Rights Reserved · APMS v1.0
     </footer>
   </div>
+  <div class="ann-overlay" id="ann-overlay" onclick="closeAnnModal(event)">
+      <div class="ann-modal">
+       <div class="ann-modal-hd">
+        <span class="material-symbols-outlined icon-inline">campaign</span>
+        <span style="font-size:13px; font-weight:700;">Write Announcement</span>
+       <button class="ann-close-btn"
+        onclick="document.getElementById('ann-overlay').classList.remove('open')">
+        <span class="material-symbols-outlined icon-inline">close</span>
+      </button>
+      </div>
 
+    <div class="ann-modal-body">
+      <div id="ann-current-info" style="display:none;
+        padding:10px 12px; margin-bottom:14px;
+        background:var(--color-background-success);
+        border:0.5px solid var(--color-border-success);
+        border-radius:8px; font-size:12px;
+        color:var(--color-text-success); line-height:1.6;">
+      </div>
+
+      <div class="ann-link-box">
+        <span style="flex:1; word-break:break-all;">
+          <span class="material-symbols-outlined icon-inline">link</span>
+          <span id="ann-modal-link"></span>
+        </span>
+        <button class="btn btn-outline"
+          style="padding:3px 10px; font-size:11px; flex-shrink:0;"
+          onclick="copyLink()">Copy</button>
+      </div>
+
+      <div class="field-wrap">
+        <div class="field-label">Message</div>
+        <textarea id="ann-msg" class="field-textarea" style="min-height:80px;"
+          placeholder="e.g. Account activation is now open. Click the link to set your password."></textarea>
+      </div>
+
+      <div class="field-wrap">
+        <div class="field-label">Duration (days)</div>
+        <input id="ann-days" class="field-input" type="number" lang="en" inputmode="numeric"
+          min="1" max="90" value="20" style="max-width:110px; direction: ltr; text-align: left;">
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="createAnnModal()">Publish &#x2197;</button>
+        <button class="btn btn-outline"
+          onclick="document.getElementById('ann-overlay').classList.remove('open')">Cancel</button>
+      </div>
+
+      <div id="ann-feedback" style="display:none; margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
   <div id="toast" class="toast"></div>
-
   <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/head/app.js') }}"></script>
-
+  <script src="{{ url_for('static', filename='assets/head/announcemets.js') }}"></script>
   <script>
     async function loadHeadUnreadNotificationsCount() {
       try {

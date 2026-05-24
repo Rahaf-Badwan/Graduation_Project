@@ -29,17 +29,17 @@
         <div id="phase-verify">
           <div style="margin-bottom:14px;">
             <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Full Name</div>
-            <input id="fullName" type="text"
+            <input id="fullName" type="text" autocomplete="off" name="student_full-name" placeholder="e.g. Taima Abed"
               style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
           </div>
           <div style="margin-bottom:14px;">
             <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID</div>
-            <input id="universityId" type="text" maxlength="7" autocomplete="off" placeholder="7-digit-number"
+            <input id="universityId" type="text" name="student_University-ID" maxlength="7" autocomplete="new-password" placeholder="7-digit-number"
               style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
           </div>
           <div style="margin-bottom:14px;">
             <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
-            <input id="email" type="email" autocomplete="off" placeholder="student@students.birzeit.edu" 
+            <input id="email" type="email" name="student_email" autocomplete="off" placeholder="student@students.birzeit.edu" 
               style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
           </div>
           <div style="margin-top:18px;">
@@ -52,7 +52,7 @@
           <div id="verify-feedback" style="display:none; margin-top:12px;"></div>
         </div>
 
-        <!-- Phase 2a -->
+        <!-- Phase 2 -->
         <div id="phase-password" style="display:none;">
           <div style="margin-bottom:14px;">
             <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
@@ -118,4 +118,5 @@
 
 <script src="/static/assets/js/activate_student.js"></script>
 </body>
+
 </html>

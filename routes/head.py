@@ -17,12 +17,13 @@ from auth import login_required
 from routes.add_student import add_student_bp
 from routes.assign_rols import assign_rols_bp
 from routes.promote import promote_bp
+from routes.dashboard import dashboard_bp
 
 head_bp = Blueprint("head", __name__, url_prefix="/head")
 head_bp.register_blueprint(add_student_bp)
 head_bp.register_blueprint(assign_rols_bp)
 head_bp.register_blueprint(promote_bp)
-
+head_bp.register_blueprint(dashboard_bp)
 # ─── Dashboard ──────────────────────────────────────────────
 @head_bp.route("/")
 @head_bp.route("/dashboard")
@@ -36,14 +37,6 @@ def dashboard():
 @login_required(role="head_of_department")
 def assign_role_page():
     return render_template("head/assign.html")
-
-
-# ─── Department Overview ────────────────────────────────────
-@head_bp.route("/overview")
-@login_required(role="head_of_department")
-def overview():
-    return render_template("head/overview.html")
-
 
 # ─── Supervisors ────────────────────────────────────────────
 @head_bp.route("/supervisors")

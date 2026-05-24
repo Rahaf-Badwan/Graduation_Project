@@ -77,13 +77,48 @@ function loadCourse(courseCode){
               </div>
               `;
           }
-          doctorList.innerHTML += `
-            <div class="doctor-card">
+
+          let hourHTML = "";
+          if(d.weekly_hours != null){
+            hourHTML = `
+            <span class="hours-tag">
+              <span class="matirial-symbols-outlined icons-inline" syle="font-size:13px; vertical-align:-2px;">schedule</span>
+              ${d.weekly_hours}h/week
+              </span>`;
+          }
+
+
+
+          if(d.role === "head_of_department"){
+            doctorList.innerHTML += `
+              <div class="doctor-card doctor-card--head">
                 <div class="left">
-                  <div class="avatar">${initials}</div>
+                  <div class="avatar avatar--head" style="background:${color}">${initials}</div>
                   <div class="doctor-info">
-                    <div class="name">${d.full_name}</div>
-                    <div class="spec">${d.specialization}</div>
+                    <div class="name">
+                      ${d.full_name}
+                      <span class="role-badge role-badge--head"> Head Of Dept.</span>
+                    </div>
+                    <div class="spec">${d.specialization} ${hourHTML}</div>}
+                  </div>
+                </div>
+                <div class="right">${badgeHTML}</div>
+              </div>`;
+              doctorSelect.innerHTML += `<option value="${d.faculty_id}">${d.full_name}</option>`;
+          }
+
+          let isCoordiantor = data.coordinator && d.full_name === data.coordinator.full_name;
+          let coordTag = isCoordiantor
+             ? `<span class="role-badge role-badge--coord">Coordinator</span>`
+             : "";
+
+          doctorList.innerHTML += `
+            <div class="doctor-card ${isCoordiantor ? 'doctor-card--coord' : ''}">
+                <div class="left">
+                  <div class="avatar" style="background: ${color}">${initials}</div>
+                  <div class="doctor-info">
+                    <div class="name">${d.full_name} ${coordTag}</div>
+                    <div class="spec">${d.specialization} ${hourHTML}</div>
                   </div>
                 </div>
                 <div class="right">
@@ -91,7 +126,6 @@ function loadCourse(courseCode){
                 </div>
             </div>
           `;
-
           //select
           doctorSelect.innerHTML +=`
             <option value="${d.faculty_id}">

@@ -6,33 +6,26 @@
 {% block content %}
 <div class="page on" id="pg-assign">
   <div class="two-col" style="align-items:start">
+
+    <!-- LEFT: Form -->
     <div>
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Assign Coordinator of Projects</span>
-          <div class="tabs">
-            <button class="tab active" onclick="selectTab('COMP4200', this)">COMP4200</button>
-            <button class="tab" onclick="selectTab('COMP4300', this)">COMP4300</button>
-          </div>
         </div>
-        <div
-          style="padding:10px;background:var(--teal-light);border-radius:var(--rm);margin-bottom:14px;font-size:12px;color:var(--teal)">
+        <div style="padding:10px;background:var(--teal-light);border-radius:var(--rm);
+                    margin-bottom:14px;font-size:12px;color:var(--teal)">
           Current Coordinator: <strong id="coordinator"> </strong>
         </div>
         <div class="form-grid">
           <div class="field-wrap">
             <div class="field-label">This Semester <span class="req">*</span></div>
-            <select id="semesterSelect" class="field-select">
-              <option></option>
-            </select>
+            <select id="semesterSelect" class="field-select"><option></option></select>
           </div>
           <div class="field-wrap">
             <div class="field-label">New Coordinator <span class="req">*</span></div>
-            <select id="doctorSelect" class="field-select">
-              <option></option>
-            </select>
+            <select id="doctorSelect" class="field-select"><option></option></select>
           </div>
-
         </div>
         <div class="field-wrap">
           <div class="field-label">Notes</div>
@@ -41,23 +34,28 @@
         </div>
         <div class="btn-row">
           <button class="btn btn-primary"
-            onclick="assignCoordinator(document.getElementById('doctorSelect').value)">Confirm New Coordinator
-            &#x2197;</button>
+            onclick="assignCoordinator(document.getElementById('doctorSelect').value)">
+            Confirm New Coordinator &#x2197;
+          </button>
           <button class="btn btn-outline">Cancel</button>
         </div>
       </div>
     </div>
 
+    <!-- RIGHT: Course Overview مع التابس -->
     <div>
       <div class="card">
-        <div class="card-hd">
-          <span class="card-title">Course OverView</span>
+        <div class="card-hd" style="flex-wrap:wrap; gap:8px;">
+          <span class="card-title">Course Overview</span>
+          <div class="tabs">
+            <button class="tab active" onclick="selectTab('COMP4200', this)">COMP4200</button>
+            <button class="tab" onclick="selectTab('COMP4300', this)">COMP4300</button>
+          </div>
         </div>
-        <div id="doctorList">
-
-        </div>
+        <div id="doctorList"></div>
       </div>
     </div>
+
   </div>
 </div>
 <script src="/static/assets/head/assign_rols.js"></script>
