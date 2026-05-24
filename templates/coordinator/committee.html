@@ -264,7 +264,8 @@
               <div class="card-hd"><span class="card-title">COMP4200 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Project Introduction — COMP4200</b> sections.
-                It assigns the supervisor + 3 doctors, chooses 2 report readers from those 3 doctors, chooses a room, and creates 30-minute slots with 10-minute breaks.
+                It assigns the supervisor + 3 doctors, chooses 2 report readers from those 3 doctors, chooses a room,
+                and creates 30-minute slots with 10-minute breaks.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -363,7 +364,8 @@
               <div class="card-hd"><span class="card-title">COMP4300 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Graduation Project — COMP4300</b> projects.
-                It assigns the supervisor + 3 doctors, room, time slots, and 2 report readers from the 3 non-supervisor doctors.
+                It assigns the supervisor + 3 doctors, room, time slots, and 2 report readers from the 3 non-supervisor
+                doctors.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -659,24 +661,24 @@
   }
 
   function filterByScope(items, courseScope) {
-  if (!Array.isArray(items)) return [];
+    if (!Array.isArray(items)) return [];
 
-  return items.filter(item => {
-    const scope = normalizeCourseScope(item.course_scope);
+    return items.filter(item => {
+      const scope = normalizeCourseScope(item.course_scope);
 
-    if (scope === courseScope) return true;
+      if (scope === courseScope) return true;
 
-    if (courseScope === 'introduction') {
-      return item.section_id || item.section_name;
-    }
+      if (courseScope === 'introduction') {
+        return item.section_id || item.section_name;
+      }
 
-    if (courseScope === 'graduation_project') {
-      return !item.section_id && scope !== 'introduction';
-    }
+      if (courseScope === 'graduation_project') {
+        return !item.section_id && scope !== 'introduction';
+      }
 
-    return false;
-  });
-}
+      return false;
+    });
+  }
 
   function uniqueCommitteeItems(items, keyPicker) {
     const seen = new Set();
@@ -937,11 +939,11 @@
         return scope === 'introduction' || item.section_id || item.section_name;
       })
     ].map(normalizeIntroSectionRow)
-     .filter(item => Number(item.student_count || 0) > 0 || (item.students || item.team_members || '').trim())
-     .filter(item => {
-       const id = item.section_id || item.project_id || item.reference_id;
-       return !usedIntroSectionIds.has(String(id));
-     });
+      .filter(item => Number(item.student_count || 0) > 0 || (item.students || item.team_members || '').trim())
+      .filter(item => {
+        const id = item.section_id || item.project_id || item.reference_id;
+        return !usedIntroSectionIds.has(String(id));
+      });
 
     if (!eligible4200.length && allowFallback) {
       eligible4200 = await loadComp4200SectionsFallback(usedIntroSectionIds);
@@ -962,7 +964,7 @@
         return !hasSection && scope !== 'introduction';
       })
     ].map(normalizeGraduationProjectRow)
-     .filter(item => item.project_id || item.title);
+      .filter(item => item.project_id || item.title);
 
     eligible4300 = uniqueCommitteeItems(eligible4300, item => item.project_id || item.reference_id || item.title);
 

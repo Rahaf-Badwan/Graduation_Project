@@ -7172,6 +7172,33 @@ def coordinator_profile_api():
         cur.close()
         conn.close()
 
+@coordinator_bp.route("/api/coordinator/evaluation/unread-count", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_unread_count():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # Make sure table exists before query
+        if not _table_exists(cursor, "evaluation_grade_tasks"):
+            cursor.close()
+            db.close()
+            return jsonify({"count": 0})
+
+        cursor.execute("""
+            SELECT COUNT(DISTINCT CONCAT(course_scope, '-', reference_id)) AS count
+            FROM evaluation_grade_tasks
+            WHERE is_open = 1
+              AND COALESCE(is_submitted, 0) = 0
+        """)
+
+        row = cursor.fetchone() or {}
+        cursor.close()
+        db.close()
+
+        return jsonify({"count": int(row.get("count") or 0)})
+    except Exception as e:
+        return jsonify({"error": str(e), "count": 0}), 500
 
 @coordinator_bp.route("/api/coordinator/profile", methods=["POST"])
 @login_required(role="coordinator")

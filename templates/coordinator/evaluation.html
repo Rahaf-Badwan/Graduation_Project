@@ -7,14 +7,245 @@
 {% block content %}
 <div class="page page-single on" id="pg-evaluation">
   <style>
-    #pg-evaluation{display:block!important;padding:20px 22px 90px!important}
-    .eval-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.eval-tab{border:1px solid #d7e3dc;background:#fff;color:#2d5137;border-radius:999px;padding:9px 14px;font-weight:800;cursor:pointer}.eval-tab.on{background:#2e7d42;border-color:#2e7d42;color:#fff;box-shadow:0 8px 18px rgba(46,125,66,.18)}
-    .eval-toolbar{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:12px}.eval-toolbar input,.eval-toolbar select{border:1px solid #d7e3dc;border-radius:12px;padding:10px 12px;background:#fff;min-width:210px}
-    .eval-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;margin:12px 0}.eval-stat{border:1px solid #e7eee9;background:#fbfdfb;border-radius:14px;padding:12px}.eval-stat b{font-size:22px;color:#2e7d42;display:block}.eval-stat span{font-size:12px;color:#667085}
-    .eval-card{border:1px solid #e7eee9;border-radius:16px;background:#fff;padding:14px;margin-bottom:12px}.eval-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.eval-title{font-weight:850;color:#1f2937}.eval-sub{font-size:12px;color:#667085;margin-top:4px}.grade-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}.grade-table th,.grade-table td{border-bottom:1px solid #edf2ef;padding:9px;text-align:left}.grade-table th{color:#475467;background:#f8fbf9;font-size:12px}.pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800}.p-open{background:#ecfdf3;color:#027a48}.p-closed{background:#fef3f2;color:#b42318}.p-pending{background:#fff7e6;color:#b54708}.p-done{background:#e8f1ff;color:#175cd3}.p-flow{background:#f0f9ff;color:#026aa2}
-    .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.mini-btn{border:0;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer}.green{background:#2e7d42;color:white}.blue{background:#2563eb;color:white}.red{background:#dc2626;color:white}.gray{background:#eef2f0;color:#344054}.notes-input{width:100%;min-height:70px;border:1px solid #d7e3dc;border-radius:12px;padding:10px;margin-top:10px}.empty{padding:18px;border:1px dashed #d7e3dc;border-radius:14px;color:#667085;background:#fbfdfb}.course-badge{background:#2e7d42;color:white;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:800}
-    .workflow-box{border:1px solid #d7e3dc;background:#fbfdfb;border-radius:14px;padding:10px 12px;margin:10px 0;font-size:13px;color:#344054}.workflow-box b{color:#2e7d42}
-    @media(max-width:800px){.eval-grid{grid-template-columns:1fr 1fr}.eval-toolbar input,.eval-toolbar select{width:100%;min-width:0}}
+    #pg-evaluation {
+      display: block !important;
+      padding: 20px 22px 90px !important
+    }
+
+    .eval-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px
+    }
+
+    .eval-tab {
+      border: 1px solid #d7e3dc;
+      background: #fff;
+      color: #2d5137;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-weight: 800;
+      cursor: pointer
+    }
+
+    .eval-tab.on {
+      background: #2e7d42;
+      border-color: #2e7d42;
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(46, 125, 66, .18)
+    }
+
+    .eval-toolbar {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px
+    }
+
+    .eval-toolbar input,
+    .eval-toolbar select {
+      border: 1px solid #d7e3dc;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      min-width: 210px
+    }
+
+    .eval-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin: 12px 0
+    }
+
+    .eval-stat {
+      border: 1px solid #e7eee9;
+      background: #fbfdfb;
+      border-radius: 14px;
+      padding: 12px
+    }
+
+    .eval-stat b {
+      font-size: 22px;
+      color: #2e7d42;
+      display: block
+    }
+
+    .eval-stat span {
+      font-size: 12px;
+      color: #667085
+    }
+
+    .eval-card {
+      border: 1px solid #e7eee9;
+      border-radius: 16px;
+      background: #fff;
+      padding: 14px;
+      margin-bottom: 12px
+    }
+
+    .eval-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap
+    }
+
+    .eval-title {
+      font-weight: 850;
+      color: #1f2937
+    }
+
+    .eval-sub {
+      font-size: 12px;
+      color: #667085;
+      margin-top: 4px
+    }
+
+    .grade-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 13px
+    }
+
+    .grade-table th,
+    .grade-table td {
+      border-bottom: 1px solid #edf2ef;
+      padding: 9px;
+      text-align: left
+    }
+
+    .grade-table th {
+      color: #475467;
+      background: #f8fbf9;
+      font-size: 12px
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 800
+    }
+
+    .p-open {
+      background: #ecfdf3;
+      color: #027a48
+    }
+
+    .p-closed {
+      background: #fef3f2;
+      color: #b42318
+    }
+
+    .p-pending {
+      background: #fff7e6;
+      color: #b54708
+    }
+
+    .p-done {
+      background: #e8f1ff;
+      color: #175cd3
+    }
+
+    .p-flow {
+      background: #f0f9ff;
+      color: #026aa2
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px
+    }
+
+    .mini-btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 9px 12px;
+      font-weight: 800;
+      cursor: pointer
+    }
+
+    .green {
+      background: #2e7d42;
+      color: white
+    }
+
+    .blue {
+      background: #2563eb;
+      color: white
+    }
+
+    .red {
+      background: #dc2626;
+      color: white
+    }
+
+    .gray {
+      background: #eef2f0;
+      color: #344054
+    }
+
+    .notes-input {
+      width: 100%;
+      min-height: 70px;
+      border: 1px solid #d7e3dc;
+      border-radius: 12px;
+      padding: 10px;
+      margin-top: 10px
+    }
+
+    .empty {
+      padding: 18px;
+      border: 1px dashed #d7e3dc;
+      border-radius: 14px;
+      color: #667085;
+      background: #fbfdfb
+    }
+
+    .course-badge {
+      background: #2e7d42;
+      color: white;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 800
+    }
+
+    .workflow-box {
+      border: 1px solid #d7e3dc;
+      background: #fbfdfb;
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin: 10px 0;
+      font-size: 13px;
+      color: #344054
+    }
+
+    .workflow-box b {
+      color: #2e7d42
+    }
+
+    @media(max-width:800px) {
+      .eval-grid {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .eval-toolbar input,
+      .eval-toolbar select {
+        width: 100%;
+        min-width: 0
+      }
+    }
   </style>
 
   <div class="eval-tabs">
@@ -29,12 +260,14 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input id="searchBox" placeholder="Search project or student..." oninput="renderProjects()">
+      <button class="mini-btn green" onclick="openAllWindows()">Open Grade for All + Notify</button>
       <button class="mini-btn gray" onclick="loadAll()">Refresh</button>
     </div>
   </div>
 
   <div class="workflow-box">
-    <b>New publishing flow:</b> Coordinator opens/closes grade entry → sends calculated result to Supervisor → Supervisor sends it to Head of Department → Head publishes it to students.
+    <b>New publishing flow:</b> Coordinator opens/closes grade entry → sends calculated result to Supervisor →
+    Supervisor sends it to Head of Department → Head publishes it to students.
   </div>
 
   <div class="eval-grid">
@@ -44,124 +277,173 @@
     <div class="eval-stat"><b id="statAvg">—</b><span>Average Final Score</span></div>
   </div>
 
-  <div id="projectsBox" class="card"><div class="empty">Loading evaluation projects...</div></div>
+  <div id="projectsBox" class="card">
+    <div class="empty">Loading evaluation projects...</div>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-let currentScope = 'introduction';
-let allProjects = [];
+  let currentScope = 'introduction';
+  let allProjects = [];
 
-function toastMsg(msg, ok=true){
-  const t = document.getElementById('toast');
-  if(t){ t.textContent = msg; t.className = 'toast show'; setTimeout(()=>t.className='toast', 2200); }
-  else alert(msg);
-}
-async function api(url, options={}){
-  const res = await fetch(url, {headers:{'Content-Type':'application/json'}, ...options});
-  const data = await res.json().catch(()=>({error:'Invalid server response'}));
-  if(!res.ok) throw new Error(data.error || 'Request failed');
-  return data;
-}
-function money(v){ return (v===null || v===undefined || v==='') ? '—' : Number(v).toFixed(2); }
-function componentName(c){
-  return ({
-    intro_report_reader:'Report reader /40',
-    intro_coordinator:'Coordinator /10',
-    intro_supervisor:'Supervisor /10',
-    intro_discussion_member:'Discussion /10',
-    grad_report_reader:'Report reader /30',
-    grad_supervisor:'Supervisor /20',
-    grad_committee_member:'Committee /25'
-  })[c] || c;
-}
+  function toastMsg(msg, ok = true) {
+    const t = document.getElementById('toast');
+    if (t) { t.textContent = msg; t.className = 'toast show'; setTimeout(() => t.className = 'toast', 2200); }
+    else alert(msg);
+  }
+  async function api(url, options = {}) {
+    const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
+    const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+  function money(v) { return (v === null || v === undefined || v === '') ? '—' : Number(v).toFixed(2); }
+  function componentName(c) {
+    return ({
+      intro_report_reader: 'Report reader /40',
+      intro_coordinator: 'Coordinator /10',
+      intro_supervisor: 'Supervisor /10',
+      intro_discussion_member: 'Discussion /10',
+      grad_report_reader: 'Report reader /30',
+      grad_supervisor: 'Supervisor /20',
+      grad_committee_member: 'Committee /25'
+    })[c] || c;
+  }
 
-function setScope(scope){
-  currentScope = scope;
-  document.getElementById('tabIntro').classList.toggle('on', scope==='introduction');
-  document.getElementById('tabGrad').classList.toggle('on', scope==='graduation_project');
-  document.getElementById('scopeBadge').textContent = scope === 'introduction' ? '◑ Project Introduction — COMP4200' : '◆ Graduation Projects — COMP4300';
-  document.getElementById('formulaText').innerHTML = scope === 'introduction'
-    ? 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the section supervisor first.'
-    : 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the project supervisor first.';
-  loadProjects();
-}
-async function loadAll(){
-  await loadProjects();
-}
-async function loadProjects(){
-  const box = document.getElementById('projectsBox');
-  if(box) box.innerHTML = '<div class="empty">Loading evaluation projects...</div>';
+  function setScope(scope) {
+    currentScope = scope;
+    document.getElementById('tabIntro').classList.toggle('on', scope === 'introduction');
+    document.getElementById('tabGrad').classList.toggle('on', scope === 'graduation_project');
+    document.getElementById('scopeBadge').textContent = scope === 'introduction' ? '◑ Project Introduction — COMP4200' : '◆ Graduation Projects — COMP4300';
+    document.getElementById('formulaText').innerHTML = scope === 'introduction'
+      ? 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the section supervisor first.'
+      : 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the project supervisor first.';
+    loadProjects();
+  }
+  async function openAllWindows() {
+    const q = (document.getElementById('searchBox').value || '').toLowerCase();
 
-  try{
-    const data = await api(`/api/coordinator/evaluation/projects?course_scope=${currentScope}`);
-    allProjects = data.projects || [];
+    const list = allProjects.filter(p =>
+      `${p.title || ''} ${p.students || ''} ${p.supervisor_name || ''}`
+        .toLowerCase()
+        .includes(q)
+    );
 
-    if(!allProjects.length){
-      renderStats([]);
-      if(box){
-        const label = currentScope === 'introduction'
-          ? 'No Project Introduction / COMP4200 sections found.'
-          : 'No Graduation Project / COMP4300 projects found.';
-        box.innerHTML = `<div class="empty">${label}</div>`;
-      }
+    if (!list.length) {
+      toastMsg('No items found to open.', false);
       return;
     }
 
-    renderProjects();
-  }catch(e){
-    allProjects = [];
-    renderStats([]);
-    if(box){
-      box.innerHTML = `<div class="empty">No projects found for this tab.</div>`;
+    if (!confirm(`Open grade entry for all ${list.length} item(s) in this tab?`)) {
+      return;
     }
-    console.warn('Evaluation projects could not be loaded:', e.message);
+
+    let success = 0;
+    let failed = 0;
+    let notifications = 0;
+
+    for (const p of list) {
+      try {
+        const d = await api('/api/coordinator/evaluation/open', {
+          method: 'POST',
+          body: JSON.stringify({
+            project_id: p.project_id,
+            course_scope: currentScope
+          })
+        });
+
+        success++;
+        notifications += Number(d.notifications_sent || 0);
+      } catch (err) {
+        console.warn('Open grade failed for item:', p.project_id, err.message);
+        failed++;
+      }
+    }
+
+    toastMsg(
+      `Opened ${success} item(s). Notifications sent: ${notifications}` +
+      (failed ? ` | Failed: ${failed}` : '')
+    );
+
+    await loadProjects();
   }
-}
-function renderStats(list){
-  document.getElementById('statTotal').textContent = list.length;
-  document.getElementById('statOpen').textContent = list.filter(p=>Number(p.is_open)).length;
-  document.getElementById('statReady').textContent = list.filter(p=>Number(p.calculated_final_score) >= 0 && !Number.isNaN(Number(p.calculated_final_score))).length;
-  const finals = list.map(p=>Number(p.calculated_final_score)).filter(v=>!Number.isNaN(v));
-  document.getElementById('statAvg').textContent = finals.length ? (finals.reduce((a,b)=>a+b,0)/finals.length).toFixed(1) : '—';
-}
-function renderProjects(){
-  const q = (document.getElementById('searchBox').value || '').toLowerCase();
-  const list = allProjects.filter(p => `${p.title||''} ${p.students||''} ${p.supervisor_name||''}`.toLowerCase().includes(q));
-  renderStats(list);
-  if(!list.length){
-    const label = currentScope === 'introduction'
-      ? 'No Project Introduction / COMP4200 sections found.'
-      : 'No Graduation Project / COMP4300 projects found.';
-    document.getElementById('projectsBox').innerHTML = `<div class="empty">${label}</div>`;
-    return;
+  async function loadAll() {
+    await loadProjects();
   }
-  document.getElementById('projectsBox').innerHTML = list.map(projectCard).join('');
-}
-function scoreCards(p){
-  if(currentScope === 'introduction'){
-    return `
+  async function loadProjects() {
+    const box = document.getElementById('projectsBox');
+    if (box) box.innerHTML = '<div class="empty">Loading evaluation projects...</div>';
+
+    try {
+      const data = await api(`/api/coordinator/evaluation/projects?course_scope=${currentScope}`);
+      allProjects = data.projects || [];
+
+      if (!allProjects.length) {
+        renderStats([]);
+        if (box) {
+          const label = currentScope === 'introduction'
+            ? 'No Project Introduction / COMP4200 sections found.'
+            : 'No Graduation Project / COMP4300 projects found.';
+          box.innerHTML = `<div class="empty">${label}</div>`;
+        }
+        return;
+      }
+
+      renderProjects();
+    } catch (e) {
+      allProjects = [];
+      renderStats([]);
+      if (box) {
+        box.innerHTML = `<div class="empty">No projects found for this tab.</div>`;
+      }
+      console.warn('Evaluation projects could not be loaded:', e.message);
+    }
+  }
+  function renderStats(list) {
+    document.getElementById('statTotal').textContent = list.length;
+    document.getElementById('statOpen').textContent = list.filter(p => Number(p.is_open)).length;
+    document.getElementById('statReady').textContent = list.filter(p => Number(p.calculated_final_score) >= 0 && !Number.isNaN(Number(p.calculated_final_score))).length;
+    const finals = list.map(p => Number(p.calculated_final_score)).filter(v => !Number.isNaN(v));
+    document.getElementById('statAvg').textContent = finals.length ? (finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1) : '—';
+  }
+  function renderProjects() {
+    const q = (document.getElementById('searchBox').value || '').toLowerCase();
+    const list = allProjects.filter(p => `${p.title || ''} ${p.students || ''} ${p.supervisor_name || ''}`.toLowerCase().includes(q));
+    renderStats(list);
+    if (!list.length) {
+      const label = currentScope === 'introduction'
+        ? 'No Project Introduction / COMP4200 sections found.'
+        : 'No Graduation Project / COMP4300 projects found.';
+      document.getElementById('projectsBox').innerHTML = `<div class="empty">${label}</div>`;
+      return;
+    }
+    document.getElementById('projectsBox').innerHTML = list.map(projectCard).join('');
+  }
+  function scoreCards(p) {
+    if (currentScope === 'introduction') {
+      return `
       <div class="eval-stat"><b>${money(p.report_score)}</b><span>Report /40</span></div>
       <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Supervisor /10</span></div>
       <div class="eval-stat"><b>${money(p.discussion_score)}</b><span>Discussion /40</span></div>
       <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
-  }
-  return `
+    }
+    return `
     <div class="eval-stat"><b>${money(p.report_score)}</b><span>Report Avg /30</span></div>
     <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Supervisor /20</span></div>
     <div class="eval-stat"><b>${money(p.committee_score)}</b><span>Committee /50</span></div>
     <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
-}
-function projectCard(p){
-  const grades = p.grades || [];
-  const rows = grades.length ? grades.map(g=>`
+  }
+  function projectCard(p) {
+    const grades = p.grades || [];
+    const rows = grades.length ? grades.map(g => `
     <tr>
       <td>${componentName(g.component)}</td><td>${g.evaluator_name || '—'}</td>
       <td>${money(g.mark)} / ${money(g.max_mark)}</td>
       <td>${g.is_submitted ? '<span class="pill p-done">Submitted</span>' : '<span class="pill p-pending">Waiting</span>'}</td>
     </tr>`).join('') : `<tr><td colspan="4">No grade tasks yet. Open grade entry to notify the assigned doctors.</td></tr>`;
-  return `<div class="eval-card" id="project-${p.project_id}">
+    return `<div class="eval-card" id="project-${p.project_id}">
     <div class="eval-card-head">
       <div>
         <div class="eval-title">${p.title}</div>
@@ -181,29 +463,29 @@ function projectCard(p){
       <button class="mini-btn blue" onclick="sendToSupervisor(${p.project_id})">Send Result to Supervisor</button>
     </div>
   </div>`;
-}
-async function openWindow(projectId){
-  try{
-    const d = await api('/api/coordinator/evaluation/open', {method:'POST', body:JSON.stringify({project_id:projectId, course_scope:currentScope})});
-    toastMsg(`Grade entry opened. Notifications sent: ${d.notifications_sent}`);
-    await loadProjects();
-  }catch(e){ toastMsg(e.message,false); }
-}
-async function closeWindow(projectId){
-  try{
-    await api('/api/coordinator/evaluation/close', {method:'POST', body:JSON.stringify({project_id:projectId, course_scope:currentScope})});
-    toastMsg('Grade entry closed and score calculated.');
-    await loadProjects();
-  }catch(e){ toastMsg(e.message,false); }
-}
-async function sendToSupervisor(projectId){
-  const notes = document.getElementById(`notes-${projectId}`).value;
-  try{
-    const d = await api('/api/coordinator/evaluation/send-to-supervisor', {method:'POST', body:JSON.stringify({project_id:projectId, course_scope:currentScope, notes})});
-    toastMsg(d.message || 'Result sent to supervisor.');
-    await loadProjects();
-  }catch(e){ toastMsg(e.message,false); }
-}
-document.addEventListener('DOMContentLoaded', ()=>{ setScope('introduction'); loadAll(); });
+  }
+  async function openWindow(projectId) {
+    try {
+      const d = await api('/api/coordinator/evaluation/open', { method: 'POST', body: JSON.stringify({ project_id: projectId, course_scope: currentScope }) });
+      toastMsg(`Grade entry opened. Notifications sent: ${d.notifications_sent}`);
+      await loadProjects();
+    } catch (e) { toastMsg(e.message, false); }
+  }
+  async function closeWindow(projectId) {
+    try {
+      await api('/api/coordinator/evaluation/close', { method: 'POST', body: JSON.stringify({ project_id: projectId, course_scope: currentScope }) });
+      toastMsg('Grade entry closed and score calculated.');
+      await loadProjects();
+    } catch (e) { toastMsg(e.message, false); }
+  }
+  async function sendToSupervisor(projectId) {
+    const notes = document.getElementById(`notes-${projectId}`).value;
+    try {
+      const d = await api('/api/coordinator/evaluation/send-to-supervisor', { method: 'POST', body: JSON.stringify({ project_id: projectId, course_scope: currentScope, notes }) });
+      toastMsg(d.message || 'Result sent to supervisor.');
+      await loadProjects();
+    } catch (e) { toastMsg(e.message, false); }
+  }
+  document.addEventListener('DOMContentLoaded', () => { setScope('introduction'); loadAll(); });
 </script>
 {% endblock %}

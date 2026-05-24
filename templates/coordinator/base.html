@@ -51,6 +51,32 @@
     </footer>
   </div>
 
+  <script>
+  async function loadCoordinatorEvaluationBadge() {
+    try {
+      const res = await fetch('/api/coordinator/evaluation/unread-count', {
+        headers: { 'Accept': 'application/json' }
+      });
+
+      const data = await res.json().catch(() => ({ count: 0 }));
+      const count = Number(data.count || 0);
+
+      const badge = document.getElementById('coordEvaluationBadge');
+
+      if (badge) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.style.display = count > 0 ? 'inline-flex' : 'none';
+      }
+    } catch (err) {
+      console.warn('Evaluation badge error:', err);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadCoordinatorEvaluationBadge);
+  window.addEventListener('focus', loadCoordinatorEvaluationBadge);
+  setInterval(loadCoordinatorEvaluationBadge, 30000);
+</script>
+
   <div id="toast" class="toast"></div>
   <script src="{{ url_for('static', filename='assets/coordinator/app.js') }}"></script>
   {% block extra_scripts %}{% endblock %}
