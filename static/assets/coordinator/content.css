@@ -603,6 +603,7 @@ body.sidebar-collapsed .sb-item:hover::before {
 /* Sidebar green border */
 .sidebar {
   border-right: 2px solid var(--accent);
+}
 
 /* ── Sidebar section labels ─────────────────────── */
 .sb-section {

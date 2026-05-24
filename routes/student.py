@@ -899,56 +899,33 @@ def _student_active_semester(cursor):
 
 
 def _target_semester_for_submission(cursor, student_id, timeline_item_id=None):
-    """Return the student's actual course semester.
-
-    Priority:
-    1) If the student is already a member of any COMP4300 project, treat them as COMP4300.
-    2) Else use student_course_results promotion info.
-    3) Else fallback to COMP4200.
-    """
     cursor.execute(
         """
-        SELECT s.semester_id, s.academic_year, s.course_code, s.start_date, s.end_date
-        FROM project_members pm
-        JOIN projects p ON p.project_id = pm.project_id
-        JOIN semesters s ON s.semester_id = p.semester_id
-        WHERE pm.student_id = %s
-          AND s.course_code = 'COMP4300'
-        ORDER BY s.is_active DESC, s.semester_id DESC, p.project_id DESC
-        LIMIT 1
+        SELECT scr.status AS course_status,
+               scr.promoted_to_semester_id,
+               scr.promoted_at
+        FROM   student_course_results scr
+        JOIN   semesters s ON s.semester_id = scr.semester_id
+        WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
+        ORDER  BY scr.semester_id DESC LIMIT 1
         """,
         (student_id,),
     )
-    comp4300_semester = cursor.fetchone()
-    if comp4300_semester:
-        return comp4300_semester, "COMP4300", "active_project"
-
-    result_row = None
-    if _table_exists_student(cursor, "student_course_results"):
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM   student_course_results scr
-            JOIN   semesters s ON s.semester_id = scr.semester_id
-            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
-            ORDER  BY scr.semester_id DESC LIMIT 1
-            """,
-            (student_id,),
-        )
-        result_row = cursor.fetchone()
-
+    result_row = cursor.fetchone()
     course_status = (result_row or {}).get("course_status", "pending")
     promoted_to = (result_row or {}).get("promoted_to_semester_id")
     promoted_at = (result_row or {}).get("promoted_at")
     is_promoted = bool(promoted_to or promoted_at)
     target_course = "COMP4300" if course_status == "passed" and is_promoted else "COMP4200"
+    if target_course == "COMP4300":
+        _cleanup_comp4200_state_for_promoted_student(
+            cursor, student_id, promoted_at=promoted_at
+        )
 
     if target_course == "COMP4300" and promoted_to:
         cursor.execute(
             """
-            SELECT semester_id, academic_year, course_code, start_date, end_date
+            SELECT semester_id, academic_year, course_code
             FROM semesters
             WHERE semester_id = %s AND course_code = 'COMP4300'
             LIMIT 1
@@ -971,6 +948,160 @@ def _target_semester_for_submission(cursor, student_id, timeline_item_id=None):
     return cursor.fetchone(), target_course, course_status
 
 
+def _student_published_intro_timeline(cursor):
+    if not _student_intro_timeline_tables_ready(cursor):
+        return None
+
+    semester = _student_active_semester(cursor)
+    if not semester:
+        return None
+
+    cursor.execute(
+        """
+        SELECT timeline_id, semester_id, title, note, is_published, published_at, updated_at
+        FROM comp4200_timelines
+        WHERE semester_id = %s AND is_published = TRUE
+        LIMIT 1
+        """,
+        (semester["semester_id"],),
+    )
+    return cursor.fetchone()
+
+
+def _student_dashboard_milestone_progress(
+    cursor, student_id, project_id=None, final_report_uploaded=False
+):
+    milestone_total = 0
+    milestone_submitted = 0
+    last_milestone_submission = ""
+    last_milestone_title = ""
+
+    try:
+        timeline = _student_published_intro_timeline(cursor)
+        timeline_id = (timeline or {}).get("timeline_id")
+        if timeline_id:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM comp4200_timeline_items
+                WHERE timeline_id = %s
+                  AND is_deadline = TRUE
+                  AND COALESCE(is_archived, FALSE) = FALSE
+                """,
+                (timeline_id,),
+            )
+            milestone_total = int((cursor.fetchone() or {}).get("total") or 0)
+
+            cursor.execute("""
+                SELECT COUNT(*) AS tbl_exists
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'milestone_submissions'
+            """)
+            if (cursor.fetchone() or {}).get("tbl_exists"):
+                if project_id:
+                    submit_where = """
+                          AND (
+                                ms.project_id = %s
+                             OR ms.student_id = %s
+                             OR EXISTS (
+                                  SELECT 1
+                                  FROM project_members pm_team
+                                  WHERE pm_team.project_id = %s
+                                    AND pm_team.student_id = ms.student_id
+                                )
+                          )
+                    """
+                    submit_params = (project_id, student_id, project_id)
+                else:
+                    submit_where = " AND ms.student_id = %s"
+                    submit_params = (student_id,)
+
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(DISTINCT ms.item_id) AS submitted
+                    FROM milestone_submissions ms
+                    JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                    WHERE ti.timeline_id = %s
+                    {submit_where}
+                    """,
+                    (timeline_id, *submit_params),
+                )
+                milestone_submitted = int(
+                    (cursor.fetchone() or {}).get("submitted") or 0
+                )
+
+                cursor.execute(
+                    f"""
+                    SELECT ms.submitted_at, ti.title
+                    FROM milestone_submissions ms
+                    JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                    WHERE ti.timeline_id = %s
+                    {submit_where}
+                    ORDER BY ms.submitted_at DESC
+                    LIMIT 1
+                    """,
+                    (timeline_id, *submit_params),
+                )
+                last_row = cursor.fetchone() or {}
+                last_milestone_submission = _fmt_date(last_row.get("submitted_at"))
+                last_milestone_title = last_row.get("title") or ""
+    except Exception:
+        milestone_total = 0
+        milestone_submitted = 0
+        last_milestone_submission = ""
+        last_milestone_title = ""
+
+    total_steps = milestone_total + 1
+    completed_steps = min(milestone_submitted, milestone_total) + (
+        1 if final_report_uploaded else 0
+    )
+    overall = (
+        100
+        if final_report_uploaded
+        else round((completed_steps / total_steps) * 100) if total_steps else 0
+    )
+
+    return {
+        "submitted": min(milestone_submitted, milestone_total),
+        "total": milestone_total,
+        "final_report_uploaded": final_report_uploaded,
+        "last_submission": last_milestone_submission,
+        "last_submission_title": last_milestone_title,
+        "overall": overall,
+    }
+
+
+def _student_intro_timeline_deadlines(cursor, limit=5):
+    timeline = _student_published_intro_timeline(cursor)
+    timeline_id = (timeline or {}).get("timeline_id")
+    if not timeline_id:
+        return []
+
+    cursor.execute(
+        """
+        SELECT title, due_date
+        FROM comp4200_timeline_items
+        WHERE timeline_id = %s
+          AND is_deadline = TRUE
+          AND COALESCE(is_archived, FALSE) = FALSE
+          AND due_date >= CURDATE()
+        ORDER BY due_date ASC, item_order ASC, item_id ASC
+        LIMIT %s
+        """,
+        (timeline_id, limit),
+    )
+    return [
+        {
+            "label": row.get("title") or "Timeline milestone",
+            "date_str": _fmt_short(row.get("due_date")),
+            "deadline_type": "timeline",
+            "_sort": _as_date(row.get("due_date")),
+        }
+        for row in cursor.fetchall()
+    ]
+
+
 @student_bp.route("/timeline")
 @login_required(role="student")
 def timeline():
@@ -983,6 +1114,16 @@ def api_student_intro_timeline():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        if not _student_intro_timeline_tables_ready(cursor):
+            cursor.close()
+            db.close()
+            return jsonify(
+                {
+                    "timeline": None,
+                    "items": [],
+                    "message": "The coordinator has not published the timeline yet.",
+                }
+            )
         cursor.execute(
             "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
             (session["user_id"],),
@@ -991,88 +1132,55 @@ def api_student_intro_timeline():
         if not student_row:
             cursor.close()
             db.close()
-            return jsonify({"timeline": None, "items": [], "message": "No student profile found."})
+            return jsonify(
+                {"timeline": None, "items": [], "message": "No student profile found."}
+            )
 
-        semester, target_course, _ = _target_semester_for_submission(cursor, student_row["student_id"])
-        semester_id = (semester or {}).get("semester_id")
-
-        # COMP4300 students read only COMP4300 coordinator deliverables/final submission.
+        _, target_course, _ = _target_semester_for_submission(
+            cursor, student_row["student_id"]
+        )
         if target_course == "COMP4300":
-            items = []
-            if semester_id and _table_exists_student(cursor, "coordinator_deliverables"):
-                cursor.execute(
-                    """
-                    SELECT deliverable_id, title, description, start_at, due_date, due_at,
-                           mark_points, status, is_published, created_at, published_at
-                    FROM coordinator_deliverables
-                    WHERE semester_id = %s
-                      AND course_scope = 'graduation_project'
-                      AND status IN ('open','in_progress','not_open')
-                      AND COALESCE(is_published, 0) = 1
-                    ORDER BY COALESCE(due_at, due_date, '9999-12-31'), deliverable_id
-                    """,
-                    (semester_id,),
-                )
-                for idx, row in enumerate(cursor.fetchall(), start=1):
-                    start_at = row.get("start_at") or row.get("created_at")
-                    due_at = row.get("due_at")
-                    items.append(
-                        {
-                            "item_id": row["deliverable_id"],
-                            "item_order": idx,
-                            "title": row.get("title") or "Graduation Project Deliverable",
-                            "description": row.get("description") or "",
-                            "start_date": start_at.strftime("%Y-%m-%dT%H:%M") if hasattr(start_at, "strftime") else str(start_at or "")[:16].replace(" ", "T"),
-                            "start_time": "",
-                            "due_date": due_at.strftime("%Y-%m-%dT%H:%M") if hasattr(due_at, "strftime") else str(row.get("due_date") or ""),
-                            "due_time": "",
-                            "milestone_label": f"Graduation Deliverable / {float(row.get('mark_points') or 0):g}",
-                            "submitted_to": "coordinator",
-                            "is_deadline": True,
-                            "status": row.get("status") or "not_open",
-                            "course_scope": "graduation_project",
-                        }
-                    )
+            db.commit()
             cursor.close()
             db.close()
             return jsonify(
-                _json_safe(
-                    {
-                        "timeline": {
-                            "timeline_id": None,
-                            "semester_id": semester_id,
-                            "title": "COMP4300 Graduation Project Deliverables",
-                            "note": "Deliverables posted by the coordinator for Graduation Projects.",
-                            "is_published": True,
-                            "published_at": None,
-                        },
-                        "items": items,
-                        "message": "No COMP4300 deliverables are posted yet." if not items else "",
-                        "target_course": target_course,
-                    }
-                )
+                {
+                    "timeline": {
+                        "timeline_id": None,
+                        "semester_id": None,
+                        "title": "COMP4300 Project Timeline",
+                        "note": "COMP4200 milestone items were cleared after promotion.",
+                        "is_published": True,
+                        "published_at": None,
+                    },
+                    "items": [],
+                    "message": "No COMP4300 timeline items are published yet.",
+                    "target_course": target_course,
+                }
             )
-
-        # COMP4200 students read only COMP4200 timeline.
-        if not _student_intro_timeline_tables_ready(cursor):
+        semester = _student_active_semester(cursor)
+        if not semester:
             cursor.close()
             db.close()
-            return jsonify({"timeline": None, "items": [], "message": "The coordinator has not published the timeline yet."})
-
+            return jsonify(
+                {"timeline": None, "items": [], "message": "No active semester found."}
+            )
         timeline = _student_published_intro_timeline(cursor)
         if not timeline:
             cursor.close()
             db.close()
-            return jsonify({"timeline": None, "items": [], "message": "The coordinator has not published the timeline yet."})
-
+            return jsonify(
+                {
+                    "timeline": None,
+                    "items": [],
+                    "message": "The coordinator has not published the timeline yet.",
+                }
+            )
         cursor.execute(
             """
-            SELECT item_id, item_order, title, description, start_date, start_time,
-                   due_date, due_time, milestone_label, submitted_to, is_deadline
+            SELECT item_id, item_order, title, description, start_date, start_time, due_date, due_time, milestone_label, submitted_to, is_deadline
             FROM comp4200_timeline_items
-            WHERE timeline_id = %s
-              AND COALESCE(is_archived, FALSE) = FALSE
-              AND is_deadline = TRUE
+            WHERE timeline_id = %s AND COALESCE(is_archived, FALSE) = FALSE AND is_deadline = TRUE
             ORDER BY item_order ASC, due_date ASC, item_id ASC
             """,
             (timeline["timeline_id"],),
@@ -1080,20 +1188,25 @@ def api_student_intro_timeline():
         items = cursor.fetchall()
         for item in items:
             item["is_deadline"] = bool(item.get("is_deadline"))
+            # Combine date+time for frontend datetime-local display
             s_date = str(item.get("start_date") or "")
             s_time = (item.get("start_time") or "").strip()
             item["start_date"] = f"{s_date}T{s_time}" if s_date and s_time else s_date
             due_date_str = str(item.get("due_date") or "")
             due_time_str = (item.get("due_time") or "").strip()
-            item["due_date"] = f"{due_date_str}T{due_time_str}" if due_date_str and due_time_str else due_date_str
+            if due_date_str and due_time_str:
+                item["due_date"] = f"{due_date_str}T{due_time_str}"
+            else:
+                item["due_date"] = due_date_str
         timeline["is_published"] = bool(timeline.get("is_published"))
         cursor.close()
         db.close()
-        return jsonify(_json_safe({"timeline": timeline, "items": items, "target_course": target_course}))
+        return jsonify(_json_safe({"timeline": timeline, "items": items}))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
+# ─── Registration ───────────────────────────────────────────
 @student_bp.route("/registration")
 @login_required(role="student")
 def registration():
@@ -3175,158 +3288,6 @@ def api_milestone_submit():
             return jsonify({"error": "Student record not found."}), 404
         student_id = st_row["student_id"]
 
-        semester, target_course, _ = _target_semester_for_submission(cursor, student_id)
-        if target_course == "COMP4300":
-            deliverable_id = int(item_id)
-            cursor.execute(
-                """
-                SELECT cd.deliverable_id, cd.title, cd.description, cd.start_at, cd.due_at,
-                       cd.due_date, cd.status, cd.course_scope, cd.semester_id
-                FROM coordinator_deliverables cd
-                JOIN semesters s ON s.semester_id = cd.semester_id
-                WHERE cd.deliverable_id = %s
-                  AND cd.course_scope = 'graduation_project'
-                  AND s.course_code = 'COMP4300'
-                  AND COALESCE(cd.is_published, 0) = 1
-                LIMIT 1
-                """,
-                (deliverable_id,),
-            )
-            deliverable = cursor.fetchone()
-            if not deliverable:
-                cursor.close()
-                db.close()
-                return jsonify({"error": "COMP4300 deliverable not found."}), 404
-            if deliverable.get("status") not in ("open", "in_progress"):
-                cursor.close()
-                db.close()
-                return jsonify({"error": "This COMP4300 submission is not open."}), 400
-
-            from datetime import datetime as _datetime, date as _date
-            now = _datetime.now()
-            start_at = deliverable.get("start_at")
-            due_at = deliverable.get("due_at")
-            if not due_at and deliverable.get("due_date"):
-                due_date_val = _as_date(deliverable.get("due_date"))
-                due_at = _datetime(due_date_val.year, due_date_val.month, due_date_val.day, 23, 59)
-            if start_at and now < start_at:
-                cursor.close()
-                db.close()
-                return jsonify({"error": "The submission window has not opened yet."}), 403
-            if due_at and now > due_at:
-                cursor.close()
-                db.close()
-                return jsonify({"error": "The submission window has closed. No more uploads are allowed."}), 403
-
-            cursor.execute(
-                """
-                SELECT p.project_id, p.title
-                FROM project_members pm
-                JOIN projects p ON p.project_id = pm.project_id
-                JOIN semesters s ON s.semester_id = p.semester_id
-                WHERE pm.student_id = %s
-                  AND s.course_code = 'COMP4300'
-                ORDER BY p.project_id DESC
-                LIMIT 1
-                """,
-                (student_id,),
-            )
-            project_row = cursor.fetchone()
-            project_id = (project_row or {}).get("project_id")
-            project_title = (project_row or {}).get("title") or "your COMP4300 project"
-            if not project_id:
-                cursor.close()
-                db.close()
-                return jsonify({"error": "No COMP4300 project found for this student."}), 404
-
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS coordinator_deliverable_submissions (
-                    submission_id INT PRIMARY KEY AUTO_INCREMENT,
-                    deliverable_id INT NOT NULL,
-                    student_id INT NOT NULL,
-                    project_id INT NULL,
-                    file_name VARCHAR(255) NOT NULL,
-                    file_path VARCHAR(600) NULL,
-                    file_data LONGBLOB NULL,
-                    file_mime VARCHAR(120) NULL,
-                    file_size_mb DECIMAL(7,2) NULL,
-                    submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE KEY uq_deliverable_student (deliverable_id, student_id),
-                    INDEX idx_cds_project (project_id),
-                    FOREIGN KEY (deliverable_id) REFERENCES coordinator_deliverables(deliverable_id) ON DELETE CASCADE,
-                    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
-                    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE SET NULL
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                """
-            )
-
-            file_name = secure_filename(f.filename) or "submission_file"
-            file_data = f.read()
-            file_mime = f.mimetype or "application/octet-stream"
-            file_size_mb = round(size_bytes / (1024 * 1024), 2)
-
-            cursor.execute(
-                """
-                SELECT cds.submission_id, cds.student_id, u.full_name AS submitted_by
-                FROM coordinator_deliverable_submissions cds
-                JOIN students st ON st.student_id = cds.student_id
-                JOIN users u ON u.user_id = st.user_id
-                WHERE cds.deliverable_id = %s
-                  AND cds.project_id = %s
-                ORDER BY cds.submitted_at DESC
-                LIMIT 1
-                """,
-                (deliverable_id, project_id),
-            )
-            existing_submission = cursor.fetchone()
-            if existing_submission and int(existing_submission.get("student_id")) != int(student_id):
-                cursor.close()
-                db.close()
-                return jsonify({
-                    "error": f"This COMP4300 deliverable has already been submitted by {existing_submission.get('submitted_by') or 'a teammate'}. Only one submission is allowed per team.",
-                    "already_submitted_by_team": True,
-                }), 409
-
-            cursor.execute(
-                """
-                INSERT INTO coordinator_deliverable_submissions
-                    (deliverable_id, student_id, project_id, file_name, file_data, file_mime, file_size_mb)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    project_id = VALUES(project_id),
-                    file_name = VALUES(file_name),
-                    file_data = VALUES(file_data),
-                    file_mime = VALUES(file_mime),
-                    file_size_mb = VALUES(file_size_mb),
-                    submitted_at = CURRENT_TIMESTAMP
-                """,
-                (deliverable_id, student_id, project_id, file_name, file_data, file_mime, file_size_mb),
-            )
-
-            # Notify coordinator and project supervisor if possible.
-            cursor.execute("SELECT user_id FROM users WHERE role = 'coordinator' AND is_active = TRUE")
-            for rec in cursor.fetchall():
-                cursor.execute(
-                    """
-                    INSERT INTO notifications
-                        (recipient_id, sender_id, notification_type, title, message, related_project_id, is_read)
-                    VALUES (%s, %s, 'file_uploaded', %s, %s, %s, FALSE)
-                    """,
-                    (
-                        rec["user_id"],
-                        user_id,
-                        "COMP4300 deliverable submitted",
-                        f"{project_title}: {deliverable.get('title') or 'Deliverable'} has been submitted.",
-                        project_id,
-                    ),
-                )
-
-            db.commit()
-            cursor.close()
-            db.close()
-            return jsonify({"success": True, "message": "COMP4300 submission uploaded successfully."})
-
         # ── جيب بيانات الـ milestone item ─────────────────────────
         cursor.execute(
             """
@@ -3957,6 +3918,7 @@ def api_student_distribution_submit():
     member_ids = [
         str(x).strip() for x in (data.get("member_ids") or []) if str(x).strip()
     ]
+    user_id = session.get("user_id")
     user_uid = session.get("university_id")
 
     if user_uid and user_uid not in member_ids:
@@ -4004,21 +3966,40 @@ def api_student_distribution_submit():
         for uid in member_ids:
             cursor.execute(
                 """
-                SELECT st.student_id
+                SELECT st.student_id, u.user_id, u.is_active
                 FROM students st
                 JOIN users u ON u.user_id = st.user_id
-                JOIN student_course_results scr ON scr.student_id = st.student_id
                 WHERE u.university_id = %s
                   AND u.role = 'student'
-                  AND scr.semester_id = %s
-                  AND COALESCE(scr.status, 'pending') <> 'passed'
-                  AND scr.promoted_to_semester_id IS NULL
-                  AND scr.promoted_at IS NULL
                 LIMIT 1
                 """,
-                (uid, semester["semester_id"]),
+                (uid,),
             )
-            if not cursor.fetchone():
+            member_row = cursor.fetchone()
+            if not member_row:
+                cursor.close()
+                db.close()
+                return (
+                    jsonify(
+                        {
+                            "error": f"Student {uid} was not found."
+                        }
+                    ),
+                    400,
+                )
+            if not member_row.get("is_active"):
+                cursor.close()
+                db.close()
+                return (
+                    jsonify(
+                        {
+                            "error": f"Student {uid} cannot be added because their account is inactive."
+                        }
+                    ),
+                    400,
+                )
+            member_context = _student_course_context(cursor, member_row["user_id"])
+            if member_context.get("target_course") != "COMP4200":
                 cursor.close()
                 db.close()
                 return (
@@ -4110,7 +4091,9 @@ def api_student_distribution_submit():
                 """
                 SELECT st.student_id FROM students st
                 JOIN users u ON u.user_id = st.user_id
-                WHERE u.university_id = %s AND u.role = 'student'
+                WHERE u.university_id = %s
+                  AND u.role = 'student'
+                  AND u.is_active = TRUE
             """,
                 (uid,),
             )

@@ -25,11 +25,15 @@ function readSidebarState() {
 function openSidebar() {
   const s = getSidebar();
   if (s) s.classList.remove('collapsed');
+  document.body.classList.remove('sidebar-collapsed');
 }
 
 function closeSidebar() {
   const s = getSidebar();
-  if (s && !sidebarPinned) s.classList.add('collapsed');
+  if (s && !sidebarPinned) {
+    s.classList.add('collapsed');
+    document.body.classList.add('sidebar-collapsed');
+  }
 }
 
 function applySidebarState() {
@@ -37,6 +41,7 @@ function applySidebarState() {
   if (!s) return;
   sidebarPinned = readSidebarState();
   s.classList.toggle('collapsed', !sidebarPinned);
+  document.body.classList.toggle('sidebar-collapsed', !sidebarPinned);
 }
 
 function toggleCoordSidebar() {
@@ -44,6 +49,7 @@ function toggleCoordSidebar() {
   if (!s) return;
   sidebarPinned = !sidebarPinned;
   s.classList.toggle('collapsed', !sidebarPinned);
+  document.body.classList.toggle('sidebar-collapsed', !sidebarPinned);
   persistSidebarState();
 }
 
