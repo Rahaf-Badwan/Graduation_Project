@@ -266,8 +266,8 @@
   </div>
 
   <div class="workflow-box">
-    <b>New publishing flow:</b> Coordinator opens/closes grade entry → sends calculated result to Supervisor →
-    Supervisor sends it to Head of Department → Head publishes it to students.
+    <b>Committee-based evaluation:</b> Nothing appears here until a committee is created in the Committee page.
+    Doctors/readers are taken from the committee setup only. Coordinator opens/closes grade entry here, then sends the calculated result to Supervisor → Head → Students.
   </div>
 
   <div class="eval-grid">
@@ -318,8 +318,8 @@
     document.getElementById('tabGrad').classList.toggle('on', scope === 'graduation_project');
     document.getElementById('scopeBadge').textContent = scope === 'introduction' ? '◑ Project Introduction — COMP4200' : '◆ Graduation Projects — COMP4300';
     document.getElementById('formulaText').innerHTML = scope === 'introduction'
-      ? 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the section supervisor first.'
-      : 'Coordinator does not assign readers/committee here and does not publish to students. Final result is sent to the project supervisor first.';
+      ? 'This page reads COMP4200 sections from created committees only. Readers and discussion doctors come from Committee page.'
+      : 'This page reads COMP4300 projects from created committees only. Readers and committee doctors come from Committee page.';
     loadProjects();
   }
   async function openAllWindows() {
@@ -384,8 +384,8 @@
         renderStats([]);
         if (box) {
           const label = currentScope === 'introduction'
-            ? 'No Project Introduction / COMP4200 sections found.'
-            : 'No Graduation Project / COMP4300 projects found.';
+            ? 'No COMP4200 sections are ready for evaluation. Create committees first in the Committee page.'
+            : 'No COMP4300 projects are ready for evaluation. Create committees first in the Committee page.';
           box.innerHTML = `<div class="empty">${label}</div>`;
         }
         return;
@@ -414,8 +414,8 @@
     renderStats(list);
     if (!list.length) {
       const label = currentScope === 'introduction'
-        ? 'No Project Introduction / COMP4200 sections found.'
-        : 'No Graduation Project / COMP4300 projects found.';
+        ? 'No COMP4200 sections are ready for evaluation. Create committees first in the Committee page.'
+        : 'No COMP4300 projects are ready for evaluation. Create committees first in the Committee page.';
       document.getElementById('projectsBox').innerHTML = `<div class="empty">${label}</div>`;
       return;
     }
@@ -447,7 +447,7 @@
     <div class="eval-card-head">
       <div>
         <div class="eval-title">${p.title}</div>
-        <div class="eval-sub">Students: ${p.students || '—'} · Supervisor: ${p.supervisor_name || '—'} · Status: ${p.status}</div>
+        <div class="eval-sub">Committee: ${p.committee_name || '—'} · Students: ${p.students || '—'} · Supervisor: ${p.supervisor_name || '—'} · Status: ${p.status || p.committee_status || 'scheduled'}</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
         <span class="pill p-flow">Coordinator → Supervisor → Head → Students</span>

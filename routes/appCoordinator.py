@@ -5161,6 +5161,23 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
     return cursor.fetchall()
 
 
+def _committee_fetch_faculty_options(cursor):
+    """Return active faculty doctors for manual responsible/reader selectors."""
+    cursor.execute("""
+        SELECT
+            f.faculty_id,
+            u.full_name,
+            f.specialization,
+            COALESCE(f.years_experience, 0) AS years_experience
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
+          AND u.is_active = TRUE
+        ORDER BY u.full_name ASC
+    """)
+    return cursor.fetchall()
+
+
 def _committee_dashboard_payload(cursor):
     _committee_ensure_course_schema(cursor)
     _committee_ensure_report_readers_table(cursor)
@@ -5218,11 +5235,16 @@ def _committee_dashboard_payload(cursor):
             "course_scope": p.get("course_scope") or "graduation_project",
             "discussion_date": p["discussion_date"],
             "start_time": p["start_time"],
+            "end_time": p.get("end_time"),
             "room_name": p["room_name"],
             "status": p["status"],
             "projects_count": p["projects_count"],
+            "responsible_faculty_id": p.get("responsible_faculty_id"),
             "responsible_name": p["responsible_name"],
+            "supervisor_faculty_id": p.get("supervisor_faculty_id") or p.get("responsible_faculty_id"),
             "supervisor_name": p.get("supervisor_name") or p.get("responsible_name"),
+            "members": p.get("members", []),
+            "projects": p.get("projects", []),
         }
         for p in plans
     ]
@@ -5236,6 +5258,7 @@ def _committee_dashboard_payload(cursor):
         "eligible_projects_4300": eligible_projects_4300,
         "plans": plans,
         "current_committees": current_committees,
+        "faculty_options": _committee_fetch_faculty_options(cursor),
         "stats": {
             "formed": int(stat_row.get("formed") or 0),
             "ongoing": int(stat_row.get("ongoing_count") or 0),
@@ -5380,13 +5403,18 @@ def _committee_generate_internal(
 
     committee_groups = []
     for supervisor_id, supervisor_projects in projects_by_supervisor.items():
+        # IMPORTANT RULE:
+        # Items inside the same committee must all belong to the SAME supervisor.
+        # We therefore split each supervisor's projects into separate chunks instead
+        # of mixing projects from different supervisors.
         random.shuffle(supervisor_projects)
-        committee_groups.append(
-            {
-                "supervisor_id": supervisor_id,
-                "projects": supervisor_projects,
-            }
-        )
+        for i in range(0, len(supervisor_projects), projects_per_committee):
+            chunk = supervisor_projects[i:i + projects_per_committee]
+            if chunk:
+                committee_groups.append({
+                    "supervisor_id": supervisor_id,
+                    "projects": chunk,
+                })
 
     random.shuffle(committee_groups)
     committee_count = len(committee_groups)
@@ -5996,11 +6024,6 @@ def api_committee_save_responsible(plan_id):
             db.close()
             return jsonify({"error": "Responsible doctor must be one of the committee members."}), 400
 
-        if (member_row.get("role") or "").lower() == "supervisor":
-            cursor.close()
-            db.close()
-            return jsonify({"error": "Responsible doctor must be different from the project supervisor."}), 400
-
         cursor.execute(
             "UPDATE committee_plans SET responsible_faculty_id = %s WHERE plan_id = %s",
             (faculty_id, plan_id),
@@ -6017,6 +6040,9 @@ def api_committee_save_responsible(plan_id):
             """,
             (plan_id,),
         )
+        # If the selected responsible doctor is the supervisor, keep role='supervisor'
+        # and rely on committee_plans.responsible_faculty_id to mark them responsible.
+        # Otherwise mark the selected non-supervisor member as responsible.
         cursor.execute(
             """
             UPDATE committee_plan_members
@@ -6038,6 +6064,8 @@ def api_committee_save_responsible(plan_id):
             "plans": _json_safe_rows(payload["plans"]),
             "current_committees": _json_safe_rows(payload["current_committees"]),
             "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
+            "eligible_sections_4200": _json_safe_rows(payload.get("eligible_sections_4200", [])),
+            "eligible_projects_4300": _json_safe_rows(payload.get("eligible_projects_4300", [])),
             "stats": _json_safe_value(payload["stats"]),
         })
     except Exception as e:
@@ -6073,16 +6101,24 @@ def api_committee_save_project_readers(plan_id, project_id):
 
         cursor.execute(
             """
-            SELECT cpp.project_id
+            SELECT cpp.project_id, p.supervisor_id
             FROM committee_plan_projects cpp
+            JOIN projects p ON p.project_id = cpp.project_id
             WHERE cpp.plan_id = %s AND cpp.project_id = %s
             """,
             (plan_id, project_id),
         )
-        if not cursor.fetchone():
+        project_row = cursor.fetchone()
+        if not project_row:
             cursor.close()
             db.close()
             return jsonify({"error": "This project does not belong to this committee."}), 404
+
+        supervisor_id = int(project_row.get("supervisor_id") or 0)
+        if reader1_id == supervisor_id or reader2_id == supervisor_id:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Report readers must be different from the project supervisor."}), 400
 
         placeholders = "%s,%s"
         cursor.execute(
@@ -6119,6 +6155,96 @@ def api_committee_save_project_readers(plan_id, project_id):
             "plans": _json_safe_rows(payload["plans"]),
             "current_committees": _json_safe_rows(payload["current_committees"]),
             "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
+            "stats": _json_safe_value(payload["stats"]),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route(
+    "/api/coordinator/committee/<int:plan_id>/section/<int:section_id>/readers",
+    methods=["POST"],
+)
+@login_required(role="coordinator")
+def api_committee_save_section_readers(plan_id, section_id):
+    data = request.get_json(silent=True) or {}
+    reader1_id = data.get("reader1_id")
+    reader2_id = data.get("reader2_id")
+
+    if not reader1_id or not reader2_id:
+        return jsonify({"error": "Choose Reader 1 and Reader 2."}), 400
+
+    try:
+        reader1_id = int(reader1_id)
+        reader2_id = int(reader2_id)
+    except Exception:
+        return jsonify({"error": "Invalid reader id."}), 400
+
+    if reader1_id == reader2_id:
+        return jsonify({"error": "Reader 1 and Reader 2 must be different doctors."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _committee_ensure_report_readers_table(cursor)
+
+        cursor.execute(
+            """
+            SELECT cps.section_id, sec.supervisor_id
+            FROM committee_plan_sections cps
+            JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+            WHERE cps.plan_id = %s AND cps.section_id = %s
+            """,
+            (plan_id, section_id),
+        )
+        section_row = cursor.fetchone()
+        if not section_row:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "This section does not belong to this committee."}), 404
+
+        supervisor_id = int(section_row.get("supervisor_id") or 0)
+        if reader1_id == supervisor_id or reader2_id == supervisor_id:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Report readers must be different from the section supervisor."}), 400
+
+        cursor.execute(
+            """
+            SELECT faculty_id
+            FROM committee_plan_members
+            WHERE plan_id = %s
+              AND faculty_id IN (%s, %s)
+            """,
+            (plan_id, reader1_id, reader2_id),
+        )
+        found = {int(row["faculty_id"]) for row in cursor.fetchall()}
+        if reader1_id not in found or reader2_id not in found:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Report readers must be selected from this committee members."}), 400
+
+        cursor.execute("DELETE FROM section_report_readers WHERE section_id = %s", (section_id,))
+        cursor.execute(
+            """
+            INSERT INTO section_report_readers (section_id, faculty_id, reader_order)
+            VALUES (%s, %s, 1), (%s, %s, 2)
+            """,
+            (section_id, reader1_id, section_id, reader2_id),
+        )
+
+        db.commit()
+        payload = _committee_dashboard_payload(cursor)
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            "message": "Section report readers saved successfully.",
+            "plans": _json_safe_rows(payload["plans"]),
+            "current_committees": _json_safe_rows(payload["current_committees"]),
+            "eligible_projects": _json_safe_rows(payload["eligible_projects"]),
+            "eligible_sections_4200": _json_safe_rows(payload.get("eligible_sections_4200", [])),
+            "eligible_projects_4300": _json_safe_rows(payload.get("eligible_projects_4300", [])),
             "stats": _json_safe_value(payload["stats"]),
         })
     except Exception as e:
