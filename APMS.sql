@@ -5507,3 +5507,648 @@ JOIN projects p ON p.project_id = prr.project_id
 WHERE prr.faculty_id = p.supervisor_id;
 
 SET SQL_SAFE_UPDATES = 1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ============================================================
+-- APMS Seed Data: 10 COMP4200 sections + 10 COMP4300 project groups
+-- Password for all NEW students and used doctors after this script: 123456
+-- Safe re-run: uses INSERT IGNORE / NOT EXISTS guards
+-- ============================================================
+
+USE apms_db;
+
+SET SQL_SAFE_UPDATES = 0;
+SET FOREIGN_KEY_CHECKS = 0;
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+SET collation_connection = 'utf8mb4_unicode_ci';
+
+SET @pwd_123456 := '$2b$05$D5fa/ZMO0l17xOixnQUsRuSI8bonQna5cdlPIvHt89jtwWb8zUd9S';
+
+-- ------------------------------------------------------------
+-- 0) Make sure both active semesters exist
+-- ------------------------------------------------------------
+INSERT IGNORE INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active)
+VALUES
+('2025/2026', 1, 'COMP4200', '2025-09-01', '2026-02-28', TRUE),
+('2025/2026', 2, 'COMP4300', '2026-03-01', '2026-07-01', TRUE);
+
+SELECT @sem4200 := semester_id
+FROM semesters
+WHERE course_code = 'COMP4200'
+  AND academic_year = '2025/2026'
+ORDER BY semester_id DESC
+LIMIT 1;
+
+SELECT @sem4300 := semester_id
+FROM semesters
+WHERE course_code = 'COMP4300'
+  AND academic_year = '2025/2026'
+ORDER BY semester_id DESC
+LIMIT 1;
+
+SELECT @coordinator_user_id := user_id
+FROM users
+WHERE role = 'coordinator'
+ORDER BY user_id ASC
+LIMIT 1;
+
+-- ------------------------------------------------------------
+-- 1) Existing doctors to use
+--    The script does NOT create new doctors. It uses these if they exist.
+--    It also resets ONLY these used doctor accounts to password 123456 for testing.
+-- ------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_used_doctors;
+CREATE TEMPORARY TABLE tmp_used_doctors (
+    seq INT PRIMARY KEY,
+    full_name VARCHAR(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
+);
+
+INSERT INTO tmp_used_doctors (seq, full_name) VALUES
+(1, 'Dr. Sobhi Ahmad'),
+(2, 'Dr. Radi Jarrar'),
+(3, 'Dr. Abdullah Krakeh'),
+(4, 'Dr. Mamoun Nawahdah'),
+(5, 'Dr. Hafez Barghouthi'),
+(6, 'Dr. Murad Njoum'),
+(7, 'Dr. Adel Taweel'),
+(8, 'Dr. Yousef Hassouneh'),
+(9, 'Dr. Bassem Alserafi'),
+(10, 'Dr. Samer Zein');
+
+DROP TEMPORARY TABLE IF EXISTS tmp_doctor_faculty;
+CREATE TEMPORARY TABLE tmp_doctor_faculty AS
+SELECT
+    d.seq,
+    d.full_name,
+    MIN(f.faculty_id) AS faculty_id,
+    MIN(u.user_id) AS user_id,
+    MIN(u.email) AS email
+FROM tmp_used_doctors d
+JOIN users u
+  ON u.full_name COLLATE utf8mb4_unicode_ci = d.full_name COLLATE utf8mb4_unicode_ci
+ AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
+ AND u.is_active = TRUE
+JOIN faculty f
+  ON f.user_id = u.user_id
+GROUP BY d.seq, d.full_name;
+
+-- Reset password for the doctors used in this seed so you know their login password.
+UPDATE users u
+JOIN tmp_doctor_faculty df ON df.user_id = u.user_id
+SET u.password_hash = @pwd_123456;
+
+-- Stop clearly if not enough existing doctors are available.
+-- MySQL has no simple SIGNAL outside procedure in all environments, so show a warning result.
+SELECT
+    CASE
+        WHEN COUNT(*) < 10 THEN 'WARNING: Less than 10 of the listed doctors were found. Add missing doctors first or change tmp_used_doctors names.'
+        ELSE 'OK: 10 doctors found and will be used.'
+    END AS doctor_check,
+    COUNT(*) AS found_doctors
+FROM tmp_doctor_faculty;
+
+-- ------------------------------------------------------------
+-- 2) Create 30 COMP4200 students + 30 COMP4300 students
+-- ------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_seed_students;
+CREATE TEMPORARY TABLE tmp_seed_students (
+    seq INT PRIMARY KEY,
+    course_code VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    university_id VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
+    full_name VARCHAR(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    email VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
+    initials VARCHAR(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
+);
+
+INSERT INTO tmp_seed_students (seq, course_code, university_id, full_name, email, initials) VALUES
+-- COMP4200 students: 30 students, 3 per section
+(1,'COMP4200','4200001','COMP4200 Student 01','4200001@students.birzeit.edu','S01'),
+(2,'COMP4200','4200002','COMP4200 Student 02','4200002@students.birzeit.edu','S02'),
+(3,'COMP4200','4200003','COMP4200 Student 03','4200003@students.birzeit.edu','S03'),
+(4,'COMP4200','4200004','COMP4200 Student 04','4200004@students.birzeit.edu','S04'),
+(5,'COMP4200','4200005','COMP4200 Student 05','4200005@students.birzeit.edu','S05'),
+(6,'COMP4200','4200006','COMP4200 Student 06','4200006@students.birzeit.edu','S06'),
+(7,'COMP4200','4200007','COMP4200 Student 07','4200007@students.birzeit.edu','S07'),
+(8,'COMP4200','4200008','COMP4200 Student 08','4200008@students.birzeit.edu','S08'),
+(9,'COMP4200','4200009','COMP4200 Student 09','4200009@students.birzeit.edu','S09'),
+(10,'COMP4200','4200010','COMP4200 Student 10','4200010@students.birzeit.edu','S10'),
+(11,'COMP4200','4200011','COMP4200 Student 11','4200011@students.birzeit.edu','S11'),
+(12,'COMP4200','4200012','COMP4200 Student 12','4200012@students.birzeit.edu','S12'),
+(13,'COMP4200','4200013','COMP4200 Student 13','4200013@students.birzeit.edu','S13'),
+(14,'COMP4200','4200014','COMP4200 Student 14','4200014@students.birzeit.edu','S14'),
+(15,'COMP4200','4200015','COMP4200 Student 15','4200015@students.birzeit.edu','S15'),
+(16,'COMP4200','4200016','COMP4200 Student 16','4200016@students.birzeit.edu','S16'),
+(17,'COMP4200','4200017','COMP4200 Student 17','4200017@students.birzeit.edu','S17'),
+(18,'COMP4200','4200018','COMP4200 Student 18','4200018@students.birzeit.edu','S18'),
+(19,'COMP4200','4200019','COMP4200 Student 19','4200019@students.birzeit.edu','S19'),
+(20,'COMP4200','4200020','COMP4200 Student 20','4200020@students.birzeit.edu','S20'),
+(21,'COMP4200','4200021','COMP4200 Student 21','4200021@students.birzeit.edu','S21'),
+(22,'COMP4200','4200022','COMP4200 Student 22','4200022@students.birzeit.edu','S22'),
+(23,'COMP4200','4200023','COMP4200 Student 23','4200023@students.birzeit.edu','S23'),
+(24,'COMP4200','4200024','COMP4200 Student 24','4200024@students.birzeit.edu','S24'),
+(25,'COMP4200','4200025','COMP4200 Student 25','4200025@students.birzeit.edu','S25'),
+(26,'COMP4200','4200026','COMP4200 Student 26','4200026@students.birzeit.edu','S26'),
+(27,'COMP4200','4200027','COMP4200 Student 27','4200027@students.birzeit.edu','S27'),
+(28,'COMP4200','4200028','COMP4200 Student 28','4200028@students.birzeit.edu','S28'),
+(29,'COMP4200','4200029','COMP4200 Student 29','4200029@students.birzeit.edu','S29'),
+(30,'COMP4200','4200030','COMP4200 Student 30','4200030@students.birzeit.edu','S30'),
+
+-- COMP4300 students: 30 students, 3 per project/group
+(31,'COMP4300','4300001','COMP4300 Student 01','4300001@students.birzeit.edu','G01'),
+(32,'COMP4300','4300002','COMP4300 Student 02','4300002@students.birzeit.edu','G02'),
+(33,'COMP4300','4300003','COMP4300 Student 03','4300003@students.birzeit.edu','G03'),
+(34,'COMP4300','4300004','COMP4300 Student 04','4300004@students.birzeit.edu','G04'),
+(35,'COMP4300','4300005','COMP4300 Student 05','4300005@students.birzeit.edu','G05'),
+(36,'COMP4300','4300006','COMP4300 Student 06','4300006@students.birzeit.edu','G06'),
+(37,'COMP4300','4300007','COMP4300 Student 07','4300007@students.birzeit.edu','G07'),
+(38,'COMP4300','4300008','COMP4300 Student 08','4300008@students.birzeit.edu','G08'),
+(39,'COMP4300','4300009','COMP4300 Student 09','4300009@students.birzeit.edu','G09'),
+(40,'COMP4300','4300010','COMP4300 Student 10','4300010@students.birzeit.edu','G10'),
+(41,'COMP4300','4300011','COMP4300 Student 11','4300011@students.birzeit.edu','G11'),
+(42,'COMP4300','4300012','COMP4300 Student 12','4300012@students.birzeit.edu','G12'),
+(43,'COMP4300','4300013','COMP4300 Student 13','4300013@students.birzeit.edu','G13'),
+(44,'COMP4300','4300014','COMP4300 Student 14','4300014@students.birzeit.edu','G14'),
+(45,'COMP4300','4300015','COMP4300 Student 15','4300015@students.birzeit.edu','G15'),
+(46,'COMP4300','4300016','COMP4300 Student 16','4300016@students.birzeit.edu','G16'),
+(47,'COMP4300','4300017','COMP4300 Student 17','4300017@students.birzeit.edu','G17'),
+(48,'COMP4300','4300018','COMP4300 Student 18','4300018@students.birzeit.edu','G18'),
+(49,'COMP4300','4300019','COMP4300 Student 19','4300019@students.birzeit.edu','G19'),
+(50,'COMP4300','4300020','COMP4300 Student 20','4300020@students.birzeit.edu','G20'),
+(51,'COMP4300','4300021','COMP4300 Student 21','4300021@students.birzeit.edu','G21'),
+(52,'COMP4300','4300022','COMP4300 Student 22','4300022@students.birzeit.edu','G22'),
+(53,'COMP4300','4300023','COMP4300 Student 23','4300023@students.birzeit.edu','G23'),
+(54,'COMP4300','4300024','COMP4300 Student 24','4300024@students.birzeit.edu','G24'),
+(55,'COMP4300','4300025','COMP4300 Student 25','4300025@students.birzeit.edu','G25'),
+(56,'COMP4300','4300026','COMP4300 Student 26','4300026@students.birzeit.edu','G26'),
+(57,'COMP4300','4300027','COMP4300 Student 27','4300027@students.birzeit.edu','G27'),
+(58,'COMP4300','4300028','COMP4300 Student 28','4300028@students.birzeit.edu','G28'),
+(59,'COMP4300','4300029','COMP4300 Student 29','4300029@students.birzeit.edu','G29'),
+(60,'COMP4300','4300030','COMP4300 Student 30','4300030@students.birzeit.edu','G30');
+
+INSERT IGNORE INTO users
+    (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
+SELECT
+    university_id, full_name, email, @pwd_123456, 'student', initials, TRUE
+FROM tmp_seed_students;
+
+-- If the student already existed, reset its password too for testing.
+UPDATE users u
+JOIN tmp_seed_students ts ON ts.university_id COLLATE utf8mb4_unicode_ci = u.university_id COLLATE utf8mb4_unicode_ci
+SET u.password_hash = @pwd_123456,
+    u.role = 'student',
+    u.is_active = TRUE;
+
+INSERT IGNORE INTO students (user_id, enrollment_year)
+SELECT u.user_id, 2022
+FROM tmp_seed_students ts
+JOIN users u ON u.university_id COLLATE utf8mb4_unicode_ci = ts.university_id COLLATE utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 3) COMP4200: create 10 sections with 3 unique students each
+-- ------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_4200_sections;
+CREATE TEMPORARY TABLE tmp_4200_sections (
+    section_no INT PRIMARY KEY,
+    section_name VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    doctor_seq INT NOT NULL,
+    student_seq_1 INT NOT NULL,
+    student_seq_2 INT NOT NULL,
+    student_seq_3 INT NOT NULL
+);
+
+INSERT INTO tmp_4200_sections VALUES
+(1,  'COMP4200 Section 01', 1,  1,  2,  3),
+(2,  'COMP4200 Section 02', 2,  4,  5,  6),
+(3,  'COMP4200 Section 03', 3,  7,  8,  9),
+(4,  'COMP4200 Section 04', 4, 10, 11, 12),
+(5,  'COMP4200 Section 05', 5, 13, 14, 15),
+(6,  'COMP4200 Section 06', 6, 16, 17, 18),
+(7,  'COMP4200 Section 07', 7, 19, 20, 21),
+(8,  'COMP4200 Section 08', 8, 22, 23, 24),
+(9,  'COMP4200 Section 09', 9, 25, 26, 27),
+(10, 'COMP4200 Section 10', 10, 28, 29, 30);
+
+INSERT INTO student_distribution_sections (section_name, supervisor_id, entered_by)
+SELECT s.section_name, df.faculty_id, @coordinator_user_id
+FROM tmp_4200_sections s
+JOIN tmp_doctor_faculty df ON df.seq = s.doctor_seq
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM student_distribution_sections existing
+    WHERE existing.section_name COLLATE utf8mb4_unicode_ci = s.section_name COLLATE utf8mb4_unicode_ci
+);
+
+-- Insert section students. Works even if uq_section_student_once(student_id) exists,
+-- because each created student appears in one section only.
+INSERT IGNORE INTO section_students (section_id, student_id)
+SELECT sec.section_id, st.student_id
+FROM tmp_4200_sections s
+JOIN student_distribution_sections sec ON sec.section_name COLLATE utf8mb4_unicode_ci = s.section_name COLLATE utf8mb4_unicode_ci
+JOIN tmp_seed_students ts ON ts.seq IN (s.student_seq_1, s.student_seq_2, s.student_seq_3)
+JOIN users u ON u.university_id COLLATE utf8mb4_unicode_ci = ts.university_id COLLATE utf8mb4_unicode_ci
+JOIN students st ON st.user_id = u.user_id;
+
+-- ------------------------------------------------------------
+-- 4) COMP4300: create 10 graduation project groups with 3 students each
+--    In your system COMP4300 appears through projects, not section_students.
+-- ------------------------------------------------------------
+DROP TEMPORARY TABLE IF EXISTS tmp_4300_projects;
+CREATE TEMPORARY TABLE tmp_4300_projects (
+    project_no INT PRIMARY KEY,
+    title VARCHAR(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    project_type VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    doctor_seq INT NOT NULL,
+    student_seq_1 INT NOT NULL,
+    student_seq_2 INT NOT NULL,
+    student_seq_3 INT NOT NULL
+);
+
+INSERT INTO tmp_4300_projects VALUES
+(1,  'COMP4300 Graduation Project 01 - Web Archive System',          'web',                  1, 31, 32, 33),
+(2,  'COMP4300 Graduation Project 02 - AI Advising Assistant',       'ai',                   2, 34, 35, 36),
+(3,  'COMP4300 Graduation Project 03 - Mobile Campus App',           'mobile',                3, 37, 38, 39),
+(4,  'COMP4300 Graduation Project 04 - Secure File Portal',          'security',              4, 40, 41, 42),
+(5,  'COMP4300 Graduation Project 05 - Database Reporting System',   'databases',             5, 43, 44, 45),
+(6,  'COMP4300 Graduation Project 06 - Software QA Platform',        'software_engineering',  6, 46, 47, 48),
+(7,  'COMP4300 Graduation Project 07 - Smart Attendance System',     'web',                  7, 49, 50, 51),
+(8,  'COMP4300 Graduation Project 08 - IoT Monitoring Dashboard',    'software_engineering',  8, 52, 53, 54),
+(9,  'COMP4300 Graduation Project 09 - Cyber Risk Analyzer',         'security',              9, 55, 56, 57),
+(10, 'COMP4300 Graduation Project 10 - Academic Chatbot System',     'ai',                  10, 58, 59, 60);
+
+INSERT INTO projects
+    (title, title_en, abstract, keywords, project_type, semester_id, supervisor_id, status, submission_date)
+SELECT
+    p.title,
+    p.title,
+    CONCAT('Seed graduation project group for ', p.title),
+    'COMP4300, graduation project, seed data',
+    p.project_type,
+    @sem4300,
+    df.faculty_id,
+    'submitted',
+    CURDATE()
+FROM tmp_4300_projects p
+JOIN tmp_doctor_faculty df ON df.seq = p.doctor_seq
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM projects existing
+    WHERE existing.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci
+      AND existing.semester_id = @sem4300
+);
+
+INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
+SELECT pr.project_id, st.student_id,
+       CASE WHEN ts.seq = p.student_seq_1 THEN TRUE ELSE FALSE END AS is_primary_contact
+FROM tmp_4300_projects p
+JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300
+JOIN tmp_seed_students ts ON ts.seq IN (p.student_seq_1, p.student_seq_2, p.student_seq_3)
+JOIN users u ON u.university_id COLLATE utf8mb4_unicode_ci = ts.university_id COLLATE utf8mb4_unicode_ci
+JOIN students st ON st.user_id = u.user_id;
+
+-- Optional: create lifecycle rows for COMP4300 groups so they appear as ready/submitted in pages using lifecycle.
+INSERT IGNORE INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes)
+SELECT pr.project_id, 'registration', 'completed', CURDATE(), CURDATE(), 'Seed registration completed'
+FROM tmp_4300_projects p
+JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300;
+
+INSERT IGNORE INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes)
+SELECT pr.project_id, 'file_submission', 'completed', CURDATE(), CURDATE(), 'Seed file submission completed'
+FROM tmp_4300_projects p
+JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300;
+
+INSERT IGNORE INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes)
+SELECT pr.project_id, 'committee_evaluation', 'pending', CURDATE(), NULL, 'Ready for committee generation'
+FROM tmp_4300_projects p
+JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300;
+
+-- ------------------------------------------------------------
+-- 5) Result checks + account list
+-- ------------------------------------------------------------
+SELECT
+    'COMP4200 sections created' AS item,
+    COUNT(*) AS count_value
+FROM student_distribution_sections
+WHERE section_name LIKE 'COMP4200 Section %';
+
+SELECT
+    'COMP4200 students in sections' AS item,
+    COUNT(DISTINCT ss.student_id) AS count_value
+FROM section_students ss
+JOIN student_distribution_sections sec ON sec.section_id = ss.section_id
+WHERE sec.section_name LIKE 'COMP4200 Section %';
+
+SELECT
+    'COMP4300 projects created' AS item,
+    COUNT(*) AS count_value
+FROM projects p
+JOIN semesters s ON s.semester_id = p.semester_id
+WHERE s.course_code = 'COMP4300'
+  AND p.title LIKE 'COMP4300 Graduation Project %';
+
+SELECT
+    'COMP4300 project students' AS item,
+    COUNT(DISTINCT pm.student_id) AS count_value
+FROM project_members pm
+JOIN projects p ON p.project_id = pm.project_id
+JOIN semesters s ON s.semester_id = p.semester_id
+WHERE s.course_code = 'COMP4300'
+  AND p.title LIKE 'COMP4300 Graduation Project %';
+
+-- Account list: all generated students + the doctors used by the seed.
+SELECT
+    u.university_id,
+    u.full_name,
+    u.email,
+    u.role,
+    '123456' AS login_password
+FROM users u
+WHERE u.university_id BETWEEN '4200001' AND '4200030'
+   OR u.university_id BETWEEN '4300001' AND '4300030'
+   OR u.user_id IN (SELECT user_id FROM tmp_doctor_faculty)
+ORDER BY u.role, u.university_id;
+
+SET FOREIGN_KEY_CHECKS = 1;
+SET SQL_SAFE_UPDATES = 1;
+
+
+
+
+
+
+
+
+
+SELECT
+    p.project_id,
+    p.title,
+    s.course_code,
+    COUNT(pm.student_id) AS students_count,
+    GROUP_CONCAT(u.full_name ORDER BY u.full_name SEPARATOR ', ') AS students
+FROM projects p
+JOIN semesters s ON s.semester_id = p.semester_id
+LEFT JOIN project_members pm ON pm.project_id = p.project_id
+LEFT JOIN students st ON st.student_id = pm.student_id
+LEFT JOIN users u ON u.user_id = st.user_id
+WHERE s.course_code = 'COMP4300'
+GROUP BY p.project_id, p.title, s.course_code
+ORDER BY p.project_id DESC;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+USE apms_db;
+SET SQL_SAFE_UPDATES = 0;
+
+-- Fix old rows that were saved as introduction but attached to the COMP4300 semester.
+UPDATE coordinator_deliverables cd
+JOIN semesters s ON s.semester_id = cd.semester_id
+SET cd.course_scope = 'graduation_project'
+WHERE s.course_code = 'COMP4300'
+  AND cd.course_scope = 'introduction';
+
+UPDATE coordinator_lectures cl
+JOIN semesters s ON s.semester_id = cl.semester_id
+SET cl.course_scope = 'graduation_project'
+WHERE s.course_code = 'COMP4300'
+  AND cl.course_scope = 'introduction';
+
+-- Make sure COMP4300 deliverables are visible to students unless you explicitly close them.
+UPDATE coordinator_deliverables cd
+JOIN semesters s ON s.semester_id = cd.semester_id
+SET cd.status = 'open'
+WHERE s.course_code = 'COMP4300'
+  AND cd.course_scope = 'graduation_project'
+  AND cd.status = 'not_open';
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- Check after running:
+SELECT cd.deliverable_id, cd.title, cd.course_scope, cd.status, cd.due_date,
+       s.course_code, s.academic_year, s.semester_number
+FROM coordinator_deliverables cd
+LEFT JOIN semesters s ON s.semester_id = cd.semester_id
+ORDER BY cd.deliverable_id DESC;
+
+
+
+USE apms_db;
+SET SQL_SAFE_UPDATES = 0;
+
+-- Fix old rows that were saved as introduction but attached to the COMP4300 semester.
+UPDATE coordinator_deliverables cd
+JOIN semesters s ON s.semester_id = cd.semester_id
+SET cd.course_scope = 'graduation_project'
+WHERE s.course_code = 'COMP4300'
+  AND cd.course_scope = 'introduction';
+
+UPDATE coordinator_lectures cl
+JOIN semesters s ON s.semester_id = cl.semester_id
+SET cl.course_scope = 'graduation_project'
+WHERE s.course_code = 'COMP4300'
+  AND cl.course_scope = 'introduction';
+
+-- Make sure COMP4300 deliverables are visible to students unless you explicitly close them.
+UPDATE coordinator_deliverables cd
+JOIN semesters s ON s.semester_id = cd.semester_id
+SET cd.status = 'open'
+WHERE s.course_code = 'COMP4300'
+  AND cd.course_scope = 'graduation_project'
+  AND cd.status = 'not_open';
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- Check after running:
+SELECT cd.deliverable_id, cd.title, cd.course_scope, cd.status, cd.due_date,
+       s.course_code, s.academic_year, s.semester_number
+FROM coordinator_deliverables cd
+LEFT JOIN semesters s ON s.semester_id = cd.semester_id
+ORDER BY cd.deliverable_id DESC;
+
+
+
+
+
+
+
+
+
+
+
+USE apms_db;
+SET SQL_SAFE_UPDATES = 0;
+SET @db := DATABASE();
+
+-- Add window/publish columns for course-scoped deliverables.
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE coordinator_deliverables ADD COLUMN start_at DATETIME NULL AFTER description', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='coordinator_deliverables' AND COLUMN_NAME='start_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE coordinator_deliverables ADD COLUMN due_at DATETIME NULL AFTER due_date', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='coordinator_deliverables' AND COLUMN_NAME='due_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE coordinator_deliverables ADD COLUMN is_published TINYINT(1) NOT NULL DEFAULT 0 AFTER status', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='coordinator_deliverables' AND COLUMN_NAME='is_published');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE coordinator_deliverables ADD COLUMN published_at DATETIME NULL AFTER is_published', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='coordinator_deliverables' AND COLUMN_NAME='published_at');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS coordinator_deliverable_submissions (
+    submission_id INT PRIMARY KEY AUTO_INCREMENT,
+    deliverable_id INT NOT NULL,
+    student_id INT NOT NULL,
+    project_id INT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(600) NULL,
+    file_data LONGBLOB NULL,
+    file_mime VARCHAR(120) NULL,
+    file_size_mb DECIMAL(7,2) NULL,
+    submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_deliverable_student (deliverable_id, student_id),
+    INDEX idx_cds_project (project_id),
+    FOREIGN KEY (deliverable_id) REFERENCES coordinator_deliverables(deliverable_id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Fix old deliverables saved under the wrong scope.
+UPDATE coordinator_deliverables cd
+JOIN semesters s ON s.semester_id = cd.semester_id
+SET cd.course_scope = CASE WHEN s.course_code = 'COMP4300' THEN 'graduation_project' ELSE 'introduction' END,
+    cd.is_published = CASE WHEN cd.status IN ('open','in_progress','completed') THEN 1 ELSE cd.is_published END,
+    cd.published_at = CASE WHEN cd.status IN ('open','in_progress','completed') AND cd.published_at IS NULL THEN NOW() ELSE cd.published_at END,
+    cd.due_at = CASE WHEN cd.due_at IS NULL AND cd.due_date IS NOT NULL THEN CONCAT(cd.due_date, ' 23:59:00') ELSE cd.due_at END
+WHERE s.course_code IN ('COMP4200','COMP4300');
+
+SET SQL_SAFE_UPDATES = 1;
+
+
+
+
+USE apms_db;
+
+SET @db := DATABASE();
+SET @sql := (
+    SELECT IF(COUNT(*) = 0,
+        "ALTER TABLE notifications ADD COLUMN course_scope ENUM('introduction','graduation_project','both') NOT NULL DEFAULT 'both' AFTER message",
+        "SELECT 'course_scope already exists'"
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND COLUMN_NAME='course_scope'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (
+    SELECT IF(COUNT(*) = 0,
+        "ALTER TABLE notifications ADD COLUMN attachment_name VARCHAR(255) NULL",
+        "SELECT 'attachment_name already exists'"
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND COLUMN_NAME='attachment_name'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (
+    SELECT IF(COUNT(*) = 0,
+        "ALTER TABLE notifications ADD COLUMN attachment_mime VARCHAR(120) NULL",
+        "SELECT 'attachment_mime already exists'"
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND COLUMN_NAME='attachment_mime'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (
+    SELECT IF(COUNT(*) = 0,
+        "ALTER TABLE notifications ADD COLUMN attachment_data LONGBLOB NULL",
+        "SELECT 'attachment_data already exists'"
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=@db AND TABLE_NAME='notifications' AND COLUMN_NAME='attachment_data'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS system_notices (
+    notice_id INT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(250) NOT NULL,
+    body TEXT NOT NULL,
+    highlight_text VARCHAR(150) NULL,
+    button1_text VARCHAR(120) NULL,
+    button2_text VARCHAR(120) NULL,
+    button3_text VARCHAR(120) NULL,
+    course_scope ENUM('introduction','graduation_project','both') NOT NULL DEFAULT 'both',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_by INT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+SET SQL_SAFE_UPDATES = 0;
+
+DELETE cps
+FROM committee_plan_sections cps
+JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+WHERE cp.course_scope = 'introduction';
+
+DELETE cpm
+FROM committee_plan_members cpm
+JOIN committee_plans cp ON cp.plan_id = cpm.plan_id
+WHERE cp.course_scope = 'introduction';
+
+DELETE FROM committee_plans
+WHERE course_scope = 'introduction';
+
+SET SQL_SAFE_UPDATES = 1;
+
+
+
+
+
+
+
+
+
+
+SELECT 
+    sec.section_id,
+    sec.section_name,
+    sup.full_name AS supervisor_name,
+    COUNT(DISTINCT ss.student_id) AS students_count
+FROM student_distribution_sections sec
+LEFT JOIN faculty f ON f.faculty_id = sec.supervisor_id
+LEFT JOIN users sup ON sup.user_id = f.user_id
+LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+LEFT JOIN committee_plan_sections cps
+       ON cps.section_id = sec.section_id
+LEFT JOIN committee_plans cp
+       ON cp.plan_id = cps.plan_id
+      AND cp.course_scope = 'introduction'
+WHERE cp.plan_id IS NULL
+GROUP BY sec.section_id, sec.section_name, sup.full_name
+HAVING COUNT(DISTINCT ss.student_id) > 0
+ORDER BY sec.section_id;
