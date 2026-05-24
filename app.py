@@ -28,7 +28,7 @@ from routes.student import student_bp
 from routes.head import head_bp
 from routes.appCoordinator import coordinator_bp
 from routes.supervisor_evaluation import supervisor_evaluation_bp
-from ai_engine import ask_apms_ai, search_uploaded_semantic
+from ai_engine import ask_apms_ai, get_ai_health, get_archived_projects
 from activate_student import activate_bp
 from announcements import announcements_bp
 app = Flask(__name__)
@@ -93,13 +93,15 @@ def _get_public_notice():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT title, body, highlight_text, button1_text, button2_text, button3_text, course_scope
             FROM system_notices
             WHERE is_active = TRUE
             ORDER BY updated_at DESC, notice_id DESC
             LIMIT 1
-            """)
+            """
+        )
         notice = cursor.fetchone()
         cursor.close()
         db.close()
@@ -370,6 +372,10 @@ def _ensure_ai_archive_table(cursor):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
     try:
+        cursor.execute("ALTER TABLE ai_conversations ADD COLUMN reply_to MEDIUMTEXT NULL")
+    except Exception:
+        pass
+    try:
         cursor.execute(
             "CREATE INDEX idx_ai_user_session ON ai_conversations(user_id, session_id, created_at)"
         )
@@ -429,17 +435,17 @@ def _purge_expired_ai_conversations(cursor):
     )
 
 
-def _save_ai_exchange(user_id, session_id, question, answer):
+def _save_ai_exchange(user_id, session_id, question, answer, reply_to=None):
     db = get_db()
     cursor = db.cursor()
     try:
         _purge_expired_ai_conversations(cursor)
         cursor.execute(
             """
-            INSERT INTO ai_conversations (user_id, session_id, message_role, message_text)
-            VALUES (%s, %s, 'user', %s)
+            INSERT INTO ai_conversations (user_id, session_id, message_role, message_text, reply_to)
+            VALUES (%s, %s, 'user', %s, %s)
             """,
-            (user_id, session_id, question),
+            (user_id, session_id, question, reply_to),
         )
         cursor.execute(
             """
@@ -459,12 +465,65 @@ def _save_ai_exchange(user_id, session_id, question, answer):
 
 
 # ─── AI API ──────────────────────────────────────────────────────────────
+def _load_ai_conversation_context(user_id, session_id, limit=10):
+    if not session_id:
+        return ""
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT message_role, message_text
+            FROM ai_conversations
+            WHERE user_id = %s AND session_id = %s
+            ORDER BY created_at DESC, conv_id DESC
+            LIMIT %s
+            """,
+            (user_id, session_id, limit),
+        )
+        rows = list(reversed(cursor.fetchall()))
+        return "\n".join(
+            f"{row.get('message_role')}: {row.get('message_text')}"
+            for row in rows
+            if row.get("message_text")
+        )
+    except Exception:
+        return ""
+    finally:
+        cursor.close()
+        db.close()
+
+
+@app.route("/api/ai/archived-projects", methods=["GET"])
+@login_required()
+def api_ai_archived_projects():
+    projects = [
+        {
+            "title": project.get("title"),
+            "project_type": project.get("project_type"),
+            "final_score": project.get("final_score"),
+            "pdf": project.get("pdf"),
+            "file_path": project.get("file_path"),
+            "status": project.get("status"),
+        }
+        for project in get_archived_projects()
+    ]
+    return jsonify({"count": len(projects), "projects": projects})
+
+
+@app.route("/api/ai/health", methods=["GET"])
+@login_required()
+def api_ai_health():
+    return jsonify(get_ai_health())
+
+
 @app.route("/api/ai/ask", methods=["POST"])
 @login_required()
 def api_ai_ask():
     data = request.get_json(silent=True) or {}
     question = (data.get("question") or "").strip()
     session_id = _normalize_ai_session_id(data.get("session_id"))
+    reply_to = (data.get("reply_to") or "").strip() or None
 
     if not question:
         return (
@@ -478,7 +537,12 @@ def api_ai_ask():
         )
 
     try:
-        future = _ai_executor.submit(ask_apms_ai, question)
+        conversation_context = _load_ai_conversation_context(
+            session["user_id"], session_id
+        )
+        future = _ai_executor.submit(
+            ask_apms_ai, question, reply_to, conversation_context
+        )
         answer = future.result(timeout=AI_RESPONSE_TIMEOUT_SECONDS)
     except TimeoutError:
         future.cancel()
@@ -495,14 +559,23 @@ def api_ai_ask():
         import traceback
 
         traceback.print_exc()
+        error_text = str(exc)
+        status_code = 500
+        user_message = "The AI assistant is temporarily unavailable. Please try again in a moment."
+        if "quota exceeded" in error_text.lower() or "429" in error_text:
+            status_code = 429
+            user_message = "The AI assistant is temporarily busy or out of available credits. Please try again later."
+        elif "api key" in error_text.lower() or "401" in error_text:
+            status_code = 503
+            user_message = "The AI assistant is not configured correctly right now. Please contact the system administrator."
         return (
-            jsonify({"error": f"AI engine error: {exc}", "session_id": session_id}),
-            500,
+            jsonify({"error": user_message, "session_id": session_id}),
+            status_code,
         )
 
     try:
         saved, save_error = _save_ai_exchange(
-            session["user_id"], session_id, question, answer
+            session["user_id"], session_id, question, answer, reply_to
         )
     except Exception as exc:
         saved, save_error = False, str(exc)
@@ -587,7 +660,7 @@ def api_ai_archive_detail(session_id):
         db.commit()
         cursor.execute(
             """
-            SELECT message_role, message_text, created_at
+            SELECT message_role, message_text, reply_to, created_at
             FROM ai_conversations
             WHERE user_id = %s AND session_id = %s
             ORDER BY created_at ASC, conv_id ASC
@@ -604,6 +677,7 @@ def api_ai_archive_detail(session_id):
                     {
                         "role": row["message_role"],
                         "text": row["message_text"],
+                        "reply_to": row.get("reply_to"),
                         "created_at": _dt_iso(row.get("created_at")),
                     }
                     for row in rows

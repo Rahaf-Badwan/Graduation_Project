@@ -11,7 +11,10 @@ function makeSessionId() {
 }
 
 function scrollBottom() {
-  const scroller = document.querySelector('.content-area');
+  const scroller =
+    document.getElementById('chatBody') ||
+    document.querySelector('.chat-scroll') ||
+    document.querySelector('.content-area');
   requestAnimationFrame(() => {
     if (scroller) scroller.scrollTop = scroller.scrollHeight;
     else window.scrollTo(0, document.documentElement.scrollHeight);
@@ -31,7 +34,7 @@ async function readJsonResponse(res) {
   try {
     return await res.json();
   } catch (err) {
-    return { error: `Server returned a non-JSON response (HTTP ${res.status}). Please check Flask terminal errors.` };
+    return { error: `Server returned a non-JSON response (HTTP ${res.status}). Check the Flask terminal.` };
   }
 }
 
@@ -74,11 +77,22 @@ function cancelReply() {
   if (bar) bar.style.display = 'none';
 }
 
-// ── Message builder ──
+// ── Mixed Arabic / English (bidi) ──
+const LRI = '\u2066'; // Left-to-Right Isolate
+const PDI = '\u2069'; // Pop Directional Isolate
+
+/** Wrap Latin words, numbers, and paths so they read correctly inside Arabic (RTL page). */
+function prepareMixedText(text) {
+  return String(text || '').replace(
+    /([A-Za-z][A-Za-z0-9+#]*(?:[./_\-'][A-Za-z0-9+#]*)*(?:\s+[A-Za-z][A-Za-z0-9+#]*)*|\d+(?:\.\d+)?)/g,
+    (match) => LRI + match + PDI
+  );
+}
+
 function applyInline(text) {
-  let s = escapeHtml(text);
+  let s = escapeHtml(prepareMixedText(text));
   s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  s = s.replace(/`([^`]+)`/g, '<code style="background:#eef;padding:1px 4px;border-radius:3px;font-size:12px">$1</code>');
+  s = s.replace(/`([^`]+)`/g, '<code class="msg-inline-code">$1</code>');
   return s;
 }
 
@@ -87,13 +101,13 @@ function formatResponse(text) {
   let body = String(text || '');
 
   if (body.startsWith('Based on uploaded PDFs:')) {
-    sourceHtml = '<span class="msg-source pdf">📄 From uploaded PDFs</span>';
+    sourceHtml = '<span class="msg-source pdf">From archived PDF</span>';
     body = body.replace('Based on uploaded PDFs:', '').trim();
   } else if (body.startsWith('Based on APMS data:')) {
-    sourceHtml = '<span class="msg-source db">🗄 From APMS database</span>';
+    sourceHtml = '<span class="msg-source db">From APMS data</span>';
     body = body.replace('Based on APMS data:', '').trim();
   } else if (body.startsWith('General AI answer:')) {
-    sourceHtml = '<span class="msg-source ai">🤖 General AI</span>';
+    sourceHtml = '<span class="msg-source ai">General answer</span>';
     body = body.replace('General AI answer:', '').trim();
   }
 
@@ -113,15 +127,16 @@ function formatResponse(text) {
     if (isBullet) {
       if (!inList) { html += '<ul class="bot-list">'; inList = true; }
       const ct = trimmed.replace(/^[-•*\d\.]+\s*/, '');
-      html += '<li dir="auto">' + applyInline(ct) + '</li>';
+      html += '<li>' + applyInline(ct) + '</li>';
     } else {
       if (inList) { html += '</ul>'; inList = false; }
-      html += '<p style="margin:0 0 6px 0" dir="auto">' + applyInline(trimmed) + '</p>';
+      html += '<p>' + applyInline(trimmed) + '</p>';
     }
   }
 
   if (inList) html += '</ul>';
-  return (sourceHtml ? '<div style="margin-bottom:10px">' + sourceHtml + '</div>' : '') + html;
+  const bodyHtml = (sourceHtml ? '<div class="msg-source-row">' + sourceHtml + '</div>' : '') + html;
+  return '<div class="msg-content" dir="auto">' + bodyHtml + '</div>';
 }
 
 function addMessage(content, kind, quotedText) {
@@ -133,25 +148,32 @@ function addMessage(content, kind, quotedText) {
 
   const bubble = document.createElement('div');
   bubble.className = 'chat-msg ' + (kind === 'user' ? 'chat-user' : 'chat-bot');
-  bubble.setAttribute('dir', 'auto');
 
   if (quotedText) {
     const q = document.createElement('div');
     q.className = 'reply-quote';
-    q.textContent = String(quotedText).length > 90 ? String(quotedText).slice(0, 90) + '…' : String(quotedText);
+    q.setAttribute('dir', 'auto');
+    q.textContent = prepareMixedText(
+      String(quotedText).length > 90 ? String(quotedText).slice(0, 90) + '…' : String(quotedText)
+    );
     bubble.appendChild(q);
   }
 
   const msgContent = document.createElement('div');
-  if (kind === 'user') msgContent.textContent = content;
-  else msgContent.innerHTML = content;
+  msgContent.className = 'msg-content';
+  msgContent.setAttribute('dir', 'auto');
+  if (kind === 'user') {
+    msgContent.textContent = prepareMixedText(content);
+  } else {
+    msgContent.innerHTML = content;
+  }
   bubble.appendChild(msgContent);
   wrap.appendChild(bubble);
 
   if (kind === 'bot' && hasReplyUi()) {
     const replyBtn = document.createElement('button');
     replyBtn.className = 'reply-btn';
-    replyBtn.innerHTML = '↩ Reply';
+    replyBtn.innerHTML = 'Reply';
     replyBtn.onclick = () => setReply((bubble.innerText || bubble.textContent || '').trim().slice(0, 200));
     wrap.appendChild(replyBtn);
   }
@@ -195,7 +217,7 @@ function syncArchiveUi() {
     btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     btn.setAttribute('title', isOpen ? 'Hide archive' : 'Show archive');
   }
-  if (backdrop) backdrop.classList.toggle('show', isOpen && window.innerWidth <= 900);
+  if (backdrop) backdrop.classList.toggle('show', isOpen && window.innerWidth <= 768);
 }
 
 function setArchiveOpen(open, remember = true) {
@@ -212,9 +234,17 @@ function toggleArchive() {
   setArchiveOpen(wrap.classList.contains('archive-collapsed'));
 }
 
-function resetWelcome() {
+async function resetWelcome() {
   const body = document.getElementById('chatBody');
   if (!body) return;
+  if (typeof window.loadApmsWelcome === 'function') {
+    await window.loadApmsWelcome();
+    return;
+  }
+  if (typeof window.buildApmsWelcome === 'function') {
+    body.innerHTML = window.buildApmsWelcome();
+    return;
+  }
   const firstName = escapeHtml(window.APMS_AI_FIRST_NAME || 'there');
   body.innerHTML = `
     <div class="chat-msg-wrap bot-wrap">
@@ -282,16 +312,19 @@ async function openArchivedChat(sessionId) {
     if (!res.ok) throw new Error(data.error || 'Failed to open conversation.');
 
     if (!data.messages || !data.messages.length) {
-      resetWelcome();
+      await resetWelcome();
       return;
     }
+
+    document.getElementById('chatBody')?.classList.add('chat-active');
+    document.querySelector('.main-panel')?.classList.add('has-conversation');
 
     for (const msg of data.messages) {
       if (msg.role === 'user') addMessage(msg.text, 'user', msg.reply_to || null);
       else addMessage(formatResponse(msg.text), 'bot');
     }
     await loadArchive(sessionId);
-    if (window.innerWidth <= 900) setArchiveOpen(false);
+    if (window.innerWidth <= 768) setArchiveOpen(false);
   } catch (err) {
     hideLoading();
     addMessage(formatResponse('⚠️ **Could not open this archived conversation.**\n- ' + err.message), 'bot');
@@ -300,7 +333,15 @@ async function openArchivedChat(sessionId) {
 
 async function deleteArchivedChat(event, sessionId) {
   event.stopPropagation();
-  if (!confirm('Delete this archived conversation?')) return;
+
+  const confirmFn = window.apmsConfirm || ((opts) => Promise.resolve(window.confirm(opts.message)));
+  const ok = await confirmFn({
+    title: 'Delete conversation?',
+    message: 'Are you sure? You will not be able to restore this conversation after deleting it.',
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+  });
+  if (!ok) return;
 
   try {
     const { res, data } = await fetchJson('/api/ai/archive/' + encodeURIComponent(sessionId), { method: 'DELETE' }, 30000);
@@ -308,37 +349,69 @@ async function deleteArchivedChat(event, sessionId) {
     if (sessionId === currentSessionId) startNewChat(false);
     await loadArchive(currentSessionId);
   } catch (err) {
-    alert('Could not delete this conversation: ' + err.message);
+    await confirmFn({
+      title: 'Could not delete',
+      message: err.message,
+      confirmText: 'OK',
+      cancelText: 'Close',
+    });
   }
 }
 
-function startNewChat(refreshArchive = true) {
+async function startNewChat(refreshArchive = true) {
   currentSessionId = makeSessionId();
   cancelReply();
-  resetWelcome();
+  document.getElementById('chatBody')?.classList.remove('chat-active');
+  document.querySelector('.main-panel')?.classList.remove('has-conversation');
+  await resetWelcome();
   const inp = document.getElementById('chatIn');
   if (inp) inp.focus();
   if (refreshArchive) loadArchive(currentSessionId);
-  if (window.innerWidth <= 900) setArchiveOpen(false);
+  if (window.innerWidth <= 768) setArchiveOpen(false);
 }
 
-async function askAI() {
+function clearWelcomeScreen() {
+  const welcome = document.querySelector('#chatBody .welcome-screen');
+  if (welcome) {
+    welcome.classList.add('welcome-screen--leaving');
+    setTimeout(() => welcome.remove(), 180);
+  } else {
+    document.getElementById('suggestedWrap')?.remove();
+  }
+  document.getElementById('chatBody')?.classList.add('chat-active');
+  document.querySelector('.main-panel')?.classList.add('has-conversation');
+}
+
+function setPromptCardsDisabled(disabled) {
+  document.querySelectorAll('.prompt-card').forEach((btn) => {
+    btn.disabled = disabled;
+    btn.classList.toggle('is-busy', disabled);
+  });
+}
+
+/**
+ * @param {string} [optionalQuestion] — full text sent to the API
+ * @param {{ displayLabel?: string }} [options] — shorter text shown in the user bubble
+ */
+async function askAI(optionalQuestion, options = {}) {
   const inp = document.getElementById('chatIn');
   const btn = document.getElementById('sendBtn');
-  if (!inp || !inp.value.trim()) return;
+  const fromInput = inp?.value?.trim() || '';
+  const question = (optionalQuestion || fromInput).trim();
+  if (!question) return;
 
-  const question = inp.value.trim();
+  const displayLabel = options.displayLabel || fromInput || question;
   const currentReply = replyToText;
-  inp.value = '';
+
+  if (inp) inp.value = '';
   cancelReply();
+  clearWelcomeScreen();
 
-  const suggested = document.getElementById('suggestedWrap');
-  if (suggested) suggested.remove();
-
-  addMessage(question, 'user', currentReply);
+  addMessage(displayLabel, 'user', currentReply);
   showLoading();
   if (btn) btn.disabled = true;
   if (inp) inp.disabled = true;
+  setPromptCardsDisabled(true);
 
   try {
     const payload = { question, session_id: currentSessionId };
@@ -354,36 +427,61 @@ async function askAI() {
     hideLoading();
 
     if (!res.ok) {
-      addMessage(formatResponse('⚠️ **Error:** ' + (data.error || 'Unknown server error.')), 'bot');
+      addMessage(formatResponse('**Error:** ' + (data.error || 'An unexpected server error occurred.')), 'bot');
     } else {
-      addMessage(formatResponse(data.answer || data.error || 'No response returned.'), 'bot');
+      addMessage(formatResponse(data.answer || data.error || 'No response was returned.'), 'bot');
     }
 
     loadArchive(currentSessionId);
   } catch (err) {
     hideLoading();
-    addMessage(formatResponse('⚠️ **Could not complete the AI request.**\n- Error: ' + err.message), 'bot');
+    addMessage(
+      formatResponse('**Could not complete the request.**\n- ' + err.message),
+      'bot'
+    );
   } finally {
     if (btn) btn.disabled = false;
-    if (inp) { inp.disabled = false; inp.focus(); }
+    if (inp) {
+      inp.disabled = false;
+      inp.focus();
+    }
+    setPromptCardsDisabled(false);
   }
 }
 
-function sendSuggested(question) {
-  const suggested = document.getElementById('suggestedWrap');
-  if (suggested) suggested.remove();
-  const inp = document.getElementById('chatIn');
-  if (inp) inp.value = question;
-  askAI();
+/** Click on a project card — asks exactly about that project */
+function sendSuggested(question, displayLabel) {
+  if (!question || !String(question).trim()) return;
+  askAI(String(question).trim(), { displayLabel: displayLabel || null });
+}
+
+function onPromptCardClick(event) {
+  const card = event.target.closest('.prompt-card');
+  if (!card || card.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const question = card.getAttribute('data-question');
+  const label = card.getAttribute('data-label');
+  if (!question) return;
+
+  const display = label ? label : question.slice(0, 120);
+  sendSuggested(question, display);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const chatBody = document.getElementById('chatBody');
+  chatBody?.addEventListener('click', onPromptCardClick);
+
   document.getElementById('chatIn')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') askAI();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      askAI();
+    }
   });
 
   const storedPref = localStorage.getItem(ARCHIVE_PREF_KEY);
-  const defaultOpen = storedPref === null ? window.innerWidth > 900 : storedPref === '1';
+  const defaultOpen = storedPref === null ? window.innerWidth > 768 : storedPref === '1';
   setArchiveOpen(defaultOpen, false);
   window.addEventListener('resize', () => syncArchiveUi());
   loadArchive();

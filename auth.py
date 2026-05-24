@@ -14,7 +14,7 @@ def login_required(role=None):
             if "user_id" not in session:
                 if _wants_json_response():
                     return (
-                        jsonify({"error": "Please log in again as coordinator."}),
+                        jsonify({"error": "Please log in again."}),
                         401,
                     )
                 return redirect(url_for("login_page"))

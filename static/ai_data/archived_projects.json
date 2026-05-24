@@ -1,0 +1,398 @@
+[
+  {
+    "title": "Smart Invoice",
+    "project_type": "ai",
+    "submission_date": "2025-02-01",
+    "final_score": 82,
+    "status": "archived",
+    "pdf": "smart_invoice.pdf",
+    "file_path": "archived_reports/smart_invoice.pdf"
+  },
+  {
+    "title": "Kitchen Station Management System",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 79,
+    "status": "archived",
+    "pdf": "kitchen_station.pdf",
+    "file_path": "archived_reports/kitchen_station.pdf"
+  },
+  {
+    "title": "DreamsJob Recruitment Platform",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 85,
+    "status": "archived",
+    "pdf": "dreamsjob.pdf",
+    "file_path": "archived_reports/dreamsjob.pdf"
+  },
+  {
+    "title": "YallaRehla Travel App",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 88,
+    "status": "archived",
+    "pdf": "yallarehla.pdf",
+    "file_path": "archived_reports/yallarehla.pdf"
+  },
+  {
+    "title": "StudentHub",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 76,
+    "status": "archived",
+    "pdf": "studenthub.pdf",
+    "file_path": "archived_reports/studenthub.pdf"
+  },
+  {
+    "title": "Wasselha Delivery System",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 83,
+    "status": "archived",
+    "pdf": "wasselha.pdf",
+    "file_path": "archived_reports/wasselha.pdf"
+  },
+  {
+    "title": "Home Sweet Home Real Estate",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 80,
+    "status": "archived",
+    "pdf": "home_sweet_home.pdf",
+    "file_path": "archived_reports/home_sweet_home.pdf"
+  },
+  {
+    "title": "Birzeit University Insurance System",
+    "project_type": "web",
+    "submission_date": "2024-02-01",
+    "final_score": 91,
+    "status": "archived",
+    "pdf": "bzu_insurance.pdf",
+    "file_path": "archived_reports/bzu_insurance.pdf"
+  },
+  {
+    "title": "Sal7ly Maintenance App",
+    "project_type": "mobile",
+    "submission_date": "2024-02-01",
+    "final_score": 78,
+    "status": "archived",
+    "pdf": "sal7ly.pdf",
+    "file_path": "archived_reports/sal7ly.pdf"
+  },
+  {
+    "title": "Monitoring World News System",
+    "project_type": "web",
+    "submission_date": "2024-02-01",
+    "final_score": 74,
+    "status": "archived",
+    "pdf": "monitoring_world_news.pdf",
+    "file_path": "archived_reports/monitoring_world_news.pdf"
+  },
+  {
+    "title": "Prediction of Anti-Cancer Peptide ACP-XG",
+    "project_type": "ai",
+    "submission_date": "2025-02-01",
+    "final_score": 94,
+    "status": "archived",
+    "pdf": "anti_cancer_peptide.pdf",
+    "file_path": "archived_reports/anti_cancer_peptide.pdf"
+  },
+  {
+    "title": "FitScoop Fitness Platform",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 81,
+    "status": "archived",
+    "pdf": "fitscoop.pdf",
+    "file_path": "archived_reports/fitscoop.pdf"
+  },
+  {
+    "title": "Wedding Planning System",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 77,
+    "status": "archived",
+    "pdf": "wedding_planning.pdf",
+    "file_path": "archived_reports/wedding_planning.pdf"
+  },
+  {
+    "title": "PharmaApp Pharmacy Management",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 86,
+    "status": "archived",
+    "pdf": "pharmaapp.pdf",
+    "file_path": "archived_reports/pharmaapp.pdf"
+  },
+  {
+    "title": "Student Digital Guide",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 80,
+    "status": "archived",
+    "pdf": "student_digital_guide.pdf",
+    "file_path": "archived_reports/student_digital_guide.pdf"
+  },
+  {
+    "title": "Palestine Charity Platform",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 75,
+    "status": "archived",
+    "pdf": "palestine_charity.pdf",
+    "file_path": "archived_reports/palestine_charity.pdf"
+  },
+  {
+    "title": "Gamified Trip Planner App",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 89,
+    "status": "archived",
+    "pdf": "gamified_trip_planner.pdf",
+    "file_path": "archived_reports/gamified_trip_planner.pdf"
+  },
+  {
+    "title": "TechSpotter Tech News Platform",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 78,
+    "status": "archived",
+    "pdf": "techspotter.pdf",
+    "file_path": "archived_reports/techspotter.pdf"
+  },
+  {
+    "title": "Multi-Environment Video Game",
+    "project_type": "other",
+    "submission_date": "2025-02-01",
+    "final_score": 83,
+    "status": "archived",
+    "pdf": "multi_env_videogame.pdf",
+    "file_path": "archived_reports/multi_env_videogame.pdf"
+  },
+  {
+    "title": "Birzeit Library Chatbot",
+    "project_type": "ai",
+    "submission_date": "2025-02-01",
+    "final_score": 92,
+    "status": "archived",
+    "pdf": "bzu_library_chatbot.pdf",
+    "file_path": "archived_reports/bzu_library_chatbot.pdf"
+  },
+  {
+    "title": "Policy Peek Policy Analyzer",
+    "project_type": "ai",
+    "submission_date": "2025-02-01",
+    "final_score": 87,
+    "status": "archived",
+    "pdf": "policy_peek.pdf",
+    "file_path": "archived_reports/policy_peek.pdf"
+  },
+  {
+    "title": "LifeActive Health Tracker",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 84,
+    "status": "archived",
+    "pdf": "lifeactive.pdf",
+    "file_path": "archived_reports/lifeactive.pdf"
+  },
+  {
+    "title": "Tronix Electronics Web Application",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 79,
+    "status": "archived",
+    "pdf": "tronix.pdf",
+    "file_path": "archived_reports/tronix.pdf"
+  },
+  {
+    "title": "Smart School Portal",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 88,
+    "status": "archived",
+    "pdf": "smart_school_portal.pdf",
+    "file_path": "archived_reports/smart_school_portal.pdf"
+  },
+  {
+    "title": "GoHelp Volunteer Platform",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 76,
+    "status": "archived",
+    "pdf": "gohelp.pdf",
+    "file_path": "archived_reports/gohelp.pdf"
+  },
+  {
+    "title": "KhatClarifier AI Writing Tool",
+    "project_type": "ai",
+    "submission_date": "2025-02-01",
+    "final_score": 90,
+    "status": "archived",
+    "pdf": "khatclarifier.pdf",
+    "file_path": "archived_reports/khatclarifier.pdf"
+  },
+  {
+    "title": "ConvoConvert Communication Tool",
+    "project_type": "ai",
+    "submission_date": "2025-02-01",
+    "final_score": 85,
+    "status": "archived",
+    "pdf": "convoconvert.pdf",
+    "file_path": "archived_reports/convoconvert.pdf"
+  },
+  {
+    "title": "Wasselni Transportation App",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 82,
+    "status": "archived",
+    "pdf": "wasselni.pdf",
+    "file_path": "archived_reports/wasselni.pdf"
+  },
+  {
+    "title": "Ackerra Fitness Platform",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 87,
+    "status": "archived",
+    "pdf": "ackerra.pdf",
+    "file_path": "archived_reports/ackerra.pdf"
+  },
+  {
+    "title": "Darak Real Estate Marketplace",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 83,
+    "status": "archived",
+    "pdf": "darak.pdf",
+    "file_path": "archived_reports/darak.pdf"
+  },
+  {
+    "title": "Flora Palestine Plant Guide",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 81,
+    "status": "archived",
+    "pdf": "flora_palestine.pdf",
+    "file_path": "archived_reports/flora_palestine.pdf"
+  },
+  {
+    "title": "Max Scheduling System",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 77,
+    "status": "archived",
+    "pdf": "max_scheduling.pdf",
+    "file_path": "archived_reports/max_scheduling.pdf"
+  },
+  {
+    "title": "PayWithPalKoin Payment System",
+    "project_type": "web",
+    "submission_date": "2025-02-01",
+    "final_score": 86,
+    "status": "archived",
+    "pdf": "paywithpalkoin.pdf",
+    "file_path": "archived_reports/paywithpalkoin.pdf"
+  },
+  {
+    "title": "Nomad Travel Companion App",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 84,
+    "status": "archived",
+    "pdf": "nomad.pdf",
+    "file_path": "archived_reports/nomad.pdf"
+  },
+  {
+    "title": "CarPal Car Sharing App",
+    "project_type": "mobile",
+    "submission_date": "2025-02-01",
+    "final_score": 88,
+    "status": "archived",
+    "pdf": "carpal.pdf",
+    "file_path": "archived_reports/carpal.pdf"
+  },
+  {
+    "title": "E-Voting System Using Blockchain",
+    "project_type": "security",
+    "submission_date": "2024-02-01",
+    "final_score": 93,
+    "status": "archived",
+    "pdf": "evoting_blockchain.pdf",
+    "file_path": "archived_reports/evoting_blockchain.pdf"
+  },
+  {
+    "title": "Nossrah Arabic Learning App",
+    "project_type": "mobile",
+    "submission_date": "2024-02-01",
+    "final_score": 80,
+    "status": "archived",
+    "pdf": "nossrah.pdf",
+    "file_path": "archived_reports/nossrah.pdf"
+  },
+  {
+    "title": "Wanderlust in Palestine Travel App",
+    "project_type": "web",
+    "submission_date": "2024-02-01",
+    "final_score": 85,
+    "status": "archived",
+    "pdf": "wanderlust_palestine.pdf",
+    "file_path": "archived_reports/wanderlust_palestine.pdf"
+  },
+  {
+    "title": "Medica Healthcare App",
+    "project_type": "mobile",
+    "submission_date": "2024-02-01",
+    "final_score": 82,
+    "status": "archived",
+    "pdf": "medica_app.pdf",
+    "file_path": "archived_reports/medica_app.pdf"
+  },
+  {
+    "title": "BZU Note Share App",
+    "project_type": "mobile",
+    "submission_date": "2024-02-01",
+    "final_score": 79,
+    "status": "archived",
+    "pdf": "bzu_note_share.pdf",
+    "file_path": "archived_reports/bzu_note_share.pdf"
+  },
+  {
+    "title": "Plestia Events Platform",
+    "project_type": "web",
+    "submission_date": "2024-02-01",
+    "final_score": 83,
+    "status": "archived",
+    "pdf": "plestia_events.pdf",
+    "file_path": "archived_reports/plestia_events.pdf"
+  },
+  {
+    "title": "Baby Voice Identification App",
+    "project_type": "ai",
+    "submission_date": "2024-02-01",
+    "final_score": 88,
+    "status": "archived",
+    "pdf": "baby_voice_id.pdf",
+    "file_path": "archived_reports/baby_voice_id.pdf"
+  },
+  {
+    "title": "Traffic Light Synchronization Optimizer",
+    "project_type": "ai",
+    "submission_date": "2024-02-01",
+    "final_score": 91,
+    "status": "archived",
+    "pdf": "traffic_light_optimizer.pdf",
+    "file_path": "archived_reports/traffic_light_optimizer.pdf"
+  },
+  {
+    "title": "CampusConnect University Network",
+    "project_type": "web",
+    "submission_date": "2024-02-01",
+    "final_score": 86,
+    "status": "archived",
+    "pdf": "campus_connect.pdf",
+    "file_path": "archived_reports/campus_connect.pdf"
+  }
+]

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f7f8" />
+  <title>APMS AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/ai/ai-app.css') }}" />
+</head>
+<body class="gpt-app">
+  <div class="app-layout" id="aiWrap">
+    <aside class="sidebar" id="archivePanel" aria-label="Chat history">
+      <div class="sidebar-top">
+        <button type="button" class="btn-new-chat" onclick="startNewChat()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          New chat
+        </button>
+        <button type="button" class="sidebar-close" onclick="setArchiveOpen(false)" aria-label="Close menu">×</button>
+      </div>
+      <div class="sidebar-label">Recent chats</div>
+      <div class="sidebar-list archive-list" id="archiveList">
+        <div class="sidebar-empty">Loading...</div>
+      </div>
+      <div class="sidebar-foot">
+        <span class="sidebar-foot-title">APMS · Birzeit</span>
+        <span class="sidebar-foot-sub">Archived projects</span>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <button type="button" class="btn-icon" id="archiveToggleBtn" onclick="toggleArchive()" aria-expanded="false" aria-label="Menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="topbar-center">
+          <span class="topbar-model">APMS AI</span>
+          <span class="topbar-sub">Graduation projects assistant</span>
+        </div>
+        <span class="topbar-status" title="Connected">●</span>
+      </header>
+
+      <div class="chat-scroll" id="chatBody" role="log" aria-live="polite"></div>
+
+      <footer class="composer-wrap" id="chatComposer">
+        <div class="reply-bar" id="replyBar" style="display:none;">
+          <span class="reply-bar-icon">↩</span>
+          <span class="reply-bar-text" id="replyBarText"></span>
+          <button type="button" class="reply-bar-cancel" onclick="cancelReply()" aria-label="Cancel">×</button>
+        </div>
+        <form class="composer" onsubmit="event.preventDefault(); askAI(); return false;">
+          <div class="composer-box">
+            <input type="text" class="chat-input" id="chatIn" dir="auto" autocomplete="off"
+              placeholder="Ask about any archived project..." />
+            <button type="button" class="btn-send" id="sendBtn" onclick="askAI()" aria-label="Send">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+          <p class="composer-hint">Answers are grounded in the archived project PDF reports.</p>
+        </form>
+      </footer>
+    </main>
+  </div>
+
+  <div class="sidebar-backdrop" id="archiveBackdrop" onclick="setArchiveOpen(false)"></div>
+
+  <div class="modal-overlay" id="confirmModal" aria-hidden="true" role="presentation">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <div class="modal-icon" aria-hidden="true"></div>
+      <h2 class="modal-title" id="confirmModalTitle">Delete conversation?</h2>
+      <p class="modal-message" id="confirmModalMessage">You will not be able to restore this conversation after deleting it.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal btn-modal--ghost" id="confirmModalCancel">Cancel</button>
+        <button type="button" class="btn-modal btn-modal--danger" id="confirmModalOk">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="apms-ai-config" data-firstname="{{ (session.full_name or 'Guest').split()[0] }}" hidden></div>
+  <script>
+    window.APMS_AI_FIRST_NAME = document.getElementById('apms-ai-config').dataset.firstname;
+  </script>
+  <script src="{{ url_for('static', filename='assets/ai/ai-ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/ai/ai-welcome.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/ai_chat.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (typeof initApmsUi === 'function') initApmsUi();
+      if (typeof window.loadApmsWelcome === 'function') {
+        window.loadApmsWelcome();
+      }
+      var open = window.innerWidth > 768 && localStorage.getItem('apms-ai-archive-open') !== '0';
+      if (typeof setArchiveOpen === 'function') setArchiveOpen(open, false);
+    });
+  </script>
+</body>
+</html>

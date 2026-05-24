@@ -6725,7 +6725,6 @@ def _evaluation_notify_faculty(cursor, course_scope, reference_id, title, messag
 
 def _evaluation_project_payload(cursor, course_scope, base_row):
     reference_id = base_row["project_id"]
-    _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
     grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
     scores = _evaluation_scores_from_grades(course_scope, grades)
 
@@ -7305,17 +7304,20 @@ def api_coordinator_evaluation_unread_count():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        # Make sure table exists before query
-        if not _table_exists(cursor, "evaluation_grade_tasks"):
+        # Make sure tables exist before query
+        if not _table_exists(cursor, "evaluation_grade_tasks") or not _table_exists(cursor, "evaluation_windows"):
             cursor.close()
             db.close()
             return jsonify({"count": 0})
 
         cursor.execute("""
-            SELECT COUNT(DISTINCT CONCAT(course_scope, '-', reference_id)) AS count
-            FROM evaluation_grade_tasks
-            WHERE is_open = 1
-              AND COALESCE(is_submitted, 0) = 0
+            SELECT COUNT(DISTINCT CONCAT(egt.course_scope, '-', egt.reference_id)) AS count
+            FROM evaluation_grade_tasks egt
+            JOIN evaluation_windows ew
+              ON ew.course_scope = egt.course_scope
+             AND ew.reference_id = egt.reference_id
+            WHERE ew.is_open = 1
+              AND COALESCE(egt.is_submitted, 0) = 0
         """)
 
         row = cursor.fetchone() or {}

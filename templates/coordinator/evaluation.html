@@ -287,6 +287,7 @@
 <script>
   let currentScope = 'introduction';
   let allProjects = [];
+  let loadSeq = 0;
 
   function toastMsg(msg, ok = true) {
     const t = document.getElementById('toast');
@@ -373,11 +374,13 @@
     await loadProjects();
   }
   async function loadProjects() {
+    const seq = ++loadSeq;
     const box = document.getElementById('projectsBox');
     if (box) box.innerHTML = '<div class="empty">Loading evaluation projects...</div>';
 
     try {
       const data = await api(`/api/coordinator/evaluation/projects?course_scope=${currentScope}`);
+      if (seq !== loadSeq) return;
       allProjects = data.projects || [];
 
       if (!allProjects.length) {
@@ -393,6 +396,7 @@
 
       renderProjects();
     } catch (e) {
+      if (seq !== loadSeq) return;
       allProjects = [];
       renderStats([]);
       if (box) {
@@ -486,6 +490,6 @@
       await loadProjects();
     } catch (e) { toastMsg(e.message, false); }
   }
-  document.addEventListener('DOMContentLoaded', () => { setScope('introduction'); loadAll(); });
+  document.addEventListener('DOMContentLoaded', () => { setScope('introduction'); });
 </script>
 {% endblock %}

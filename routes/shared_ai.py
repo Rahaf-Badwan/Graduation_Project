@@ -25,3 +25,9 @@ def shared_ai_page():
         "shared/ai.html",
         base_template=ROLE_BASE_TEMPLATES.get(role_path),
     )
+
+
+@shared_ai_bp.route("/ai/standalone")
+@login_required()
+def standalone_ai_page():
+    return render_template("shared/ai_standalone.html")
