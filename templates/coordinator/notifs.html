@@ -867,9 +867,12 @@
                 <option value="">Choose receiver...</option>
                 <option value="head">Head of Department</option>
                 <option value="doctors">All Doctors / Supervisors</option>
-                <option value="all_sections">All Sections</option>
+                <option value="all_students">All Students / selected course</option>
+                <option value="comp4200_students">All COMP4200 Students</option>
+                <option value="comp4300_students">All COMP4300 Students</option>
+                <option value="all_sections">All COMP4200 Sections</option>
                 <option value="doctor">One Doctor</option>
-                <option value="section">One Section</option>
+                <option value="section">One COMP4200 Section</option>
                 <option value="student">One Student</option>
               </select>
             </div>
@@ -1104,8 +1107,17 @@
         placeholder = 'Choose doctor...';
         rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' — ' + esc(d.university_id || '') + '</option>'));
       } else if (scope === 'student') {
-        rows = state.options.students || [];
-        placeholder = 'Choose student...';
+        const courseScope = $('snCourseScope').value;
+        if (courseScope === 'graduation_project') {
+          rows = state.options.comp4300_students || [];
+          placeholder = 'Choose COMP4300 student...';
+        } else if (courseScope === 'introduction') {
+          rows = state.options.comp4200_students || [];
+          placeholder = 'Choose COMP4200 student...';
+        } else {
+          rows = state.options.students || [];
+          placeholder = 'Choose student...';
+        }
         rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + '</option>'));
       } else if (scope === 'section') {
         rows = state.options.sections || [];
@@ -1285,6 +1297,7 @@
     });
 
     $('snScope').addEventListener('change', updateSpecificWrap);
+    $('snCourseScope').addEventListener('change', updateSpecificWrap);
 
     document.querySelectorAll('.sn-tab').forEach(btn => {
       btn.addEventListener('click', () => {

@@ -12,6 +12,7 @@ import csv
 import io
 import math
 import random
+import bcrypt
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -1865,9 +1866,143 @@ def _table_exists(cursor, table_name):
     return int(row.get("cnt") or 0) > 0
 
 
-def _notification_recipients(cursor, scope, value=None):
+def _student_user_rows_by_course(cursor, course_code):
+    """
+    Return active student rows for a course.
+    COMP4300 is detected mainly from real graduation projects/project_members.
+    COMP4200 is detected from student_course_results or sections.
+    """
+    course_code = (course_code or "").strip().upper()
+    rows_by_user = {}
+
+    def add_rows(rows):
+        for row in rows:
+            user_id = row.get("user_id")
+            if user_id and user_id not in rows_by_user:
+                rows_by_user[user_id] = row
+
+    # Source 1: students that are members of projects in the selected course semester.
+    if _table_exists(cursor, "projects") and _table_exists(cursor, "project_members"):
+        has_course_code = _db_column_exists(cursor, "semesters", "course_code")
+        if has_course_code:
+            cursor.execute(
+                """
+                SELECT DISTINCT st.student_id, u.user_id, u.full_name, u.university_id,
+                       %s AS course_code
+                FROM projects p
+                JOIN semesters s ON s.semester_id = p.semester_id
+                JOIN project_members pm ON pm.project_id = p.project_id
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE s.course_code = %s
+                  AND u.role = 'student'
+                  AND u.is_active = TRUE
+                ORDER BY u.full_name
+                """,
+                (course_code, course_code),
+            )
+            add_rows(cursor.fetchall())
+
+    # Source 2: student_course_results for databases that track enrollment/promotion there.
+    if _table_exists(cursor, "student_course_results"):
+        if _db_column_exists(cursor, "student_course_results", "course_code"):
+            cursor.execute(
+                """
+                SELECT DISTINCT st.student_id, u.user_id, u.full_name, u.university_id,
+                       %s AS course_code
+                FROM student_course_results scr
+                JOIN students st ON st.student_id = scr.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE scr.course_code = %s
+                  AND u.role = 'student'
+                  AND u.is_active = TRUE
+                ORDER BY u.full_name
+                """,
+                (course_code, course_code),
+            )
+            add_rows(cursor.fetchall())
+        elif _db_column_exists(cursor, "student_course_results", "semester_id"):
+            cursor.execute(
+                """
+                SELECT DISTINCT st.student_id, u.user_id, u.full_name, u.university_id,
+                       %s AS course_code
+                FROM student_course_results scr
+                JOIN semesters s ON s.semester_id = scr.semester_id
+                JOIN students st ON st.student_id = scr.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE s.course_code = %s
+                  AND u.role = 'student'
+                  AND u.is_active = TRUE
+                ORDER BY u.full_name
+                """,
+                (course_code, course_code),
+            )
+            add_rows(cursor.fetchall())
+
+            if course_code == "COMP4300" and _db_column_exists(cursor, "student_course_results", "promoted_to_semester_id"):
+                cursor.execute(
+                    """
+                    SELECT DISTINCT st.student_id, u.user_id, u.full_name, u.university_id,
+                           'COMP4300' AS course_code
+                    FROM student_course_results scr
+                    JOIN semesters promoted_sem ON promoted_sem.semester_id = scr.promoted_to_semester_id
+                    JOIN students st ON st.student_id = scr.student_id
+                    JOIN users u ON u.user_id = st.user_id
+                    WHERE promoted_sem.course_code = 'COMP4300'
+                      AND scr.status = 'passed'
+                      AND u.role = 'student'
+                      AND u.is_active = TRUE
+                    ORDER BY u.full_name
+                    """
+                )
+                add_rows(cursor.fetchall())
+
+    # Source 3: COMP4200 sections.
+    if course_code == "COMP4200" and _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
+        cursor.execute(
+            """
+            SELECT DISTINCT st.student_id, u.user_id, u.full_name, u.university_id,
+                   'COMP4200' AS course_code
+            FROM section_students ss
+            JOIN students st ON st.student_id = ss.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE u.role = 'student'
+              AND u.is_active = TRUE
+            ORDER BY u.full_name
+            """
+        )
+        add_rows(cursor.fetchall())
+
+    return sorted(rows_by_user.values(), key=lambda r: (r.get("full_name") or "").lower())
+
+
+def _student_user_ids_by_course(cursor, course_code):
+    return [row["user_id"] for row in _student_user_rows_by_course(cursor, course_code)]
+
+
+def _all_active_student_rows(cursor):
+    cursor.execute(
+        """
+        SELECT st.student_id, u.user_id, u.full_name, u.university_id,
+               NULL AS course_code
+        FROM students st
+        JOIN users u ON u.user_id = st.user_id
+        WHERE u.role = 'student'
+          AND u.is_active = TRUE
+        ORDER BY u.full_name
+        """
+    )
+    return cursor.fetchall()
+
+
+def _all_active_student_user_ids(cursor):
+    return [row["user_id"] for row in _all_active_student_rows(cursor)]
+
+
+def _notification_recipients(cursor, scope, value=None, course_scope="both"):
     """Return user_ids for the coordinator selected target."""
     scope = (scope or "").strip()
+    course_scope = (course_scope or "both").strip()
 
     if scope == "head":
         cursor.execute(
@@ -1892,6 +2027,19 @@ def _notification_recipients(cursor, scope, value=None):
             (value,),
         )
         return [r["user_id"] for r in cursor.fetchall()]
+
+    if scope in {"all_students", "students"}:
+        if course_scope == "graduation_project":
+            return _student_user_ids_by_course(cursor, "COMP4300")
+        if course_scope == "introduction":
+            return _student_user_ids_by_course(cursor, "COMP4200")
+        return _all_active_student_user_ids(cursor)
+
+    if scope == "comp4200_students":
+        return _student_user_ids_by_course(cursor, "COMP4200")
+
+    if scope == "comp4300_students":
+        return _student_user_ids_by_course(cursor, "COMP4300")
 
     if scope == "student":
         cursor.execute(
@@ -1934,6 +2082,9 @@ def _notification_recipients(cursor, scope, value=None):
         return [r["recipient_id"] for r in cursor.fetchall()]
 
     if scope == "all_sections":
+        # All sections are COMP4200 introduction sections. For COMP4300, use project members instead.
+        if course_scope == "graduation_project":
+            return _student_user_ids_by_course(cursor, "COMP4300")
         if not (
             _table_exists(cursor, "student_distribution_sections")
             and _table_exists(cursor, "section_students")
@@ -1996,14 +2147,9 @@ def api_coordinator_notification_options():
             """)
         doctors = cursor.fetchall()
 
-        cursor.execute("""
-            SELECT st.student_id, u.user_id, u.full_name, u.university_id
-            FROM students st
-            JOIN users u ON u.user_id = st.user_id
-            WHERE u.role = 'student' AND u.is_active = TRUE
-            ORDER BY u.full_name
-            """)
-        students = cursor.fetchall()
+        students = _all_active_student_rows(cursor)
+        comp4200_students = _student_user_rows_by_course(cursor, "COMP4200")
+        comp4300_students = _student_user_rows_by_course(cursor, "COMP4300")
 
         sections = []
         if _table_exists(cursor, "student_distribution_sections") and _table_exists(
@@ -2030,6 +2176,8 @@ def api_coordinator_notification_options():
                 "heads": heads,
                 "doctors": doctors,
                 "students": students,
+                "comp4200_students": comp4200_students,
+                "comp4300_students": comp4300_students,
                 "sections": sections,
             }
         )
@@ -2152,7 +2300,7 @@ def api_coordinator_notifications_send():
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_notification_attachment_columns(cursor)
-        recipients = _notification_recipients(cursor, scope, value)
+        recipients = _notification_recipients(cursor, scope, value, course_scope)
         sender_id = session.get("user_id")
         recipients = sorted({int(r) for r in recipients if int(r) != int(sender_id)})
 
@@ -4439,6 +4587,135 @@ def _committee_time_add(start_hhmm, minutes_to_add):
     return (dt + timedelta(minutes=minutes_to_add)).strftime("%H:%M")
 
 
+
+def _committee_time_to_minutes(value):
+    """Convert a HH:MM / TIME value to minutes after midnight."""
+    if value is None:
+        return 0
+    if hasattr(value, "hour") and hasattr(value, "minute"):
+        return int(value.hour) * 60 + int(value.minute)
+    text = str(value).strip()
+    if not text:
+        return 0
+    # MySQL TIME may arrive as HH:MM:SS.
+    parts = text.split(":")
+    try:
+        return int(parts[0]) * 60 + int(parts[1])
+    except Exception:
+        return 0
+
+
+def _committee_time_ranges_overlap(start1, end1, start2, end2):
+    """Return True when two committee time ranges overlap."""
+    s1 = _committee_time_to_minutes(start1)
+    e1 = _committee_time_to_minutes(end1)
+    s2 = _committee_time_to_minutes(start2)
+    e2 = _committee_time_to_minutes(end2)
+    return s1 < e2 and s2 < e1
+
+
+def _committee_faculty_has_db_time_conflict(
+    cursor,
+    faculty_id,
+    discussion_date,
+    start_time,
+    end_time,
+    exclude_plan_id=None,
+):
+    """Check if a doctor already has an active committee that overlaps this time."""
+    params = [faculty_id, discussion_date, end_time, start_time]
+    exclude_sql = ""
+    if exclude_plan_id:
+        exclude_sql = " AND cp.plan_id <> %s"
+        params.append(exclude_plan_id)
+
+    cursor.execute(
+        f"""
+        SELECT cp.plan_id
+        FROM committee_plan_members cpm
+        JOIN committee_plans cp ON cp.plan_id = cpm.plan_id
+        WHERE cpm.faculty_id = %s
+          AND cp.discussion_date = %s
+          AND cp.status IN ('draft', 'scheduled', 'in_progress')
+          AND cp.start_time < %s
+          AND cp.end_time > %s
+          {exclude_sql}
+        LIMIT 1
+        """,
+        tuple(params),
+    )
+    return cursor.fetchone() is not None
+
+
+def _committee_faculty_has_generated_time_conflict(
+    faculty_id,
+    discussion_date,
+    start_time,
+    end_time,
+    generated_faculty_slots=None,
+):
+    """Check conflicts against committees generated in the current request before DB commit."""
+    for slot in generated_faculty_slots or []:
+        if str(slot.get("discussion_date")) != str(discussion_date):
+            continue
+        if int(faculty_id) not in {int(x) for x in slot.get("faculty_ids", set())}:
+            continue
+        if _committee_time_ranges_overlap(start_time, end_time, slot.get("start_time"), slot.get("end_time")):
+            return True
+    return False
+
+
+def _committee_faculty_has_any_time_conflict(
+    cursor,
+    faculty_id,
+    discussion_date,
+    start_time,
+    end_time,
+    generated_faculty_slots=None,
+    exclude_plan_id=None,
+):
+    return _committee_faculty_has_db_time_conflict(
+        cursor,
+        faculty_id,
+        discussion_date,
+        start_time,
+        end_time,
+        exclude_plan_id=exclude_plan_id,
+    ) or _committee_faculty_has_generated_time_conflict(
+        faculty_id,
+        discussion_date,
+        start_time,
+        end_time,
+        generated_faculty_slots=generated_faculty_slots,
+    )
+
+
+def _committee_conflicting_faculty_ids(
+    cursor,
+    faculty_ids,
+    discussion_date,
+    start_time,
+    end_time,
+    generated_faculty_slots=None,
+    exclude_plan_id=None,
+):
+    conflicts = set()
+    for faculty_id in faculty_ids or []:
+        if faculty_id is None:
+            continue
+        if _committee_faculty_has_any_time_conflict(
+            cursor,
+            int(faculty_id),
+            discussion_date,
+            start_time,
+            end_time,
+            generated_faculty_slots=generated_faculty_slots,
+            exclude_plan_id=exclude_plan_id,
+        ):
+            conflicts.add(int(faculty_id))
+    return conflicts
+
+
 def _committee_fetch_faculty_pool(cursor):
     # Do NOT filter by active_committee_count = 0.
     # Include ALL active doctors so there are always >= 4 specialisations.
@@ -4626,6 +4903,149 @@ def _committee_pick_members_for_supervisor(
 
     return chosen_members
 
+
+
+def _committee_flat_faculty_pool(groups):
+    """Return all faculty members from the grouped faculty pool as a flat list."""
+    result = []
+    for members in groups.values():
+        for member in members:
+            item = dict(member)
+            item["faculty_id"] = int(item["faculty_id"])
+            item["specialization"] = item.get("specialization") or "General"
+            result.append(item)
+    return result
+
+
+def _committee_pick_members_for_supervisors(
+    groups,
+    supervisor_ids,
+    used_faculty_ids=None,
+    rotation_index=0,
+    reserved_supervisor_ids=None,
+    unavailable_faculty_ids=None,
+):
+    """
+    Build one discussion committee that can contain projects from multiple supervisors.
+
+    Rule:
+    - The committee has exactly 4 doctors.
+    - Every supervisor of every project/section in this committee must be a committee member.
+    - Remaining seats are filled with other doctors, preferring unused doctors and different majors.
+    """
+    if used_faculty_ids is None:
+        used_faculty_ids = set()
+
+    used_faculty_ids = {int(x) for x in used_faculty_ids if x is not None}
+    reserved_supervisor_ids = {int(x) for x in (reserved_supervisor_ids or set()) if x is not None}
+    unavailable_faculty_ids = {int(x) for x in (unavailable_faculty_ids or set()) if x is not None}
+
+    clean_supervisor_ids = []
+    for sid in supervisor_ids or []:
+        if sid is None:
+            continue
+        sid = int(sid)
+        if sid not in clean_supervisor_ids:
+            clean_supervisor_ids.append(sid)
+
+    if not clean_supervisor_ids:
+        raise ValueError("Every committee item must have an assigned supervisor.")
+
+    if len(clean_supervisor_ids) > 4:
+        raise ValueError(
+            "One committee cannot contain projects/sections from more than 4 different supervisors, "
+            "because every supervisor must be inside the same 4-doctor committee."
+        )
+
+    all_faculty = _committee_flat_faculty_pool(groups)
+    faculty_by_id = {int(member["faculty_id"]): member for member in all_faculty}
+
+    chosen_members = []
+    chosen_ids = set()
+    chosen_specs = set()
+
+    for supervisor_id in clean_supervisor_ids:
+        if supervisor_id in unavailable_faculty_ids:
+            raise ValueError(
+                "A project/section supervisor already has another committee at this time. "
+                "The system will try another time slot."
+            )
+
+        supervisor = faculty_by_id.get(supervisor_id)
+        if not supervisor:
+            raise ValueError(
+                "A project/section supervisor is not available for committee generation. "
+                "Check that every supervisor has a faculty record and an active user account."
+            )
+        supervisor_member = dict(supervisor)
+        supervisor_member["role"] = "supervisor"
+        chosen_members.append(supervisor_member)
+        chosen_ids.add(supervisor_id)
+        chosen_specs.add(supervisor_member.get("specialization") or "General")
+
+    if len(all_faculty) < 4:
+        raise ValueError("At least 4 active doctors are required to generate committees.")
+
+    def sort_key(member):
+        fid = int(member["faculty_id"])
+        spec = member.get("specialization") or "General"
+        return (
+            fid in used_faculty_ids,                 # unused first
+            spec in chosen_specs,                    # different major first
+            int(member.get("active_committee_count") or 0),
+            -int(member.get("years_experience") or 0),
+            member.get("full_name") or "",
+        )
+
+    def add_candidates(candidates, allow_reserved_supervisors=False, require_new_major=False):
+        nonlocal chosen_members, chosen_ids, chosen_specs
+        for member in sorted(candidates, key=sort_key):
+            fid = int(member["faculty_id"])
+            spec = member.get("specialization") or "General"
+            if fid in chosen_ids:
+                continue
+            if fid in unavailable_faculty_ids:
+                continue
+            # Do not pull another project's supervisor as a filler doctor unless strict options fail.
+            if not allow_reserved_supervisors and fid in reserved_supervisor_ids:
+                continue
+            if require_new_major and spec in chosen_specs:
+                continue
+            item = dict(member)
+            item["role"] = "member"
+            chosen_members.append(item)
+            chosen_ids.add(fid)
+            chosen_specs.add(spec)
+            used_faculty_ids.add(fid)
+            if len(chosen_members) == 4:
+                return True
+        return len(chosen_members) == 4
+
+    candidates = [member for member in all_faculty if int(member["faculty_id"]) not in chosen_ids]
+    unused_candidates = [member for member in candidates if int(member["faculty_id"]) not in used_faculty_ids]
+
+    # 1) Best: unused, not another reserved supervisor, and new major.
+    add_candidates(unused_candidates, allow_reserved_supervisors=False, require_new_major=True)
+
+    # 2) Then unused, not another reserved supervisor, even if major repeats.
+    if len(chosen_members) < 4:
+        add_candidates(unused_candidates, allow_reserved_supervisors=False, require_new_major=False)
+
+    # 3) Then any non-reserved doctor.
+    if len(chosen_members) < 4:
+        add_candidates(candidates, allow_reserved_supervisors=False, require_new_major=False)
+
+    # 4) Last fallback: allow reserved supervisors as fillers so generation does not get blocked.
+    if len(chosen_members) < 4:
+        add_candidates(candidates, allow_reserved_supervisors=True, require_new_major=False)
+
+    if len(chosen_members) < 4:
+        raise ValueError(
+            "Could not create a complete 4-doctor committee without time conflicts. "
+            "Try a later start time or add more available doctors."
+        )
+
+    return chosen_members
 
 def _committee_ensure_course_schema(cursor):
     """Keep committee tables compatible with both COMP4200 and COMP4300."""
@@ -5485,32 +5905,59 @@ def _committee_generate_internal(
         """)
     rooms = cursor.fetchall()
 
-    projects_by_supervisor = defaultdict(list)
+    eligible_with_supervisors = []
+    all_supervisor_ids = set()
     for project in eligible_projects:
         supervisor_id = project.get("supervisor_id")
         if supervisor_id:
-            projects_by_supervisor[int(supervisor_id)].append(project)
+            project = dict(project)
+            project["supervisor_id"] = int(supervisor_id)
+            eligible_with_supervisors.append(project)
+            all_supervisor_ids.add(int(supervisor_id))
 
-    if not projects_by_supervisor:
+    if not eligible_with_supervisors:
         raise ValueError(
             "No eligible items with assigned supervisors were found. "
             "Assign a supervisor before generating committees."
         )
 
+    # New rule:
+    # A committee may contain projects/sections from different supervisors.
+    # Every supervisor represented in a committee is inserted as a committee member.
+    # Since a committee has 4 doctors, a single committee cannot contain more than
+    # 4 different supervisors.
+    random.shuffle(eligible_with_supervisors)
     committee_groups = []
-    for supervisor_id, supervisor_projects in projects_by_supervisor.items():
-        # IMPORTANT RULE:
-        # Items inside the same committee must all belong to the SAME supervisor.
-        # We therefore split each supervisor's projects into separate chunks instead
-        # of mixing projects from different supervisors.
-        random.shuffle(supervisor_projects)
-        for i in range(0, len(supervisor_projects), projects_per_committee):
-            chunk = supervisor_projects[i:i + projects_per_committee]
-            if chunk:
-                committee_groups.append({
-                    "supervisor_id": supervisor_id,
-                    "projects": chunk,
-                })
+    current_chunk = []
+    current_supervisor_ids = set()
+
+    for project in eligible_with_supervisors:
+        supervisor_id = int(project["supervisor_id"])
+        would_add_new_supervisor = supervisor_id not in current_supervisor_ids
+        must_start_new_group = (
+            current_chunk
+            and (
+                len(current_chunk) >= projects_per_committee
+                or (would_add_new_supervisor and len(current_supervisor_ids) >= 4)
+            )
+        )
+
+        if must_start_new_group:
+            committee_groups.append({
+                "supervisor_ids": sorted(current_supervisor_ids),
+                "projects": current_chunk,
+            })
+            current_chunk = []
+            current_supervisor_ids = set()
+
+        current_chunk.append(project)
+        current_supervisor_ids.add(supervisor_id)
+
+    if current_chunk:
+        committee_groups.append({
+            "supervisor_ids": sorted(current_supervisor_ids),
+            "projects": current_chunk,
+        })
 
     random.shuffle(committee_groups)
     committee_count = len(committee_groups)
@@ -5521,32 +5968,95 @@ def _committee_generate_internal(
         )
 
     used_faculty_ids = set()
-    reserved_supervisor_ids = set(projects_by_supervisor.keys())
+    reserved_supervisor_ids = set(all_supervisor_ids)
+    all_faculty_ids = {
+        int(member["faculty_id"])
+        for members in faculty_groups.values()
+        for member in members
+        if member.get("faculty_id") is not None
+    }
+    generated_faculty_slots = []
     course_label = "COMP4200" if course_scope == "introduction" else "COMP4300"
 
     for idx, committee_group in enumerate(committee_groups):
         chunk = committee_group["projects"]
-        supervisor_id = committee_group["supervisor_id"]
+        supervisor_ids = committee_group.get("supervisor_ids") or []
+        supervisor_id = int(supervisor_ids[0]) if supervisor_ids else None
 
         if not chunk:
             continue
 
-        members = _committee_pick_members_for_supervisor(
-            faculty_groups,
-            supervisor_id,
-            used_faculty_ids,
-            idx,
-            reserved_supervisor_ids,
-        )
-        room = rooms[idx]
-        supervisor_name = chunk[0].get("supervisor_name") or "Supervisor"
-        committee_name = f"{course_label} Committee {idx + 1} — {supervisor_name}"
-        last_slot_end = start_time
+        committee_duration_minutes = max(30, ((len(chunk) - 1) * 40) + 30)
+        members = None
+        committee_start_time = None
+        last_slot_end = None
+        unavailable_faculty_ids = set()
 
-        for slot_index in range(len(chunk)):
-            slot_start = _committee_time_add(start_time, slot_index * 40)
-            slot_end = _committee_time_add(slot_start, 30)
-            last_slot_end = slot_end
+        # Committees can run in parallel only when their doctors do not overlap.
+        # If a required supervisor or selected member already has a committee at the
+        # requested time, move this committee forward by 40 minutes and try again.
+        max_attempts = max(36, len(committee_groups) * 8)
+        for attempt in range(max_attempts):
+            candidate_start = _committee_time_add(start_time, attempt * 40)
+            candidate_end = _committee_time_add(candidate_start, committee_duration_minutes)
+
+            supervisor_conflicts = _committee_conflicting_faculty_ids(
+                cursor,
+                supervisor_ids,
+                discussion_date,
+                candidate_start,
+                candidate_end,
+                generated_faculty_slots=generated_faculty_slots,
+            )
+            if supervisor_conflicts:
+                continue
+
+            unavailable_faculty_ids = _committee_conflicting_faculty_ids(
+                cursor,
+                all_faculty_ids,
+                discussion_date,
+                candidate_start,
+                candidate_end,
+                generated_faculty_slots=generated_faculty_slots,
+            )
+
+            try:
+                candidate_members = _committee_pick_members_for_supervisors(
+                    faculty_groups,
+                    supervisor_ids,
+                    used_faculty_ids,
+                    idx + attempt,
+                    reserved_supervisor_ids,
+                    unavailable_faculty_ids=unavailable_faculty_ids,
+                )
+            except ValueError:
+                continue
+
+            member_ids = [int(member["faculty_id"]) for member in candidate_members]
+            member_conflicts = _committee_conflicting_faculty_ids(
+                cursor,
+                member_ids,
+                discussion_date,
+                candidate_start,
+                candidate_end,
+                generated_faculty_slots=generated_faculty_slots,
+            )
+            if member_conflicts:
+                continue
+
+            members = candidate_members
+            committee_start_time = candidate_start
+            last_slot_end = candidate_end
+            break
+
+        if members is None or committee_start_time is None or last_slot_end is None:
+            raise ValueError(
+                f"Could not schedule {course_label} Committee {idx + 1} without doctor time conflicts. "
+                "Try an earlier/later start time or add more available doctors."
+            )
+
+        room = rooms[idx]
+        committee_name = f"{course_label} Committee {idx + 1}"
 
         insert_cursor = db.cursor()
         if _committee_plan_has_academic_year(cursor):
@@ -5561,7 +6071,7 @@ def _committee_generate_internal(
                     course_scope,
                     active_semester["academic_year"],
                     discussion_date,
-                    start_time,
+                    committee_start_time,
                     last_slot_end,
                     room["room_id"],
                     supervisor_id,
@@ -5580,7 +6090,7 @@ def _committee_generate_internal(
                     committee_name,
                     course_scope,
                     discussion_date,
-                    start_time,
+                    committee_start_time,
                     last_slot_end,
                     room["room_id"],
                     supervisor_id,
@@ -5596,11 +6106,11 @@ def _committee_generate_internal(
                 INSERT INTO committee_plan_members (plan_id, faculty_id, role)
                 VALUES (%s, %s, %s)
                 """,
-                (plan_id, member["faculty_id"], "supervisor" if int(member["faculty_id"]) == int(supervisor_id) else "member"),
+                (plan_id, member["faculty_id"], "supervisor" if int(member["faculty_id"]) in {int(x) for x in supervisor_ids} else "member"),
             )
 
         for slot_index, project in enumerate(chunk, start=1):
-            slot_start = _committee_time_add(start_time, (slot_index - 1) * 40)
+            slot_start = _committee_time_add(committee_start_time, (slot_index - 1) * 40)
             slot_end = _committee_time_add(slot_start, 30)
 
             if course_scope == "introduction":
@@ -5630,6 +6140,16 @@ def _committee_generate_internal(
             _committee_auto_assign_readers(cursor, plan_id, chunk, members, course_scope)
         if '_committee_send_notifications' in globals():
             _committee_send_notifications(cursor, plan_id, session.get("user_id"))
+
+        generated_faculty_slots.append({
+            "faculty_ids": {int(member["faculty_id"]) for member in members},
+            "discussion_date": discussion_date,
+            "start_time": committee_start_time,
+            "end_time": last_slot_end,
+        })
+
+        for member in members:
+            used_faculty_ids.add(int(member["faculty_id"]))
 
         insert_cursor.close()
 
@@ -7854,6 +8374,248 @@ def api_coordinator_evaluation_unread_count():
         return jsonify({"count": int(row.get("count") or 0)})
     except Exception as e:
         return jsonify({"error": str(e), "count": 0}), 500
+
+
+def _ensure_user_profile_extra_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_profile_extra (
+            user_id INT PRIMARY KEY,
+            office_number VARCHAR(120) NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+
+@coordinator_bp.route("/api/coordinator/profile", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_profile_get():
+    try:
+        user_id = session.get("user_id")
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_user_profile_extra_table(cursor)
+        db.commit()
+
+        cursor.execute(
+            """
+            SELECT 
+                u.user_id,
+                u.full_name,
+                u.email,
+                u.avatar_initials,
+                u.role,
+                COALESCE(f.title, 'Coordinator') AS title,
+                COALESCE(upe.office_number, '') AS office_number
+            FROM users u
+            LEFT JOIN faculty f ON f.user_id = u.user_id
+            LEFT JOIN user_profile_extra upe ON upe.user_id = u.user_id
+            WHERE u.user_id = %s
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+
+        profile = cursor.fetchone()
+
+        cursor.close()
+        db.close()
+
+        if not profile:
+            return jsonify({"error": "Profile not found."}), 404
+
+        profile["course_label"] = "COMP4200 / COMP4300"
+
+        return jsonify({"profile": profile})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/profile", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_profile_update():
+    try:
+        user_id = session.get("user_id")
+        data = request.get_json(silent=True) or {}
+
+        full_name = (data.get("full_name") or "").strip()
+        email = (data.get("email") or "").strip()
+        office_number = (data.get("office_number") or "").strip()
+
+        if not full_name:
+            return jsonify({"error": "Full name is required."}), 400
+
+        if not email:
+            return jsonify({"error": "Email is required."}), 400
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_user_profile_extra_table(cursor)
+
+        cursor.execute(
+            """
+            SELECT user_id
+            FROM users
+            WHERE email = %s AND user_id <> %s
+            LIMIT 1
+            """,
+            (email, user_id),
+        )
+
+        if cursor.fetchone():
+            cursor.close()
+            db.close()
+            return jsonify({"error": "This email is already used by another user."}), 400
+
+        avatar_initials = "".join(
+            part[0].upper()
+            for part in full_name.split()
+            if part.strip()
+        )[:2] or "CO"
+
+        cursor.execute(
+            """
+            UPDATE users
+            SET full_name = %s,
+                email = %s,
+                avatar_initials = %s
+            WHERE user_id = %s
+            """,
+            (full_name, email, avatar_initials, user_id),
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO user_profile_extra (user_id, office_number)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE office_number = VALUES(office_number)
+            """,
+            (user_id, office_number),
+        )
+
+        db.commit()
+
+        session["full_name"] = full_name
+        session["avatar_initials"] = avatar_initials
+
+        cursor.close()
+        db.close()
+
+        return jsonify({"message": "Profile updated successfully."})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/change-password", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_change_password():
+    try:
+        user_id = session.get("user_id")
+        data = request.get_json(silent=True) or {}
+
+        current_password = (data.get("current_password") or "").strip()
+        new_password = (data.get("new_password") or "").strip()
+        confirm_password = (data.get("confirm_password") or "").strip()
+
+        if not current_password or not new_password or not confirm_password:
+            return jsonify({"error": "Please fill in all password fields."}), 400
+
+        if len(new_password) < 8:
+            return jsonify({"error": "New password must be at least 8 characters."}), 400
+
+        if new_password != confirm_password:
+            return jsonify({"error": "New passwords do not match."}), 400
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT password_hash
+            FROM users
+            WHERE user_id = %s
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+
+        user = cursor.fetchone()
+
+        if not user:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "User not found."}), 404
+
+        stored_hash = user.get("password_hash") or ""
+
+        if not bcrypt.checkpw(current_password.encode(), stored_hash.encode()):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Current password is incorrect."}), 400
+
+        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+
+        cursor.execute(
+            """
+            UPDATE users
+            SET password_hash = %s
+            WHERE user_id = %s
+            """,
+            (new_hash, user_id),
+        )
+
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return jsonify({"message": "Password updated successfully."})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@coordinator_bp.route("/coordinator/switch-to-supervisor", methods=["POST", "GET"])
+@login_required(role="coordinator")
+def switch_to_supervisor():
+    """
+    Allow a coordinator who also exists in faculty table to view the system as supervisor.
+    It keeps the original coordinator session so the user can switch back.
+    """
+    user_id = session.get("user_id")
+
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute(
+        """
+        SELECT f.faculty_id, u.full_name
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE f.user_id = %s
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+
+    faculty = cursor.fetchone()
+    cursor.close()
+    db.close()
+
+    if not faculty:
+        return redirect(url_for("coordinator_bp.coordinator_page", page="profile"))
+
+    session["original_role"] = session.get("role")
+    session["original_user_id"] = session.get("user_id")
+    session["original_full_name"] = session.get("full_name")
+    session["is_switched_to_supervisor"] = True
+
+    session["role"] = "supervisor"
+    session["faculty_id"] = faculty["faculty_id"]
+
+    return redirect(url_for("supervisor_dashboard"))
+
 
 @coordinator_bp.route("/api/coordinator/profile", methods=["POST"])
 @login_required(role="coordinator")
