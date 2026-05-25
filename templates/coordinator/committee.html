@@ -303,6 +303,12 @@
       </button>
     </div>
 
+    <div class="btn-row" style="margin:0 0 16px 0;flex-wrap:wrap">
+      <button class="btn btn-outline" type="button" onclick="downloadCommitteeSchedule()">
+        Download Committee Schedule Excel
+      </button>
+    </div>
+
     <div id="comp4200CommitteePage" class="course-committee-page active">
       <div class="tab-bar">
         <button class="tab on" type="button" onclick="showCommitteeSection('committee4200Generator', this)">Auto
@@ -1238,6 +1244,11 @@
     }
   }
 
+
+  function downloadCommitteeSchedule(courseScope = 'all') {
+    const scope = courseScope || 'all';
+    window.location.href = `/api/coordinator/committee-schedule-export?course_scope=${encodeURIComponent(scope)}`;
+  }
 
   document.addEventListener('DOMContentLoaded', function () {
     const firstCourseTab = document.querySelector('#pg-committee .main-course-tabs .tab');

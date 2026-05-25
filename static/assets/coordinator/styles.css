@@ -864,3 +864,6 @@ body.sidebar-collapsed .sb-item:hover::before {
 .sidebar {
   border-right: 2px solid var(--accent);
 }
+
+/* ===== SIDEBAR FONT WEIGHT FIX ===== */
+.sidebar * { font-weight: normal; }
