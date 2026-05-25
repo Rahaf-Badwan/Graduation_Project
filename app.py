@@ -49,6 +49,11 @@ app.config["MAIL_DEFAULT_SENDER"] = (
 
 mail = Mail(app)
 
+
+@app.route("/favicon.ico")
+def favicon():
+    return redirect(url_for("static", filename="favicon.png"))
+
 # ─── Register Blueprints ─────────────────────────────────────────────────
 app.register_blueprint(archive_bp)
 app.register_blueprint(shared_ai_bp)
