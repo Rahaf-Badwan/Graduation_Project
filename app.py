@@ -888,6 +888,27 @@ def api_supervisor_submit_feedback():
     return jsonify({"success": True, "feedback_id": feedback_id})
 
 
+@app.route("/switch-back-to-coordinator", methods=["POST", "GET"])
+@login_required(role="supervisor")
+def switch_back_to_coordinator():
+    """
+    Return from supervisor view back to coordinator account.
+    """
+    if not session.get("is_switched_to_supervisor"):
+        return redirect(url_for("supervisor_dashboard"))
+
+    session["role"] = session.get("original_role", "coordinator")
+    session["user_id"] = session.get("original_user_id", session.get("user_id"))
+    session["full_name"] = session.get("original_full_name", session.get("full_name"))
+
+    session.pop("original_role", None)
+    session.pop("original_user_id", None)
+    session.pop("original_full_name", None)
+    session.pop("is_switched_to_supervisor", None)
+
+    return redirect(url_for("coordinator_bp.coordinator_dashboard"))
+
+
 @app.route("/api/supervisor/my-feedback", methods=["GET"])
 @login_required(role="supervisor")
 def api_supervisor_my_feedback():

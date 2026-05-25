@@ -1,994 +1,407 @@
 {% extends 'coordinator/base.html' %}
 
-{% block page_title %}Create Evaluation Committee{% endblock %}
-{% block page_id %}committee{% endblock %}
-{% block topbar_title %}Create Evaluation Committee{% endblock %}
+{% block page_title %}Profile{% endblock %}
+{% block page_id %}profile{% endblock %}
+{% block topbar_title %}Profile{% endblock %}
 
 {% block content %}
 <style>
-  html,
-  body {
-    scroll-behavior: auto !important;
+  #pg-profile {
+    padding: 20px 22px 90px;
   }
 
-  #pg-committee {
-    display: block !important;
-    min-height: auto !important;
-    height: auto !important;
-    padding: 20px 22px 90px !important;
-    margin: 0 !important;
-  }
-
-  #pg-committee .committee-page-wrap {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
-  #pg-committee .tab-bar {
+  .profile-header {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 0 0 16px 0;
-    padding: 0;
-  }
-
-  #pg-committee .main-course-tabs {
-    margin-bottom: 20px;
-    padding: 10px;
-    background: #f7fbf8;
-    border: 1px solid #e1ece5;
-    border-radius: 18px;
-  }
-
-  #pg-committee .tab {
-    border: 1px solid #d7e3dc;
+    gap: 18px;
     background: #fff;
-    color: #2d5137;
-    padding: 9px 14px;
-    border-radius: 999px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: 0.18s ease;
+    border: 1px solid #e6ece8;
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
+    margin-bottom: 18px;
   }
 
-  #pg-committee .tab:hover {
-    background: #f3f7f4;
-  }
-
-  #pg-committee .tab.on {
+  .profile-avatar-lg {
+    width: 78px;
+    height: 78px;
+    border-radius: 22px;
     background: #2e7d42;
     color: #fff;
-    border-color: #2e7d42;
-    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
-  }
-
-  #pg-committee .course-committee-page {
-    display: none;
-  }
-
-  #pg-committee .course-committee-page.active {
-    display: block;
-  }
-
-  #pg-committee .committee-section {
-    display: none;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
-  #pg-committee .committee-section.active {
-    display: block;
-  }
-
-  #pg-committee .committee-grid {
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: 16px;
-    align-items: start;
-  }
-
-  #pg-committee .committee-info-box {
-    border-left: 5px solid #2e7d42;
-    background: #f7fbf8;
-    border-radius: 14px;
-    padding: 13px 14px;
-    color: #344054;
-    line-height: 1.55;
-    font-size: 13px;
-  }
-
-  #pg-committee .committee-mini-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-
-  #pg-committee .committee-rule-box {
-    border: 1px solid #e7eee9;
-    background: #fbfdfb;
-    border-radius: 14px;
-    padding: 14px;
-    color: #344054;
-    line-height: 1.8;
-    font-size: 14px;
-  }
-
-  #pg-committee .committee-empty {
-    padding: 22px;
-    border: 1px dashed #cddbd2;
-    border-radius: 14px;
-    color: #667085;
-    text-align: center;
-    background: #fbfdfb;
-  }
-
-  #pg-committee .card {
-    margin-top: 0 !important;
-  }
-
-  #pg-committee .committee-actions-card {
-    margin-top: 14px;
-  }
-
-  #pg-committee .committee-card {
-    border: 1px solid #e7eee9;
-    background: #fff;
-    border-radius: 16px;
-    padding: 14px;
-    margin-bottom: 12px;
-    box-shadow: 0 8px 20px rgba(16, 24, 40, 0.04);
-  }
-
-  #pg-committee .committee-card-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
     font-weight: 900;
-    color: #1f3f2a;
+    flex-shrink: 0;
+  }
+
+  .profile-main {
+    flex: 1;
+  }
+
+  .profile-name {
+    font-size: 22px;
+    font-weight: 900;
+    color: #173b24;
+    margin-bottom: 5px;
+  }
+
+  .profile-sub {
+    font-size: 13px;
+    color: #667085;
+    margin-bottom: 9px;
+  }
+
+  .profile-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .pill.green {
+    background: #ecfdf3;
+    color: #027a48;
+  }
+
+  .pill.gray {
+    background: #f2f4f7;
+    color: #475467;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e6ece8;
+    border-radius: 22px;
+    box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
+    overflow: hidden;
+  }
+
+  .card-hd {
+    padding: 17px 20px;
+    border-bottom: 1px solid #edf2ef;
+    background: #fbfdfb;
+  }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: #173b24;
+  }
+
+  .card-body {
+    padding: 18px 20px;
+  }
+
+  .field-wrap {
+    margin-bottom: 14px;
+  }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 900;
+    color: #344054;
     margin-bottom: 6px;
   }
 
-  #pg-committee .committee-card-meta {
-    color: #667085;
-    font-size: 13px;
-    line-height: 1.6;
+  .field-input {
+    width: 100%;
+    border: 1px solid #d8e2dc;
+    border-radius: 13px;
+    padding: 11px 13px;
+    font-size: 14px;
+    outline: none;
+    background: #fff;
+    font-family: inherit;
   }
 
-  #pg-committee .project-list {
+  .field-input:focus {
+    border-color: #2e7d42;
+    box-shadow: 0 0 0 4px rgba(46, 125, 66, 0.12);
+  }
+
+  .btn-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
     margin-top: 10px;
-    padding: 10px;
-    background: #f9fbfa;
+  }
+
+  .btn {
+    border: 0;
+    border-radius: 13px;
+    padding: 10px 15px;
+    font-weight: 900;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .btn-primary {
+    background: #2e7d42;
+    color: #fff;
+  }
+
+  .btn-outline {
+    background: #f7fbf8;
+    color: #245c33;
+    border: 1px solid #cfe0d4;
+  }
+
+  .profile-msg {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 12px;
     border-radius: 12px;
-    border: 1px solid #eef3ef;
-  }
-
-  #pg-committee .project-item {
-    padding: 9px 0;
-    border-bottom: 1px solid #e9f0eb;
-  }
-
-  #pg-committee .project-item:last-child {
-    border-bottom: none;
-  }
-
-  #pg-committee .project-title {
-    font-weight: 800;
-    color: #243b2c;
-  }
-
-  #pg-committee .project-meta {
-    color: #667085;
     font-size: 13px;
-    margin-top: 3px;
+    font-weight: 700;
   }
 
-  #pg-committee .msg-ok {
-    color: #2e7d42;
-    font-weight: 800;
+  .profile-msg.ok {
+    display: block;
+    color: #027a48;
+    background: #ecfdf3;
+    border: 1px solid #abefc6;
   }
 
-  #pg-committee .msg-error {
+  .profile-msg.error {
+    display: block;
     color: #b42318;
-    font-weight: 800;
+    background: #fef3f2;
+    border: 1px solid #fecdca;
   }
 
-  @media (max-width: 980px) {
-    #pg-committee .committee-grid {
+  @media (max-width: 850px) {
+    .profile-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .two-col {
       grid-template-columns: 1fr;
-    }
-
-    #pg-committee .committee-mini-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-
-  @media (max-width: 620px) {
-    #pg-committee .committee-mini-grid {
-      grid-template-columns: 1fr;
-    }
-
-    #pg-committee .tab {
-      width: 100%;
-      text-align: center;
     }
   }
 </style>
 
-<div class="page page-single on" id="pg-committee">
-  <div class="committee-page-wrap">
+<div class="page page-single on" id="pg-profile">
+  <div class="profile-header">
+    <div class="profile-avatar-lg" id="profileAvatar">--</div>
 
-    <!-- MAIN COURSE TABS -->
-    <div class="tab-bar main-course-tabs">
-      <button class="tab on" type="button" onclick="showCourseCommitteePage('comp4200', this)">
-        COMP4200 Committee
+    <div class="profile-main">
+      <div class="profile-name" id="profileName">Loading...</div>
+      <div class="profile-sub" id="profileSubtitle">Coordinator · Computer Science Department</div>
+
+      <div class="profile-pills">
+        <span class="pill green">Active Coordinator</span>
+        <span class="pill gray" id="profileCourse">COMP4200 / COMP4300</span>
+      </div>
+      <form action="{{ url_for('coordinator_bp.switch_to_supervisor') }}" method="post">
+      
+    </div>
+    <button class="btn btn-outline" type="submit">
+        Switch to Supervisor
       </button>
+    </form>
+  </div>
 
-      <button class="tab" type="button" onclick="showCourseCommitteePage('comp4300', this)">
-        COMP4300 Committee
-      </button>
-    </div>
-
-    <!-- =========================================================
-         COMP4200 PAGE
-    ========================================================== -->
-    <div id="comp4200CommitteePage" class="course-committee-page active">
-
-      <div class="tab-bar">
-        <button class="tab on" type="button" onclick="showCommitteeSection('4200Generator', this)">
-          Auto Generator
-        </button>
-
-        <button class="tab" type="button" onclick="showCommitteeSection('4200Eligible', this)">
-          Eligible Sections
-        </button>
-
-        <button class="tab" type="button" onclick="showCommitteeSection('4200Generated', this)">
-          Generated Committees
-        </button>
-
-        <button class="tab" type="button" onclick="showCommitteeSection('4200Current', this)">
-          Current Committees
-        </button>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Personal Information</span>
       </div>
 
-      <!-- COMP4200 GENERATOR -->
-      <div id="4200Generator" class="committee-section active">
-        <div class="committee-grid">
-          <div>
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">COMP4200 Committee Generator</span>
-              </div>
-
-              <div class="committee-info-box" style="margin-bottom:12px">
-                ◈ This generator creates evaluation committees for
-                <b>Project Introduction — COMP4200</b>. It uses introduction
-                sections/groups, assigns doctors, chooses a room, and creates
-                30-minute discussion slots with a 10-minute break.
-              </div>
-
-              <div class="form-grid">
-                <div class="field-wrap">
-                  <div class="field-label">Discussion Date <span class="req">*</span></div>
-                  <input class="field-input" id="committeeDate4200" type="date" />
-                </div>
-
-                <div class="field-wrap">
-                  <div class="field-label">Start Time <span class="req">*</span></div>
-                  <input class="field-input" id="committeeStartTime4200" type="time" value="09:00" />
-                </div>
-              </div>
-
-              <div class="field-wrap" style="margin-top:12px">
-                <div class="field-label">Sections Per Committee <span class="req">*</span></div>
-                <input class="field-input" id="projectsPerCommittee4200" type="number" min="1" value="2" />
-              </div>
-
-              <div class="btn-row" style="margin-top:14px">
-                <button class="btn btn-primary" type="button" onclick="generateCommittees('introduction')">
-                  Generate COMP4200 Committees
-                </button>
-
-                <button class="btn btn-outline" type="button" onclick="resetAndRedistributeCommittees('introduction')">
-                  Reset & Redistribute COMP4200
-                </button>
-              </div>
-
-              <div id="committeeMsg4200" style="margin-top:12px;font-size:13px"></div>
-            </div>
+      <div class="card-body">
+        <form id="profileForm">
+          <div class="field-wrap">
+            <div class="field-label">Full Name</div>
+            <input class="field-input" id="fullName" name="full_name" autocomplete="name">
           </div>
 
-          <div>
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">COMP4200 Rules</span>
-              </div>
-
-              <div class="committee-rule-box">
-                ✓ Uses <b>Project Introduction sections</b><br />
-                ✓ Each committee has <b>4 doctors</b><br />
-                ✓ Doctors should have <b>different majors</b><br />
-                ✓ Each discussion is <b>30 minutes</b><br />
-                ✓ There is a <b>10 minute break</b> between discussions<br />
-                ✓ Students receive committee room, time, and members
-              </div>
-            </div>
-
-            <div class="card committee-actions-card">
-              <div class="card-hd">
-                <span class="card-title">Generation Notes</span>
-              </div>
-
-              <div class="committee-info-box">
-                Use this tab for <b>COMP4200</b> students only. After generating,
-                open Generated Committees to review the result.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- COMP4200 ELIGIBLE -->
-      <div id="4200Eligible" class="committee-section">
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-title">COMP4200 Eligible Sections</span>
+          <div class="field-wrap">
+            <div class="field-label">Email</div>
+            <input class="field-input" id="email" name="email" type="email" autocomplete="email">
           </div>
 
-          <div class="committee-info-box" style="margin-bottom:12px">
-            These are the Project Introduction sections ready for committee assignment.
+          <div class="field-wrap">
+            <div class="field-label">Office Number</div>
+            <input class="field-input" id="officeNumber" name="office_number"
+              placeholder="Example: Science Building — 214">
           </div>
 
-          <div id="eligibleProjectsBox4200">
-            <div class="committee-empty">Loading eligible sections...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- COMP4200 GENERATED -->
-      <div id="4200Generated" class="committee-section">
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-title">COMP4200 Generated Committees</span>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="submit">Save Changes</button>
           </div>
 
-          <div class="committee-info-box" style="margin-bottom:12px">
-            Review generated COMP4200 committees here.
-          </div>
-
-          <div id="committeePlansBox4200">
-            <div class="committee-empty">Loading generated committees...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- COMP4200 CURRENT -->
-      <div id="4200Current" class="committee-section">
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-title">COMP4200 Current Committees</span>
-          </div>
-
-          <div class="committee-info-box" style="margin-bottom:12px">
-            These are the current COMP4200 committees saved in the system.
-          </div>
-
-          <div id="currentCommitteesBox4200">
-            <div class="committee-empty">Loading current committees...</div>
-          </div>
-        </div>
+          <div class="profile-msg" id="profileMsg"></div>
+        </form>
       </div>
     </div>
 
-    <!-- =========================================================
-         COMP4300 PAGE
-    ========================================================== -->
-    <div id="comp4300CommitteePage" class="course-committee-page">
-
-      <div class="tab-bar">
-        <button class="tab on" type="button" onclick="showCommitteeSection('4300Generator', this)">
-          Auto Generator
-        </button>
-
-        <button class="tab" type="button" onclick="showCommitteeSection('4300Eligible', this)">
-          Eligible Projects
-        </button>
-
-        <button class="tab" type="button" onclick="showCommitteeSection('4300Generated', this)">
-          Generated Committees
-        </button>
-
-        <button class="tab" type="button" onclick="showCommitteeSection('4300Current', this)">
-          Current Committees
-        </button>
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Change Password</span>
       </div>
 
-      <!-- COMP4300 GENERATOR -->
-      <div id="4300Generator" class="committee-section active">
-        <div class="committee-grid">
-          <div>
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">COMP4300 Committee Generator</span>
-              </div>
-
-              <div class="committee-info-box" style="margin-bottom:12px">
-                ◈ This generator creates evaluation committees for
-                <b>Graduation Project — COMP4300</b>. It uses graduation projects,
-                assigns committee members, chooses a room, assigns report readers,
-                and creates discussion slots.
-              </div>
-
-              <div class="form-grid">
-                <div class="field-wrap">
-                  <div class="field-label">Discussion Date <span class="req">*</span></div>
-                  <input class="field-input" id="committeeDate4300" type="date" />
-                </div>
-
-                <div class="field-wrap">
-                  <div class="field-label">Start Time <span class="req">*</span></div>
-                  <input class="field-input" id="committeeStartTime4300" type="time" value="09:00" />
-                </div>
-              </div>
-
-              <div class="field-wrap" style="margin-top:12px">
-                <div class="field-label">Projects Per Committee <span class="req">*</span></div>
-                <input class="field-input" id="projectsPerCommittee4300" type="number" min="1" value="2" />
-              </div>
-
-              <div class="btn-row" style="margin-top:14px">
-                <button class="btn btn-primary" type="button" onclick="generateCommittees('graduation_project')">
-                  Generate COMP4300 Committees
-                </button>
-
-                <button class="btn btn-outline" type="button" onclick="resetAndRedistributeCommittees('graduation_project')">
-                  Reset & Redistribute COMP4300
-                </button>
-              </div>
-
-              <div id="committeeMsg4300" style="margin-top:12px;font-size:13px"></div>
-            </div>
+      <div class="card-body">
+        <form id="passwordForm">
+          <div class="field-wrap">
+            <div class="field-label">Current Password</div>
+            <input class="field-input" id="currentPassword" type="password" autocomplete="current-password">
           </div>
 
-          <div>
-            <div class="card">
-              <div class="card-hd">
-                <span class="card-title">COMP4300 Rules</span>
-              </div>
-
-              <div class="committee-rule-box">
-                ✓ Uses <b>Graduation Projects</b><br />
-                ✓ Each committee has <b>4 doctors</b><br />
-                ✓ The project supervisor is included<br />
-                ✓ Report readers are assigned<br />
-                ✓ Each discussion is <b>30 minutes</b><br />
-                ✓ Students receive committee room, time, and members
-              </div>
-            </div>
-
-            <div class="card committee-actions-card">
-              <div class="card-hd">
-                <span class="card-title">Generation Notes</span>
-              </div>
-
-              <div class="committee-info-box">
-                Use this tab for <b>COMP4300</b> graduation projects only.
-                Committee members receive projects, room, time, and readers.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- COMP4300 ELIGIBLE -->
-      <div id="4300Eligible" class="committee-section">
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-title">COMP4300 Eligible Projects</span>
+          <div class="field-wrap">
+            <div class="field-label">New Password</div>
+            <input class="field-input" id="newPassword" type="password" autocomplete="new-password">
           </div>
 
-          <div class="committee-info-box" style="margin-bottom:12px">
-            These are graduation projects ready for committee assignment.
+          <div class="field-wrap">
+            <div class="field-label">Confirm New Password</div>
+            <input class="field-input" id="confirmPassword" type="password" autocomplete="new-password">
           </div>
 
-          <div id="eligibleProjectsBox4300">
-            <div class="committee-empty">Loading eligible projects...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- COMP4300 GENERATED -->
-      <div id="4300Generated" class="committee-section">
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-title">COMP4300 Generated Committees</span>
+          <div class="btn-row">
+            <button class="btn btn-primary" type="submit">Update Password</button>
           </div>
 
-          <div class="committee-info-box" style="margin-bottom:12px">
-            Review generated COMP4300 committees here.
-          </div>
-
-          <div id="committeePlansBox4300">
-            <div class="committee-empty">Loading generated committees...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- COMP4300 CURRENT -->
-      <div id="4300Current" class="committee-section">
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-title">COMP4300 Current Committees</span>
-          </div>
-
-          <div class="committee-info-box" style="margin-bottom:12px">
-            These are the current COMP4300 committees saved in the system.
-          </div>
-
-          <div id="currentCommitteesBox4300">
-            <div class="committee-empty">Loading current committees...</div>
-          </div>
-        </div>
+          <div class="profile-msg" id="passwordMsg"></div>
+        </form>
       </div>
     </div>
-
   </div>
 </div>
 
 <script>
-  if ('scrollRestoration' in history) {
-    history.scrollRestoration = 'manual';
-  }
+  (() => {
+    const $ = id => document.getElementById(id);
 
-  function safeText(value) {
-    if (value === null || value === undefined) return '';
-    return String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
+    function showMsg(id, text, type) {
+      const box = $(id);
+      box.textContent = text;
+      box.className = `profile-msg ${type}`;
+    }
 
-  function scopeSuffix(courseScope) {
-    return courseScope === 'introduction' ? '4200' : '4300';
-  }
+    function initials(name) {
+      return String(name || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(part => part[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2) || '--';
+    }
 
-  function courseLabel(courseScope) {
-    return courseScope === 'introduction'
-      ? 'COMP4200'
-      : 'COMP4300';
-  }
+    async function apiFetch(url, options = {}) {
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        },
+        ...options
+      });
 
-  function resetCommitteeScroll() {
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+      const data = await res.json().catch(() => ({}));
 
-    const possibleScrollers = [
-      '.content-area',
-      '.main-content',
-      '.main',
-      '.page-content',
-      '.shell',
-      '#pg-committee'
-    ];
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Request failed');
+      }
 
-    possibleScrollers.forEach(selector => {
-      const el = document.querySelector(selector);
-      if (el) {
-        el.scrollTop = 0;
+      return data;
+    }
+
+    async function loadProfile() {
+      try {
+        const data = await apiFetch('/api/coordinator/profile');
+        const user = data.profile || {};
+
+        $('fullName').value = user.full_name || '';
+        $('email').value = user.email || '';
+        $('officeNumber').value = user.office_number || '';
+
+        $('profileName').textContent = user.full_name || 'Coordinator';
+        $('profileAvatar').textContent = user.avatar_initials || initials(user.full_name);
+        $('profileSubtitle').textContent = `${user.title || 'Coordinator'} · Computer Science Department`;
+        $('profileCourse').textContent = user.course_label || 'COMP4200 / COMP4300';
+      } catch (err) {
+        $('profileName').textContent = 'Profile';
+        showMsg('profileMsg', err.message, 'error');
+      }
+    }
+
+    $('profileForm').addEventListener('submit', async event => {
+      event.preventDefault();
+
+      try {
+        const data = await apiFetch('/api/coordinator/profile', {
+          method: 'POST',
+          body: JSON.stringify({
+            full_name: $('fullName').value.trim(),
+            email: $('email').value.trim(),
+            office_number: $('officeNumber').value.trim()
+          })
+        });
+
+        showMsg('profileMsg', data.message || 'Profile updated successfully.', 'ok');
+        loadProfile();
+      } catch (err) {
+        showMsg('profileMsg', err.message, 'error');
       }
     });
-  }
 
-  function showCourseCommitteePage(course, btn) {
-    document.querySelectorAll('#pg-committee .course-committee-page').forEach(page => {
-      page.classList.remove('active');
-    });
+    $('passwordForm').addEventListener('submit', async event => {
+      event.preventDefault();
 
-    const targetId = course === 'comp4200'
-      ? 'comp4200CommitteePage'
-      : 'comp4300CommitteePage';
+      const currentPassword = $('currentPassword').value;
+      const newPassword = $('newPassword').value;
+      const confirmPassword = $('confirmPassword').value;
 
-    const target = document.getElementById(targetId);
-    if (target) {
-      target.classList.add('active');
-    }
-
-    document.querySelectorAll('#pg-committee .main-course-tabs .tab').forEach(tab => {
-      tab.classList.remove('on');
-    });
-
-    if (btn) {
-      btn.classList.add('on');
-    }
-
-    const firstInnerTab = target ? target.querySelector('.tab-bar:not(.main-course-tabs) .tab') : null;
-    const firstSection = target ? target.querySelector('.committee-section') : null;
-
-    if (target) {
-      target.querySelectorAll('.committee-section').forEach(section => {
-        section.classList.remove('active');
-      });
-
-      target.querySelectorAll('.tab-bar:not(.main-course-tabs) .tab').forEach(tab => {
-        tab.classList.remove('on');
-      });
-    }
-
-    if (firstInnerTab) {
-      firstInnerTab.classList.add('on');
-    }
-
-    if (firstSection) {
-      firstSection.classList.add('active');
-    }
-
-    setTimeout(resetCommitteeScroll, 0);
-  }
-
-  function showCommitteeSection(id, btn) {
-    const page = btn.closest('.course-committee-page');
-
-    if (page) {
-      page.querySelectorAll('.committee-section').forEach(section => {
-        section.classList.remove('active');
-      });
-
-      page.querySelectorAll('.tab-bar .tab').forEach(tab => {
-        tab.classList.remove('on');
-      });
-    }
-
-    const selected = document.getElementById(id);
-    if (selected) {
-      selected.classList.add('active');
-    }
-
-    if (btn) {
-      btn.classList.add('on');
-    }
-
-    setTimeout(resetCommitteeScroll, 0);
-  }
-
-  function getGeneratorValues(courseScope) {
-    const suffix = scopeSuffix(courseScope);
-
-    return {
-      course_scope: courseScope,
-      discussion_date: document.getElementById(`committeeDate${suffix}`).value,
-      start_time: document.getElementById(`committeeStartTime${suffix}`).value,
-      projects_per_committee: document.getElementById(`projectsPerCommittee${suffix}`).value
-    };
-  }
-
-  function setCommitteeMessage(courseScope, message, isError) {
-    const suffix = scopeSuffix(courseScope);
-    const box = document.getElementById(`committeeMsg${suffix}`);
-
-    if (!box) return;
-
-    box.innerHTML = `
-      <span class="${isError ? 'msg-error' : 'msg-ok'}">
-        ${safeText(message)}
-      </span>
-    `;
-  }
-
-  async function generateCommittees(courseScope) {
-    const body = getGeneratorValues(courseScope);
-
-    if (!body.discussion_date || !body.start_time || !body.projects_per_committee) {
-      setCommitteeMessage(courseScope, 'Please fill discussion date, start time, and number per committee.', true);
-      return;
-    }
-
-    try {
-      setCommitteeMessage(courseScope, `Generating ${courseLabel(courseScope)} committees...`, false);
-
-      const res = await fetch('/api/coordinator/committee-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setCommitteeMessage(courseScope, data.error || 'Committee generation failed.', true);
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        showMsg('passwordMsg', 'Please fill in all password fields.', 'error');
         return;
       }
 
-      setCommitteeMessage(courseScope, data.message || 'Committees generated successfully.', false);
-      await loadCommitteeDashboard();
-
-    } catch (err) {
-      setCommitteeMessage(courseScope, err.message || 'Committee generation failed.', true);
-    }
-  }
-
-  async function resetAndRedistributeCommittees(courseScope) {
-    const body = getGeneratorValues(courseScope);
-
-    if (!body.discussion_date || !body.start_time || !body.projects_per_committee) {
-      setCommitteeMessage(courseScope, 'Please fill discussion date, start time, and number per committee.', true);
-      return;
-    }
-
-    const ok = confirm(`Reset and redistribute ${courseLabel(courseScope)} committees?`);
-    if (!ok) return;
-
-    try {
-      setCommitteeMessage(courseScope, `Resetting ${courseLabel(courseScope)} committees...`, false);
-
-      const res = await fetch('/api/coordinator/committee-reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setCommitteeMessage(courseScope, data.error || 'Committee reset failed.', true);
+      if (newPassword.length < 8) {
+        showMsg('passwordMsg', 'New password must be at least 8 characters.', 'error');
         return;
       }
 
-      setCommitteeMessage(courseScope, data.message || 'Committees reset successfully.', false);
-      await loadCommitteeDashboard();
-
-    } catch (err) {
-      setCommitteeMessage(courseScope, err.message || 'Committee reset failed.', true);
-    }
-  }
-
-  function filterByScope(items, courseScope) {
-    if (!Array.isArray(items)) return [];
-
-    return items.filter(item => {
-      const itemScope = item.course_scope || item.committee_course_scope || item.plan_course_scope;
-
-      if (!itemScope) {
-        return true;
+      if (newPassword !== confirmPassword) {
+        showMsg('passwordMsg', 'New passwords do not match.', 'error');
+        return;
       }
 
-      return itemScope === courseScope;
-    });
-  }
+      try {
+        const data = await apiFetch('/api/coordinator/change-password', {
+          method: 'POST',
+          body: JSON.stringify({
+            current_password: currentPassword,
+            new_password: newPassword,
+            confirm_password: confirmPassword
+          })
+        });
 
-  function renderEligibleProjects(courseScope, projects) {
-    const suffix = scopeSuffix(courseScope);
-    const box = document.getElementById(`eligibleProjectsBox${suffix}`);
-    if (!box) return;
-
-    const label = courseLabel(courseScope);
-    const rows = filterByScope(projects || [], courseScope);
-
-    if (!rows.length) {
-      box.innerHTML = `<div class="committee-empty">No eligible ${label} items found.</div>`;
-      return;
-    }
-
-    box.innerHTML = rows.map(project => `
-      <div class="committee-card">
-        <div class="committee-card-title">${safeText(project.title || project.section_name || 'Untitled')}</div>
-        <div class="committee-card-meta">
-          Supervisor: ${safeText(project.supervisor_name || 'Not assigned')}<br>
-          Students: ${safeText(project.team_members || project.students || '—')}<br>
-          Status: ${safeText(project.status || 'submitted')}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  function renderCommitteePlans(courseScope, plans) {
-    const suffix = scopeSuffix(courseScope);
-    const box = document.getElementById(`committeePlansBox${suffix}`);
-    if (!box) return;
-
-    const label = courseLabel(courseScope);
-    const rows = filterByScope(plans || [], courseScope);
-
-    if (!rows.length) {
-      box.innerHTML = `<div class="committee-empty">No generated ${label} committees found.</div>`;
-      return;
-    }
-
-    box.innerHTML = rows.map(plan => {
-      const members = Array.isArray(plan.members) ? plan.members : [];
-      const projects = Array.isArray(plan.projects) ? plan.projects : [];
-
-      return `
-        <div class="committee-card">
-          <div class="committee-card-title">${safeText(plan.committee_name || 'Committee')}</div>
-
-          <div class="committee-card-meta">
-            Date: ${safeText(plan.discussion_date || '')}<br>
-            Time: ${safeText(plan.start_time || '')} - ${safeText(plan.end_time || '')}<br>
-            Room: ${safeText(plan.room_name || '—')}<br>
-            Status: ${safeText(plan.status || 'scheduled')}<br>
-            Supervisor: ${safeText(plan.supervisor_name || plan.responsible_name || '—')}
-          </div>
-
-          <div class="project-list">
-            <b>Committee Members</b>
-            ${
-              members.length
-                ? members.map(member => `
-                    <div class="project-item">
-                      <div class="project-title">${safeText(member.full_name || 'Doctor')}</div>
-                      <div class="project-meta">
-                        Role: ${safeText(member.role || 'member')}
-                        ${member.specialization ? ` | Major: ${safeText(member.specialization)}` : ''}
-                      </div>
-                    </div>
-                  `).join('')
-                : '<div class="committee-empty">No members found.</div>'
-            }
-          </div>
-
-          <div class="project-list">
-            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'}</b>
-            ${
-              projects.length
-                ? projects.map(project => `
-                    <div class="project-item">
-                      <div class="project-title">${safeText(project.title || project.section_name || 'Untitled')}</div>
-                      <div class="project-meta">
-                        Time: ${safeText(project.slot_start || '')} - ${safeText(project.slot_end || '')}<br>
-                        Students: ${safeText(project.team_members || project.students || '—')}<br>
-                        ${
-                          courseScope === 'graduation_project'
-                            ? `Readers: ${safeText(project.reader1_name || '—')} / ${safeText(project.reader2_name || '—')}`
-                            : ''
-                        }
-                      </div>
-                    </div>
-                  `).join('')
-                : '<div class="committee-empty">No projects found.</div>'
-            }
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  function renderCurrentCommittees(courseScope, committees) {
-    const suffix = scopeSuffix(courseScope);
-    const box = document.getElementById(`currentCommitteesBox${suffix}`);
-    if (!box) return;
-
-    const label = courseLabel(courseScope);
-    const rows = filterByScope(committees || [], courseScope);
-
-    if (!rows.length) {
-      box.innerHTML = `<div class="committee-empty">No current ${label} committees found.</div>`;
-      return;
-    }
-
-    box.innerHTML = rows.map(item => `
-      <div class="committee-card">
-        <div class="committee-card-title">${safeText(item.committee_name || 'Committee')}</div>
-        <div class="committee-card-meta">
-          Date: ${safeText(item.discussion_date || '')}<br>
-          Start: ${safeText(item.start_time || '')}<br>
-          Room: ${safeText(item.room_name || '—')}<br>
-          Projects/Sections: ${safeText(item.projects_count || 0)}<br>
-          Supervisor: ${safeText(item.supervisor_name || item.responsible_name || '—')}<br>
-          Status: ${safeText(item.status || 'scheduled')}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  async function loadCommitteeDashboard() {
-    try {
-      const res = await fetch('/api/coordinator/committee-dashboard');
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load committee dashboard.');
-      }
-
-      renderEligibleProjects('introduction', data.eligible_projects || []);
-      renderEligibleProjects('graduation_project', data.eligible_projects || []);
-
-      renderCommitteePlans('introduction', data.plans || []);
-      renderCommitteePlans('graduation_project', data.plans || []);
-
-      renderCurrentCommittees('introduction', data.current_committees || []);
-      renderCurrentCommittees('graduation_project', data.current_committees || []);
-
-    } catch (err) {
-      const errorHtml = `<div class="committee-empty">Committee data error: ${safeText(err.message)}</div>`;
-
-      [
-        'eligibleProjectsBox4200',
-        'eligibleProjectsBox4300',
-        'committeePlansBox4200',
-        'committeePlansBox4300',
-        'currentCommitteesBox4200',
-        'currentCommitteesBox4300'
-      ].forEach(id => {
-        const box = document.getElementById(id);
-        if (box) box.innerHTML = errorHtml;
-      });
-    }
-  }
-
-  function lockCommitteeSupervisorUi() {
-    const root = document.getElementById('pg-committee') || document.body;
-
-    root.querySelectorAll('*').forEach(function (el) {
-      const text = (el.textContent || '').trim();
-
-      if (text === 'Responsible Doctor') {
-        el.textContent = 'Supervisor';
-      }
-
-      if (text === 'Save Responsible') {
-        const row = el.closest('.btn-row, .form-grid, div');
-        if (row) {
-          row.style.display = 'none';
-        } else {
-          el.style.display = 'none';
-        }
-      }
-
-      if (text === 'Responsible') {
-        el.textContent = 'Supervisor';
+        $('passwordForm').reset();
+        showMsg('passwordMsg', data.message || 'Password updated successfully.', 'ok');
+      } catch (err) {
+        showMsg('passwordMsg', err.message, 'error');
       }
     });
 
-    root.querySelectorAll('select').forEach(function (select) {
-      const optionText = Array.from(select.options || [])
-        .map(function (opt) { return opt.textContent || ''; })
-        .join(' ');
-
-      const nextButton = select.parentElement
-        ? select.parentElement.querySelector('button')
-        : null;
-
-      if (optionText.includes('Dr.') && nextButton && (nextButton.textContent || '').includes('Save Responsible')) {
-        select.disabled = true;
-        select.style.display = 'none';
-      }
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    const firstCourseTab = document.querySelector('#pg-committee .main-course-tabs .tab');
-    showCourseCommitteePage('comp4200', firstCourseTab);
-
-    loadCommitteeDashboard();
-
-    lockCommitteeSupervisorUi();
-    setTimeout(lockCommitteeSupervisorUi, 300);
-    setTimeout(lockCommitteeSupervisorUi, 1000);
-
-    const target = document.getElementById('pg-committee') || document.body;
-    const observer = new MutationObserver(function () {
-      lockCommitteeSupervisorUi();
-    });
-
-    observer.observe(target, {
-      childList: true,
-      subtree: true,
-      characterData: true
-    });
-
-    setTimeout(resetCommitteeScroll, 0);
-    setTimeout(resetCommitteeScroll, 100);
-    setTimeout(resetCommitteeScroll, 300);
-  });
-
-  window.addEventListener('load', function () {
-    setTimeout(resetCommitteeScroll, 0);
-    setTimeout(resetCommitteeScroll, 100);
-  });
+    loadProfile();
+  })();
 </script>
 {% endblock %}

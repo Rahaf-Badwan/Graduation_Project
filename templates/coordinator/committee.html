@@ -328,8 +328,7 @@
               <div class="card-hd"><span class="card-title">COMP4200 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Project Introduction — COMP4200</b> sections.
-                It assigns the supervisor + 3 doctors, chooses 2 report readers from those 3 doctors, chooses a room,
-                and creates 30-minute slots with 10-minute breaks.
+                It creates 4-doctor committees. Sections may have different supervisors, and every section supervisor is included in the same committee. It chooses 2 report readers excluding each section supervisor, chooses a room, and creates 30-minute slots with 10-minute breaks.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -361,11 +360,13 @@
               <div class="card-hd"><span class="card-title">COMP4200 Rules</span></div>
               <div class="committee-rule-box">
                 ✓ Uses <b>student_distribution_sections</b><br>
-                ✓ Each committee has <b>4 doctors</b>: supervisor + 3 doctors<br>
-                ✓ The section supervisor is included in the discussion committee<br>
-                ✓ The <b>2 report readers</b> are chosen from the 3 non-supervisor doctors<br>
+                ✓ Each committee has <b>4 doctors</b><br>
+                ✓ Sections in the same committee may have <b>different supervisors</b><br>
+                ✓ Every section supervisor is included in the same discussion committee<br>
+                ✓ The <b>2 report readers</b> are chosen from committee doctors excluding that section supervisor<br>
                 ✓ Each discussion is <b>30 minutes</b><br>
-                ✓ There is a <b>10 minute break</b> between discussions
+                ✓ There is a <b>10 minute break</b> between discussions<br>
+                ✓ The same doctor cannot be scheduled in two committees at overlapping times
               </div>
             </div>
             <div class="card committee-actions-card">
@@ -428,8 +429,7 @@
               <div class="card-hd"><span class="card-title">COMP4300 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Graduation Project — COMP4300</b> projects.
-                It assigns the supervisor + 3 doctors, room, time slots, and 2 report readers from the 3 non-supervisor
-                doctors.
+                It creates 4-doctor committees. Projects may have different supervisors, and every project supervisor is included in the same committee. It assigns room, time slots, and 2 report readers excluding each project supervisor.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -461,10 +461,12 @@
               <div class="card-hd"><span class="card-title">COMP4300 Rules</span></div>
               <div class="committee-rule-box">
                 ✓ Uses <b>projects</b> table with COMP4300 semester<br>
-                ✓ Each committee has <b>4 doctors</b>: supervisor + 3 doctors<br>
-                ✓ The project supervisor is included in the committee<br>
-                ✓ The <b>2 report readers</b> are chosen from the 3 non-supervisor doctors<br>
-                ✓ Each discussion is <b>30 minutes</b>
+                ✓ Each committee has <b>4 doctors</b><br>
+                ✓ Projects in the same committee may have <b>different supervisors</b><br>
+                ✓ Every project supervisor is included in the same committee<br>
+                ✓ The <b>2 report readers</b> are chosen from committee doctors excluding that project supervisor<br>
+                ✓ Each discussion is <b>30 minutes</b><br>
+                ✓ The same doctor cannot be scheduled in two committees at overlapping times
               </div>
             </div>
             <div class="card committee-actions-card">
@@ -898,7 +900,7 @@
             Time: ${safeText(plan.start_time || '')} - ${safeText(plan.end_time || '')}<br>
             Room: ${safeText(plan.room_name || '—')}<br>
             Status: ${safeText(plan.status || 'scheduled')}<br>
-            Supervisor for all items: ${safeText(plan.supervisor_name || '—')}<br>
+            Project/section supervisors are included as committee members<br>
             Responsible Doctor: ${safeText(plan.responsible_name || 'Not selected yet')}
           </div>
 
@@ -929,7 +931,7 @@
           </div>
 
           <div class="project-list">
-            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — same supervisor only</b>
+            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — multiple supervisors allowed</b>
             ${projects.length ? projects.map(project => {
               const isSection = courseScope === 'introduction' || project.section_id;
               const itemId = project.section_id || project.project_id;
@@ -997,7 +999,7 @@
             Start: ${safeText(item.start_time || '')}${item.end_time ? ` - ${safeText(item.end_time)}` : ''}<br>
             Room: ${safeText(item.room_name || '—')}<br>
             Projects/Sections: ${safeText(item.projects_count || projects.length || 0)}<br>
-            Same Supervisor: ${safeText(item.supervisor_name || '—')}<br>
+            Project/section supervisors are included as committee members<br>
             Responsible Doctor: ${safeText(item.responsible_name || 'Not selected yet')}<br>
             Status: ${safeText(item.status || 'scheduled')}
           </div>
@@ -1013,7 +1015,7 @@
           </div>
 
           <div class="project-list">
-            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — same supervisor only</b>
+            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — multiple supervisors allowed</b>
             ${projects.length ? projects.map(project => `
               <div class="project-item">
                 <div class="project-title">${safeText(project.title || project.section_name || 'Untitled')}</div>

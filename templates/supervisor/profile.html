@@ -18,6 +18,14 @@
         style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--green-light);color:var(--green)">COMP4300</span>
     </div>
   </div>
+  
+    {% if session.get('is_switched_to_supervisor') %}
+    <form action="{{ url_for('switch_back_to_coordinator') }}" method="post" style="margin: 10px;">
+      <button class="btn btn-outline" type="submit">
+        Back to Coordinator
+      </button>
+    </form>
+    {% endif %}
   <button class="btn btn-outline">Update profile</button>
 </div>
 
