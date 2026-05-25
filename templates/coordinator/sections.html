@@ -343,9 +343,14 @@
         </div>
       </div>
 
-      <button class="sections-refresh-btn" type="button" onclick="loadSectionResults()">
-        Refresh
-      </button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="sections-refresh-btn" type="button" onclick="loadSectionResults()">
+          Refresh
+        </button>
+        <button class="btn btn-primary" type="button" onclick="successAllSections()">
+          Success All Sections
+        </button>
+      </div>
     </div>
 
     <div class="sections-info-box">
@@ -590,6 +595,43 @@
       button.textContent = 'Save Result';
     }
   }
+
+  async function successAllSections() {
+    if (!confirm('Mark ALL Project Introduction sections and Graduation Project groups as Succeeded?')) {
+      return;
+    }
+
+    setSectionsMessage('Marking all sections as succeeded...', 'loading');
+
+    try {
+      const res = await fetch('/api/coordinator/section-results/succeed-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          course_scope: 'all',
+          notes: 'Marked succeeded by coordinator bulk action.'
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to mark all sections as succeeded.');
+      }
+
+      await loadSectionResults();
+      setSectionsMessage(data.message || 'All sections were marked as succeeded.', 'ok');
+
+      setTimeout(function () {
+        setSectionsMessage('', '');
+      }, 3000);
+    } catch (err) {
+      setSectionsMessage(err.message, 'error');
+    }
+  }
+
 
   document.addEventListener('DOMContentLoaded', function () {
     loadSectionResults();

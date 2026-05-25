@@ -261,6 +261,8 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input id="searchBox" placeholder="Search project or student..." oninput="renderProjects()">
       <button class="mini-btn green" onclick="openAllWindows()">Open Grade for All + Notify</button>
+      <button class="mini-btn red" onclick="closeAllEvaluations()">Close Evaluation for All</button>
+      <button class="mini-btn blue" onclick="downloadCommitteeSchedule()">Download Committee Schedule Excel</button>
       <button class="mini-btn gray" onclick="loadAll()">Refresh</button>
     </div>
   </div>
@@ -372,6 +374,23 @@
   }
   async function loadAll() {
     await loadProjects();
+  }
+  function downloadCommitteeSchedule() {
+    window.location.href = `/api/coordinator/committee-schedule-export?course_scope=${encodeURIComponent(currentScope)}`;
+  }
+  async function closeAllEvaluations() {
+    const label = currentScope === 'introduction' ? 'COMP4200 sections' : 'COMP4300 projects';
+    if (!confirm(`Close evaluation for all ${label} in this tab?`)) return;
+    try {
+      const data = await api('/api/coordinator/evaluation/close-all', {
+        method: 'POST',
+        body: JSON.stringify({ course_scope: currentScope })
+      });
+      toastMsg(data.message || 'Evaluation closed for all items.');
+      await loadProjects();
+    } catch (e) {
+      toastMsg(e.message, false);
+    }
   }
   async function loadProjects() {
     const seq = ++loadSeq;

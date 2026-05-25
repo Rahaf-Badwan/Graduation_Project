@@ -3675,6 +3675,102 @@ def api_coordinator_mark_section_result():
         return jsonify({"error": str(e)}), 500
 
 
+@coordinator_bp.route("/api/coordinator/section-results/succeed-all", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_succeed_all_section_results():
+    """Mark all visible COMP4200 sections and COMP4300 project groups as succeeded."""
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "all").strip()
+
+    if course_scope not in {"all", "introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be all, introduction, or graduation_project."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+
+        semester = _get_active_semester(cursor)
+        semester_id = semester["semester_id"] if semester else None
+
+        intro_ids = []
+        grad_ids = []
+
+        if course_scope in {"all", "introduction"}:
+            if _table_exists(cursor, "student_distribution_sections"):
+                cursor.execute("""
+                    SELECT sec.section_id AS reference_id
+                    FROM student_distribution_sections sec
+                    WHERE sec.section_id IS NOT NULL
+                    ORDER BY sec.section_id DESC
+                """)
+                intro_ids = [row["reference_id"] for row in cursor.fetchall()]
+
+        if course_scope in {"all", "graduation_project"}:
+            grad_where_parts = []
+            grad_params_list = []
+            if semester_id:
+                grad_where_parts.append("p.semester_id = %s")
+                grad_params_list.append(semester_id)
+
+            grad_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
+            grad_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
+
+            grad_where = "WHERE " + " AND ".join(grad_where_parts)
+            cursor.execute(
+                f"""
+                SELECT DISTINCT p.project_id AS reference_id
+                FROM projects p
+                {grad_where}
+                ORDER BY p.project_id DESC
+                """,
+                tuple(grad_params_list),
+            )
+            grad_ids = [row["reference_id"] for row in cursor.fetchall()]
+
+        notes = (data.get("notes") or "Marked succeeded by coordinator bulk action.").strip() or None
+        marked_by = session.get("user_id")
+
+        def mark_rows(scope, ids):
+            count = 0
+            for reference_id in ids:
+                cursor.execute(
+                    """
+                    INSERT INTO section_completion_status
+                        (course_scope, reference_id, status, notes, marked_by, marked_at)
+                    VALUES (%s, %s, 'succeeded', %s, %s, NOW())
+                    ON DUPLICATE KEY UPDATE
+                        status = 'succeeded',
+                        notes = VALUES(notes),
+                        marked_by = VALUES(marked_by),
+                        marked_at = NOW(),
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (scope, reference_id, notes, marked_by),
+                )
+                count += 1
+            return count
+
+        intro_count = mark_rows("introduction", intro_ids)
+        grad_count = mark_rows("graduation_project", grad_ids)
+
+        db.commit()
+        cursor.close()
+        db.close()
+
+        total = intro_count + grad_count
+        return jsonify(
+            {
+                "message": f"Successfully marked {total} section/group item(s) as succeeded.",
+                "updated": total,
+                "introduction_updated": intro_count,
+                "graduation_updated": grad_count,
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @coordinator_bp.route("/api/coordinator/export-groups", methods=["GET"])
 @login_required(role="coordinator")
 def api_export_groups():
@@ -6367,145 +6463,252 @@ def _evaluation_insert_task(cursor, course_scope, reference_id, component, facul
     return True
 
 
-def _evaluation_autocreate_tasks(cursor, course_scope, reference_id, created_by=None):
+def _evaluation_committee_setup_for_item(cursor, course_scope, reference_id):
     """
-    Create grade tasks from the committee page setup.
+    Return the exact committee setup for one evaluation item.
 
-    Committee rule used here:
-    - Committee = supervisor + 3 other doctors.
-    - The full committee gives discussion/committee marks.
-    - The 2 report readers are chosen from the 3 non-supervisor doctors.
-    - Coordinator does not read/evaluate and does not assign readers from the Evaluation page.
+    This function is intentionally strict:
+    - The item must belong to a committee plan.
+    - The committee must have a responsible doctor selected.
+    - Reader 1 and Reader 2 must be saved from the Committee page.
+    - Readers must be committee members and must not be the item supervisor.
+    - Evaluation tasks are built only from this returned setup.
     """
-    created_faculty_ids = set()
+    _committee_ensure_course_schema(cursor)
     _committee_ensure_report_readers_table(cursor)
 
+    reference_id = int(reference_id)
+
     if course_scope == "graduation_project":
-        cursor.execute("SELECT supervisor_id FROM projects WHERE project_id = %s", (reference_id,))
-        project = cursor.fetchone() or {}
-        supervisor_id = project.get("supervisor_id")
-
-        if supervisor_id:
-            _evaluation_insert_task(cursor, course_scope, reference_id, "grad_supervisor", supervisor_id, created_by)
-            created_faculty_ids.add(int(supervisor_id))
-
-        # Two report readers, selected by the committee generator from the 3 non-supervisor members.
         cursor.execute(
             """
-            SELECT faculty_id
-            FROM project_report_readers
-            WHERE project_id = %s
-            ORDER BY reader_order ASC, id ASC
-            LIMIT 2
+            SELECT
+                cp.plan_id,
+                cp.committee_name,
+                COALESCE(cp.course_scope, 'graduation_project') AS course_scope,
+                cp.responsible_faculty_id,
+                p.project_id AS reference_id,
+                p.title,
+                p.supervisor_id,
+                sup_u.full_name AS supervisor_name
+            FROM committee_plan_projects cpp
+            JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+            JOIN projects p ON p.project_id = cpp.project_id
+            LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+            LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
+            WHERE cpp.project_id = %s
+              AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+              AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+            ORDER BY cp.plan_id DESC
+            LIMIT 1
             """,
             (reference_id,),
         )
-        for row in cursor.fetchall():
-            fid = row.get("faculty_id")
-            if fid:
-                _evaluation_insert_task(cursor, course_scope, reference_id, "grad_report_reader", fid, created_by)
-                created_faculty_ids.add(int(fid))
-
-        # Full committee = supervisor + 3 doctors. All submit committee marks.
-        if _table_exists(cursor, "committee_plan_projects") and _table_exists(cursor, "committee_plan_members"):
-            cursor.execute(
-                """
-                SELECT cpm.faculty_id, MIN(COALESCE(cpm.role, 'member')) AS member_role
-                FROM committee_plan_projects cpp
-                JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
-                JOIN committee_plan_members cpm ON cpm.plan_id = cp.plan_id
-                WHERE cpp.project_id = %s
-                  AND cp.status <> 'cancelled'
-                  AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
-                GROUP BY cpm.faculty_id
-                ORDER BY MIN(CASE WHEN cpm.role = 'supervisor' THEN 0 ELSE 1 END), cpm.faculty_id
-                LIMIT 4
-                """,
-                (reference_id,),
-            )
-            for row in cursor.fetchall():
-                fid = row.get("faculty_id")
-                if fid:
-                    _evaluation_insert_task(cursor, course_scope, reference_id, "grad_committee_member", fid, created_by)
-                    created_faculty_ids.add(int(fid))
+        item = cursor.fetchone()
+        reader_table = "project_report_readers"
+        reader_key = "project_id"
+        reader_component = "grad_report_reader"
+        supervisor_component = "grad_supervisor"
+        committee_component = "grad_committee_member"
+        item_label = "project"
     else:
-        supervisor_id = None
-        if _table_exists(cursor, "student_distribution_sections"):
-            cursor.execute("SELECT supervisor_id FROM student_distribution_sections WHERE section_id = %s", (reference_id,))
-            section = cursor.fetchone() or {}
-            supervisor_id = section.get("supervisor_id")
-            if supervisor_id:
-                _evaluation_insert_task(cursor, course_scope, reference_id, "intro_supervisor", supervisor_id, created_by)
-                created_faculty_ids.add(int(supervisor_id))
-
-        # Two report readers from the 3 non-supervisor committee doctors.
         cursor.execute(
             """
-            SELECT faculty_id
-            FROM section_report_readers
-            WHERE section_id = %s
-            ORDER BY reader_order ASC, id ASC
-            LIMIT 2
+            SELECT
+                cp.plan_id,
+                cp.committee_name,
+                COALESCE(cp.course_scope, 'introduction') AS course_scope,
+                cp.responsible_faculty_id,
+                sec.section_id AS reference_id,
+                sec.section_name AS title,
+                sec.supervisor_id,
+                sup_u.full_name AS supervisor_name
+            FROM committee_plan_sections cps
+            JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+            JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+            LEFT JOIN faculty sup_f ON sup_f.faculty_id = sec.supervisor_id
+            LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
+            WHERE cps.section_id = %s
+              AND COALESCE(cp.course_scope, 'introduction') = 'introduction'
+              AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+            ORDER BY cp.plan_id DESC
+            LIMIT 1
             """,
             (reference_id,),
         )
-        for row in cursor.fetchall():
-            fid = row.get("faculty_id")
-            if fid:
-                _evaluation_insert_task(cursor, course_scope, reference_id, "intro_report_reader", fid, created_by)
-                created_faculty_ids.add(int(fid))
+        item = cursor.fetchone()
+        reader_table = "section_report_readers"
+        reader_key = "section_id"
+        reader_component = "intro_report_reader"
+        supervisor_component = "intro_supervisor"
+        committee_component = "intro_discussion_member"
+        item_label = "section"
 
-        # Full committee discussion = supervisor + 3 doctors.
-        if _table_exists(cursor, "committee_plan_sections") and _table_exists(cursor, "committee_plan_members"):
-            cursor.execute(
-                """
-                SELECT cpm.faculty_id, MIN(COALESCE(cpm.role, 'member')) AS member_role
-                FROM committee_plan_sections cps
-                JOIN committee_plans cp ON cp.plan_id = cps.plan_id
-                JOIN committee_plan_members cpm ON cpm.plan_id = cp.plan_id
-                WHERE cps.section_id = %s
-                  AND cp.status <> 'cancelled'
-                  AND COALESCE(cp.course_scope, 'graduation_project') = 'introduction'
-                GROUP BY cpm.faculty_id
-                ORDER BY MIN(CASE WHEN cpm.role = 'supervisor' THEN 0 ELSE 1 END), cpm.faculty_id
-                LIMIT 4
-                """,
-                (reference_id,),
-            )
-            committee_members = cursor.fetchall()
-            for row in committee_members:
-                fid = row.get("faculty_id")
-                if fid:
-                    _evaluation_insert_task(cursor, course_scope, reference_id, "intro_discussion_member", fid, created_by)
-                    created_faculty_ids.add(int(fid))
+    if not item:
+        return {
+            "ok": False,
+            "error": f"Create/generate a committee for this {item_label} first.",
+            "status": 400,
+        }
 
-            # Fallback: if readers were not generated yet, choose first two non-supervisor members now.
-            cursor.execute(
-                """
-                SELECT COUNT(*) AS cnt
-                FROM evaluation_grade_tasks
-                WHERE course_scope = 'introduction'
-                  AND reference_id = %s
-                  AND component = 'intro_report_reader'
-                """,
-                (reference_id,),
-            )
-            reader_count = int((cursor.fetchone() or {}).get("cnt") or 0)
-            if reader_count < 2:
-                fallback_readers = []
-                for row in committee_members:
-                    fid = row.get("faculty_id")
-                    if not fid:
-                        continue
-                    if supervisor_id and int(fid) == int(supervisor_id):
-                        continue
-                    fallback_readers.append(int(fid))
-                for fid in fallback_readers[:2]:
-                    _evaluation_insert_task(cursor, course_scope, reference_id, "intro_report_reader", fid, created_by)
-                    created_faculty_ids.add(int(fid))
+    plan_id = item.get("plan_id")
+    supervisor_id = item.get("supervisor_id")
+    responsible_id = item.get("responsible_faculty_id")
+
+    if not supervisor_id:
+        return {
+            "ok": False,
+            "error": f"This {item_label} has no supervisor assigned.",
+            "status": 400,
+        }
+
+    cursor.execute(
+        """
+        SELECT DISTINCT cpm.faculty_id, cpm.role, u.full_name
+        FROM committee_plan_members cpm
+        JOIN faculty f ON f.faculty_id = cpm.faculty_id
+        JOIN users u ON u.user_id = f.user_id
+        WHERE cpm.plan_id = %s
+        ORDER BY
+            CASE
+                WHEN cpm.role = 'supervisor' THEN 0
+                WHEN cpm.faculty_id = %s THEN 1
+                ELSE 2
+            END,
+            u.full_name
+        """,
+        (plan_id, responsible_id),
+    )
+    members = cursor.fetchall()
+    member_ids = [int(row["faculty_id"]) for row in members if row.get("faculty_id")]
+    member_id_set = set(member_ids)
+
+    if len(member_id_set) < 4:
+        return {
+            "ok": False,
+            "error": "This committee must have 4 committee doctors before opening evaluation.",
+            "status": 400,
+        }
+
+    if int(supervisor_id) not in member_id_set:
+        return {
+            "ok": False,
+            "error": "The item supervisor is not inside the selected committee. Regenerate/fix the committee first.",
+            "status": 400,
+        }
+
+    if not responsible_id:
+        return {
+            "ok": False,
+            "error": "Choose and save the Responsible Doctor from the Committee page before opening grade entry.",
+            "status": 400,
+        }
+
+    responsible_id = int(responsible_id)
+    if responsible_id not in member_id_set:
+        return {
+            "ok": False,
+            "error": "Responsible Doctor must be one of this committee members.",
+            "status": 400,
+        }
+
+    cursor.execute(
+        f"""
+        SELECT rr.faculty_id, rr.reader_order, u.full_name
+        FROM {reader_table} rr
+        JOIN faculty f ON f.faculty_id = rr.faculty_id
+        JOIN users u ON u.user_id = f.user_id
+        WHERE rr.{reader_key} = %s
+        ORDER BY rr.reader_order ASC, rr.id ASC
+        LIMIT 2
+        """,
+        (reference_id,),
+    )
+    readers = cursor.fetchall()
+    reader_ids = [int(row["faculty_id"]) for row in readers if row.get("faculty_id")]
+
+    if len(reader_ids) != 2 or len(set(reader_ids)) != 2:
+        return {
+            "ok": False,
+            "error": "Choose and save Reader 1 and Reader 2 from the Committee page before opening grade entry.",
+            "status": 400,
+        }
+
+    invalid_readers = [fid for fid in reader_ids if fid not in member_id_set]
+    if invalid_readers:
+        return {
+            "ok": False,
+            "error": "Reader 1 and Reader 2 must be selected from this same committee members.",
+            "status": 400,
+        }
+
+    if int(supervisor_id) in set(reader_ids):
+        return {
+            "ok": False,
+            "error": "Reader 1 and Reader 2 must be different from the item supervisor.",
+            "status": 400,
+        }
+
+    return {
+        "ok": True,
+        "plan": item,
+        "plan_id": int(plan_id),
+        "title": item.get("title"),
+        "supervisor_id": int(supervisor_id),
+        "responsible_id": responsible_id,
+        "members": members,
+        "member_ids": member_ids,
+        "reader_ids": reader_ids,
+        "reader_component": reader_component,
+        "supervisor_component": supervisor_component,
+        "committee_component": committee_component,
+    }
+
+
+def _evaluation_autocreate_tasks(cursor, course_scope, reference_id, created_by=None):
+    """
+    Rebuild grade tasks from the CURRENT Committee page setup only.
+
+    This fixes the mismatch where Evaluation could keep old doctors or choose
+    fallback readers. On every Open Grade Entry action, old rows for this item
+    are deleted, then new rows are created from:
+    - saved committee members for the same plan_id
+    - saved Reader 1 + Reader 2 for this exact project/section
+    - the real supervisor of this exact project/section
+    """
+    setup = _evaluation_committee_setup_for_item(cursor, course_scope, reference_id)
+    if not setup.get("ok"):
+        raise ValueError(setup.get("error") or "Committee setup is incomplete.")
+
+    reference_id = int(reference_id)
+
+    # Critical: remove old/wrong rows first so Evaluation cannot display doctors
+    # from an older committee or old reader assignment.
+    cursor.execute(
+        """
+        DELETE FROM evaluation_grade_tasks
+        WHERE course_scope = %s
+          AND reference_id = %s
+        """,
+        (course_scope, reference_id),
+    )
+
+    created_faculty_ids = set()
+
+    for fid in setup["reader_ids"]:
+        _evaluation_insert_task(cursor, course_scope, reference_id, setup["reader_component"], fid, created_by)
+        created_faculty_ids.add(int(fid))
+
+    _evaluation_insert_task(cursor, course_scope, reference_id, setup["supervisor_component"], setup["supervisor_id"], created_by)
+    created_faculty_ids.add(int(setup["supervisor_id"]))
+
+    # The discussion/committee doctors are exactly the committee members saved
+    # for the current plan. No random doctors, no old tasks, no fallback.
+    for fid in setup["member_ids"]:
+        _evaluation_insert_task(cursor, course_scope, reference_id, setup["committee_component"], fid, created_by)
+        created_faculty_ids.add(int(fid))
 
     return created_faculty_ids
-
 
 def _evaluation_cleanup_tasks(cursor, course_scope, reference_id):
     """
@@ -6725,6 +6928,7 @@ def _evaluation_notify_faculty(cursor, course_scope, reference_id, title, messag
 
 def _evaluation_project_payload(cursor, course_scope, base_row):
     reference_id = base_row["project_id"]
+    _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
     grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
     scores = _evaluation_scores_from_grades(course_scope, grades)
 
@@ -6782,6 +6986,212 @@ def api_evaluation_faculty_options():
         return jsonify({"error": str(e)}), 500
 
 
+@coordinator_bp.route("/api/coordinator/committee-schedule-export", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_committee_schedule_export():
+    """Download the saved committee schedule as a CSV file that opens in Excel."""
+    try:
+        course_scope = (request.args.get("course_scope") or "all").strip()
+        if course_scope not in {"all", "introduction", "graduation_project"}:
+            return jsonify({"error": "Invalid course_scope."}), 400
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _committee_ensure_course_schema(cursor)
+        _committee_ensure_report_readers_table(cursor)
+
+        headers = [
+            "Course",
+            "Committee",
+            "Discussion Date",
+            "Slot Start",
+            "Slot End",
+            "Room",
+            "Responsible Doctor",
+            "Item Type",
+            "Project / Section",
+            "Supervisor",
+            "Students",
+            "Reader 1",
+            "Reader 2",
+            "Committee Members",
+            "Status",
+        ]
+        rows = []
+
+        scope_filter_sql = ""
+        params = []
+        if course_scope != "all":
+            scope_filter_sql = " AND COALESCE(cp.course_scope, 'graduation_project') = %s"
+            params.append(course_scope)
+
+        if _table_exists(cursor, "committee_plans") and _table_exists(cursor, "committee_plan_sections"):
+            cursor.execute(
+                f"""
+                SELECT
+                    COALESCE(cp.course_scope, 'introduction') AS course_scope,
+                    cp.plan_id,
+                    cp.committee_name,
+                    cp.discussion_date,
+                    TIME_FORMAT(cps.slot_start, '%%H:%%i') AS slot_start,
+                    TIME_FORMAT(cps.slot_end, '%%H:%%i') AS slot_end,
+                    COALESCE(dr.room_name, '') AS room_name,
+                    COALESCE(resp_u.full_name, '') AS responsible_name,
+                    sec.section_name AS item_title,
+                    COALESCE(sup_u.full_name, '') AS supervisor_name,
+                    COALESCE(GROUP_CONCAT(DISTINCT stu_u.full_name ORDER BY stu_u.full_name SEPARATOR ', '), '') AS students,
+                    COALESCE(r1_u.full_name, '') AS reader1_name,
+                    COALESCE(r2_u.full_name, '') AS reader2_name,
+                    COALESCE((
+                        SELECT GROUP_CONCAT(DISTINCT mem_u.full_name ORDER BY mem_u.full_name SEPARATOR ', ')
+                        FROM committee_plan_members cpm
+                        JOIN faculty mem_f ON mem_f.faculty_id = cpm.faculty_id
+                        JOIN users mem_u ON mem_u.user_id = mem_f.user_id
+                        WHERE cpm.plan_id = cp.plan_id
+                    ), '') AS committee_members,
+                    COALESCE(cp.status, 'scheduled') AS status
+                FROM committee_plan_sections cps
+                JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+                JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+                LEFT JOIN discussion_rooms dr ON dr.room_id = cp.room_id
+                LEFT JOIN faculty resp_f ON resp_f.faculty_id = cp.responsible_faculty_id
+                LEFT JOIN users resp_u ON resp_u.user_id = resp_f.user_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = sec.supervisor_id
+                LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
+                LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+                LEFT JOIN students stu ON stu.student_id = ss.student_id
+                LEFT JOIN users stu_u ON stu_u.user_id = stu.user_id
+                LEFT JOIN section_report_readers r1 ON r1.section_id = sec.section_id AND r1.reader_order = 1
+                LEFT JOIN faculty r1_f ON r1_f.faculty_id = r1.faculty_id
+                LEFT JOIN users r1_u ON r1_u.user_id = r1_f.user_id
+                LEFT JOIN section_report_readers r2 ON r2.section_id = sec.section_id AND r2.reader_order = 2
+                LEFT JOIN faculty r2_f ON r2_f.faculty_id = r2.faculty_id
+                LEFT JOIN users r2_u ON r2_u.user_id = r2_f.user_id
+                WHERE COALESCE(cp.status, 'scheduled') <> 'cancelled'
+                  AND COALESCE(cp.course_scope, 'introduction') = 'introduction'
+                  {scope_filter_sql}
+                GROUP BY cp.plan_id, cp.committee_name, cp.discussion_date, cps.slot_start, cps.slot_end,
+                         dr.room_name, resp_u.full_name, sec.section_name, sup_u.full_name,
+                         r1_u.full_name, r2_u.full_name, cp.status, cp.course_scope
+                ORDER BY cp.discussion_date DESC, cp.plan_id DESC, cps.slot_start ASC, sec.section_name ASC
+                """,
+                tuple(params),
+            )
+            for row in cursor.fetchall():
+                rows.append([
+                    "COMP4200",
+                    row.get("committee_name") or "",
+                    row.get("discussion_date") or "",
+                    row.get("slot_start") or "",
+                    row.get("slot_end") or "",
+                    row.get("room_name") or "",
+                    row.get("responsible_name") or "",
+                    "Section",
+                    row.get("item_title") or "",
+                    row.get("supervisor_name") or "",
+                    row.get("students") or "",
+                    row.get("reader1_name") or "",
+                    row.get("reader2_name") or "",
+                    row.get("committee_members") or "",
+                    row.get("status") or "",
+                ])
+
+        params = []
+        scope_filter_sql = ""
+        if course_scope != "all":
+            scope_filter_sql = " AND COALESCE(cp.course_scope, 'graduation_project') = %s"
+            params.append(course_scope)
+
+        if _table_exists(cursor, "committee_plans") and _table_exists(cursor, "committee_plan_projects"):
+            cursor.execute(
+                f"""
+                SELECT
+                    COALESCE(cp.course_scope, 'graduation_project') AS course_scope,
+                    cp.plan_id,
+                    cp.committee_name,
+                    cp.discussion_date,
+                    TIME_FORMAT(cpp.slot_start, '%%H:%%i') AS slot_start,
+                    TIME_FORMAT(cpp.slot_end, '%%H:%%i') AS slot_end,
+                    COALESCE(dr.room_name, '') AS room_name,
+                    COALESCE(resp_u.full_name, '') AS responsible_name,
+                    p.title AS item_title,
+                    COALESCE(sup_u.full_name, '') AS supervisor_name,
+                    COALESCE(GROUP_CONCAT(DISTINCT stu_u.full_name ORDER BY pm.is_primary_contact DESC, stu_u.full_name SEPARATOR ', '), '') AS students,
+                    COALESCE(r1_u.full_name, '') AS reader1_name,
+                    COALESCE(r2_u.full_name, '') AS reader2_name,
+                    COALESCE((
+                        SELECT GROUP_CONCAT(DISTINCT mem_u.full_name ORDER BY mem_u.full_name SEPARATOR ', ')
+                        FROM committee_plan_members cpm
+                        JOIN faculty mem_f ON mem_f.faculty_id = cpm.faculty_id
+                        JOIN users mem_u ON mem_u.user_id = mem_f.user_id
+                        WHERE cpm.plan_id = cp.plan_id
+                    ), '') AS committee_members,
+                    COALESCE(cp.status, 'scheduled') AS status
+                FROM committee_plan_projects cpp
+                JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+                JOIN projects p ON p.project_id = cpp.project_id
+                LEFT JOIN discussion_rooms dr ON dr.room_id = cp.room_id
+                LEFT JOIN faculty resp_f ON resp_f.faculty_id = cp.responsible_faculty_id
+                LEFT JOIN users resp_u ON resp_u.user_id = resp_f.user_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
+                LEFT JOIN project_members pm ON pm.project_id = p.project_id
+                LEFT JOIN students stu ON stu.student_id = pm.student_id
+                LEFT JOIN users stu_u ON stu_u.user_id = stu.user_id
+                LEFT JOIN project_report_readers r1 ON r1.project_id = p.project_id AND r1.reader_order = 1
+                LEFT JOIN faculty r1_f ON r1_f.faculty_id = r1.faculty_id
+                LEFT JOIN users r1_u ON r1_u.user_id = r1_f.user_id
+                LEFT JOIN project_report_readers r2 ON r2.project_id = p.project_id AND r2.reader_order = 2
+                LEFT JOIN faculty r2_f ON r2_f.faculty_id = r2.faculty_id
+                LEFT JOIN users r2_u ON r2_u.user_id = r2_f.user_id
+                WHERE COALESCE(cp.status, 'scheduled') <> 'cancelled'
+                  AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+                  {scope_filter_sql}
+                GROUP BY cp.plan_id, cp.committee_name, cp.discussion_date, cpp.slot_start, cpp.slot_end,
+                         dr.room_name, resp_u.full_name, p.title, sup_u.full_name,
+                         r1_u.full_name, r2_u.full_name, cp.status, cp.course_scope
+                ORDER BY cp.discussion_date DESC, cp.plan_id DESC, cpp.slot_start ASC, p.title ASC
+                """,
+                tuple(params),
+            )
+            for row in cursor.fetchall():
+                rows.append([
+                    "COMP4300",
+                    row.get("committee_name") or "",
+                    row.get("discussion_date") or "",
+                    row.get("slot_start") or "",
+                    row.get("slot_end") or "",
+                    row.get("room_name") or "",
+                    row.get("responsible_name") or "",
+                    "Project",
+                    row.get("item_title") or "",
+                    row.get("supervisor_name") or "",
+                    row.get("students") or "",
+                    row.get("reader1_name") or "",
+                    row.get("reader2_name") or "",
+                    row.get("committee_members") or "",
+                    row.get("status") or "",
+                ])
+
+        cursor.close()
+        db.close()
+
+        suffix = "all" if course_scope == "all" else ("comp4200" if course_scope == "introduction" else "comp4300")
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        data = "\ufeff" + output.getvalue()
+        output.close()
+        return Response(
+            data,
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename=committee_schedule_{suffix}.csv"},
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @coordinator_bp.route("/api/coordinator/evaluation/projects", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_evaluation_projects():
@@ -6793,59 +7203,99 @@ def api_coordinator_evaluation_projects():
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_evaluation_schema(cursor)
-        semester = _get_active_semester(cursor)
-        semester_id = semester["semester_id"] if semester else None
+        _committee_ensure_course_schema(cursor)
+        _committee_ensure_report_readers_table(cursor)
 
         projects = []
+
         if course_scope == "introduction":
-            if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
-                cursor.execute("""
-                    SELECT sec.section_id AS project_id,
-                           sec.section_name AS title,
-                           'introduction' AS course_scope,
-                           'COMP4200' AS course_code,
-                           'section' AS status,
-                           u_sup.full_name AS supervisor_name,
-                           COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '), '') AS students
-                    FROM student_distribution_sections sec
-                    JOIN faculty f ON f.faculty_id = sec.supervisor_id
-                    JOIN users u_sup ON u_sup.user_id = f.user_id
+            if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "committee_plan_sections"):
+                cursor.execute(
+                    """
+                    SELECT
+                        sec.section_id AS project_id,
+                        sec.section_name AS title,
+                        'introduction' AS course_scope,
+                        'COMP4200' AS course_code,
+                        COALESCE(cp.status, 'scheduled') AS status,
+                        cp.status AS committee_status,
+                        cp.plan_id,
+                        cp.committee_name,
+                        cp.responsible_faculty_id,
+                        resp_u.full_name AS responsible_name,
+                        u_sup.full_name AS supervisor_name,
+                        COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '), '') AS students
+                    FROM committee_plan_sections cps
+                    JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+                    JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+                    JOIN faculty f_sup ON f_sup.faculty_id = sec.supervisor_id
+                    JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+                    LEFT JOIN faculty resp_f ON resp_f.faculty_id = cp.responsible_faculty_id
+                    LEFT JOIN users resp_u ON resp_u.user_id = resp_f.user_id
                     LEFT JOIN section_students ss ON ss.section_id = sec.section_id
                     LEFT JOIN students st ON st.student_id = ss.student_id
                     LEFT JOIN users u_st ON u_st.user_id = st.user_id
-                    GROUP BY sec.section_id, sec.section_name, u_sup.full_name
+                    WHERE COALESCE(cp.course_scope, 'introduction') = 'introduction'
+                      AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+                      AND cp.plan_id = (
+                          SELECT MAX(cp2.plan_id)
+                          FROM committee_plan_sections cps2
+                          JOIN committee_plans cp2 ON cp2.plan_id = cps2.plan_id
+                          WHERE cps2.section_id = sec.section_id
+                            AND COALESCE(cp2.course_scope, 'introduction') = 'introduction'
+                            AND COALESCE(cp2.status, 'scheduled') <> 'cancelled'
+                      )
+                    GROUP BY sec.section_id, sec.section_name, cp.status, cp.plan_id, cp.committee_name,
+                             cp.responsible_faculty_id, resp_u.full_name, u_sup.full_name
                     HAVING COUNT(DISTINCT ss.student_id) > 0
-                    ORDER BY sec.section_id DESC
-                """)
+                    ORDER BY cp.plan_id DESC, sec.section_id DESC
+                    """
+                )
                 projects = cursor.fetchall()
         else:
-            if not semester_id:
-                cursor.close()
-                db.close()
-                return jsonify({"projects": []})
-            cursor.execute("""
-                SELECT p.project_id,
-                       p.title,
-                       'graduation_project' AS course_scope,
-                       'COMP4300' AS course_code,
-                       p.status,
-                       u_sup.full_name AS supervisor_name,
-                       COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students
-                FROM projects p
-                JOIN semesters s ON s.semester_id = p.semester_id
-                JOIN project_members pm ON pm.project_id = p.project_id
-                JOIN students st ON st.student_id = pm.student_id
-                JOIN users u_st ON u_st.user_id = st.user_id
-                LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
-                LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
-                WHERE p.semester_id = %s
-                  AND COALESCE(s.course_code, 'COMP4300') = 'COMP4300'
-                  AND p.status IN ('submitted','under_review','needs_revision','committee_evaluation','accepted','rejected','archived')
-                  AND p.title NOT LIKE 'Committee Demo%%'
-                GROUP BY p.project_id, p.title, p.status, u_sup.full_name
-                ORDER BY FIELD(p.status,'committee_evaluation','submitted','under_review','needs_revision','accepted','archived','rejected'), p.project_id DESC
-            """, (semester_id,))
-            projects = cursor.fetchall()
+            if _table_exists(cursor, "projects") and _table_exists(cursor, "committee_plan_projects"):
+                cursor.execute(
+                    """
+                    SELECT
+                        p.project_id,
+                        p.title,
+                        'graduation_project' AS course_scope,
+                        'COMP4300' AS course_code,
+                        p.status,
+                        cp.status AS committee_status,
+                        cp.plan_id,
+                        cp.committee_name,
+                        cp.responsible_faculty_id,
+                        resp_u.full_name AS responsible_name,
+                        u_sup.full_name AS supervisor_name,
+                        COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students
+                    FROM committee_plan_projects cpp
+                    JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+                    JOIN projects p ON p.project_id = cpp.project_id
+                    LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+                    LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+                    LEFT JOIN faculty resp_f ON resp_f.faculty_id = cp.responsible_faculty_id
+                    LEFT JOIN users resp_u ON resp_u.user_id = resp_f.user_id
+                    LEFT JOIN project_members pm ON pm.project_id = p.project_id
+                    LEFT JOIN students st ON st.student_id = pm.student_id
+                    LEFT JOIN users u_st ON u_st.user_id = st.user_id
+                    WHERE COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+                      AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+                      AND p.title NOT LIKE 'Committee Demo%%'
+                      AND cp.plan_id = (
+                          SELECT MAX(cp2.plan_id)
+                          FROM committee_plan_projects cpp2
+                          JOIN committee_plans cp2 ON cp2.plan_id = cpp2.plan_id
+                          WHERE cpp2.project_id = p.project_id
+                            AND COALESCE(cp2.course_scope, 'graduation_project') = 'graduation_project'
+                            AND COALESCE(cp2.status, 'scheduled') <> 'cancelled'
+                      )
+                    GROUP BY p.project_id, p.title, p.status, cp.status, cp.plan_id, cp.committee_name,
+                             cp.responsible_faculty_id, resp_u.full_name, u_sup.full_name
+                    ORDER BY cp.plan_id DESC, p.project_id DESC
+                    """
+                )
+                projects = cursor.fetchall()
 
         result = [_evaluation_project_payload(cursor, course_scope, row) for row in projects]
         db.commit()
@@ -6885,7 +7335,13 @@ def api_coordinator_evaluation_open():
             db.close()
             return jsonify({"error": "Evaluation item not found."}), 404
 
-        _evaluation_autocreate_tasks(cursor, course_scope, reference_id, session.get("user_id"))
+        try:
+            _evaluation_autocreate_tasks(cursor, course_scope, reference_id, session.get("user_id"))
+        except ValueError as setup_error:
+            cursor.close()
+            db.close()
+            return jsonify({"error": str(setup_error)}), 400
+
         _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
         cursor.execute(
             """
@@ -7033,6 +7489,80 @@ def api_coordinator_evaluation_close():
         cursor.close()
         db.close()
         return jsonify({"message": "Grade entry closed and score calculated.", "scores": _json_safe_value(scores)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/close-all", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_close_all():
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "introduction").strip()
+
+    if course_scope not in {"introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+        _committee_ensure_course_schema(cursor)
+
+        if course_scope == "introduction":
+            cursor.execute(
+                """
+                SELECT DISTINCT sec.section_id AS reference_id
+                FROM committee_plan_sections cps
+                JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+                JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+                WHERE COALESCE(cp.course_scope, 'introduction') = 'introduction'
+                  AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+                """
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT DISTINCT p.project_id AS reference_id
+                FROM committee_plan_projects cpp
+                JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+                JOIN projects p ON p.project_id = cpp.project_id
+                WHERE COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+                  AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+                """
+            )
+
+        reference_ids = [int(row["reference_id"]) for row in cursor.fetchall() if row.get("reference_id")]
+        closed_count = 0
+
+        for reference_id in reference_ids:
+            _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
+            grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+            scores = _evaluation_scores_from_grades(course_scope, grades)
+
+            cursor.execute(
+                """
+                INSERT INTO evaluation_windows
+                    (course_scope, reference_id, is_open, opened_by, opened_at, closed_at)
+                VALUES (%s, %s, FALSE, %s, NULL, NOW())
+                ON DUPLICATE KEY UPDATE
+                    is_open = FALSE,
+                    closed_at = NOW()
+                """,
+                (course_scope, reference_id, session.get("user_id")),
+            )
+
+            if course_scope == "graduation_project" and scores.get("final_score") is not None and _db_column_exists(cursor, "projects", "final_score"):
+                cursor.execute(
+                    "UPDATE projects SET final_score = %s WHERE project_id = %s",
+                    (scores["final_score"], reference_id),
+                )
+
+            closed_count += 1
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": f"Evaluation closed for {closed_count} item(s).", "closed_count": closed_count})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -7304,20 +7834,17 @@ def api_coordinator_evaluation_unread_count():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        # Make sure tables exist before query
-        if not _table_exists(cursor, "evaluation_grade_tasks") or not _table_exists(cursor, "evaluation_windows"):
+        # Make sure table exists before query
+        if not _table_exists(cursor, "evaluation_grade_tasks"):
             cursor.close()
             db.close()
             return jsonify({"count": 0})
 
         cursor.execute("""
-            SELECT COUNT(DISTINCT CONCAT(egt.course_scope, '-', egt.reference_id)) AS count
-            FROM evaluation_grade_tasks egt
-            JOIN evaluation_windows ew
-              ON ew.course_scope = egt.course_scope
-             AND ew.reference_id = egt.reference_id
-            WHERE ew.is_open = 1
-              AND COALESCE(egt.is_submitted, 0) = 0
+            SELECT COUNT(DISTINCT CONCAT(course_scope, '-', reference_id)) AS count
+            FROM evaluation_grade_tasks
+            WHERE is_open = 1
+              AND COALESCE(is_submitted, 0) = 0
         """)
 
         row = cursor.fetchone() or {}
