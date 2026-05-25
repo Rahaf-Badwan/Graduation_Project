@@ -26,7 +26,8 @@ def get_course(course_code):
     cursor.execute(
         """
                         SELECT u.full_name,
-                               ca.assigned_at
+                               ca.assigned_at,
+                               f.faculty_id
                         FROM coordinator_assignments ca
                         JOIN faculty f ON ca.faculty_id = f.faculty_id
                         JOIN users u ON u.user_id = f.user_id

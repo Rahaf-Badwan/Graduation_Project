@@ -35,7 +35,7 @@ def api_verify_student():
                        FROM users 
                        WHERE university_id = %s
                             AND role = 'student'
-                       """, (university_id))
+                       """, (university_id,))
         student = cursor.fetchone()
         cursor.close()
         db.close()

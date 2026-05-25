@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
 async function loadCurrentAnn(){
   try{
-    var res = await fetch('/api/announcements/active');
+    var res = await fetch('/head/api/announcements/active');
     var data = await res.json();
     if(data.announcement){
       var ann = data.announcement;

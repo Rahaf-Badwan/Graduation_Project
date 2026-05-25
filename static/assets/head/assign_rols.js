@@ -107,7 +107,7 @@ function loadCourse(courseCode){
               doctorSelect.innerHTML += `<option value="${d.faculty_id}">${d.full_name}</option>`;
           }
 
-          let isCoordiantor = data.coordinator && d.full_name === data.coordinator.full_name;
+          let isCoordiantor = data.coordinator && d.faculty_id === data.coordinator.faculty_id;
           let coordTag = isCoordiantor
              ? `<span class="role-badge role-badge--coord">Coordinator</span>`
              : "";

@@ -18,12 +18,14 @@ from routes.add_student import add_student_bp
 from routes.assign_rols import assign_rols_bp
 from routes.promote import promote_bp
 from routes.dashboard import dashboard_bp
+from routes.profile import profile_bp
 
 head_bp = Blueprint("head", __name__, url_prefix="/head")
 head_bp.register_blueprint(add_student_bp)
 head_bp.register_blueprint(assign_rols_bp)
 head_bp.register_blueprint(promote_bp)
 head_bp.register_blueprint(dashboard_bp)
+head_bp.register_blueprint(profile_bp)
 # ─── Dashboard ──────────────────────────────────────────────
 @head_bp.route("/")
 @head_bp.route("/dashboard")

@@ -62,6 +62,15 @@ def api_add_student():
             (user_id,),
         )
 
+        student_id = cursor.lastrowid
+
+        cursor.execute("""
+            INSERT INTO student_course_results (student_id, semester_id, status)
+            SELECT %s, semester_id, 'pending'
+            FROM semesters
+            WHERE course_code = 'COMP4200' AND is_active = TRUE
+            LIMIT 1
+                """, (student_id,),)
         db.commit()
         cursor.close()
         db.close()
@@ -99,37 +108,24 @@ def api_active_students():
         cursor.execute(
             """
                     SELECT DISTINCT
-                           u.user_id,
-                           u.university_id,
-                           u.full_name,
-                           u.email,
-                           u.avatar_initials
-                    FROM users u
-                    JOIN students st ON st.user_id = u.user_id
-                    JOIN project_members pm ON pm.student_id = st.student_id
-                    JOIN projects p ON p.project_id = pm.project_id
-                    JOIN semesters s ON s.semester_id = p.semester_id
-                    WHERE u.role = 'student'
-                        AND u.is_active = TRUE
-                        AND s.course_code = %s
-                    ORDER BY u.full_name""",
+           u.user_id,
+           u.university_id,
+           u.full_name,
+           u.email,
+           u.avatar_initials
+    FROM users u
+    JOIN students st ON st.user_id = u.user_id
+    JOIN student_course_results scr ON scr.student_id = st.student_id
+    JOIN semesters s ON s.semester_id = scr.semester_id
+    WHERE u.role = 'student'
+        AND u.is_active = TRUE
+        AND s.course_code = %s
+    ORDER BY u.full_name""",
             (course,),
         )
         students = cursor.fetchall()
-
-        # if the student is activate but not have projects
-        if not students:
-            cursor.execute("""SELECT u.user_id, u.university_id, u.full_name,
-                              u.email, u.avatar_initials
-                        FROM users u
-                        JOIN students s ON s.user_id = u.user_id
-                        WHERE u.role = 'student'
-                            AND is_active = TRUE
-                        ORDER BY u.full_name""")
-            students = cursor.fetchall()
-
-            cursor.close()
-            db.close()
+        cursor.close()
+        db.close()
 
         return jsonify({"students": students, "course": course}), 200
 
