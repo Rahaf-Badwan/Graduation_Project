@@ -8354,17 +8354,17 @@ def api_coordinator_evaluation_unread_count():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        # Make sure table exists before query
-        if not _table_exists(cursor, "evaluation_grade_tasks"):
-            cursor.close()
-            db.close()
-            return jsonify({"count": 0})
+        _ensure_evaluation_schema(cursor)
+        db.commit()
 
         cursor.execute("""
-            SELECT COUNT(DISTINCT CONCAT(course_scope, '-', reference_id)) AS count
-            FROM evaluation_grade_tasks
-            WHERE is_open = 1
-              AND COALESCE(is_submitted, 0) = 0
+            SELECT COUNT(DISTINCT CONCAT(egt.course_scope, '-', egt.reference_id)) AS count
+            FROM evaluation_grade_tasks egt
+            JOIN evaluation_windows ew
+              ON ew.course_scope = egt.course_scope
+             AND ew.reference_id = egt.reference_id
+            WHERE ew.is_open = TRUE
+              AND COALESCE(egt.is_submitted, FALSE) = FALSE
         """)
 
         row = cursor.fetchone() or {}

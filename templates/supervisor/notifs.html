@@ -40,36 +40,6 @@
     padding: 6px 10px 88px
   }
 
-  .main-notif-tabs {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin: 0 0 12px
-  }
-
-  .main-notif-tab {
-    border: 1px solid #dde6e1;
-    background: #fff;
-    color: #3a6147;
-    padding: 7px 14px;
-    border-radius: 999px;
-    font-weight: 500;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background .15s, color .15s, border-color .15s
-  }
-
-  .main-notif-tab:hover { background: #f4faf6; }
-
-  .main-notif-tab.on {
-    background: var(--sn-green);
-    color: #fff;
-    border-color: var(--sn-green)
-  }
-
-  .notif-tab-pane { display: none }
-  .notif-tab-pane.active { display: block }
-
   .sn-messages-card {
     width: 100%;
     min-height: calc(100vh - 190px)
@@ -653,16 +623,70 @@
     .sn-msg-icon { width: 32px; height: 32px }
     .sn-fab { right: 16px; bottom: 18px }
   }
+
+  /* ── Dark mode overrides ── */
+  html[data-theme="dark"] {
+    --sn-green: var(--green);
+    --sn-border: var(--color-border-tertiary);
+    --sn-muted: var(--color-text-secondary);
+    --sn-text: var(--color-text-primary);
+    --sn-bg: var(--color-background-secondary);
+  }
+  html[data-theme="dark"] .sn-card { background: var(--color-background-primary); border-color: var(--color-border-tertiary); box-shadow: none; }
+  html[data-theme="dark"] .sn-card-hd { background: var(--color-background-secondary) !important; border-bottom-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-card-title { color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-card-sub { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-tabs { background: var(--color-background-primary); }
+  html[data-theme="dark"] .sn-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+  html[data-theme="dark"] .main-notif-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .main-notif-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+  html[data-theme="dark"] .sn-msg { background: var(--color-background-primary); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-msg:hover { border-color: var(--green); box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+  html[data-theme="dark"] .sn-msg.unread { background: var(--color-background-tertiary) !important; border-color: var(--green) !important; }
+  html[data-theme="dark"] .sn-msg-title { color: var(--color-text-primary) !important; }
+  html[data-theme="dark"] .sn-msg-meta { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-msg-preview { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-pill.read { background: var(--blue-light); color: var(--blue); }
+  html[data-theme="dark"] .sn-pill.unread-pill { background: var(--amber-light); color: var(--amber); }
+  html[data-theme="dark"] .sn-pill.sent-pill { background: var(--green-light); color: var(--green); }
+  html[data-theme="dark"] .course-pill { background: var(--green-light); color: var(--green); }
+  html[data-theme="dark"] .sn-att-badge { background: var(--color-background-tertiary); color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-btn { background: var(--green); color: #fff; }
+  html[data-theme="dark"] .sn-btn.secondary { background: var(--color-background-tertiary); color: var(--green); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-field label { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-field input,
+  html[data-theme="dark"] .sn-field select,
+  html[data-theme="dark"] .sn-field textarea { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-file-zone { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-file-zone-label { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-file-chosen { background: var(--color-background-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-empty { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-drawer-overlay { background: rgba(0,0,0,.55); }
+  html[data-theme="dark"] .sn-compose-drawer { background: var(--color-background-primary); }
+  html[data-theme="dark"] .sn-drawer-close { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--green); }
+  html[data-theme="dark"] .sn-overlay { background: rgba(0,0,0,.6); }
+  html[data-theme="dark"] .sn-modal { background: var(--color-background-primary); }
+  html[data-theme="dark"] .sn-modal-hd { background: var(--color-background-secondary); border-bottom-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-modal-title { color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-modal-close { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-modal-msg-meta { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-modal-msg-body { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-modal-reply-title { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-modal-att-link { background: var(--color-background-tertiary); color: var(--green); }
+  html[data-theme="dark"] .sn-modal-divider { background: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-msg-icon.inbox-icon { background: var(--color-background-tertiary); color: var(--green); }
+  html[data-theme="dark"] .sn-msg-icon.sent-icon { background: var(--color-background-tertiary); color: #60a5fa; }
+  html[data-theme="dark"] .notice-preview { border-left-color: var(--green); background: var(--color-background-tertiary); }
+  html[data-theme="dark"] .notice-preview-title { color: var(--color-text-primary); }
+  html[data-theme="dark"] .notice-preview-body { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .notice-preview-hl { color: #f87171; }
+  html[data-theme="dark"] .sn-toast { background: var(--color-background-tertiary); color: var(--color-text-primary); }
 </style>
 
 <div class="page page-single on" id="pg-notifs">
   <div class="sn-shell">
-    <div class="main-notif-tabs">
-      <button class="main-notif-tab on" type="button" data-main-tab="messages">Messages</button>
-      <button class="main-notif-tab" type="button" data-main-tab="notice">Important Notice</button>
-    </div>
-
-    <section class="sn-card sn-messages-card notif-tab-pane active" id="tab-messages">
+    <section class="sn-card sn-messages-card" id="tab-messages">
       <div class="sn-card-hd">
         <div>
           <div class="sn-card-title">Messages</div>
@@ -683,50 +707,6 @@
       </div>
     </section>
 
-    <section class="sn-card notif-tab-pane" id="tab-notice">
-      <div class="sn-card-hd">
-        <div>
-          <div class="sn-card-title">Important Notice on Login Screen</div>
-          <div class="sn-card-sub">This updates the notice shown on the main login screen.</div>
-        </div>
-      </div>
-      <div class="sn-body">
-        <form id="noticeForm">
-          <div class="sn-form-row">
-            <div class="sn-field"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="250"
-                placeholder="Important Notice — APMS System" required></div>
-            <div class="sn-field"><label for="noticeHighlight">Highlight / deadline text</label><input
-                id="noticeHighlight" maxlength="150" placeholder="Example: Deadline: 15/2/2026"></div>
-          </div>
-          <div class="sn-field">
-            <label for="noticeCourseScope">Notice for</label>
-            <select id="noticeCourseScope" required>
-              <option value="introduction">Project Introduction / COMP4200</option>
-              <option value="graduation_project">Graduation Project / COMP4300</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          <div class="sn-field"><label for="noticeBody">Notice body</label><textarea id="noticeBody"
-              placeholder="Write the notice that students, supervisors, and head will see before login..."
-              required></textarea></div>
-          <div class="sn-form-row">
-            <div class="sn-field"><label for="noticeBtn1">Button 1 text</label><input id="noticeBtn1"
-                placeholder="ⓘ How does the system work?"></div>
-            <div class="sn-field"><label for="noticeBtn2">Button 2 text</label><input id="noticeBtn2"
-                placeholder="⬆ Project Upload Guide"></div>
-          </div>
-          <div class="sn-field"><label for="noticeBtn3">Button 3 text</label><input id="noticeBtn3"
-              placeholder="⚙ Roles & Permissions"></div>
-          <div class="notice-preview">
-            <div class="notice-preview-title" id="noticePreviewTitle">Important Notice — APMS System</div>
-            <div class="notice-preview-body" id="noticePreviewBody">Preview will appear here.</div>
-            <div class="notice-preview-hl" id="noticePreviewHl"></div>
-          </div>
-          <div class="sn-actions"><button class="sn-btn secondary" type="button" id="reloadNoticeBtn">Reload
-              Current</button><button class="sn-btn" type="submit">Update Login Notice</button></div>
-        </form>
-      </div>
-    </section>
   </div>
 
   <button class="sn-fab" id="snFabCompose" type="button" data-tooltip="Send Message" aria-label="Send Message">✎</button>
@@ -863,15 +843,6 @@
     const overlay = $('snOverlay');
     const composeDrawer = $('snComposeDrawer');
     const composeOverlay = $('snComposeOverlay');
-
-    function showMainTab(tabName) {
-      document.querySelectorAll('.main-notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.mainTab === tabName));
-      document.querySelectorAll('.notif-tab-pane').forEach(pane => pane.classList.remove('active'));
-      const pane = $('tab-' + tabName);
-      if (pane) pane.classList.add('active');
-      window.scrollTo(0, 0);
-    }
-    document.querySelectorAll('.main-notif-tab').forEach(btn => btn.addEventListener('click', () => showMainTab(btn.dataset.mainTab)));
 
     function openCompose() {
       composeDrawer.classList.add('open');
@@ -1209,55 +1180,8 @@
       } catch (e) { showToast(e.message, true); }
     });
 
-    function updateNoticePreview() {
-      $('noticePreviewTitle').textContent = ($('noticeTitle').value || 'Important Notice — APMS System') + ' · ' + courseLabel($('noticeCourseScope').value || 'both');
-      $('noticePreviewBody').textContent = $('noticeBody').value || 'Preview will appear here.';
-      $('noticePreviewHl').textContent = $('noticeHighlight').value || '';
-    }
-
-    async function loadNotice() {
-      try {
-        const data = await fetchJSON('/supervisor/api/important-notice');
-        const n = data.notice || {};
-        $('noticeTitle').value = n.title || 'Important Notice — APMS System';
-        $('noticeBody').value = n.body || '';
-        $('noticeHighlight').value = n.highlight_text || '';
-        $('noticeBtn1').value = n.button1_text || 'ⓘ How does the system work?';
-        $('noticeBtn2').value = n.button2_text || '⬆ Project Upload Guide';
-        $('noticeBtn3').value = n.button3_text || '⚙ Roles & Permissions';
-        $('noticeCourseScope').value = n.course_scope || 'both';
-        updateNoticePreview();
-      } catch (err) { showToast(err.message, true); }
-    }
-
-    ['noticeTitle', 'noticeBody', 'noticeHighlight'].forEach(id => $(id).addEventListener('input', updateNoticePreview));
-    $('noticeCourseScope').addEventListener('change', updateNoticePreview);
-    $('reloadNoticeBtn').addEventListener('click', loadNotice);
-    $('noticeForm').addEventListener('submit', async event => {
-      event.preventDefault();
-      const payload = {
-        title: $('noticeTitle').value.trim(),
-        body: $('noticeBody').value.trim(),
-        highlight_text: $('noticeHighlight').value.trim(),
-        button1_text: $('noticeBtn1').value.trim(),
-        button2_text: $('noticeBtn2').value.trim(),
-        button3_text: $('noticeBtn3').value.trim(),
-        course_scope: $('noticeCourseScope').value
-      };
-      try {
-        const data = await fetchJSON('/supervisor/api/important-notice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        showToast(data.message || 'Notice updated.');
-        updateNoticePreview();
-      } catch (err) { showToast(err.message, true); }
-    });
-
     loadOptions().then(updateSpecificWrap);
     loadMessages();
-    loadNotice();
   })();
 </script>
 {% endblock %}
