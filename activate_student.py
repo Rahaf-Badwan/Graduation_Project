@@ -105,6 +105,152 @@ def api_set_password():
     except Exception as e:
         return jsonify({'error': f'An error occurred: {e}'}), 500
         
+@activate_bp.route('/api/activate/supervisor/verify', methods=['POST'])
+def api_verify_supervisor():
+    """
+    Step 1 for supervisors.
+    Checks that the supervisor exists in users (role='supervisor', is_active=FALSE).
+    Returns user_id so the frontend can continue to set-password step.
+    """
+    data = request.get_json(silent=True) or {}
+
+    university_id = (data.get('university_id') or '').strip()
+    email         = (data.get('email')         or '').strip()
+
+    if not university_id or not email:
+        return jsonify({'error': 'Please fill in your university ID and email.'}), 400
+
+    try:
+        db     = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT u.user_id, u.full_name, u.is_active
+            FROM   users u
+            WHERE  u.university_id = %s
+              AND  u.email         = %s
+              AND  u.role          = 'supervisor'
+        """, (university_id, email))
+        sup = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if not sup:
+            return jsonify({
+                'error': 'No supervisor account found with that ID and email. '
+                         'Please contact the head of department.'
+            }), 404
+
+        if sup['is_active']:
+            return jsonify({
+                'error': 'This supervisor account is already active. You can log in directly.'
+            }), 409
+
+        return jsonify({
+            'message': f'Welcome, {sup["full_name"]}. Please set your hours and password.',
+            'user_id':   sup['user_id'],
+            'full_name': sup['full_name'],
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'An error occurred: {e}'}), 500
+
+
+@activate_bp.route('/api/activate/supervisor/set-password', methods=['POST'])
+def api_supervisor_set_password():
+    """
+    Step 2 for supervisors.
+    Sets graduation_project_hours + password, activates the account.
+    """
+    data = request.get_json(silent=True) or {}
+
+    user_id  = data.get('user_id')
+    hours    = data.get('graduation_project_hours')
+    password = (data.get('password')         or '').strip()
+    confirm  = (data.get('confirm_password') or '').strip()
+
+    if not user_id or not password or hours is None:
+        return jsonify({'error': 'Please fill in all fields.'}), 400
+
+    if password != confirm:
+        return jsonify({'error': 'The two passwords do not match.'}), 400
+
+    if len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters long.'}), 400
+
+    try:
+        hours_val = float(hours)
+        if hours_val < 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid hours value.'}), 400
+
+    try:
+        db     = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # Confirm account is still inactive
+        cursor.execute("""
+            SELECT u.user_id, f.faculty_id
+            FROM   users   u
+            JOIN   faculty f ON f.user_id = u.user_id
+            WHERE  u.user_id   = %s
+              AND  u.role      = 'supervisor'
+              AND  u.is_active = FALSE
+        """, (user_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            cursor.close()
+            db.close()
+            return jsonify({
+                'error': 'Supervisor not found or already active.'
+            }), 404
+
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+        # Activate the user account
+        cursor.execute("""
+            UPDATE users
+            SET    password_hash = %s,
+                   is_active     = TRUE
+            WHERE  user_id = %s
+        """, (hashed, user_id))
+
+        # Store hours on faculty row
+        cursor.execute("""
+            UPDATE faculty
+            SET    graduation_project_hours = %s
+            WHERE  faculty_id = %s
+        """, (hours_val, row['faculty_id']))
+
+        # Also store in faculty_load_settings for the active semester
+        cursor.execute("""
+            SELECT semester_id FROM semesters
+            WHERE  is_active = TRUE
+            ORDER BY semester_id DESC
+            LIMIT 1
+        """)
+        sem = cursor.fetchone()
+        if sem:
+            cursor.execute("""
+                INSERT INTO faculty_load_settings
+                    (faculty_id, semester_id, graduation_project_hours)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    graduation_project_hours = VALUES(graduation_project_hours)
+            """, (row['faculty_id'], sem['semester_id'], hours_val))
+
+        db.commit()
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            'message': 'Your supervisor account has been activated successfully. You may now log in.'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'An error occurred: {e}'}), 500
 
 
  

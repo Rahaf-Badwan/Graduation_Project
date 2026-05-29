@@ -1227,6 +1227,28 @@ input[type="number"]{
     margin-right: 6px;
 }
 
+.switch-wrap {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--color-background-primary);
+  /*border: 0.5px solid var(--color-border-tertiary);*/
+  /*border-radius: var(--border-radius-lg);*/
+  padding: 10px 16px; cursor: pointer;
+}
+.toggle-track {
+  width: 44px; height: 24px; background: #E1F5EE;
+  border-radius: 999px; position: relative;
+  transition: background 0.2s;
+}
+.toggle-track.on { background: #1D9E75; }
+.toggle-thumb {
+  width: 18px; height: 18px; background: #0F6E56;
+  border-radius: 50%; position: absolute;
+  top: 3px; left: 3px; transition: transform 0.2s;
+}
+.toggle-track.on .toggle-thumb {
+  transform: translateX(20px); background: #fff;
+}
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }

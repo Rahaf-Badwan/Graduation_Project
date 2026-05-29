@@ -87,15 +87,16 @@
 
     
 
-    <!--<a class="sb-item {% if request.path == '/head/announcements' %}on{% endif %}"
-      data-page="announcements"
-      data-tip="announcements"
-      href="/head/announcements">
-      <span class="sb-icon">
-        <span class="material-symbols-outlined icon-inline">campaign</span>
-      </span>
-      <span class="sb-label">Write Announcement</span>
-    </a>-->
+    <div class="switch-wrap" onclick="switchRole()" id="roleSwitch">
+  <div style="display:flex; flex-direction:column;">
+    <span style="font-size:11px; color:var(--color-text-secondary);" id="roleSub">
+      Switch to supervisor view
+    </span>
+  </div>
+  <div class="toggle-track" id="toggleTrack">
+    <div class="toggle-thumb"></div>
+  </div>
+</div>
   </div>
 
   <div class="sb-footer">

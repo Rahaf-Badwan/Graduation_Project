@@ -158,3 +158,31 @@ def api_dashboard_data():
         "coordinator": coordinator,
 
     })
+@dashboard_bp.route('/api/switch-role', methods=['POST'])
+@login_required(role="head_of_department")
+def api_switch_role():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    
+    user_id = session.get("user_id")
+    
+   
+    cursor.execute("""
+        SELECT f.faculty_id 
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE f.user_id = %s
+    """, (user_id,))
+    
+    faculty = cursor.fetchone()
+    cursor.close()
+    db.close()
+    
+    if not faculty:
+        return jsonify({"success": False, "message": "No supervisor profile found"})
+    
+    
+    session["role"] = "supervisor"
+    session["original_role"] = "head_of_department"  # احتفظ بالأصل عشان يرجع
+    
+    return jsonify({"success": True})
