@@ -29,8 +29,8 @@
 
   #pg-lectures .lecture-tab {
     border: 1px solid #d7e3dc;
-    background: #fff;
-    color: #2d5137;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
     border-radius: 999px;
     padding: 9px 14px;
     font-weight: 800;
@@ -39,12 +39,12 @@
   }
 
   #pg-lectures .lecture-tab:hover {
-    background: #f3f7f4;
+    background: var(--color-background-tertiary);
   }
 
   #pg-lectures .lecture-tab.on {
     background: #2e7d42;
-    border-color: #2e7d42;
+    border-color: var(--accent);
     color: #fff;
     box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
   }
@@ -91,7 +91,7 @@
 
   #pg-lectures .card {
     margin-top: 0 !important;
-    background: #fff;
+    background: var(--color-background-primary);
     border: 1px solid #e6ece8;
     border-radius: 18px;
     box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
@@ -111,13 +111,13 @@
   #pg-lectures .card-title {
     font-size: 16px;
     font-weight: 900;
-    color: #173b24;
+    color: var(--color-text-primary);
   }
 
   #pg-lectures .card-action {
     border: 1px solid #d7e3dc;
-    background: #f3f7f4;
-    color: #245c33;
+    background: var(--color-background-tertiary);
+    color: var(--green);
     border-radius: 12px;
     padding: 8px 12px;
     font-weight: 800;
@@ -126,16 +126,16 @@
   }
 
   #pg-lectures .card-action:hover {
-    background: #e8f3eb;
+    background: var(--green-light);
     border-color: #b9d7c2;
   }
 
   #pg-lectures .lecture-note {
     border-left: 5px solid #2e7d42;
-    background: #f7fbf8;
+    background: var(--color-background-tertiary);
     border-radius: 14px;
     padding: 13px 14px;
-    color: #344054;
+    color: var(--color-text-primary);
     line-height: 1.55;
     font-size: 13px;
     margin: 14px 18px;
@@ -147,7 +147,7 @@
     border-radius: 14px;
     padding: 14px;
     margin: 0 18px 14px 18px;
-    background: #fbfdfb;
+    background: var(--color-background-tertiary);
   }
 
   #pg-lectures .mini-form.on {
@@ -163,7 +163,7 @@
   #pg-lectures label {
     font-size: 12px;
     font-weight: 800;
-    color: #344054;
+    color: var(--color-text-primary);
     display: block;
     margin-bottom: 5px;
   }
@@ -175,7 +175,7 @@
     padding: 10px 12px;
     border: 1px solid #d8e2dc;
     border-radius: 12px;
-    background: #fff;
+    background: var(--color-background-primary);
     font: inherit;
     outline: none;
   }
@@ -183,7 +183,7 @@
   #pg-lectures input:focus,
   #pg-lectures select:focus,
   #pg-lectures textarea:focus {
-    border-color: #2e7d42;
+    border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
   }
 
@@ -196,7 +196,7 @@
     border-radius: 14px;
     padding: 18px;
     color: #667085;
-    background: #fbfdfb;
+    background: var(--color-background-tertiary);
     font-size: 13px;
     text-align: center;
     margin: 0 18px 18px 18px;
@@ -209,7 +209,7 @@
     gap: 12px;
     align-items: flex-start;
     border: 1px solid #e7eee9;
-    background: #fff;
+    background: var(--color-background-primary);
     border-radius: 16px;
     padding: 13px 14px;
     margin: 0 18px 12px 18px;
@@ -220,8 +220,8 @@
     width: 42px;
     height: 42px;
     border-radius: 14px;
-    background: #ecfdf3;
-    color: #2e7d42;
+    background: var(--green-light);
+    color: var(--accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -230,7 +230,7 @@
 
   #pg-lectures .lecture-item-title {
     font-weight: 900;
-    color: #173b24;
+    color: var(--color-text-primary);
     margin-bottom: 4px;
   }
 
@@ -273,8 +273,8 @@
 
   #pg-lectures .submission-filter-btn {
     border: 1px solid #d7e3dc;
-    background: #fff;
-    color: #2d5137;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
     border-radius: 999px;
     padding: 7px 12px;
     font-size: 12px;
@@ -284,13 +284,13 @@
 
   #pg-lectures .submission-filter-btn.on {
     background: #2e7d42;
-    border-color: #2e7d42;
+    border-color: var(--accent);
     color: #fff;
   }
 
   #pg-lectures .submission-file-card {
     border: 1px solid #e7eee9;
-    background: #fff;
+    background: var(--color-background-primary);
     border-radius: 16px;
     padding: 14px 16px;
     margin-bottom: 12px;
@@ -299,7 +299,7 @@
 
   #pg-lectures .submission-folder {
     border: 1px solid #dfe9e3;
-    background: #fff;
+    background: var(--color-background-primary);
     border-radius: 16px;
     margin-bottom: 14px;
     overflow: hidden;
@@ -313,14 +313,14 @@
     gap: 12px;
     flex-wrap: wrap;
     padding: 13px 16px;
-    background: #f7fbf8;
+    background: var(--color-background-tertiary);
     border-bottom: 1px solid #e7eee9;
   }
 
   #pg-lectures .submission-folder-title {
     font-size: 15px;
     font-weight: 900;
-    color: #173b24;
+    color: var(--color-text-primary);
   }
 
   #pg-lectures .submission-folder-meta {
@@ -354,7 +354,7 @@
   #pg-lectures .submission-file-title {
     font-size: 15px;
     font-weight: 900;
-    color: #173b24;
+    color: var(--color-text-primary);
   }
 
   #pg-lectures .submission-file-meta {
@@ -368,16 +368,16 @@
     margin-top: 10px;
     padding: 8px 11px;
     border-radius: 10px;
-    background: #f3f7f4;
+    background: var(--color-background-tertiary);
     border: 1px solid #d7e3dc;
-    color: #245c33;
+    color: var(--green);
     font-size: 12px;
     font-weight: 800;
     text-decoration: none;
   }
 
   #pg-lectures .submission-file-link:hover {
-    background: #e8f3eb;
+    background: var(--green-light);
   }
 
   @media(max-width:900px) {
@@ -974,8 +974,8 @@
       const pid = 'proj-' + g.project_id;
       const typeText = projectTypeLabel(g.project_type);
       const typeLabel = g.project_type
-        ? `<span style="font-size:11px;background:#f0f4f1;border:1px solid #d0ddd4;
-                        border-radius:6px;padding:2px 8px;color:#2e7d42">
+        ? `<span style="font-size:11px;background:var(--color-background-tertiary);border:1px solid var(--color-border-tertiary);
+                        border-radius:6px;padding:2px 8px;color:var(--green)">
              ${safe(typeText)}
            </span>` : '';
 
@@ -985,7 +985,7 @@
         const icon = f.file_type==='final_report'?'📄':f.file_type==='source_code'?'💾':f.file_type==='presentation'?'📊':'📁';
         return `<div style="display:flex;align-items:center;justify-content:space-between;
                              padding:8px 0;border-top:1px solid #eef1ee">
-          <div style="font-size:13px;color:#344054">
+          <div style="font-size:13px;color:var(--color-text-primary)">
             ${icon} <b>${safe((f.file_type||'file').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}</b>
             <span style="color:#888;font-size:11px">${sz}</span>
           </div>
@@ -999,12 +999,12 @@
       return `
         <div style="border:1px solid #e7eee9;border-radius:10px;margin-bottom:8px;overflow:hidden">
           <div style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
-                      background:#fafcfa"
+                      background:var(--color-background-secondary)"
                onclick="var b=document.getElementById('${pid}');
                         b.style.display=b.style.display==='none'?'block':'none';
                         this.querySelector('.pa').textContent=b.style.display==='none'?'▸':'▾'">
             <div style="display:flex;align-items:center;gap:8px">
-              <span class="pa" style="color:#2e7d42;font-size:13px">▸</span>
+              <span class="pa" style="color:var(--green);font-size:13px">▸</span>
               <span style="font-weight:700;font-size:14px">${safe(g.project_title)}</span>
               ${typeLabel}
             </div>
@@ -1012,8 +1012,8 @@
           </div>
           <div id="${pid}" style="display:none;padding:0 14px 10px">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;
-                        margin:8px 0;font-size:12px;color:#344054;
-                        background:#f7fbf8;border-radius:8px;padding:8px 12px">
+                        margin:8px 0;font-size:12px;color:var(--color-text-primary);
+                        background:var(--color-background-tertiary);border-radius:8px;padding:8px 12px">
               ${g.supervisor_name ? `<div>🎓 <b>Supervisor:</b> ${safe(g.supervisor_name)}</div>` : ''}
               ${g.team_members    ? `<div style="grid-column:1/-1">👥 <b>Team:</b> ${safe(g.team_members)}</div>` : ''}
               ${g.uploaded_at     ? `<div>🕐 <b>Submitted:</b> ${safe(g.uploaded_at)}</div>` : ''}
@@ -1047,7 +1047,7 @@
                         this.querySelector('.ca').textContent=b.style.display==='none'?'▸':'▾'">
             <div>
               <div class="submission-folder-title" style="display:flex;align-items:center;gap:8px">
-                <span class="ca" style="color:#2e7d42;font-size:16px">▾</span>
+                <span class="ca" style="color:var(--green);font-size:16px">▾</span>
                 Final Submissions — ${safe(course)}
               </div>
               <div class="submission-folder-meta">${total} project${total===1?'':'s'} submitted</div>

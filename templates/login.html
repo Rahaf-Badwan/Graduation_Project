@@ -6,11 +6,12 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>APMS — Sign In</title>
+  <script>try{if(localStorage.getItem('apmsTheme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
   <link rel="stylesheet" href="{{ url_for('static', filename='login_style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <style>
     .error-msg {
-      background: #fff0f0;
+      background: var(--coral-light);
       border: 1px solid #f5c6c6;
       color: #c0392b;
       font-size: 12px;
@@ -29,7 +30,7 @@
       position: absolute;
       top: 100%;
       left: 0;
-      background: #fff;
+      background: var(--color-background-primary);
       border: 1px solid #e0e0e0;
       border-radius: 8px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
@@ -53,7 +54,7 @@
 
     .dropdown a:hover {
       background: #f0f0f0;
-      color: #1a3d1f;
+      color: var(--color-text-primary);
     }
 
     .dropdown-divider {
@@ -77,6 +78,14 @@
         <li><a href="https://itc.birzeit.edu" target="_blank">ITC</a></li>
       </ul>
       <ul class="nav-links nav-right">
+        <li>
+          <button id="loginThemeBtn" onclick="toggleLoginTheme()" title="Toggle dark / light mode" style="
+            background:none; border:none; cursor:pointer;
+            padding:5px 7px; border-radius:6px; color:#555;
+            display:flex; align-items:center; transition:background 0.15s;">
+            <span class="material-symbols-outlined" style="font-size:18px;line-height:1">dark_mode</span>
+          </button>
+        </li>
 
         <li><a href="">Archived Projects</a></li>
 
@@ -167,8 +176,8 @@
                 align-items: center; 
                 gap: 6px;
                 padding: 7px 14px;
-                background: #fff;
-                color: #111827;
+                background: var(--color-background-primary);
+                color: var(--color-text-primary);
                 border-radius: 7px;
                 font-size: 12px; 
                 font-weight: 700;
@@ -232,6 +241,22 @@
     </footer>
   </div>
   <script>
+    function toggleLoginTheme() {
+      var dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      try { localStorage.setItem('apmsTheme', dark ? 'dark' : 'light'); } catch(e) {}
+      _updateLoginThemeIcon(dark);
+    }
+    function _updateLoginThemeIcon(isDark) {
+      var ico = document.querySelector('#loginThemeBtn .material-symbols-outlined');
+      if (ico) ico.textContent = isDark ? 'light_mode' : 'dark_mode';
+      var btn = document.getElementById('loginThemeBtn');
+      if (btn) btn.style.color = isDark ? '#c9d1d9' : '#555';
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      _updateLoginThemeIcon(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+
     function togglePassword() {
       const input = document.getElementById('password');
       const btn = document.getElementById('eye-btn');

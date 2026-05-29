@@ -15,6 +15,8 @@
 
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/head/styles.css') }}" />
+  <script>try{if(localStorage.getItem('apmsTheme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
+  <script src="{{ url_for('static', filename='assets/js/theme.js') }}" defer></script>
 
   <style>
     
@@ -30,7 +32,7 @@
       height: 9px;
       background: #e5484d;
       border-radius: 50%;
-      border: 2px solid #fff;
+      border: 2px solid var(--color-background-primary);
       display: none;
     }
 
@@ -89,6 +91,9 @@
               <span class="material-symbols-outlined icon-inline">notifications</span>
               <div class="tb-notif-dot" id="headTopNotifDot"></div>
             </div>
+            <button class="tb-theme-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Switch to dark mode">
+              <span class="material-symbols-outlined icon-inline">dark_mode</span>
+            </button>
 
             <button class="btn btn-outline" onclick="openAnnModal()"
               style="font-size:12px; padding:5px 12px; display: flex; align-items: center; gap:5px;">

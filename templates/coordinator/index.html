@@ -11,14 +11,14 @@
   #pg-dashboard {
     display: block !important; min-height: auto !important;
     height: auto !important; padding: 0 0 80px !important;
-    margin: 0 !important; background: #f5f6f7;
+    margin: 0 !important; background: var(--color-background-secondary);
     font-family: 'Segoe UI', system-ui, sans-serif;
   }
 
   /* TOP STAT BAR */
   #pg-dashboard .top-stat-bar {
     display: grid; grid-template-columns: repeat(4, 1fr);
-    background: #fff; border-bottom: 1.5px solid #e8edea; margin-bottom: 20px;
+    background: var(--color-background-primary); border-bottom: 1.5px solid #e8edea; margin-bottom: 20px;
   }
   #pg-dashboard .top-stat-item {
     padding: 18px 28px 16px; border-right: 1.5px solid #e8edea;
@@ -28,10 +28,10 @@
     font-size: 30px; font-weight: 900; line-height: 1;
     margin-bottom: 5px; letter-spacing: -0.5px;
   }
-  #pg-dashboard .top-stat-num.green  { color: #2e7d42; }
-  #pg-dashboard .top-stat-num.teal   { color: #0f766e; }
+  #pg-dashboard .top-stat-num.green  { color: var(--accent); }
+  #pg-dashboard .top-stat-num.teal   { color: var(--teal); }
   #pg-dashboard .top-stat-num.orange { color: #c2410c; }
-  #pg-dashboard .top-stat-num.blue   { color: #1d4ed8; }
+  #pg-dashboard .top-stat-num.blue   { color: var(--blue); }
   #pg-dashboard .top-stat-num.loading { color: #d1d5db; font-size: 22px; }
   #pg-dashboard .top-stat-lbl { font-size: 12px; color: #6b7280; font-weight: 500; }
 
@@ -43,7 +43,7 @@
 
   /* PANELS */
   #pg-dashboard .panel {
-    background: #fff; border: 1px solid #e8edea;
+    background: var(--color-background-primary); border: 1px solid #e8edea;
     border-radius: 14px; overflow: hidden; margin-bottom: 16px;
   }
   #pg-dashboard .panel-hd {
@@ -51,13 +51,13 @@
     padding: 14px 18px; border-bottom: 1px solid #eef2ef;
   }
   #pg-dashboard .panel-hd-left { display: flex; align-items: center; gap: 8px; }
-  #pg-dashboard .panel-title { font-size: 14px; font-weight: 800; color: #1a3d25; }
+  #pg-dashboard .panel-title { font-size: 14px; font-weight: 800; color: var(--color-text-primary); }
   #pg-dashboard .panel-badge {
     font-size: 11px; font-weight: 700; color: #6b7280;
-    background: #f3f4f6; border-radius: 999px; padding: 2px 8px;
+    background: var(--color-background-tertiary); border-radius: 999px; padding: 2px 8px;
   }
   #pg-dashboard .panel-action {
-    font-size: 12.5px; color: #2e7d42; font-weight: 700;
+    font-size: 12.5px; color: var(--accent); font-weight: 700;
     cursor: pointer; background: none; border: none; padding: 0; text-decoration: none;
   }
   #pg-dashboard .panel-action:hover { text-decoration: underline; }
@@ -65,20 +65,24 @@
   /* QUICK ACTIONS */
   #pg-dashboard .qa-grid {
     display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 1px; background: #eef2ef;
+    gap: 1px; background: var(--color-background-tertiary);
   }
   #pg-dashboard .qa-card {
     display: flex; align-items: center; gap: 12px;
-    padding: 14px 16px; background: #fff;
+    padding: 14px 16px; background: var(--color-background-primary);
     cursor: pointer; transition: background 0.13s; text-decoration: none;
   }
-  #pg-dashboard .qa-card:hover { background: #f8fbf9; }
+  #pg-dashboard .qa-card:hover { background: var(--color-background-tertiary); }
   #pg-dashboard .qa-icon {
     width: 36px; height: 36px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
+    flex-shrink: 0;
   }
-  #pg-dashboard .qa-label { font-size: 13px; font-weight: 700; color: #1a3d25; }
+  #pg-dashboard .qa-icon .material-symbols-outlined {
+    font-size: 20px;
+    line-height: 1;
+  }
+  #pg-dashboard .qa-label { font-size: 13px; font-weight: 700; color: var(--color-text-primary); }
   #pg-dashboard .qa-sub   { font-size: 11px; color: #9ca3af; margin-top: 1px; }
 
   /* PROJECT ROWS */
@@ -88,10 +92,10 @@
     transition: background 0.12s; cursor: pointer;
   }
   #pg-dashboard .proj-row:last-child { border-bottom: none; }
-  #pg-dashboard .proj-row:hover { background: #f8fbf9; }
+  #pg-dashboard .proj-row:hover { background: var(--color-background-tertiary); }
   #pg-dashboard .proj-info { flex: 1; min-width: 0; }
   #pg-dashboard .proj-title {
-    font-size: 13.5px; font-weight: 700; color: #111827;
+    font-size: 13.5px; font-weight: 700; color: var(--color-text-primary);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
   }
   #pg-dashboard .proj-meta { font-size: 11.5px; color: #9ca3af; }
@@ -119,9 +123,9 @@
   #pg-dashboard .mini-stat-cell:nth-child(2n)  { border-right: none; }
   #pg-dashboard .mini-stat-cell:nth-child(n+3) { border-bottom: none; }
   #pg-dashboard .mini-stat-val {
-    font-size: 22px; font-weight: 900; color: #2e7d42; line-height: 1; margin-bottom: 4px;
+    font-size: 22px; font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 4px;
   }
-  #pg-dashboard .mini-stat-val.blue { color: #1d4ed8; }
+  #pg-dashboard .mini-stat-val.blue { color: var(--blue); }
   #pg-dashboard .mini-stat-val.red  { color: #b42318; }
   #pg-dashboard .mini-stat-lbl { font-size: 11.5px; color: #6b7280; font-weight: 500; }
 
@@ -132,9 +136,9 @@
   #pg-dashboard .progress-row {
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;
   }
-  #pg-dashboard .progress-lbl { font-size: 12.5px; color: #374151; font-weight: 600; }
+  #pg-dashboard .progress-lbl { font-size: 12.5px; color: var(--color-text-secondary); font-weight: 600; }
   #pg-dashboard .progress-pct { font-size: 12px; color: #6b7280; font-weight: 600; }
-  #pg-dashboard .progress-bg { background: #e8f0ea; border-radius: 999px; height: 6px; overflow: hidden; }
+  #pg-dashboard .progress-bg { background: var(--color-background-tertiary); border-radius: 999px; height: 6px; overflow: hidden; }
   #pg-dashboard .progress-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; }
 
   /* SEMESTER CONTROL */
@@ -144,8 +148,8 @@
   }
   #pg-dashboard .sem-row:last-child { margin-bottom: 0; }
   #pg-dashboard .sem-key { font-size: 12.5px; color: #6b7280; }
-  #pg-dashboard .sem-val { font-size: 12.5px; font-weight: 700; color: #1a3d25; }
-  #pg-dashboard .sem-val.open   { color: #2e7d42; }
+  #pg-dashboard .sem-val { font-size: 12.5px; font-weight: 700; color: var(--color-text-primary); }
+  #pg-dashboard .sem-val.open   { color: var(--accent); }
   #pg-dashboard .sem-val.closed { color: #9ca3af; }
   #pg-dashboard .sem-actions {
     display: flex; gap: 8px; padding: 12px 18px;
@@ -154,10 +158,10 @@
   #pg-dashboard .sem-btn {
     flex: 1; min-width: 90px; padding: 9px 12px; border-radius: 9px;
     font-size: 12.5px; font-weight: 700; cursor: pointer; transition: 0.14s ease;
-    border: 1px solid #d1e7d9; background: #f0f8f2; color: #1a5c2e; text-align: center;
+    border: 1px solid #d1e7d9; background: var(--green-light); color: var(--color-text-primary); text-align: center;
   }
-  #pg-dashboard .sem-btn:hover { background: #e2f0e6; }
-  #pg-dashboard .sem-btn.primary { background: #2e7d42; color: #fff; border-color: #2e7d42; }
+  #pg-dashboard .sem-btn:hover { background: var(--green-light); }
+  #pg-dashboard .sem-btn.primary { background: #2e7d42; color: #fff; border-color: var(--accent); }
   #pg-dashboard .sem-btn.primary:hover { background: #245c33; }
 
   /* NOTIFICATIONS */
@@ -167,16 +171,16 @@
     cursor: pointer; transition: background 0.12s;
   }
   #pg-dashboard .notif-item:last-child { border-bottom: none; }
-  #pg-dashboard .notif-item:hover { background: #f8fbf9; }
-  #pg-dashboard .notif-item.unread { background: #f7fbf8; }
+  #pg-dashboard .notif-item:hover { background: var(--color-background-tertiary); }
+  #pg-dashboard .notif-item.unread { background: var(--color-background-tertiary); }
   #pg-dashboard .notif-dot {
     width: 8px; height: 8px; border-radius: 50%;
     background: #2e7d42; flex-shrink: 0; margin-top: 5px;
   }
-  #pg-dashboard .notif-dot.read { background: #e5e7eb; }
+  #pg-dashboard .notif-dot.read { background: var(--color-border-tertiary); }
   #pg-dashboard .notif-body { flex: 1; min-width: 0; }
   #pg-dashboard .notif-title {
-    font-size: 13px; font-weight: 700; color: #111827;
+    font-size: 13px; font-weight: 700; color: var(--color-text-primary);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
   }
   #pg-dashboard .notif-meta { font-size: 11.5px; color: #9ca3af; }
@@ -247,27 +251,27 @@
       </div>
       <div class="qa-grid">
         <a class="qa-card" href="/coordinator/review">
-          <div class="qa-icon" style="background:#f0fdf4">📋</div>
+          <div class="qa-icon" style="background:var(--green-light);color:var(--green)"><span class="material-symbols-outlined">rate_review</span></div>
           <div><div class="qa-label">Project Review</div><div class="qa-sub">Review submissions</div></div>
         </a>
         <a class="qa-card" href="/coordinator/committee">
-          <div class="qa-icon" style="background:#f0f9ff">👨‍⚖️</div>
+          <div class="qa-icon" style="background:var(--blue-light);color:var(--blue)"><span class="material-symbols-outlined">gavel</span></div>
           <div><div class="qa-label">Committees</div><div class="qa-sub">Schedule & manage</div></div>
         </a>
         <a class="qa-card" href="/coordinator/registration">
-          <div class="qa-icon" style="background:#fdf4ff">📬</div>
+          <div class="qa-icon" style="background:var(--purple-light);color:var(--purple)"><span class="material-symbols-outlined">assignment_ind</span></div>
           <div><div class="qa-label">Distribution</div><div class="qa-sub">Student registration</div></div>
         </a>
         <a class="qa-card" href="/coordinator/hours">
-          <div class="qa-icon" style="background:#fff7ed">⏱️</div>
+          <div class="qa-icon" style="background:var(--amber-light);color:var(--amber)"><span class="material-symbols-outlined">schedule</span></div>
           <div><div class="qa-label">Faculty Hours</div><div class="qa-sub">Supervisor load</div></div>
         </a>
         <a class="qa-card" href="/coordinator/lectures">
-          <div class="qa-icon" style="background:#f8fafc">📚</div>
+          <div class="qa-icon" style="background:var(--color-background-tertiary);color:var(--color-text-secondary)"><span class="material-symbols-outlined">menu_book</span></div>
           <div><div class="qa-label">Lectures</div><div class="qa-sub">Deliverables & timeline</div></div>
         </a>
         <a class="qa-card" href="/coordinator/search">
-          <div class="qa-icon" style="background:#f0fdf4">🗃️</div>
+          <div class="qa-icon" style="background:var(--green-light);color:var(--green)"><span class="material-symbols-outlined">folder_open</span></div>
           <div><div class="qa-label">Archive Search</div><div class="qa-sub">Browse past projects</div></div>
         </a>
       </div>
@@ -405,11 +409,24 @@ function timeAgo(str) {
   return Math.floor(d/86400) + 'd ago';
 }
 
+function isDark() {
+  return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
 const STATUS_COLOR = {
   submitted:'#c58a17', under_review:'#0f766e', needs_revision:'#d97706',
   committee_evaluation:'#7c3aed', accepted:'#2e7d42', archived:'#6b7280',
   rejected:'#b42318', draft:'#9ca3af'
 };
+const STATUS_COLOR_DARK = {
+  submitted:'#fbbf24', under_review:'#2dd4bf', needs_revision:'#f59e0b',
+  committee_evaluation:'#a78bfa', accepted:'#4ade80', archived:'#8b949e',
+  rejected:'#f87171', draft:'#8b949e'
+};
+function statusColor(s) {
+  const m = isDark() ? STATUS_COLOR_DARK : STATUS_COLOR;
+  return m[s] || (isDark() ? '#8b949e' : '#9ca3af');
+}
 const STATUS_LABEL = {
   submitted:'Submitted', under_review:'Under Review', needs_revision:'Needs Revision',
   committee_evaluation:'In Evaluation', accepted:'Accepted',
@@ -417,7 +434,9 @@ const STATUS_LABEL = {
 };
 const TYPE_ORDER  = ['web','mobile','ai','software_engineering','security','databases','other'];
 const TYPE_LABELS = {web:'Web',mobile:'Mobile',ai:'AI',software_engineering:'Software Eng.',security:'Security',databases:'Databases',other:'Other'};
-const TYPE_COLORS = {web:'#2e7d42',mobile:'#0f766e',ai:'#7c3aed',software_engineering:'#1d4ed8',security:'#b42318',databases:'#c58a17',other:'#6b7280'};
+const TYPE_COLORS      = {web:'#2e7d42',mobile:'#0f766e',ai:'#7c3aed',software_engineering:'#1d4ed8',security:'#b42318',databases:'#c58a17',other:'#6b7280'};
+const TYPE_COLORS_DARK = {web:'#4ade80',mobile:'#2dd4bf',ai:'#a78bfa',software_engineering:'#60a5fa',security:'#f87171',databases:'#fbbf24',other:'#8b949e'};
+function typeColor(k) { return (isDark() ? TYPE_COLORS_DARK : TYPE_COLORS)[k] || '#8b949e'; }
 
 let _typeChart = null;
 
@@ -458,7 +477,10 @@ async function loadDashboard() {
       dashUnderEvaluation:s.under_evaluation, dashAccepted:s.accepted, dashRejected:s.rejected
     }).forEach(([id,val])=>{ const e=document.getElementById(id); if(e) e.textContent=String(val??0); });
 
-    renderProjects(d.latest_projects || []);
+    window._lastProjects = d.latest_projects || [];
+    window._lastAbt = abt;
+    window._lastDashStats = s;
+    renderProjects(window._lastProjects);
     renderTypeChart(abt);
     renderWorkflow(s);
   } catch(e) {
@@ -481,7 +503,7 @@ function renderProjects(list) {
     return;
   }
   el.innerHTML = list.map(p => {
-    const color = STATUS_COLOR[p.status] || '#9ca3af';
+    const color = statusColor(p.status);
     const label = STATUS_LABEL[p.status] || p.status;
     const meta  = [p.supervisor_name, p.team_members].filter(Boolean).join(' · ');
     return `<div class="proj-row" onclick="window.location.href='/coordinator/review'">
@@ -511,8 +533,8 @@ function renderTypeChart(abt) {
       labels: display.map(k => TYPE_LABELS[k]),
       datasets: [{
         data: display.map(k => abt[k]||0),
-        backgroundColor: display.map(k => TYPE_COLORS[k]+'cc'),
-        borderColor:     display.map(k => TYPE_COLORS[k]),
+        backgroundColor: display.map(k => typeColor(k)+'cc'),
+        borderColor:     display.map(k => typeColor(k)),
         borderWidth: 1.5, borderRadius: 6, borderSkipped: false
       }]
     },
@@ -526,8 +548,8 @@ function renderTypeChart(abt) {
         }}}
       },
       scales: {
-        x: { beginAtZero:true, ticks:{precision:0,font:{size:11}}, grid:{color:'#f0f4f1'} },
-        y: { ticks:{font:{size:12,weight:'600'},color:'#374151'}, grid:{display:false} }
+        x: { beginAtZero:true, ticks:{precision:0,font:{size:11}}, grid:{color: isDark() ? '#30363d' : '#f0f4f1'} },
+        y: { ticks:{font:{size:12,weight:'600'},color: isDark() ? '#8b949e' : '#374151'}, grid:{display:false} }
       }
     }
   });
@@ -538,10 +560,11 @@ function renderWorkflow(s) {
   const el = document.getElementById('workflowBars');
   if (!el) return;
   const total = Math.max(s.total_projects||1, 1);
+  const dark = isDark();
   const items = [
-    { label:'Awaiting review',     val:s.awaiting_review ||0, color:'#c58a17' },
-    { label:'Under evaluation',    val:s.under_evaluation||0, color:'#7c3aed' },
-    { label:'Accepted / Archived', val:s.accepted        ||0, color:'#2e7d42' },
+    { label:'Awaiting review',     val:s.awaiting_review ||0, color: dark ? '#fbbf24' : '#c58a17' },
+    { label:'Under evaluation',    val:s.under_evaluation||0, color: dark ? '#a78bfa' : '#7c3aed' },
+    { label:'Accepted / Archived', val:s.accepted        ||0, color: dark ? '#4ade80' : '#2e7d42' },
   ];
   el.innerHTML = items.map(item => {
     const pct = Math.round((item.val/total)*100);
@@ -601,5 +624,18 @@ document.addEventListener('DOMContentLoaded', () => {
   loadNotifications();
   window.scrollTo(0, 0);
 });
+
+/* Re-render chart and workflow bars when user toggles the theme */
+new MutationObserver(() => {
+  if (window._lastDashStats) {
+    renderWorkflow(window._lastDashStats);
+  }
+  if (window._lastAbt && _typeChart) {
+    renderTypeChart(window._lastAbt);
+  }
+  if (window._lastProjects) {
+    renderProjects(window._lastProjects);
+  }
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 </script>
 {% endblock %}

@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/coordinator/content.css') }}?v=20260525-sidebar" />
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/coordinator/overrides.css') }}?v=20260525-sidebar" />
+  <script>try{if(localStorage.getItem('apmsTheme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
+  <script src="{{ url_for('static', filename='assets/js/theme.js') }}" defer></script>
 </head>
 
 <body data-page="{% block page_id %}dashboard{% endblock %}">
@@ -36,6 +38,9 @@
               <span class="material-symbols-outlined icon-inline">notifications</span>
               <div class="tb-notif-dot"></div>
             </div>
+            <button class="tb-theme-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Switch to dark mode">
+              <span class="material-symbols-outlined icon-inline">dark_mode</span>
+            </button>
             <div class="tb-logo">APMS</div>
           </div>
         </div>

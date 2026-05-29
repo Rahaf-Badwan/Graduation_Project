@@ -5,8 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Activate Account — APMS</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <script>try{if(localStorage.getItem('apmsTheme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
   <link rel="stylesheet" href="{{ url_for('static', filename='login_style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <style>
+    html[data-theme="dark"] .card {
+      background: #161b22 !important;
+      box-shadow: 0 2px 24px rgba(0,0,0,0.5) !important;
+    }
+    html[data-theme="dark"] .card > div:first-child {
+      background: #1c2128 !important;
+      border-bottom-color: #30363d !important;
+    }
+    html[data-theme="dark"] #pill-2 { background: #30363d !important; }
+    html[data-theme="dark"] input {
+      background: #1e2128 !important;
+      border-color: #30363d !important;
+      color: #e2e8f0 !important;
+    }
+    html[data-theme="dark"] #fullName,
+    html[data-theme="dark"] #universityId,
+    html[data-theme="dark"] #email,
+    html[data-theme="dark"] #password,
+    html[data-theme="dark"] #confirmPassword {
+      background: #1e2128 !important;
+      border-color: #30363d !important;
+      color: #e2e8f0 !important;
+    }
+    html[data-theme="dark"] [style*="color:#6b7280"] { color: #8b949e !important; }
+    html[data-theme="dark"] [style*="color: #6b7280"] { color: #8b949e !important; }
+    html[data-theme="dark"] [style*="border:0.5px solid #e5e7eb"]:not(input) {
+      border-color: #30363d !important;
+      color: #4ade80 !important;
+    }
+    html[data-theme="dark"] [style*="color:#065f46"] { color: #4ade80 !important; }
+    html[data-theme="dark"] [style*="background:#e5e7eb"] { background: #30363d !important; }
+    html[data-theme="dark"] #activate-theme-btn { background: #161b22 !important; border-color: #30363d !important; color: #c9d1d9 !important; }
+    html[data-theme="dark"] #activate-theme-btn:hover { background: #21262d !important; }
+  </style>
 </head>
 <body>
 
@@ -17,7 +53,7 @@
       
       <!-- card-hd -->
       <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:0.5px solid #e5e7eb;">
-        <span style="font-size:14px; font-weight:600; color:#2d6a38;" id="card-title">Activate Account</span>
+        <span style="font-size:14px; font-weight:600; color:var(--green);" id="card-title">Activate Account</span>
         <div style="display:flex; gap:6px;">
           <div style="height:4px; width:32px; border-radius:99px; background:#2d6a38; transition:background 0.3s;" id="pill-1"></div>
           <div style="height:4px; width:32px; border-radius:99px; background:#e5e7eb; transition:background 0.3s;" id="pill-2"></div>
@@ -75,7 +111,7 @@
               Activate Account ↗
             </button>
             <button onclick="resetToStep1()" style="
-              flex:1; padding:9px; background:transparent; color:#2d6a38;
+              flex:1; padding:9px; background:transparent; color:var(--green);
               border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
               Back
             </button>
@@ -86,14 +122,14 @@
         <!--  Not Found -->
         <div id="phase-not-found" style="display:none; text-align:center; padding:12px 0 4px;">
           <div style="font-size:36px; margin-bottom:10px;"><span class="material-symbols-outlined" style="font-size:36px; color:#f59e0b; margin-bottom:10px; display:block;">warning</span></div>
-          <div style="font-size:14px; font-weight:600; color:#2d6a38; margin-bottom:6px;">Account Not Found</div>
+          <div style="font-size:14px; font-weight:600; color:var(--green); margin-bottom:6px;">Account Not Found</div>
           <div style="font-size:13px; color:#6b7280; line-height:1.6;">
             Your details don't match any registered student.<br>
             Please contact your <strong>Head of Department</strong> to register your account first.
           </div>
           <div style="margin-top:20px;">
             <button onclick="resetToStep1()" style="
-              width:100%; padding:9px; background:transparent; color:#2d6a38;
+              width:100%; padding:9px; background:transparent; color:var(--green);
               border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
               Try Again
             </button>
@@ -107,7 +143,7 @@
           <div style="font-size:13px; color:#6b7280; line-height:1.6;">
             Your account is now active. You can log in using your university ID and the password you just set.
           </div>
-          <a href="/login" style="display:inline-block; margin-top:16px; font-size:13px; font-weight:500; color:#2d6a38; text-decoration:none;">
+          <a href="/login" style="display:inline-block; margin-top:16px; font-size:13px; font-weight:500; color:var(--green); text-decoration:none;">
             Go to Login →
           </a>
         </div>
@@ -117,7 +153,37 @@
   </div>
 </div>
 
+<button id="activate-theme-btn" onclick="toggleLoginTheme()" title="Toggle dark / light mode" style="
+  position:fixed; top:14px; right:14px; z-index:999;
+  background:#fff; border:1px solid #e0e0e0; border-radius:8px;
+  padding:6px 8px; cursor:pointer; line-height:1; color:#555;
+  display:flex; align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1); transition:background 0.15s;">
+  <span class="material-symbols-outlined" style="font-size:18px;line-height:1">dark_mode</span>
+</button>
+
 <script src="/static/assets/js/activate_student.js"></script>
+<script>
+  function toggleLoginTheme() {
+    var dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    try { localStorage.setItem('apmsTheme', dark ? 'dark' : 'light'); } catch(e) {}
+    _updateActivateThemeIcon(dark);
+  }
+  function _updateActivateThemeIcon(isDark) {
+    var ico = document.querySelector('#activate-theme-btn .material-symbols-outlined');
+    if (ico) ico.textContent = isDark ? 'light_mode' : 'dark_mode';
+    var btn = document.getElementById('activate-theme-btn');
+    if (btn) {
+      btn.style.color    = isDark ? '#c9d1d9' : '#555';
+      btn.style.background  = isDark ? '#1e2128' : '#fff';
+      btn.style.borderColor = isDark ? '#30363d' : '#e0e0e0';
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    _updateActivateThemeIcon(document.documentElement.getAttribute('data-theme') === 'dark');
+  });
+</script>
 </body>
 
 </html>

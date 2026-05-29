@@ -46,3 +46,119 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ══════════════════════════════════════════
+   COORDINATOR DARK MODE
+   ══════════════════════════════════════════ */
+
+/* ── Sidebar shell ── */
+html[data-theme="dark"] .sidebar {
+  background: var(--color-background-primary);
+  border-right-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] .sb-profile {
+  border-bottom-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] .sb-profile:hover { background: var(--color-background-tertiary); }
+html[data-theme="dark"] .sb-avatar {
+  background: var(--accent-light);
+  color: #6ec97e;
+}
+html[data-theme="dark"] .sb-name { color: var(--color-text-primary); }
+html[data-theme="dark"] .sb-role {
+  background: var(--accent-light);
+  color: #6ec97e;
+}
+html[data-theme="dark"] .sb-item          { color: #c9d1d9 !important; }
+html[data-theme="dark"] .sb-item:hover    { background: var(--color-background-tertiary); color: #e2e8f0 !important; }
+html[data-theme="dark"] .sb-item.on       { background: var(--accent-light); color: #6ec97e !important; border-left-color: var(--green); }
+html[data-theme="dark"] .sb-toggle        { color: #c9d1d9 !important; }
+html[data-theme="dark"] .sb-footer        { border-top-color: var(--color-border-tertiary); }
+html[data-theme="dark"] .sb-footer-item   { color: #c9d1d9 !important; }
+html[data-theme="dark"] .sb-footer-item:hover { color: #e2e8f0 !important; }
+
+/* ── Topbar ── */
+html[data-theme="dark"] .topbar {
+  background: var(--color-background-primary);
+  border-bottom-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] .tb-notif { color: var(--color-text-secondary); }
+
+/* ── Content area ── */
+html[data-theme="dark"] .content-area {
+  background: var(--color-background-secondary);
+}
+
+/* ── Dashboard panels ── */
+html[data-theme="dark"] #pg-dashboard .panel {
+  background: var(--color-background-primary);
+  border-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] #pg-dashboard .panel-hd {
+  border-bottom-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] #pg-dashboard .panel-badge {
+  background: var(--color-background-tertiary);
+  color: var(--color-text-secondary);
+}
+html[data-theme="dark"] #pg-dashboard .top-stat-bar {
+  background: var(--color-background-primary);
+  border-bottom-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] #pg-dashboard .top-stat-item {
+  border-right-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] #pg-dashboard .top-stat-lbl { color: var(--color-text-secondary); }
+
+/* ── Semester control ── */
+html[data-theme="dark"] #pg-dashboard .sem-btn {
+  background: var(--color-background-tertiary);
+  border-color: var(--color-border-tertiary);
+  color: var(--color-text-primary);
+}
+html[data-theme="dark"] #pg-dashboard .sem-btn.primary {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+html[data-theme="dark"] #pg-dashboard .sem-btn.primary:hover { background: var(--accent-hover); }
+html[data-theme="dark"] #pg-dashboard .sem-actions {
+  border-top-color: var(--color-border-tertiary);
+}
+
+/* ── Progress bars ── */
+html[data-theme="dark"] #pg-dashboard .progress-list {
+  border-top-color: var(--color-border-tertiary);
+}
+
+/* ── Project rows ── */
+html[data-theme="dark"] #pg-dashboard .proj-row {
+  border-bottom-color: var(--color-border-tertiary);
+}
+
+/* ── Notifications ── */
+html[data-theme="dark"] #pg-dashboard .notif-item {
+  border-bottom-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] #pg-dashboard .notif-dot { background: var(--green); }
+html[data-theme="dark"] #pg-dashboard .notif-unread-badge { background: var(--green); }
+html[data-theme="dark"] #pg-dashboard .notif-meta { color: var(--color-text-secondary); }
+
+/* ── Mini stat grid ── */
+html[data-theme="dark"] #pg-dashboard .mini-stat-cell {
+  border-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] #pg-dashboard .mini-stat-lbl { color: var(--color-text-secondary); }
+
+/* ── Quick action cards ── */
+html[data-theme="dark"] #pg-dashboard .qa-card:hover {
+  background: var(--color-background-tertiary);
+}
+html[data-theme="dark"] #pg-dashboard .qa-sub { color: var(--color-text-secondary); }
+
+/* ── Card border color inherited from global but needs coordinator-specific fix ── */
+html[data-theme="dark"] .card {
+  background: var(--color-background-primary);
+  border-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] .tab-bar { border-bottom-color: var(--color-border-tertiary); }

@@ -32,8 +32,8 @@
 
     #pg-exams .exam-tab {
       border: 1px solid #d7e3dc;
-      background: #fff;
-      color: #2d5137;
+      background: var(--color-background-primary);
+      color: var(--color-text-primary);
       border-radius: 999px;
       padding: 9px 14px;
       font-weight: 800;
@@ -42,12 +42,12 @@
     }
 
     #pg-exams .exam-tab:hover {
-      background: #f3f7f4;
+      background: var(--color-background-tertiary);
     }
 
     #pg-exams .exam-tab.on {
       background: #2e7d42;
-      border-color: #2e7d42;
+      border-color: var(--accent);
       color: #fff;
       box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
     }
@@ -68,10 +68,10 @@
 
     #pg-exams .exam-info-box {
       border-left: 5px solid #2e7d42;
-      background: #f7fbf8;
+      background: var(--color-background-tertiary);
       border-radius: 14px;
       padding: 13px 14px;
-      color: #344054;
+      color: var(--color-text-primary);
       line-height: 1.55;
       font-size: 13px;
       margin-bottom: 14px;
@@ -93,7 +93,7 @@
     #pg-exams .exam-field label {
       font-size: 12px;
       font-weight: 800;
-      color: #344054;
+      color: var(--color-text-primary);
     }
 
     #pg-exams .exam-input,
@@ -103,13 +103,13 @@
       border-radius: 12px;
       padding: 10px 12px;
       font-size: 14px;
-      background: #fff;
+      background: var(--color-background-primary);
       outline: none;
     }
 
     #pg-exams .exam-input:focus,
     #pg-exams .exam-textarea:focus {
-      border-color: #2e7d42;
+      border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
     }
 
@@ -123,7 +123,7 @@
       padding: 10px 12px;
       border: 1px solid #d8e2dc;
       border-radius: 12px;
-      background: #fbfdfb;
+      background: var(--color-background-tertiary);
       font-size: 12px;
       color: #667085;
       min-height: 42px;
@@ -135,18 +135,18 @@
       overflow: auto;
       border: 1px solid #d8e2dc;
       border-radius: 14px;
-      background: #fff;
+      background: var(--color-background-primary);
     }
 
     #pg-exams .timeline-table {
       width: 100%;
       border-collapse: collapse;
       min-width: 980px;
-      background: #fff;
+      background: var(--color-background-primary);
     }
 
     #pg-exams .timeline-table thead tr {
-      background: #f7fbf8;
+      background: var(--color-background-tertiary);
       font-size: 12px;
       color: #667085;
       text-align: left;
@@ -163,12 +163,12 @@
       padding: 8px;
       border: 1px solid #d8e2dc;
       border-radius: 8px;
-      background: #fff;
+      background: var(--color-background-primary);
       outline: none;
     }
 
     #pg-exams .timeline-small-input:focus {
-      border-color: #2e7d42;
+      border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.10);
     }
 
@@ -178,7 +178,7 @@
 
     #pg-exams .grad-final-box {
       border: 1px solid #e7eee9;
-      background: #fbfdfb;
+      background: var(--color-background-tertiary);
       border-radius: 16px;
       padding: 14px;
       margin-top: 14px;
@@ -202,15 +202,15 @@
 
     #pg-exams .exam-msg.ok {
       display: block;
-      color: #027a48;
-      background: #ecfdf3;
+      color: var(--green);
+      background: var(--green-light);
       border: 1px solid #abefc6;
     }
 
     #pg-exams .exam-msg.error {
       display: block;
       color: #b42318;
-      background: #fef3f2;
+      background: var(--coral-light);
       border: 1px solid #fecdca;
     }
 
@@ -229,14 +229,14 @@
       border: 1px solid #d8e2dc;
       border-radius: 12px;
       padding: 9px 11px;
-      background: #fff;
+      background: var(--color-background-primary);
       outline: none;
       font-size: 13px;
     }
 
     #pg-exams .submission-toolbar input:focus,
     #pg-exams .submission-toolbar select:focus {
-      border-color: #2e7d42;
+      border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.10);
     }
 
@@ -249,7 +249,7 @@
 
     #pg-exams .submission-stat {
       border: 1px solid #e7eee9;
-      background: #fbfdfb;
+      background: var(--color-background-tertiary);
       border-radius: 14px;
       padding: 12px;
     }
@@ -257,7 +257,7 @@
     #pg-exams .submission-stat b {
       display: block;
       font-size: 22px;
-      color: #243b2c;
+      color: var(--color-text-primary);
       line-height: 1;
     }
 
@@ -276,7 +276,7 @@
 
     #pg-exams .submission-card {
       border: 1px solid #e7eee9;
-      background: #fff;
+      background: var(--color-background-primary);
       border-radius: 16px;
       padding: 13px;
       display: grid;
@@ -287,7 +287,7 @@
 
     #pg-exams .submission-title {
       font-weight: 900;
-      color: #243b2c;
+      color: var(--color-text-primary);
       margin-bottom: 5px;
     }
 
@@ -303,8 +303,8 @@
       padding: 4px 10px;
       font-size: 11px;
       font-weight: 900;
-      background: #eef7f0;
-      color: #2e7d42;
+      background: var(--green-light);
+      color: var(--accent);
       margin-bottom: 5px;
     }
 
@@ -313,7 +313,7 @@
       border: 1px dashed #d7e3dc;
       border-radius: 14px;
       color: #667085;
-      background: #fbfdfb;
+      background: var(--color-background-tertiary);
       line-height: 1.5;
     }
 

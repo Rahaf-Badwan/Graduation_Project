@@ -21,6 +21,8 @@ body {
   --blue-light: #E6F1FB;
   --amber: #BA7517;
   --amber-light: #FAEEDA;
+  --purple: #7c3aed;
+  --purple-light: #ede9fe;
   --coral: #993C1D;
   --coral-light: #FAECE7;
   --r: 10px;
@@ -1228,3 +1230,561 @@ input[type="number"]{
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* ===== THEME TOGGLE BUTTON ===== */
+.tb-theme-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: none;
+  border: 1px solid var(--color-border-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background .15s, color .15s;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.tb-theme-btn:hover {
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+}
+.tb-theme-btn .icon-inline {
+  font-size: 18px;
+}
+
+/* ===== DARK MODE =====
+   html[data-theme="dark"] specificity = (0,1,1) beats :root (0,1,0)
+   so these vars override any :root definitions in role-specific CSS. */
+html[data-theme="dark"] {
+  --color-background-primary: #1e2128;
+  --color-background-secondary: #141720;
+  --color-background-tertiary: #252a35;
+  --color-text-primary:   #e2e4e9;
+  --color-text-secondary: #8b949e;
+  --color-border-tertiary: #30363d;
+  --color-border-secondary: #2d3340;
+  /* Green accent (shared + coordinator) */
+  --green:        #2a9955;
+  --green-light:  #1a2d24;
+  --green-mid:    #2ea55c;
+  /* Supervisor green tokens */
+  --sup:      #2a9955;
+  --sup-light:#1a2d24;
+  --sup-mid:  #2a9955;
+  --sup-dark: #238044;
+  /* Coordinator accent tokens */
+  --accent:       #2a9955;
+  --accent-light: #1a2d24;
+  --accent-mid:   #2ea55c;
+  --accent-hover: #238044;
+  /* Blues */
+  --blue:         #60a5fa;
+  --blue-light:   #152236;
+  /* Ambers */
+  --amber:        #fbbf24;
+  --amber-light:  #2d2318;
+  /* Corals */
+  --coral:        #f87171;
+  --coral-light:  #2d1a14;
+  /* Purples */
+  --purple:       #a78bfa;
+  --purple-light: #1e1d3a;
+  /* Teal */
+  --teal:         #2dd4bf;
+  --teal-light:   #0d2520;
+}
+
+html[data-theme="dark"] body {
+  background: #141720;
+  color: var(--color-text-primary);
+}
+
+/* Fix hardcoded dark green text on green-light backgrounds */
+html[data-theme="dark"] .p-accepted,
+html[data-theme="dark"] .p-ontrack {
+  color: #6ec97e;
+}
+
+/* Fix hardcoded score chip colors */
+html[data-theme="dark"] .sc-a {
+  background: #1c2d14;
+  color: #7ec850;
+}
+
+/* Fix challenge solution box */
+html[data-theme="dark"] .ch-sol {
+  background: var(--green-light);
+  color: #7ec850;
+}
+
+/* Fix announcement modal hardcoded whites */
+html[data-theme="dark"] .ann-modal {
+  background: var(--color-background-primary);
+}
+html[data-theme="dark"] .ann-link-box {
+  background: var(--color-background-tertiary);
+}
+html[data-theme="dark"] .ann-close-btn:hover {
+  background: var(--color-background-tertiary);
+}
+
+/* Fix head/supervisor doctor card hardcoded light colors */
+html[data-theme="dark"] .doctor-card {
+  background: var(--color-background-secondary);
+}
+html[data-theme="dark"] .doctor-card:hover {
+  background: var(--color-background-tertiary);
+}
+html[data-theme="dark"] .avatar {
+  background: var(--green-light);
+  color: #6ec97e;
+}
+html[data-theme="dark"] .badge {
+  background: #2d1a14;
+  color: #f08080;
+}
+
+/* Fix select elements with hardcoded borders */
+html[data-theme="dark"] select {
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-tertiary);
+}
+
+/* Fix notif dot border (some base templates hardcode #fff) */
+html[data-theme="dark"] .tb-notif-dot {
+  border-color: var(--color-background-primary);
+}
+
+/* ── Archive search & shared page elements ── */
+html[data-theme="dark"] .ap-item:hover {
+  background: var(--color-background-tertiary);
+  border-color: var(--green);
+}
+
+/* Project type icon badges */
+html[data-theme="dark"] .ap-icon.web      { background: #152236; color: #60a5fa; }
+html[data-theme="dark"] .ap-icon.ai       { background: #1e1d3a; color: #a78bfa; }
+html[data-theme="dark"] .ap-icon.mobile   { background: var(--green-light); color: #6ec97e; }
+html[data-theme="dark"] .ap-icon.security { background: #2d1a14; color: #f08080; }
+html[data-theme="dark"] .ap-icon.other    { background: var(--color-background-tertiary); color: #9ca3af; }
+
+/* Score chip color overrides */
+html[data-theme="dark"] .sc-b { background: var(--amber-light); color: #fbbf24; }
+html[data-theme="dark"] .sc-c { background: #2d1a14; color: #f08080; }
+
+/* View modal title hardcoded dark green */
+html[data-theme="dark"] .vm-title { color: var(--color-text-primary); }
+
+/* ── Coordinator dashboard ── */
+html[data-theme="dark"] #pg-dashboard .panel-title,
+html[data-theme="dark"] #pg-dashboard .qa-label,
+html[data-theme="dark"] #pg-dashboard .sem-val,
+html[data-theme="dark"] #pg-dashboard .proj-title { color: var(--color-text-primary); }
+
+html[data-theme="dark"] #pg-dashboard .progress-bg { background: var(--color-background-tertiary); }
+html[data-theme="dark"] #pg-dashboard .notif-item.unread { background: var(--color-background-tertiary); }
+html[data-theme="dark"] #pg-dashboard .sem-btn {
+  background: var(--color-background-tertiary);
+  border-color: var(--color-border-tertiary);
+  color: var(--color-text-primary);
+}
+html[data-theme="dark"] #pg-dashboard .sem-btn:hover { background: var(--color-background-primary); }
+html[data-theme="dark"] #pg-dashboard .sem-btn.primary {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+html[data-theme="dark"] #pg-dashboard .eef-divider { background: var(--color-border-tertiary); }
+
+/* ── Notification pages (all roles) ── */
+html[data-theme="dark"] .notif-item { border-color: var(--color-border-tertiary); }
+html[data-theme="dark"] .notif-item.unread { background: var(--color-background-tertiary); }
+html[data-theme="dark"] .notif-title { color: var(--color-text-primary); }
+
+/* ── Review / evaluation modals ── */
+html[data-theme="dark"] .rev-modal,
+html[data-theme="dark"] .eval-modal,
+html[data-theme="dark"] .modal-box,
+html[data-theme="dark"] .dl-modal { background: var(--color-background-primary); }
+
+/* ── Login / auth pages ── */
+html[data-theme="dark"] .login-box,
+html[data-theme="dark"] .auth-card { background: var(--color-background-primary); }
+
+/* ── Timeline items ── */
+html[data-theme="dark"] .tl-item,
+html[data-theme="dark"] .tl-card { background: var(--color-background-primary); }
+
+/* ── Profile page ── */
+html[data-theme="dark"] .profile-card,
+html[data-theme="dark"] .prof-section { background: var(--color-background-primary); }
+
+/* ── Sections / registration ── */
+html[data-theme="dark"] .section-row,
+html[data-theme="dark"] .sec-row,
+html[data-theme="dark"] .reg-row { background: var(--color-background-primary); }
+
+/* ── Hours / lectures ── */
+html[data-theme="dark"] .hour-row,
+html[data-theme="dark"] .lec-row,
+html[data-theme="dark"] .lec-item { background: var(--color-background-primary); }
+
+/* ── Supervisor grades ── */
+html[data-theme="dark"] .grade-row,
+html[data-theme="dark"] .grade-card { background: var(--color-background-primary); }
+
+/* ── Amber/warning highlights ── */
+html[data-theme="dark"] [class*="warn"],
+html[data-theme="dark"] [class*="pending"] { color: #fbbf24; }
+
+/* ── Border overrides for hardcoded light borders ── */
+html[data-theme="dark"] .ap-item { border-color: var(--color-border-tertiary); }
+html[data-theme="dark"] .ap-item { border-left-color: var(--green); }
+
+/* ── Quick-action icon boxes: backgrounds use CSS vars so they auto-adapt ── */
+/* No filter needed — var(--green-light/blue-light/etc.) already resolve to dark values */
+
+/* ── Notification dot states ── */
+html[data-theme="dark"] .notif-dot.read { background: var(--color-border-tertiary); }
+
+/* ── Hardcoded dark text that becomes invisible on dark backgrounds ── */
+html[data-theme="dark"] .panel-title,
+html[data-theme="dark"] .qa-label,
+html[data-theme="dark"] .vm-title,
+html[data-theme="dark"] .proj-title { color: var(--color-text-primary); }
+
+html[data-theme="dark"] .top-stat-lbl,
+html[data-theme="dark"] .qa-sub,
+html[data-theme="dark"] .proj-meta,
+html[data-theme="dark"] .sem-key,
+html[data-theme="dark"] .notif-meta { color: var(--color-text-secondary); }
+
+/* ── Supervisor evaluation cards ── */
+html[data-theme="dark"] .eval-card,
+html[data-theme="dark"] .sup-eval-card { background: var(--color-background-primary); }
+
+/* ── Committee page elements ── */
+html[data-theme="dark"] .comm-row,
+html[data-theme="dark"] .comm-card,
+html[data-theme="dark"] .member-row { background: var(--color-background-primary); }
+
+/* ── Exam / exams page ── */
+html[data-theme="dark"] .exam-row,
+html[data-theme="dark"] .exam-card { background: var(--color-background-primary); }
+
+/* ── Hardcoded light gray pill/chip backgrounds ── */
+html[data-theme="dark"] .status-chip,
+html[data-theme="dark"] .type-chip,
+html[data-theme="dark"] .role-chip { background: var(--color-background-tertiary); }
+
+/* ══════════════════════════════════════════════════
+   DARK MODE — TEXT COLOR OVERRIDES
+   All hardcoded dark text that becomes invisible on dark backgrounds
+   ══════════════════════════════════════════════════ */
+
+/* Status text: .p-accepted dark teal on dark green bg */
+html[data-theme="dark"] .p-accepted { color: #6ec97e; }
+html[data-theme="dark"] .p-ontrack  { color: #6ec97e; }
+
+/* Challenge solution box dark teal text */
+html[data-theme="dark"] .ch-sol { color: #6ec97e; }
+
+/* Toasts in head/coordinator with dark text on colored bg */
+html[data-theme="dark"] .toast-success { background: #1a2d24; color: #6ec97e; }
+html[data-theme="dark"] .toast-error   { background: #2d1a14; color: #f87171; }
+html[data-theme="dark"] .toast-warning { background: var(--amber-light); color: #fbbf24; }
+
+/* Role badge coordinator dark green text */
+html[data-theme="dark"] .role-badge--coord { background: var(--green-light); color: #6ec97e; }
+
+/* ── Global: any remaining hardcoded border-color with near-black ── */
+html[data-theme="dark"] [style*="border-left-color: #111827"],
+html[data-theme="dark"] [style*="border-color: #111827"] {
+  border-color: var(--color-border-tertiary) !important;
+}
+
+/* ── Coordinator dashboard — stat number colors ── */
+html[data-theme="dark"] #pg-dashboard .top-stat-num.teal   { color: var(--teal); }
+html[data-theme="dark"] #pg-dashboard .top-stat-num.blue   { color: var(--blue); }
+html[data-theme="dark"] #pg-dashboard .top-stat-num.orange { color: #fb923c; }
+html[data-theme="dark"] #pg-dashboard .top-stat-num.red    { color: var(--coral); }
+html[data-theme="dark"] #pg-dashboard .mini-stat-val        { color: var(--green); }
+html[data-theme="dark"] #pg-dashboard .mini-stat-val.blue   { color: var(--blue); }
+html[data-theme="dark"] #pg-dashboard .mini-stat-val.red    { color: var(--coral); }
+
+/* ── Coordinator dashboard — misc dark text ── */
+html[data-theme="dark"] #pg-dashboard .qa-sub  { color: var(--color-text-secondary); }
+html[data-theme="dark"] #pg-dashboard .proj-meta { color: var(--color-text-secondary); }
+html[data-theme="dark"] #pg-dashboard .notif-meta { color: var(--color-text-secondary); }
+html[data-theme="dark"] #pg-dashboard .sem-key  { color: var(--color-text-secondary); }
+html[data-theme="dark"] #pg-dashboard .sem-val.open   { color: var(--green); }
+html[data-theme="dark"] #pg-dashboard .sem-val.closed { color: var(--color-text-secondary); }
+
+/* ── Border colors that used near-black ── */
+html[data-theme="dark"] .sn-system-notice { border-left-color: var(--color-text-secondary) !important; }
+
+/* ── Notification page tab indicators ── */
+html[data-theme="dark"] .main-notif-tab.active { color: var(--green); border-color: var(--green); }
+
+/* ── Any text inside colored light-bg boxes that stays dark ── */
+html[data-theme="dark"] .ann-modal *:not(button):not(input):not(textarea) {
+  color: var(--color-text-primary);
+}
+
+/* ── input / textarea / field elements ── */
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .field-input,
+html[data-theme="dark"] .field-textarea,
+html[data-theme="dark"] .exam-input,
+html[data-theme="dark"] .exam-textarea {
+  background: var(--color-background-secondary) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--color-border-tertiary) !important;
+}
+
+/* Date / time / datetime-local — color-scheme:dark makes the browser
+   render its native picker chrome (separators, icon, calendar) in dark colors */
+html[data-theme="dark"] input[type="date"],
+html[data-theme="dark"] input[type="time"],
+html[data-theme="dark"] input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: var(--color-text-secondary) !important; }
+
+/* ── Coordinator sidebar / topbar dark text overrides ── */
+html[data-theme="dark"] .sid { color: var(--color-text-primary) !important; }
+
+/* ── Field labels and sub-labels ── */
+html[data-theme="dark"] .tb-sub,
+html[data-theme="dark"] .sb-id,
+html[data-theme="dark"] .stat-label,
+html[data-theme="dark"] .field-label { color: var(--color-text-secondary); }
+
+/* ── Sidebar items — brighter text in dark mode ── */
+html[data-theme="dark"] .sb-item          { color: #c9d1d9 !important; }
+html[data-theme="dark"] .sb-item:hover    { color: #e2e8f0 !important; background: var(--color-background-tertiary); }
+html[data-theme="dark"] .sb-item.on       { background: var(--green-light); color: #6ec97e !important; border-left-color: var(--green); }
+html[data-theme="dark"] .sb-footer-item   { color: #c9d1d9 !important; }
+html[data-theme="dark"] .sb-footer-item:hover { color: #e2e8f0 !important; }
+html[data-theme="dark"] .sb-toggle        { color: #c9d1d9 !important; }
+
+/* ── Coordinator sidebar tooltip arrow ── */
+html[data-theme="dark"] body.sidebar-collapsed .sb-item::before {
+  border-right-color: var(--color-background-tertiary);
+}
+html[data-theme="dark"] body.sidebar-collapsed .sb-item::after {
+  background: var(--color-background-tertiary);
+  color: var(--color-text-primary);
+}
+
+/* ── Coordinator score chip in coordinator/styles.css ── */
+html[data-theme="dark"] .sc-a { background: #1c2d14; color: #7ec850; }
+
+/* ── Status label text colors on colored backgrounds ── */
+html[data-theme="dark"] [class*="status-"] { color: var(--color-text-primary); }
+
+/* ── Medium gray labels that become muddy on dark bg ── */
+html[data-theme="dark"] .label,
+html[data-theme="dark"] .sub-label,
+html[data-theme="dark"] .meta,
+html[data-theme="dark"] .hint { color: var(--color-text-secondary); }
+
+/* ── General: any inline style with near-black colors ── */
+html[data-theme="dark"] [style*="color: #111827"],
+html[data-theme="dark"] [style*="color:#111827"],
+html[data-theme="dark"] [style*="color: #1f2937"],
+html[data-theme="dark"] [style*="color:#1f2937"],
+html[data-theme="dark"] [style*="color: #374151"],
+html[data-theme="dark"] [style*="color:#374151"],
+html[data-theme="dark"] [style*="color: #173b24"],
+html[data-theme="dark"] [style*="color:#173b24"],
+html[data-theme="dark"] [style*="color: #1a3d25"],
+html[data-theme="dark"] [style*="color:#1a3d25"] {
+  color: var(--color-text-primary) !important;
+}
+
+/* ── Cards / panels: ensure text inside dark cards is readable ── */
+html[data-theme="dark"] .card { color: var(--color-text-primary); }
+html[data-theme="dark"] .card h1,
+html[data-theme="dark"] .card h2,
+html[data-theme="dark"] .card h3,
+html[data-theme="dark"] .card h4 { color: var(--color-text-primary); }
+
+/* ══════════════════════════════════════════════════
+   PER-PAGE DARK MODE FIXES
+   ══════════════════════════════════════════════════ */
+
+/* ── head/styles.css: pill & score chip overrides ── */
+html[data-theme="dark"] .p-accepted {
+  background: var(--green-light);
+  color: #6ec97e;
+}
+html[data-theme="dark"] .sc-a {
+  background: #1c2d14;
+  color: #7ec850;
+}
+
+/* ── head/styles.css: badge (error pill) ── */
+html[data-theme="dark"] .badge {
+  background: #2d1a14;
+  color: #f87171;
+}
+
+/* ── head/styles.css: doctor-card variants ── */
+html[data-theme="dark"] .doctor-card {
+  background: var(--color-background-secondary);
+  border-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] .doctor-card:hover {
+  background: var(--color-background-tertiary);
+}
+html[data-theme="dark"] .doctor-card--head {
+  background: var(--color-background-secondary);
+  border-left-color: #f59e0b;
+}
+html[data-theme="dark"] .doctor-card--coord {
+  background: var(--color-background-secondary);
+  border-left-color: var(--green);
+}
+
+/* ── head/styles.css: avatar ── */
+html[data-theme="dark"] .avatar {
+  background: var(--green-light);
+  color: #6ec97e;
+}
+
+/* ── head/styles.css: ann-link-box ── */
+html[data-theme="dark"] .ann-link-box {
+  background: var(--color-background-tertiary);
+}
+
+/* ── head/styles.css: hours-tag ── */
+html[data-theme="dark"] .hours-tag {
+  background: var(--color-background-tertiary);
+  color: var(--color-text-secondary);
+}
+
+/* ── head/styles.css: role badges ── */
+html[data-theme="dark"] .role-badge--head {
+  background: var(--amber-light);
+  color: #fbbf24;
+}
+html[data-theme="dark"] .role-badge--coord {
+  background: var(--green-light);
+  color: #6ec97e;
+}
+
+/* ── head/styles.css: toast notifications ── */
+html[data-theme="dark"] .toast-success {
+  background: #1a2d24;
+  color: #6ec97e;
+}
+html[data-theme="dark"] .toast-error {
+  background: #2d1a14;
+  color: #f87171;
+}
+
+/* ── head/styles.css: ann-modal (overriding #fff) ── */
+html[data-theme="dark"] .ann-modal {
+  background: var(--color-background-primary);
+}
+html[data-theme="dark"] .ann-close-btn:hover {
+  background: var(--color-background-tertiary);
+}
+
+/* ── head/styles.css: select border ── */
+html[data-theme="dark"] select {
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-tertiary);
+}
+
+/* ── supervisor/styles.css: pills with hardcoded dark text ── */
+html[data-theme="dark"] .p-ontrack {
+  background: var(--green-light);
+  color: #6ec97e;
+}
+
+/* ── student/timeline.html: timeline card border ── */
+html[data-theme="dark"] .timeline-card {
+  border-color: var(--color-border-tertiary);
+}
+html[data-theme="dark"] #pg-timeline .card {
+  border-color: var(--color-border-tertiary);
+}
+
+/* ── coordinator/lectures.html: JS-rendered inline styles catch-all ── */
+html[data-theme="dark"] [style*="background:#f0f4f1"],
+html[data-theme="dark"] [style*="background: #f0f4f1"] {
+  background: var(--color-background-tertiary) !important;
+}
+html[data-theme="dark"] [style*="color:#344054"],
+html[data-theme="dark"] [style*="color: #344054"] {
+  color: var(--color-text-primary) !important;
+}
+html[data-theme="dark"] [style*="color:#2d6a38"],
+html[data-theme="dark"] [style*="color: #2d6a38"] {
+  color: var(--green) !important;
+}
+
+/* ── head/profile.html: error/warning boxes ── */
+html[data-theme="dark"] [style*="background:#fff0f0"],
+html[data-theme="dark"] [style*="background: #fff0f0"] {
+  background: var(--coral-light) !important;
+  color: var(--coral) !important;
+  border-color: var(--color-border-tertiary) !important;
+}
+
+/* ── supervisor/supervisor_grades.html page overrides ── */
+html[data-theme="dark"] #pg-grades .badge {
+  background: var(--green) !important;
+  color: #fff !important;
+}
+html[data-theme="dark"] #pg-grades .task-card {
+  background: var(--color-background-secondary) !important;
+  border-color: var(--color-border-tertiary) !important;
+}
+html[data-theme="dark"] #pg-grades .task-sub { color: var(--color-text-secondary) !important; }
+html[data-theme="dark"] #pg-grades .p-open   { background: var(--green-light) !important;  color: var(--green) !important; }
+html[data-theme="dark"] #pg-grades .p-closed { background: var(--coral-light) !important;  color: var(--coral) !important; }
+html[data-theme="dark"] #pg-grades .p-done   { background: var(--blue-light)  !important;  color: var(--blue)  !important; }
+html[data-theme="dark"] #pg-grades .p-pending { background: var(--amber-light) !important; color: var(--amber) !important; }
+html[data-theme="dark"] #pg-grades .grade-form input,
+html[data-theme="dark"] #pg-grades .grade-form textarea {
+  background: var(--color-background-secondary) !important;
+  border-color: var(--color-border-tertiary) !important;
+  color: var(--color-text-primary) !important;
+}
+html[data-theme="dark"] #pg-grades .gray  { background: var(--color-background-tertiary) !important; }
+html[data-theme="dark"] #pg-grades .green { background: var(--green) !important; }
+html[data-theme="dark"] #pg-grades .empty {
+  background: var(--color-background-secondary) !important;
+  border-color: var(--color-border-tertiary) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+/* ── Pink/rose hardcoded inline colours (#FBEAF0 bg / #993556 text) ── */
+html[data-theme="dark"] [style*="FBEAF0"] { background-color: #2d1124 !important; }
+html[data-theme="dark"] [style*="993556"] { color: #f472b6 !important; }
+
+/* ── coordinator/lectures.html: hardcoded light borders in JS template strings ── */
+html[data-theme="dark"] [style*="border:1px solid #e7eee9"],
+html[data-theme="dark"] [style*="border: 1px solid #e7eee9"] {
+  border-color: var(--color-border-tertiary) !important;
+}
+html[data-theme="dark"] [style*="border-top:1px solid #eef1ee"],
+html[data-theme="dark"] [style*="border-top: 1px solid #eef1ee"] {
+  border-top-color: var(--color-border-tertiary) !important;
+}
+
+/* ── Medium gray text (#667085) used as secondary label in inline styles ── */
+html[data-theme="dark"] [style*="color:#667085"],
+html[data-theme="dark"] [style*="color: #667085"] { color: var(--color-text-secondary) !important; }

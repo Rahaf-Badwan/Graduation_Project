@@ -10,11 +10,13 @@ const TYPE_LABEL = {
 };
 
 const TYPE_ICON = {
-  ai: '🧠',
-  web: '🌐',
-  mobile: '📱',
-  security: '🔒',
-  other: '📦',
+  ai:       'psychology',
+  web:      'language',
+  mobile:   'smartphone',
+  security: 'security',
+  databases:'storage',
+  software_engineering: 'code',
+  other:    'category',
 };
 
 function escapeHtml(text) {
@@ -53,7 +55,7 @@ function buildWelcomeHtml(projects) {
       const title = escapeHtml(p.title);
       const type = p.project_type || 'other';
       const typeLabel = TYPE_LABEL[type] || type;
-      const icon = TYPE_ICON[type] || '📄';
+      const icon = TYPE_ICON[type] || 'description';
       const score = p.final_score != null ? p.final_score : '—';
       const q = projectQuestion(p.title);
       const label = p.title;
@@ -62,7 +64,7 @@ function buildWelcomeHtml(projects) {
         data-label="${escapeAttr(label)}"
         data-question="${escapeAttr(q)}"
         aria-label="Ask about ${title}">
-        <span class="prompt-card-icon">${icon}</span>
+        <span class="prompt-card-icon"><span class="material-symbols-outlined" style="font-size:20px;line-height:1">${icon}</span></span>
         <span class="prompt-card-body">
           <span class="prompt-card-title">${title}</span>
           <span class="prompt-card-meta">

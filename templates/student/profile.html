@@ -54,13 +54,13 @@
         <div class="card-hd"><span class="card-title">Change Password</span></div>
 
         {% if pwd_error %}
-        <div style="background:#fff0f0;border:1px solid #f5c6c6;color:#c0392b;
+        <div style="background:var(--coral-light);border:1px solid var(--color-border-tertiary);color:var(--coral);
                       font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
           ⚠ {{ pwd_error }}
         </div>
         {% endif %}
         {% if pwd_success %}
-        <div style="background:#f0fff4;border:1px solid #a8d5b5;color:#1a5c2a;
+        <div style="background:var(--green-light);border:1px solid var(--color-border-tertiary);color:var(--green);
                       font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
           ✅ {{ pwd_success }}
         </div>

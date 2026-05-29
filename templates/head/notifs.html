@@ -49,8 +49,8 @@
 
   .main-notif-tab {
     border: 1px solid #d7e3dc;
-    background: #fff;
-    color: #2d5137;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
     padding: 10px 14px;
     border-radius: 999px;
     font-weight: 900;
@@ -82,7 +82,7 @@
   }
 
   .sn-card {
-    background: #fff;
+    background: var(--color-background-primary);
     border: 1px solid var(--sn-border);
     border-radius: 22px;
     box-shadow: 0 14px 36px rgba(16, 24, 40, .07);
@@ -102,7 +102,7 @@
   .sn-card-title {
     font-size: 20px;
     font-weight: 900;
-    color: #12351f;
+    color: var(--color-text-primary);
     letter-spacing: -.02em
   }
 
@@ -140,7 +140,7 @@
   .sn-field label {
     font-size: 13px;
     font-weight: 800;
-    color: #344054
+    color: var(--color-text-primary)
   }
 
   .sn-field input,
@@ -150,7 +150,7 @@
     border-radius: 14px;
     padding: 11px 13px;
     font-size: 14px;
-    background: #fff;
+    background: var(--color-background-primary);
     outline: none;
     font-family: inherit;
     transition: border-color .15s, box-shadow .15s, background .15s
@@ -167,7 +167,7 @@
   .sn-field textarea:focus {
     border-color: var(--sn-green);
     box-shadow: 0 0 0 4px rgba(46, 125, 66, .12);
-    background: #fff
+    background: var(--color-background-primary)
   }
 
   .sn-file-zone {
@@ -177,14 +177,14 @@
     text-align: center;
     cursor: pointer;
     transition: border-color .15s, background .15s, transform .15s;
-    background: #fbfefc;
+    background: var(--color-background-tertiary);
     position: relative
   }
 
   .sn-file-zone:hover,
   .sn-file-zone.drag {
     border-color: var(--sn-green);
-    background: #f0faf2;
+    background: var(--green-light);
     transform: translateY(-1px)
   }
 
@@ -211,12 +211,12 @@
     display: none;
     align-items: center;
     gap: 8px;
-    background: #ecfdf3;
+    background: var(--green-light);
     border-radius: 12px;
     padding: 9px 12px;
     font-size: 13px;
     font-weight: 800;
-    color: #027a48;
+    color: var(--green);
     margin-top: 8px
   }
 
@@ -254,8 +254,8 @@
   }
 
   .sn-btn.secondary {
-    background: #f7fbf8;
-    color: #245c33;
+    background: var(--color-background-tertiary);
+    color: var(--green);
     border: 1px solid #cfe0d4;
     box-shadow: none
   }
@@ -270,13 +270,13 @@
     display: flex;
     gap: 8px;
     padding: 16px 22px 0;
-    background: #fff
+    background: var(--color-background-primary)
   }
 
   .sn-tab {
     border: 1px solid #d7e3dc;
-    background: #fff;
-    color: #2d5137;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
     padding: 9px 17px;
     border-radius: 999px;
     font-weight: 900;
@@ -304,7 +304,7 @@
 
   .sn-msg {
     border: 1px solid #e5eee8;
-    background: #fff;
+    background: var(--color-background-primary);
     border-radius: 18px;
     padding: 15px 16px;
     display: grid;
@@ -339,13 +339,13 @@
   }
 
   .sn-msg-icon.inbox-icon {
-    background: #e6f6eb;
+    background: var(--green-light);
     color: var(--sn-green)
   }
 
   .sn-msg-icon.sent-icon {
-    background: #eff6ff;
-    color: #1d4ed8
+    background: var(--blue-light);
+    color: var(--blue)
   }
 
   .sn-msg-top {
@@ -371,7 +371,7 @@
 
   .sn-msg-preview {
     font-size: 13.5px;
-    color: #52635a;
+    color: var(--color-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -389,18 +389,18 @@
   }
 
   .sn-pill.read {
-    background: #eef4ff;
-    color: #3538cd
+    background: var(--blue-light);
+    color: var(--blue)
   }
 
   .sn-pill.unread-pill {
-    background: #fef3c7;
+    background: var(--amber-light);
     color: #92400e
   }
 
   .sn-pill.sent-pill {
-    background: #ecfdf3;
-    color: #027a48
+    background: var(--green-light);
+    color: var(--green)
   }
 
   .sn-att-badge,
@@ -418,12 +418,12 @@
 
   .sn-att-badge {
     color: #6b7280;
-    background: #f3f4f6
+    background: var(--color-background-tertiary)
   }
 
   .course-pill {
-    color: #027a48;
-    background: #ecfdf3
+    color: var(--green);
+    background: var(--green-light)
   }
 
   .sn-empty {
@@ -432,7 +432,7 @@
     border-radius: 16px;
     color: var(--sn-muted);
     text-align: center;
-    background: #fbfdfb;
+    background: var(--color-background-tertiary);
     font-size: 14px
   }
 
@@ -455,7 +455,7 @@
     right: 0;
     bottom: 0;
     width: min(560px, 94vw);
-    background: #fff;
+    background: var(--color-background-primary);
     z-index: 190;
     box-shadow: -18px 0 44px rgba(15, 23, 42, .18);
     transform: translateX(105%);
@@ -490,8 +490,8 @@
     height: 36px;
     border-radius: 999px;
     border: 1px solid #d8e2dc;
-    background: #f7fbf8;
-    color: #245c33;
+    background: var(--color-background-tertiary);
+    color: var(--green);
     font-size: 21px;
     line-height: 1;
     cursor: pointer;
@@ -550,7 +550,7 @@
     top: 50%;
     transform: translateY(-50%) translateX(8px);
     border: 7px solid transparent;
-    border-left-color: #111827;
+    border-left-color: var(--color-text-primary);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -583,7 +583,7 @@
   }
 
   .sn-modal {
-    background: #fff;
+    background: var(--color-background-primary);
     border-radius: 22px;
     width: 100%;
     max-width: 650px;
@@ -601,13 +601,13 @@
     padding: 17px 21px;
     border-bottom: 1px solid #edf2ef;
     gap: 10px;
-    background: #fbfdfb
+    background: var(--color-background-tertiary)
   }
 
   .sn-modal-title {
     font-size: 18px;
     font-weight: 900;
-    color: #173b24
+    color: var(--color-text-primary)
   }
 
   .sn-modal-close {
@@ -634,9 +634,9 @@
   .sn-modal-msg-body {
     font-size: 14px;
     line-height: 1.65;
-    color: #344054;
+    color: var(--color-text-primary);
     white-space: pre-wrap;
-    background: #f8faf8;
+    background: var(--color-background-tertiary);
     border-radius: 14px;
     padding: 13px 15px;
     margin-bottom: 13px;
@@ -650,7 +650,7 @@
     font-size: 13px;
     font-weight: 800;
     color: var(--sn-green);
-    background: #ecfdf3;
+    background: var(--green-light);
     border-radius: 10px;
     padding: 7px 12px;
     text-decoration: none;
@@ -658,19 +658,19 @@
   }
 
   .sn-modal-att-link:hover {
-    background: #d1fae5
+    background: var(--green-light)
   }
 
   .sn-modal-divider {
     height: 1px;
-    background: #edf2ef;
+    background: var(--color-background-tertiary);
     margin: 15px 0
   }
 
   .sn-modal-reply-title {
     font-size: 13px;
     font-weight: 900;
-    color: #344054;
+    color: var(--color-text-primary);
     margin-bottom: 10px
   }
 
@@ -697,7 +697,7 @@
   /* Important Notice tab: kept from the coordinator page */
   .notice-preview {
     border-left: 5px solid #2e7d42;
-    background: #f7fbf8;
+    background: var(--color-background-tertiary);
     border-radius: 14px;
     padding: 13px 14px;
     margin-top: 8px
@@ -705,13 +705,13 @@
 
   .notice-preview-title {
     font-weight: 900;
-    color: #163b24;
+    color: var(--color-text-primary);
     margin-bottom: 8px
   }
 
   .notice-preview-body {
     font-size: 13px;
-    color: #344054;
+    color: var(--color-text-primary);
     line-height: 1.55;
     white-space: pre-wrap
   }
@@ -770,6 +770,49 @@
       bottom: 20px
     }
   }
+
+  /* ── Dark mode overrides ── */
+  html[data-theme="dark"] {
+    --sn-green: var(--green);
+    --sn-border: var(--color-border-tertiary);
+    --sn-muted: var(--color-text-secondary);
+    --sn-text: var(--color-text-primary);
+  }
+  html[data-theme="dark"] .sn-card { background: var(--color-background-primary); border-color: var(--color-border-tertiary); box-shadow: none; }
+  html[data-theme="dark"] .sn-card-hd { background: var(--color-background-secondary) !important; border-bottom-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-card-sub { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-tabs { background: var(--color-background-primary); }
+  html[data-theme="dark"] .sn-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+  html[data-theme="dark"] .main-notif-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .main-notif-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+  html[data-theme="dark"] .sn-msg { background: var(--color-background-primary); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-msg:hover { border-color: var(--green); box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+  html[data-theme="dark"] .sn-msg.unread { background: var(--color-background-tertiary) !important; border-color: var(--green) !important; }
+  html[data-theme="dark"] .sn-msg-title  { color: var(--color-text-primary) !important; }
+  html[data-theme="dark"] .sn-msg-meta   { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-msg-preview { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-pill.read       { background: var(--blue-light);  color: var(--blue); }
+  html[data-theme="dark"] .sn-pill.unread-pill { background: var(--amber-light); color: var(--amber); }
+  html[data-theme="dark"] .sn-pill.sent-pill   { background: var(--green-light); color: var(--green); }
+  html[data-theme="dark"] .course-pill { background: var(--green-light); color: var(--green); }
+  html[data-theme="dark"] .sn-att-badge { background: var(--color-background-tertiary); color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-btn { background: var(--green); }
+  html[data-theme="dark"] .sn-btn.secondary { background: var(--color-background-tertiary); color: var(--green); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-field input, html[data-theme="dark"] .sn-field select, html[data-theme="dark"] .sn-field textarea { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-file-zone { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-file-zone-label { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-empty { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-modal { background: var(--color-background-primary); }
+  html[data-theme="dark"] .sn-modal-hd { background: var(--color-background-secondary); border-bottom-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-modal-title { color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-modal-close { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-modal-msg-meta { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-modal-msg-body { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-modal-divider { background: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-compose-drawer { background: var(--color-background-primary); }
+  html[data-theme="dark"] .sn-drawer-close { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--green); }
+  html[data-theme="dark"] .notice-preview { border-left-color: var(--green); background: var(--color-background-tertiary); }
 </style>
 
 <div class="page page-single on" id="pg-notifs">
@@ -896,7 +939,7 @@
             <label for="snMessage">Message</label>
             <textarea id="snMessage" name="message" placeholder="Write your memo here..." required></textarea>
           </div>
-          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#344054;margin-bottom:13px;">
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--color-text-primary);margin-bottom:13px;">
             <input type="checkbox" id="snUrgent" name="urgent" value="1"> Mark as urgent
           </label>
           <div class="sn-field">

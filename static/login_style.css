@@ -4,6 +4,13 @@
   padding: 0;
 }
 
+:root {
+  --color-background-primary: #ffffff;
+  --color-text-primary: #1a1a1a;
+  --coral-light: #fde8e8;
+  --green-light: #eef7f0;
+}
+
 .page {
   min-height: 100vh;
   display: flex;
@@ -368,3 +375,102 @@ footer strong {
   color: #1a3d1f;
   font-weight: 700;
 }
+
+/* ══════════════════════════════════════════
+   DARK MODE — Login / Forgot / Activate pages
+   ══════════════════════════════════════════ */
+html[data-theme="dark"] {
+  --color-background-primary: #161b22;
+  --color-text-primary: #e2e8f0;
+  --coral-light: #2d1014;
+  --green-light: #0d2618;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .page { background: #0d1117; }
+
+html[data-theme="dark"] nav {
+  background: #161b22;
+  border-bottom-color: #30363d;
+}
+html[data-theme="dark"] .nav-brand { color: #4ade80; }
+html[data-theme="dark"] .nav-links li a { color: #c9d1d9; }
+html[data-theme="dark"] .nav-links li a:hover { background: #21262d; color: #e2e8f0; }
+
+html[data-theme="dark"] .login-card,
+html[data-theme="dark"] .reset-card {
+  background: #161b22;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+html[data-theme="dark"] .card-title { color: #e2e8f0; }
+html[data-theme="dark"] .card-sub   { color: #8b949e; }
+
+html[data-theme="dark"] label { color: #8b949e; }
+
+html[data-theme="dark"] input[type=text],
+html[data-theme="dark"] input[type=password],
+html[data-theme="dark"] input[type=email],
+html[data-theme="dark"] input[type=number] {
+  background: #1e2128 !important;
+  border-color: #30363d !important;
+  color: #e2e8f0 !important;
+}
+html[data-theme="dark"] input[type=text]:focus,
+html[data-theme="dark"] input[type=password]:focus,
+html[data-theme="dark"] input[type=email]:focus,
+html[data-theme="dark"] input[type=number]:focus {
+  border-color: #4ade80 !important;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15) !important;
+}
+
+html[data-theme="dark"] .card-links a,
+html[data-theme="dark"] .back-link { color: #4ade80; }
+html[data-theme="dark"] .card-divider { color: #30363d; }
+html[data-theme="dark"] .card-project { border-top-color: #21262d; }
+html[data-theme="dark"] .card-project p { color: #6e7681; }
+
+html[data-theme="dark"] footer {
+  background: #161b22;
+  border-top-color: #30363d;
+  color: #8b949e;
+}
+html[data-theme="dark"] footer strong { color: #4ade80; }
+
+html[data-theme="dark"] .dropdown {
+  background: #161b22;
+  border-color: #30363d;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+html[data-theme="dark"] .dropdown a { color: #c9d1d9; }
+html[data-theme="dark"] .dropdown a:hover { background: #21262d; color: #e2e8f0; }
+html[data-theme="dark"] .dropdown-divider { background: #30363d; }
+
+html[data-theme="dark"] .notice {
+  background: rgba(22, 27, 34, 0.95);
+  border-left-color: #4ade80;
+}
+html[data-theme="dark"] .notice-title { color: #4ade80; }
+html[data-theme="dark"] .notice p { color: #c9d1d9; }
+html[data-theme="dark"] .notice .hl  { color: #4ade80; }
+html[data-theme="dark"] .notice .dhl { color: #f87171; }
+html[data-theme="dark"] .notice-btns button {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: transparent;
+}
+html[data-theme="dark"] .notice-btns button:hover { background: rgba(74, 222, 128, 0.1); }
+
+html[data-theme="dark"] .page-desc { color: #8b949e; }
+html[data-theme="dark"] .success-msg {
+  background: #0d2618;
+  border-color: #1a4d2e;
+  color: #4ade80;
+}
+html[data-theme="dark"] .error-msg {
+  background: #2d1014;
+  border-color: #4d1a1a;
+  color: #f87171;
+}
+
+html[data-theme="dark"] #loginThemeBtn { color: #c9d1d9 !important; }
+html[data-theme="dark"] #loginThemeBtn:hover { background: #21262d !important; }
