@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Rahaf-Badwan\\\\OneDrive\\\\Desktop\\\\APMS\\\\templates\" -Filter \"*.html\")",
-      "Bash(Select-Object -ExpandProperty Name)"
-    ]
-  }
-}
