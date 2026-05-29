@@ -3053,6 +3053,18 @@ WHERE semester_id = (SELECT semester_id FROM (SELECT semester_id FROM semesters 
 -- Run AFTER your main APMS.sql
 -- Each project gets a supervisor assigned from existing faculty
 -- ============================================================
+SELECT
+    f.faculty_id AS supervisor_id,
+    u.user_id,
+    u.university_id,
+    u.full_name,
+    u.email,
+    u.role,
+    f.specialization
+FROM faculty f
+JOIN users u ON u.user_id = f.user_id
+WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
+ORDER BY f.faculty_id;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
 SELECT 'Smart Invoice', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 82.00
@@ -3062,301 +3074,301 @@ AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Smart Invoice' AND status='a
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Kitchen Station Management System', 'web', s.semester_id, 4, 'archived', '2025-02-01', 79.00
+SELECT 'Kitchen Station Management System', 'web', s.semester_id, 14, 'archived', '2025-02-01', 79.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Kitchen Station Management System' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'DreamsJob Recruitment Platform', 'web', s.semester_id, 5, 'archived', '2025-02-01', 85.00
+SELECT 'DreamsJob Recruitment Platform', 'web', s.semester_id, 12, 'archived', '2025-02-01', 85.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='DreamsJob Recruitment Platform' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'YallaRehla Travel App', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 88.00
+SELECT 'YallaRehla Travel App', 'mobile', s.semester_id, 0, 'archived', '2025-02-01', 88.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='YallaRehla Travel App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'StudentHub', 'web', s.semester_id, 7, 'archived', '2025-02-01', 76.00
+SELECT 'StudentHub', 'web', s.semester_id, 0, 'archived', '2025-02-01', 76.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='StudentHub' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Wasselha Delivery System', 'mobile', s.semester_id, 3, 'archived', '2025-02-01', 83.00
+SELECT 'Wasselha Delivery System', 'mobile', s.semester_id, 10, 'archived', '2025-02-01', 83.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wasselha Delivery System' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Home Sweet Home Real Estate', 'web', s.semester_id, 4, 'archived', '2025-02-01', 80.00
+SELECT 'Home Sweet Home Real Estate', 'web', s.semester_id, 8, 'archived', '2025-02-01', 80.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Home Sweet Home Real Estate' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Birzeit University Insurance System', 'web', s.semester_id, 5, 'archived', '2024-02-01', 91.00
+SELECT 'Birzeit University Insurance System', 'web', s.semester_id, 14, 'archived', '2024-02-01', 91.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Birzeit University Insurance System' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Sal7ly Maintenance App', 'mobile', s.semester_id, 6, 'archived', '2024-02-01', 78.00
+SELECT 'Sal7ly Maintenance App', 'mobile', s.semester_id, 2, 'archived', '2024-02-01', 78.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Sal7ly Maintenance App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Monitoring World News System', 'web', s.semester_id, 7, 'archived', '2024-02-01', 74.00
+SELECT 'Monitoring World News System', 'web', s.semester_id, 0, 'archived', '2024-02-01', 74.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Monitoring World News System' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Prediction of Anti-Cancer Peptide ACP-XG', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 94.00
+SELECT 'Prediction of Anti-Cancer Peptide ACP-XG', 'ai', s.semester_id, 4, 'archived', '2025-02-01', 94.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Prediction of Anti-Cancer Peptide ACP-XG' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'FitScoop Fitness Platform', 'mobile', s.semester_id, 4, 'archived', '2025-02-01', 81.00
+SELECT 'FitScoop Fitness Platform', 'mobile', s.semester_id, 0, 'archived', '2025-02-01', 81.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='FitScoop Fitness Platform' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Wedding Planning System', 'web', s.semester_id, 5, 'archived', '2025-02-01', 77.00
+SELECT 'Wedding Planning System', 'web', s.semester_id, 0, 'archived', '2025-02-01', 77.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wedding Planning System' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'PharmaApp Pharmacy Management', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 86.00
+SELECT 'PharmaApp Pharmacy Management', 'mobile', s.semester_id, 0, 'archived', '2025-02-01', 86.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='PharmaApp Pharmacy Management' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Student Digital Guide', 'web', s.semester_id, 7, 'archived', '2025-02-01', 80.00
+SELECT 'Student Digital Guide', 'web', s.semester_id, 0, 'archived', '2025-02-01', 80.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Student Digital Guide' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Palestine Charity Platform', 'web', s.semester_id, 3, 'archived', '2025-02-01', 75.00
+SELECT 'Palestine Charity Platform', 'web', s.semester_id, 6, 'archived', '2025-02-01', 75.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Palestine Charity Platform' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Gamified Trip Planner App', 'mobile', s.semester_id, 4, 'archived', '2025-02-01', 89.00
+SELECT 'Gamified Trip Planner App', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 89.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Gamified Trip Planner App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'TechSpotter Tech News Platform', 'web', s.semester_id, 5, 'archived', '2025-02-01', 78.00
+SELECT 'TechSpotter Tech News Platform', 'web', s.semester_id, 0, 'archived', '2025-02-01', 78.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='TechSpotter Tech News Platform' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Multi-Environment Video Game', 'other', s.semester_id, 6, 'archived', '2025-02-01', 83.00
+SELECT 'Multi-Environment Video Game', 'other', s.semester_id, 0, 'archived', '2025-02-01', 83.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Multi-Environment Video Game' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Birzeit Library Chatbot', 'ai', s.semester_id, 7, 'archived', '2025-02-01', 92.00
+SELECT 'Birzeit Library Chatbot', 'ai', s.semester_id, 4, 'archived', '2025-02-01', 92.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Birzeit Library Chatbot' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Policy Peek Policy Analyzer', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 87.00
+SELECT 'Policy Peek Policy Analyzer', 'ai', s.semester_id, 8, 'archived', '2025-02-01', 87.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Policy Peek Policy Analyzer' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'LifeActive Health Tracker', 'mobile', s.semester_id, 4, 'archived', '2025-02-01', 84.00
+SELECT 'LifeActive Health Tracker', 'mobile', s.semester_id, 10, 'archived', '2025-02-01', 84.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='LifeActive Health Tracker' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Tronix Electronics Web Application', 'web', s.semester_id, 5, 'archived', '2025-02-01', 79.00
+SELECT 'Tronix Electronics Web Application', 'web', s.semester_id, 0, 'archived', '2025-02-01', 79.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Tronix Electronics Web Application' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Smart School Portal', 'web', s.semester_id, 6, 'archived', '2025-02-01', 88.00
+SELECT 'Smart School Portal', 'web', s.semester_id, 1, 'archived', '2025-02-01', 88.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Smart School Portal' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'GoHelp Volunteer Platform', 'web', s.semester_id, 7, 'archived', '2025-02-01', 76.00
+SELECT 'GoHelp Volunteer Platform', 'web', s.semester_id, 4, 'archived', '2025-02-01', 76.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='GoHelp Volunteer Platform' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'KhatClarifier AI Writing Tool', 'ai', s.semester_id, 3, 'archived', '2025-02-01', 90.00
+SELECT 'KhatClarifier AI Writing Tool', 'ai', s.semester_id, 11, 'archived', '2025-02-01', 90.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='KhatClarifier AI Writing Tool' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'ConvoConvert Communication Tool', 'ai', s.semester_id, 4, 'archived', '2025-02-01', 85.00
+SELECT 'ConvoConvert Communication Tool', 'ai', s.semester_id, 0, 'archived', '2025-02-01', 85.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='ConvoConvert Communication Tool' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Wasselni Transportation App', 'mobile', s.semester_id, 5, 'archived', '2025-02-01', 82.00
+SELECT 'Wasselni Transportation App', 'mobile', s.semester_id, 12, 'archived', '2025-02-01', 82.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wasselni Transportation App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Ackerra Fitness Platform', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 87.00
+SELECT 'Ackerra Fitness Platform', 'mobile', s.semester_id, 0, 'archived', '2025-02-01', 87.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Ackerra Fitness Platform' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Darak Real Estate Marketplace', 'web', s.semester_id, 7, 'archived', '2025-02-01', 83.00
+SELECT 'Darak Real Estate Marketplace', 'web', s.semester_id, 10, 'archived', '2025-02-01', 83.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Darak Real Estate Marketplace' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Flora Palestine Plant Guide', 'mobile', s.semester_id, 3, 'archived', '2025-02-01', 81.00
+SELECT 'Flora Palestine Plant Guide', 'mobile', s.semester_id, 8, 'archived', '2025-02-01', 81.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Flora Palestine Plant Guide' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Max Scheduling System', 'web', s.semester_id, 4, 'archived', '2025-02-01', 77.00
+SELECT 'Max Scheduling System', 'web', s.semester_id, 11, 'archived', '2025-02-01', 77.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Max Scheduling System' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'PayWithPalKoin Payment System', 'web', s.semester_id, 5, 'archived', '2025-02-01', 86.00
+SELECT 'PayWithPalKoin Payment System', 'web', s.semester_id, 2, 'archived', '2025-02-01', 86.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='PayWithPalKoin Payment System' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Nomad Travel Companion App', 'mobile', s.semester_id, 6, 'archived', '2025-02-01', 84.00
+SELECT 'Nomad Travel Companion App', 'mobile', s.semester_id, 12, 'archived', '2025-02-01', 84.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Nomad Travel Companion App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'CarPal Car Sharing App', 'mobile', s.semester_id, 7, 'archived', '2025-02-01', 88.00
+SELECT 'CarPal Car Sharing App', 'mobile', s.semester_id, 0, 'archived', '2025-02-01', 88.00
 FROM semesters s
 WHERE s.academic_year='2024/2025' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='CarPal Car Sharing App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'E-Voting System Using Blockchain', 'security', s.semester_id, 3, 'archived', '2024-02-01', 93.00
+SELECT 'E-Voting System Using Blockchain', 'security', s.semester_id, 2, 'archived', '2024-02-01', 93.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='E-Voting System Using Blockchain' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Nossrah Arabic Learning App', 'mobile', s.semester_id, 4, 'archived', '2024-02-01', 80.00
+SELECT 'Nossrah Arabic Learning App', 'mobile', s.semester_id, 3, 'archived', '2024-02-01', 80.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Nossrah Arabic Learning App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Wanderlust in Palestine Travel App', 'web', s.semester_id, 5, 'archived', '2024-02-01', 85.00
+SELECT 'Wanderlust in Palestine Travel App', 'web', s.semester_id, 0, 'archived', '2024-02-01', 85.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Wanderlust in Palestine Travel App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Medica Healthcare App', 'mobile', s.semester_id, 6, 'archived', '2024-02-01', 82.00
+SELECT 'Medica Healthcare App', 'mobile', s.semester_id, 0, 'archived', '2024-02-01', 82.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Medica Healthcare App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'BZU Note Share App', 'mobile', s.semester_id, 7, 'archived', '2024-02-01', 79.00
+SELECT 'BZU Note Share App', 'mobile', s.semester_id, 0, 'archived', '2024-02-01', 79.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='BZU Note Share App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Plestia Events Platform', 'web', s.semester_id, 3, 'archived', '2024-02-01', 83.00
+SELECT 'Plestia Events Platform', 'web', s.semester_id, 0, 'archived', '2024-02-01', 83.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Plestia Events Platform' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Baby Voice Identification App', 'ai', s.semester_id, 4, 'archived', '2024-02-01', 88.00
+SELECT 'Baby Voice Identification App', 'ai', s.semester_id, 19, 'archived', '2024-02-01', 88.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Baby Voice Identification App' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'Traffic Light Synchronization Optimizer', 'ai', s.semester_id, 5, 'archived', '2024-02-01', 91.00
+SELECT 'Traffic Light Synchronization Optimizer', 'ai', s.semester_id, 19, 'archived', '2024-02-01', 91.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='Traffic Light Synchronization Optimizer' AND status='archived')
 LIMIT 1;
 
 INSERT INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date, final_score)
-SELECT 'CampusConnect University Network', 'web', s.semester_id, 6, 'archived', '2024-02-01', 86.00
+SELECT 'CampusConnect University Network', 'web', s.semester_id, 22, 'archived', '2024-02-01', 86.00
 FROM semesters s
 WHERE s.academic_year='2023/2024' AND s.course_code='COMP4200'
 AND NOT EXISTS (SELECT 1 FROM projects WHERE title='CampusConnect University Network' AND status='archived')
