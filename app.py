@@ -31,6 +31,8 @@ from routes.supervisor_evaluation import supervisor_evaluation_bp
 from ai_engine import ask_apms_ai, get_ai_health, get_archived_projects
 from activate_student import activate_bp
 from announcements import announcements_bp
+from routes.general_supervisors import general_supervisors_bp
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 AI_RESPONSE_TIMEOUT_SECONDS = int(os.environ.get("AI_RESPONSE_TIMEOUT_SECONDS", "55"))
@@ -63,6 +65,7 @@ app.register_blueprint(coordinator_bp)
 app.register_blueprint(supervisor_evaluation_bp)
 app.register_blueprint(activate_bp)
 app.register_blueprint(announcements_bp, url_prefix='/head')
+app.register_blueprint(general_supervisors_bp, url_prefix='/supervisor')
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def _get_active_semester(cursor):
     cursor.execute("""

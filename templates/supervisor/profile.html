@@ -1,91 +1,153 @@
 {% extends 'supervisor/base.html' %}
-{% block page_title %}My Profile{% endblock %}
+
+{% block page_title %}Profile{% endblock %}
 {% block page_id %}profile{% endblock %}
 {% block topbar_title %}My Profile{% endblock %}
 
 {% block content %}
-<div class="profile-header">
-  <div class="profile-avatar-lg">{{ session.avatar_initials }}</div>
-  <div style="flex:1">
-    <div style="font-size:18px;font-weight:600;color:var(--color-text-primary)">{{ session.full_name }}</div>
-    <div style="font-size:13px;color:var(--color-text-secondary);margin-top:2px">Supervisor of Website development for
-      graduated projects in Birzeit University</div>
-    <div style="margin-top:6px;display:flex;gap:6px">
-      <span class="pill p-sup">Active supervisor</span>
-      <span
-        style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--blue-light);color:var(--blue)">COMP4200</span>
-      <span
-        style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--green-light);color:var(--green)">COMP4300</span>
-    </div>
-  </div>
-  
-    {% if session.get('is_switched_to_supervisor') %}
-    <form action="{{ url_for('switch_back_to_coordinator') }}" method="post" style="margin: 10px;">
-      <button class="btn btn-outline" type="submit">
-        Back to Coordinator
-      </button>
-    </form>
-    {% endif %}
-  <button class="btn btn-outline">Update profile</button>
-</div>
+<div class="page on" id="pg-profile">
 
-<div class="two-col">
-  <div class="card">
-    <div class="card-hd"><span class="card-title">My Information</span></div>
-    <div class="field-wrap">
-      <div class="field-label">Full name</div><input class="field-input" value="{{ session.full_name }}" />
-    </div>
-    <div class="field-wrap">
-      <div class="field-label">Email</div><input class="field-input" value="{{ session.email }}" />
-    </div>
-    <div class="field-wrap">
-      <div class="field-label">Specialty</div><input class="field-input"
-        value="{{ session.specialty or 'Web development' }}" />
-    </div>
-    <div class="field-wrap">
-      <div class="field-label">Office number</div><input class="field-input" value="{{ session.office or '' }}" />
-    </div>
-    <div class="btn-row"><button class="btn btn-primary">Save changes</button></div>
-  </div>
-
-  <div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title">My Statistics</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="stat">
-          <div class="stat-num" style="color:var(--sup-mid);font-size:18px">5</div>
-          <div class="stat-label">Projects this semester</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num" style="color:var(--green);font-size:18px">81.2</div>
-          <div class="stat-label">Average grade</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num" style="color:var(--blue);font-size:18px">22</div>
-          <div class="stat-label">Total projects</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num" style="color:var(--purple);font-size:18px">6</div>
-          <div class="stat-label">Years of supervision</div>
-        </div>
+  <div class="profile-header">
+    <div class="profile-avatar-lg">{{ user.avatar_initials if user else '?' }}</div>
+    <div style="flex:1">
+      <div style="font-size:18px;font-weight:600;color:var(--color-text-primary)">
+        {{ user.title if user and user.title else 'Dr.' }} {{ user.full_name if user else '—' }}
+      </div>
+      <div style="font-size:13px;color:var(--color-text-secondary);margin-top:2px">
+        {{ user.university_id if user else '—' }} · Supervisor · Department of Computer Science
+      </div>
+      <div style="margin-top:6px;display:flex;gap:6px">
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;
+                     background:var(--blue-light);color:var(--blue)">Supervisor</span>
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;
+                     background:var(--green-light);color:var(--green)">
+          {{ user.specialization.replace('_',' ').title() if user and user.specialization else 'Computer Science' }}
+        </span>
       </div>
     </div>
+  </div>
 
+  <div class="two-col">
+
+    <!-- ── Personal Information (read-only) ── -->
     <div class="card">
-      <div class="card-hd"><span class="card-title">Change password</span></div>
+      <div class="card-hd"><span class="card-title">Personal Information</span></div>
+
       <div class="field-wrap">
-        <div class="field-label">Current password</div><input class="field-input" type="password"
-          placeholder="••••••••" />
+        <div class="field-label">Full Name</div>
+        <input class="field-input" readonly style="background:var(--color-background-secondary)"
+          value="{{ (user.title ~ ' ' ~ user.full_name) if user and user.title else (user.full_name if user else '') }}" />
       </div>
       <div class="field-wrap">
-        <div class="field-label">New password</div><input class="field-input" type="password" placeholder="••••••••" />
+        <div class="field-label">Staff ID</div>
+        <input class="field-input" readonly style="background:var(--color-background-secondary)"
+          value="{{ user.university_id if user else '' }}" />
       </div>
-      <div class="field-wrap" style="margin-bottom:10px">
-        <div class="field-label">Confirm password</div><input class="field-input" type="password"
-          placeholder="••••••••" />
+      <div class="field-wrap">
+        <div class="field-label">Email</div>
+        <input class="field-input" readonly style="background:var(--color-background-secondary)"
+          value="{{ user.email if user else '' }}" />
       </div>
-      <div class="btn-row"><button class="btn btn-primary">Update</button></div>
+      <div class="field-wrap">
+        <div class="field-label">Office</div>
+        <input class="field-input" readonly style="background:var(--color-background-secondary)"
+          value="{{ user.office_number if user and user.office_number else '—' }}" />
+      </div>
+    </div>
+
+    <div>
+
+      <!-- ── Change Password ── -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Change Password</span></div>
+
+        {% if pwd_error %}
+        <div style="background:#fff0f0;border:1px solid #f5c6c6;color:#c0392b;
+                    font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
+          ⚠ {{ pwd_error }}
+        </div>
+        {% endif %}
+        {% if pwd_success %}
+        <div style="background:#f0fff4;border:1px solid #a8d5b5;color:#1a5c2a;
+                    font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
+          ✅ {{ pwd_success }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('general_supervisors.change_password') }}">
+          <div class="field-wrap">
+            <div class="field-label">Current Password</div>
+            <div style="position:relative">
+              <input class="field-input" type="password" name="current_password"
+                placeholder="••••••••" style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;font-size:15px;line-height:1">👁</button>
+            </div>
+          </div>
+          <div class="field-wrap">
+            <div class="field-label">New Password</div>
+            <div style="position:relative">
+              <input class="field-input" type="password" name="new_password"
+                placeholder="At least 8 characters" style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;font-size:15px;line-height:1">👁</button>
+            </div>
+          </div>
+          <div class="field-wrap">
+            <div class="field-label">Confirm Password</div>
+            <div style="position:relative">
+              <input class="field-input" type="password" name="confirm_password"
+                placeholder="Re-enter new password" style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;font-size:15px;line-height:1">👁</button>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary">Update Password</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ── Academic Information (read-only) ── -->
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Academic Information</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Role</span>
+            <span>Supervisor</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Department</span>
+            <span>Computer Science</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Specialization</span>
+            <span>{{ user.specialization.replace('_',' ').title() if user and user.specialization else '—' }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0">
+            <span style="color:var(--color-text-secondary)">Years of Experience</span>
+            <span>{{ user.years_experience if user and user.years_experience else '—' }}</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
+
 </div>
+
+<script>
+  function togglePwd(btn) {
+    const input = btn.previousElementSibling;
+    const hidden = input.type === 'password';
+    input.type = hidden ? 'text' : 'password';
+    btn.textContent = hidden ? '🙈' : '👁';
+  }
+</script>
 {% endblock %}

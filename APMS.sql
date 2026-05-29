@@ -6184,4 +6184,35 @@ JOIN students st ON st.student_id = scr.student_id
 JOIN users u ON u.user_id = st.user_id
 JOIN semesters sem ON sem.semester_id = scr.semester_id;
 
-select * from users;
+SHOW COLUMNS FROM faculty;
+
+
+INSERT INTO projects (semester_id, supervisor_id, title, project_type, status, final_score) VALUES
+(5, 1, 'Hospital Management System', 'software_engineering', 'accepted', 85.5),
+(5, 2, 'Food Delivery Mobile App', 'mobile', 'accepted', 90.0),
+(5, 3, 'AI Fraud Detection System', 'ai', 'rejected', 72.3),
+(5, 1, 'E-Commerce Website', 'web', 'accepted', 88.0),
+(5, 4, 'Task Management App', 'mobile', 'rejected', 65.0),
+(5, 2, 'Network Security Monitor', 'security', 'accepted', 91.5),
+(5, 3, 'HR Database System', 'databases', 'accepted', 78.0),
+(5, 5, 'Smart Campus Navigation', 'ai', 'accepted', 83.0),
+(5, 5, 'Online Exam Platform', 'web', 'accepted', 76.5),
+(5, 4, 'Inventory Management System', 'software_engineering', 'accepted', 88.5);
+
+
+INSERT INTO notifications (recipient_id, sender_id, notification_type, title, message, course_scope, is_read)
+VALUES (
+  1,
+  2,
+  'feedback_received',
+  'Project Submission Update — COMP4300',
+  'Dear Dr. Iyad,\n\nI wanted to inform you that several students have recently submitted their COMP4300 graduation projects. A total of 7 projects are now under review and awaiting your approval.\n\nPlease review the submissions at your earliest convenience.\n\nBest regards,\nDr. Ruba Awadallah\nCourse Coordinator',
+  'graduation_project',
+  0
+);
+SELECT u.user_id, u.university_id, u.full_name, u.email,
+                   u.avatar_initials, f.specialization, f.years_experience,
+                   f.title, f.office_number
+            FROM users u
+            JOIN faculty f ON f.user_id = u.user_id
+            WHERE u.user_id = 3;

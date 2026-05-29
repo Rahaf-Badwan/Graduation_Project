@@ -1,73 +1,1263 @@
 {% extends 'supervisor/base.html' %}
+
 {% block page_title %}Notifications{% endblock %}
 {% block page_id %}notifs{% endblock %}
 {% block topbar_title %}Notifications{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-hd"><span class="card-title">Notifications</span><button class="card-action">Mark all as
-      read</button></div>
+<style>
+  :root {
+    --sn-green: #2e7d42;
+    --sn-green-dark: #205c31;
+    --sn-green-soft: #f4faf6;
+    --sn-border: #e8eeeb;
+    --sn-muted: #7a8f82;
+    --sn-text: #1e3326;
+    --sn-bg: #f8fbf9;
+  }
 
-  <div
-    style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;padding-bottom:8px;border-bottom:0.5px solid var(--color-border-tertiary)">
-    Today</div>
+  #pg-notifs {
+    position: relative;
+    min-height: calc(100vh - 120px);
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important
+  }
 
-  <div class="notif-item unread">
-    <div class="notif-icon-wrap" style="background:var(--sup-light)">
-      <span class="material-symbols-outlined icon-inline" style="font-size:16px">upload_file</span>
-    </div>
-    <div style="flex:1">
-      <div class="notif-title">Taima Abed uploaded updated files</div>
-      <div class="notif-meta">A new version of the final report has been uploaded — APMS · 1 hour ago</div>
-    </div>
-    <div class="notif-dot-red"></div>
-  </div>
+  #pg-notifs.page,
+  #pg-notifs.page-single,
+  #pg-notifs.page-single.on {
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important
+  }
 
-  <div class="notif-item unread">
-    <div class="notif-icon-wrap" style="background:var(--purple-light)">
-      <span class="material-symbols-outlined icon-inline" style="font-size:16px">group</span>
-    </div>
-    <div style="flex:1">
-      <div class="notif-title">You have been assigned membership in a new committee</div>
-      <div class="notif-meta">E-Learning Platform Project Evaluation Committee · February 22, 2026 · 3 hours ago</div>
-    </div>
-    <div class="notif-dot-red"></div>
-  </div>
+  .sn-shell {
+    width: 100%;
+    max-width: none !important;
+    margin: 0;
+    padding: 6px 10px 88px
+  }
 
-  <div class="notif-item unread">
-    <div class="notif-icon-wrap" style="background:var(--amber-light)">
-      <span class="material-symbols-outlined icon-inline" style="font-size:16px">schedule</span>
+  .main-notif-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 0 0 12px
+  }
+
+  .main-notif-tab {
+    border: 1px solid #dde6e1;
+    background: #fff;
+    color: #3a6147;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s
+  }
+
+  .main-notif-tab:hover { background: #f4faf6; }
+
+  .main-notif-tab.on {
+    background: var(--sn-green);
+    color: #fff;
+    border-color: var(--sn-green)
+  }
+
+  .notif-tab-pane { display: none }
+  .notif-tab-pane.active { display: block }
+
+  .sn-messages-card {
+    width: 100%;
+    min-height: calc(100vh - 190px)
+  }
+
+  .sn-card {
+    background: #fff;
+    border: 1px solid var(--sn-border);
+    border-radius: 14px;
+    overflow: hidden
+  }
+
+  .sn-card-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--sn-border);
+    background: #fff
+  }
+
+  .sn-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a3324;
+    letter-spacing: -.01em
+  }
+
+  .sn-card-sub {
+    font-size: 12px;
+    color: var(--sn-muted);
+    margin-top: 2px;
+    font-weight: 400
+  }
+
+  .sn-body { padding: 14px 18px }
+
+  .sn-supervisor-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end
+  }
+
+  .sn-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px
+  }
+
+  .sn-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px
+  }
+
+  .sn-field label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #4a5e52
+  }
+
+  .sn-field input,
+  .sn-field select,
+  .sn-field textarea {
+    border: 1px solid #dde6e1;
+    border-radius: 8px;
+    padding: 8px 11px;
+    font-size: 13px;
+    background: #fff;
+    outline: none;
+    font-family: inherit;
+    font-weight: 400;
+    color: var(--sn-text);
+    transition: border-color .15s, box-shadow .15s
+  }
+
+  .sn-field textarea {
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.5
+  }
+
+  .sn-field input:focus,
+  .sn-field select:focus,
+  .sn-field textarea:focus {
+    border-color: var(--sn-green);
+    box-shadow: 0 0 0 3px rgba(46, 125, 66, .08)
+  }
+
+  .sn-file-zone {
+    border: 1.5px dashed #cddbd2;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: #fbfdfb;
+    position: relative
+  }
+
+  .sn-file-zone:hover,
+  .sn-file-zone.drag {
+    border-color: var(--sn-green);
+    background: #f4faf6
+  }
+
+  .sn-file-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%
+  }
+
+  .sn-file-zone-label {
+    font-size: 12px;
+    color: var(--sn-muted);
+    pointer-events: none;
+    font-weight: 400
+  }
+
+  .sn-file-zone-label strong { color: var(--sn-green); font-weight: 500 }
+
+  .sn-file-chosen {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: #f0fdf4;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #027a48;
+    margin-top: 6px
+  }
+
+  .sn-file-chosen .remove-att {
+    cursor: pointer;
+    color: #b42318;
+    margin-left: auto;
+    font-size: 14px;
+    line-height: 1
+  }
+
+  .sn-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 8px
+  }
+
+  .sn-btn {
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity .15s, transform .15s;
+    background: var(--sn-green);
+    color: #fff
+  }
+
+  .sn-btn:hover { opacity: .9; transform: translateY(-1px) }
+
+  .sn-btn.secondary {
+    background: #f4f7f5;
+    color: #2d5137;
+    border: 1px solid #d4e0d8
+  }
+
+  .sn-btn.small {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 7px
+  }
+
+  .sn-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 12px 18px 0;
+    background: #fff
+  }
+
+  .sn-tab {
+    border: 1px solid #dde6e1;
+    background: #fff;
+    color: #3a6147;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-weight: 500;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s
+  }
+
+  .sn-tab:hover { background: #f4faf6 }
+
+  .sn-tab.on {
+    background: var(--sn-green);
+    color: #fff;
+    border-color: var(--sn-green)
+  }
+
+  .sn-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: calc(100vh - 340px)
+  }
+
+  .sn-msg {
+    border: 1px solid #eaf0ec;
+    background: #fff;
+    border-radius: 10px;
+    padding: 11px 14px;
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 12px;
+    align-items: start;
+    cursor: pointer;
+    transition: box-shadow .15s, border-color .15s, background .15s
+  }
+
+  .sn-msg:hover {
+    box-shadow: 0 4px 12px rgba(46, 125, 66, .07);
+    border-color: #c9decf
+  }
+
+  .sn-msg.unread {
+    background: #fafdfb;
+    border-color: #c8dece
+  }
+
+  .sn-msg-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0
+  }
+
+  .sn-msg-icon.inbox-icon { background: #edf7f0; color: var(--sn-green) }
+  .sn-msg-icon.sent-icon { background: #eff4ff; color: #2563eb }
+
+  .sn-msg-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 2px
+  }
+
+  .sn-msg-title {
+    font-weight: 500;
+    color: var(--sn-text);
+    font-size: 13.5px;
+    line-height: 1.3
+  }
+
+  .sn-msg-meta {
+    font-size: 11px;
+    color: var(--sn-muted);
+    margin-bottom: 4px;
+    font-weight: 400
+  }
+
+  .sn-msg-preview {
+    font-size: 12.5px;
+    color: #5e7268;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    line-height: 1.4;
+    font-weight: 400
+  }
+
+  .sn-pill {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0
+  }
+
+  .sn-pill.read { background: #eef4ff; color: #3538cd }
+  .sn-pill.unread-pill { background: #fef9ec; color: #92400e }
+  .sn-pill.sent-pill { background: #ecfdf3; color: #027a48 }
+
+  .sn-att-badge,
+  .course-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    border-radius: 999px;
+    padding: 3px 7px;
+    margin-top: 4px;
+    margin-right: 4px
+  }
+
+  .sn-att-badge { color: #6b7280; background: #f3f4f6 }
+  .course-pill { color: #027a48; background: #ecfdf3 }
+
+  .sn-empty {
+    padding: 24px;
+    border: 1px dashed #cddbd2;
+    border-radius: 10px;
+    color: var(--sn-muted);
+    text-align: center;
+    background: #fbfdfb;
+    font-size: 13px;
+    font-weight: 400
+  }
+
+  .sn-drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, .35);
+    z-index: 180
+  }
+
+  .sn-drawer-overlay.open { display: block }
+
+  .sn-compose-drawer {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: min(500px, 92vw);
+    background: #fff;
+    z-index: 190;
+    box-shadow: -8px 0 32px rgba(15, 23, 42, .12);
+    transform: translateX(105%);
+    transition: transform .22s ease;
+    border-radius: 16px 0 0 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden
+  }
+
+  .sn-compose-drawer.open { transform: translateX(0) }
+
+  .sn-compose-drawer .sn-card {
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column
+  }
+
+  .sn-compose-drawer .sn-body {
+    overflow: auto;
+    flex: 1;
+    padding-bottom: 24px
+  }
+
+  .sn-drawer-close {
+    width: 30px; height: 30px;
+    border-radius: 999px;
+    border: 1px solid #dde6e1;
+    background: #f7fbf8;
+    color: #3a6147;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    font-weight: 400
+  }
+
+  .sn-fab {
+    position: fixed;
+    right: 24px; bottom: 24px;
+    z-index: 160;
+    width: 48px; height: 48px;
+    border-radius: 999px;
+    border: 0;
+    background: var(--sn-green);
+    color: #fff;
+    font-size: 20px;
+    box-shadow: 0 6px 20px rgba(46, 125, 66, .25);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .15s, opacity .15s
+  }
+
+  .sn-fab:hover { transform: translateY(-2px); opacity: .92 }
+
+  .sn-fab::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: 58px; top: 50%;
+    transform: translateY(-50%) translateX(6px);
+    background: #111827;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 6px 10px;
+    border-radius: 8px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .15s, visibility .15s, transform .15s
+  }
+
+  .sn-fab:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0)
+  }
+
+  .sn-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.38);
+    z-index: 220;
+    align-items: center;
+    justify-content: center;
+    padding: 16px
+  }
+
+  .sn-overlay.open { display: flex }
+
+  .sn-modal {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 580px;
+    max-height: 88vh;
+    overflow-y: auto;
+    box-shadow: 0 16px 48px rgba(0,0,0,.16);
+    display: flex;
+    flex-direction: column
+  }
+
+  .sn-modal-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--sn-border);
+    gap: 10px
+  }
+
+  .sn-modal-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a3324
+  }
+
+  .sn-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #7a8f82;
+    line-height: 1;
+    padding: 0
+  }
+
+  .sn-modal-body { padding: 16px 18px; flex: 1 }
+
+  .sn-modal-msg-meta {
+    font-size: 11px;
+    color: #7a8f82;
+    margin-bottom: 8px;
+    font-weight: 400
+  }
+
+  .sn-modal-msg-body {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #344054;
+    white-space: pre-wrap;
+    background: #f8faf8;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border: 1px solid #e8eeeb;
+    font-weight: 400
+  }
+
+  .sn-modal-att-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--sn-green);
+    background: #ecfdf3;
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-decoration: none;
+    margin-bottom: 12px
+  }
+
+  .sn-modal-att-link:hover { background: #d1fae5 }
+
+  .sn-modal-divider { height: 1px; background: var(--sn-border); margin: 12px 0 }
+
+  .sn-modal-reply-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: #344054;
+    margin-bottom: 8px
+  }
+
+  .sn-toast {
+    position: fixed;
+    right: 20px; bottom: 88px;
+    z-index: 999;
+    background: #111827;
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    display: none;
+    max-width: 320px;
+    font-size: 13px;
+    font-weight: 500
+  }
+
+  .sn-specific-wrap { display: none }
+
+  .notice-preview {
+    border-left: 3px solid var(--sn-green);
+    background: #f7fbf8;
+    border-radius: 8px;
+    padding: 11px 13px;
+    margin-top: 8px
+  }
+
+  .notice-preview-title {
+    font-weight: 600;
+    color: #163b24;
+    margin-bottom: 6px;
+    font-size: 13px
+  }
+
+  .notice-preview-body {
+    font-size: 12.5px;
+    color: #344054;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    font-weight: 400
+  }
+
+  .notice-preview-hl {
+    color: #b42318;
+    font-weight: 500;
+    margin-top: 6px;
+    font-size: 12px
+  }
+
+  @media(max-width:700px) {
+    .sn-form-row { grid-template-columns: 1fr }
+    .sn-card-hd { align-items: flex-start; flex-direction: column }
+    .sn-supervisor-actions { width: 100%; justify-content: space-between }
+  }
+
+  @media(max-width:560px) {
+    .sn-shell { padding: 6px 8px 96px }
+    .sn-body { padding: 12px }
+    .sn-tabs { padding-left: 12px }
+    .sn-card-hd { padding: 12px }
+    .sn-msg { grid-template-columns: 32px 1fr; padding: 10px }
+    .sn-msg-icon { width: 32px; height: 32px }
+    .sn-fab { right: 16px; bottom: 18px }
+  }
+</style>
+
+<div class="page page-single on" id="pg-notifs">
+  <div class="sn-shell">
+    <div class="main-notif-tabs">
+      <button class="main-notif-tab on" type="button" data-main-tab="messages">Messages</button>
+      <button class="main-notif-tab" type="button" data-main-tab="notice">Important Notice</button>
     </div>
-    <div style="flex:1">
-      <div class="notif-title">Rahaf Badwan hasn't uploaded files in two weeks.</div>
-      <div class="notif-meta">Smart Delivery App — It is recommended to contact the student immediately. (2 days ago)
+
+    <section class="sn-card sn-messages-card notif-tab-pane active" id="tab-messages">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Messages</div>
+          <div class="sn-card-sub">Click a message to open, read, reply, and download attachments.</div>
+        </div>
+        <div class="sn-supervisor-actions">
+          <button class="sn-btn secondary" id="snMarkAllBtn" type="button">Mark All Read</button>
+        </div>
       </div>
-    </div>
-    <div class="notif-dot-red"></div>
+      <div class="sn-tabs">
+        <button class="sn-tab on" type="button" data-tab="inbox">Inbox</button>
+        <button class="sn-tab" type="button" data-tab="sent">Sent</button>
+      </div>
+      <div class="sn-body">
+        <div id="snList" class="sn-list">
+          <div class="sn-empty">Loading messages...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sn-card notif-tab-pane" id="tab-notice">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Important Notice on Login Screen</div>
+          <div class="sn-card-sub">This updates the notice shown on the main login screen.</div>
+        </div>
+      </div>
+      <div class="sn-body">
+        <form id="noticeForm">
+          <div class="sn-form-row">
+            <div class="sn-field"><label for="noticeTitle">Notice title</label><input id="noticeTitle" maxlength="250"
+                placeholder="Important Notice — APMS System" required></div>
+            <div class="sn-field"><label for="noticeHighlight">Highlight / deadline text</label><input
+                id="noticeHighlight" maxlength="150" placeholder="Example: Deadline: 15/2/2026"></div>
+          </div>
+          <div class="sn-field">
+            <label for="noticeCourseScope">Notice for</label>
+            <select id="noticeCourseScope" required>
+              <option value="introduction">Project Introduction / COMP4200</option>
+              <option value="graduation_project">Graduation Project / COMP4300</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div class="sn-field"><label for="noticeBody">Notice body</label><textarea id="noticeBody"
+              placeholder="Write the notice that students, supervisors, and head will see before login..."
+              required></textarea></div>
+          <div class="sn-form-row">
+            <div class="sn-field"><label for="noticeBtn1">Button 1 text</label><input id="noticeBtn1"
+                placeholder="ⓘ How does the system work?"></div>
+            <div class="sn-field"><label for="noticeBtn2">Button 2 text</label><input id="noticeBtn2"
+                placeholder="⬆ Project Upload Guide"></div>
+          </div>
+          <div class="sn-field"><label for="noticeBtn3">Button 3 text</label><input id="noticeBtn3"
+              placeholder="⚙ Roles & Permissions"></div>
+          <div class="notice-preview">
+            <div class="notice-preview-title" id="noticePreviewTitle">Important Notice — APMS System</div>
+            <div class="notice-preview-body" id="noticePreviewBody">Preview will appear here.</div>
+            <div class="notice-preview-hl" id="noticePreviewHl"></div>
+          </div>
+          <div class="sn-actions"><button class="sn-btn secondary" type="button" id="reloadNoticeBtn">Reload
+              Current</button><button class="sn-btn" type="submit">Update Login Notice</button></div>
+        </form>
+      </div>
+    </section>
   </div>
 
-  <div
-    style="font-size:12px;color:var(--color-text-secondary);margin:10px 0 8px;padding-top:8px;border-top:0.5px solid var(--color-border-tertiary)">
-    Last week</div>
+  <button class="sn-fab" id="snFabCompose" type="button" data-tooltip="Send Message" aria-label="Send Message">✎</button>
 
-  <div class="notif-item">
-    <div class="notif-icon-wrap" style="background:var(--green-light)">
-      <span class="material-symbols-outlined icon-inline" style="font-size:16px">check_circle</span>
-    </div>
-    <div style="flex:1">
-      <div class="notif-title">Your feedback has been sent to the APMS project.</div>
-      <div class="notif-meta">Notified: Amneh Abu Muslim · Score: 78/100 · February 3, 2026</div>
-    </div>
-  </div>
+  <div class="sn-drawer-overlay" id="snComposeOverlay"></div>
+  <aside class="sn-compose-drawer" id="snComposeDrawer" aria-hidden="true">
+    <section class="sn-card">
+      <div class="sn-card-hd">
+        <div>
+          <div class="sn-card-title">Send Message</div>
+          <div class="sn-card-sub">Send a message to coordinators, doctors, sections, or students.</div>
+        </div>
+        <button class="sn-drawer-close" id="snCloseCompose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="sn-body">
+        <form id="snSendForm" enctype="multipart/form-data">
+          <div class="sn-form-row">
+            <div class="sn-field">
+              <label for="snScope">Send to</label>
+              <select id="snScope" name="scope" required>
+                <option value="">Choose receiver...</option>
+                <option value="coordinators">All Coordinators</option>
+                <option value="coordinator">One Coordinator</option>
+                <option value="doctors">All Doctors / Supervisors</option>
+                <option value="all_sections">All Sections</option>
+                <option value="doctor">One Doctor</option>
+                <option value="section">One Section</option>
+                <option value="students">All Students</option>
+                <option value="student">One Student</option>
+              </select>
+            </div>
+            <div class="sn-field sn-specific-wrap" id="snSpecificWrap">
+              <label for="snSpecific">Choose specific receiver</label>
+              <select id="snSpecific" name="value"></select>
+            </div>
+          </div>
+          <div class="sn-field">
+            <label for="snCourseScope">Message for</label>
+            <select id="snCourseScope" name="course_scope" required>
+              <option value="introduction">Project Introduction / COMP4200</option>
+              <option value="graduation_project">Graduation Project / COMP4300</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div class="sn-field">
+            <label for="snTitle">Title</label>
+            <input id="snTitle" name="title" placeholder="Example: Committee meeting reminder" maxlength="250" required>
+          </div>
+          <div class="sn-field">
+            <label for="snMessage">Message</label>
+            <textarea id="snMessage" name="message" placeholder="Write your memo here..." required></textarea>
+          </div>
+          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#344054;margin-bottom:13px;">
+            <input type="checkbox" id="snUrgent" name="urgent" value="1"> Mark as urgent
+          </label>
+          <div class="sn-field">
+            <label>Attachment <span style="font-weight:400;color:#9ca3af">(optional, max 10 MB)</span></label>
+            <div class="sn-file-zone" id="snFileZone">
+              <input type="file" id="snFile" name="file" accept="*/*">
+              <div class="sn-file-zone-label">📎 <strong>Click to attach</strong> or drag a file here</div>
+            </div>
+            <div class="sn-file-chosen" id="snFileChosen">
+              <span>📄</span>
+              <span id="snFileName"></span>
+              <span class="remove-att" id="snRemoveAtt" title="Remove">✕</span>
+            </div>
+          </div>
+          <div class="sn-actions">
+            <button class="sn-btn secondary" type="button" id="snClearBtn">Clear</button>
+            <button class="sn-btn" type="submit">Send Message</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </aside>
+</div>
 
-  <div class="notif-item">
-    <div class="notif-icon-wrap" style="background:var(--blue-light)">
-      <span class="material-symbols-outlined icon-inline" style="font-size:16px">event</span>
+<div class="sn-overlay" id="snOverlay">
+  <div class="sn-modal" id="snModal">
+    <div class="sn-modal-hd">
+      <div class="sn-modal-title" id="modalTitle">Message</div>
+      <button class="sn-modal-close" id="modalClose" type="button">✕</button>
     </div>
-    <div style="flex:1">
-      <div class="notif-title">APMS Project Discussion Schedule</div>
-      <div class="notif-meta">February 20, 2026 — 10:00 AM · Room 201</div>
+    <div class="sn-modal-body">
+      <div class="sn-modal-msg-meta" id="modalMeta"></div>
+      <div class="sn-modal-msg-body" id="modalBody"></div>
+      <a class="sn-modal-att-link" id="modalAttLink" href="#" target="_blank" style="display:none">
+        📎 <span id="modalAttName"></span>
+      </a>
+
+      <div id="modalReplySection">
+        <div class="sn-modal-divider"></div>
+        <div class="sn-modal-reply-title">↩ Reply to <span id="modalReplyTo"></span></div>
+        <form id="modalReplyForm" enctype="multipart/form-data">
+          <input type="hidden" id="modalReplyUserId" name="value">
+          <input type="hidden" name="scope" value="reply">
+          <input type="hidden" id="modalReplyCourseScope" name="course_scope" value="both">
+          <div class="sn-field">
+            <input id="modalReplyTitle" name="title" placeholder="Re: ..." maxlength="250" required>
+          </div>
+          <div class="sn-field">
+            <textarea id="modalReplyMsg" name="message" placeholder="Write your reply..." style="min-height:80px"
+              required></textarea>
+          </div>
+          <div class="sn-field">
+            <div class="sn-file-zone" id="replyFileZone">
+              <input type="file" id="replyFile" name="file" accept="*/*">
+              <div class="sn-file-zone-label">📎 <strong>Attach a file</strong> (optional)</div>
+            </div>
+            <div class="sn-file-chosen" id="replyFileChosen">
+              <span>📄</span>
+              <span id="replyFileName"></span>
+              <span class="remove-att" id="replyRemoveAtt" title="Remove">✕</span>
+            </div>
+          </div>
+          <div class="sn-actions">
+            <button class="sn-btn secondary small" type="button" id="modalCancelBtn">Cancel</button>
+            <button class="sn-btn small" type="submit">Send Reply</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </div>
+
+<div class="sn-toast" id="snToast"></div>
+
+<script>
+  (() => {
+    const state = { tab: 'inbox', options: { heads: [], doctors: [], students: [], sections: [] }, currentMsg: null };
+    const $ = id => document.getElementById(id);
+    const list = $('snList');
+    const toast = $('snToast');
+    const overlay = $('snOverlay');
+    const composeDrawer = $('snComposeDrawer');
+    const composeOverlay = $('snComposeOverlay');
+
+    function showMainTab(tabName) {
+      document.querySelectorAll('.main-notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.mainTab === tabName));
+      document.querySelectorAll('.notif-tab-pane').forEach(pane => pane.classList.remove('active'));
+      const pane = $('tab-' + tabName);
+      if (pane) pane.classList.add('active');
+      window.scrollTo(0, 0);
+    }
+    document.querySelectorAll('.main-notif-tab').forEach(btn => btn.addEventListener('click', () => showMainTab(btn.dataset.mainTab)));
+
+    function openCompose() {
+      composeDrawer.classList.add('open');
+      composeOverlay.classList.add('open');
+      composeDrawer.setAttribute('aria-hidden', 'false');
+      setTimeout(() => $('snScope').focus(), 80);
+    }
+
+    function closeCompose() {
+      composeDrawer.classList.remove('open');
+      composeOverlay.classList.remove('open');
+      composeDrawer.setAttribute('aria-hidden', 'true');
+    }
+
+    function showToast(msg, isErr = false) {
+      toast.textContent = msg;
+      toast.style.background = isErr ? '#991b1b' : '#111827';
+      toast.style.display = 'block';
+      setTimeout(() => (toast.style.display = 'none'), 3400);
+    }
+
+    async function fetchJSON(url, opts = {}) {
+      const res = await fetch(url, { headers: { Accept: 'application/json' }, ...opts });
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error('Server error (' + res.status + ').'); }
+      if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ').');
+      return data;
+    }
+
+    async function postForm(url, formData) {
+      const res = await fetch(url, { method: 'POST', headers: { Accept: 'application/json' }, body: formData });
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error('Server error (' + res.status + ').'); }
+      if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ').');
+      return data;
+    }
+
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+    }
+
+    function roleLabel(role) {
+      return ({ head_of_department: 'Head of Department', supervisor: 'Supervisor', coordinator: 'Coordinator', student: 'Student' }[role] || role || 'System');
+    }
+
+    function courseLabel(scope) {
+      return ({ introduction: 'Project Introduction', graduation_project: 'Graduation Project', both: 'Both Courses' }[scope] || 'Both Courses');
+    }
+
+    function wireFileZone(zoneId, inputId, chosenId, nameId, removeId) {
+      const zone = $(zoneId);
+      const input = $(inputId);
+      const chosen = $(chosenId);
+      const nameEl = $(nameId);
+      const remove = $(removeId);
+
+      function showChosen(name) {
+        nameEl.textContent = name;
+        chosen.style.display = 'flex';
+        zone.style.display = 'none';
+      }
+      function clearChosen() {
+        input.value = '';
+        chosen.style.display = 'none';
+        zone.style.display = 'block';
+      }
+
+      input.addEventListener('change', () => {
+        if (input.files[0]) showChosen(input.files[0].name);
+      });
+      remove.addEventListener('click', clearChosen);
+
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.classList.remove('drag');
+        const f = e.dataTransfer.files[0];
+        if (f) {
+          const dt = new DataTransfer(); dt.items.add(f);
+          input.files = dt.files;
+          showChosen(f.name);
+        }
+      });
+    }
+
+    wireFileZone('snFileZone', 'snFile', 'snFileChosen', 'snFileName', 'snRemoveAtt');
+    wireFileZone('replyFileZone', 'replyFile', 'replyFileChosen', 'replyFileName', 'replyRemoveAtt');
+
+    $('snFabCompose').addEventListener('click', openCompose);
+    $('snCloseCompose').addEventListener('click', closeCompose);
+    composeOverlay.addEventListener('click', closeCompose);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeCompose();
+        closeModal();
+      }
+    });
+
+    async function loadOptions() {
+      try { state.options = await fetchJSON('/supervisor/api/notifications/options'); }
+      catch (e) { showToast(e.message, true); }
+    }
+
+    function optionCourseLabel(row) {
+      const scope = row.course_scope || 'both';
+      const code = row.course_code || (scope === 'graduation_project' ? 'COMP4300' : scope === 'introduction' ? 'COMP4200' : 'Both');
+      return code;
+    }
+
+    function filterByCourse(rows) {
+      const selected = $('snCourseScope').value || 'both';
+      if (selected === 'both') return rows || [];
+      return (rows || []).filter(row => (row.course_scope || 'both') === selected || (row.course_scope || 'both') === 'both');
+    }
+
+    function updateSpecificWrap() {
+      const scope = $('snScope').value;
+      const selectedCourse = $('snCourseScope').value || 'both';
+      const wrap = $('snSpecificWrap');
+      const select = $('snSpecific');
+      select.innerHTML = '';
+      let rows = [], placeholder = 'Choose...';
+
+      if (scope === 'coordinator') {
+        rows = filterByCourse(state.options.coordinators || []);
+        placeholder = selectedCourse === 'graduation_project'
+          ? 'Choose COMP4300 coordinator...'
+          : selectedCourse === 'introduction'
+            ? 'Choose COMP4200 coordinator...'
+            : 'Choose coordinator...';
+        rows.forEach(c => select.insertAdjacentHTML('beforeend', '<option value="' + esc(c.user_id) + '">' + esc(c.full_name) + ' — ' + esc(optionCourseLabel(c)) + '</option>'));
+      } else if (scope === 'doctor') {
+        rows = state.options.doctors || [];
+        placeholder = 'Choose doctor...';
+        rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' — ' + esc(d.university_id || '') + '</option>'));
+      } else if (scope === 'student') {
+        rows = filterByCourse(state.options.students || []);
+        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 student...' : selectedCourse === 'introduction' ? 'Choose COMP4200 student...' : 'Choose student...';
+        rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + ' — ' + esc(optionCourseLabel(s)) + '</option>'));
+      } else if (scope === 'section') {
+        rows = filterByCourse(state.options.sections || []);
+        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 project/section...' : selectedCourse === 'introduction' ? 'Choose COMP4200 section...' : 'Choose section/project...';
+        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
+      }
+
+      if (['coordinator', 'doctor', 'student', 'section'].includes(scope)) {
+        select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>');
+        wrap.style.display = 'flex';
+      } else {
+        wrap.style.display = 'none';
+      }
+    }
+
+    function renderInbox(rows) {
+      if (!rows.length) { list.innerHTML = '<div class="sn-empty">No received messages yet.</div>'; return; }
+      list.innerHTML = rows.map(r =>
+        '<article class="sn-msg ' + (r.is_read ? '' : 'unread') + '" data-id="' + r.notification_id + '" data-tab="inbox">' +
+        '<div class="sn-msg-icon inbox-icon">' + (r.notification_type === 'urgent_alert' ? '🔴' : '✉') + '</div>' +
+        '<div style="min-width:0">' +
+        '<div class="sn-msg-top">' +
+        '<div class="sn-msg-title">' + esc(r.title) + '</div>' +
+        '<span class="sn-pill ' + (r.is_read ? 'read' : 'unread-pill') + '">' + (r.is_read ? 'Read' : 'New') + '</span>' +
+        '</div>' +
+        '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
+        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '</div>' +
+        '</article>'
+      ).join('');
+    }
+
+    function renderSent(rows) {
+      if (!rows.length) { list.innerHTML = '<div class="sn-empty">No sent messages yet.</div>'; return; }
+      list.innerHTML = rows.map(r =>
+        '<article class="sn-msg" data-id="' + r.notification_id + '" data-tab="sent">' +
+        '<div class="sn-msg-icon sent-icon">↗</div>' +
+        '<div style="min-width:0">' +
+        '<div class="sn-msg-top">' +
+        '<div class="sn-msg-title">' + esc(r.title) + '</div>' +
+        '<span class="sn-pill sent-pill">Sent</span>' +
+        '</div>' +
+        '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
+        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '</div>' +
+        '</article>'
+      ).join('');
+    }
+
+    async function loadMessages() {
+      list.innerHTML = '<div class="sn-empty">Loading messages...</div>';
+      try {
+        if (state.tab === 'sent') {
+          const data = await fetchJSON('/supervisor/api/notifications/sent');
+          renderSent(data.sent || []);
+          state._sentRows = data.sent || [];
+        } else {
+          const data = await fetchJSON('/supervisor/api/notifications/inbox');
+          renderInbox(data.notifications || []);
+          state._inboxRows = data.notifications || [];
+          const dot = document.querySelector('.tb-notif-dot');
+          if (dot) dot.style.display = (data.notifications || []).some(n => !n.is_read) ? 'block' : 'none';
+        }
+      } catch (e) {
+        list.innerHTML = '<div class="sn-empty">' + esc(e.message) + '</div>';
+      }
+    }
+
+    function openModal(msgData, tab) {
+      state.currentMsg = msgData;
+      $('modalTitle').textContent = msgData.title;
+      const isInbox = tab === 'inbox';
+      const meta = isInbox
+        ? 'From: ' + (msgData.sender_name || 'System') + ' · ' + roleLabel(msgData.sender_role) + ' · ' + (msgData.created_at || '')
+        : 'To: ' + (msgData.recipient_name || '') + ' · ' + roleLabel(msgData.recipient_role) + ' · ' + (msgData.created_at || '');
+      $('modalMeta').textContent = meta + ' · ' + courseLabel(msgData.course_scope);
+      $('modalBody').textContent = msgData.message;
+
+      const attLink = $('modalAttLink');
+      if (msgData.has_attachment) {
+        attLink.href = '/supervisor/api/notifications/' + msgData.notification_id + '/attachment';
+        $('modalAttName').textContent = msgData.attachment_name || 'Download attachment';
+        attLink.style.display = 'inline-flex';
+      } else {
+        attLink.style.display = 'none';
+      }
+
+      const replySection = $('modalReplySection');
+      if (isInbox && msgData.sender_user_id) {
+        $('modalReplyUserId').value = msgData.sender_user_id;
+        $('modalReplyCourseScope').value = msgData.course_scope || 'both';
+        $('modalReplyTo').textContent = msgData.sender_name || 'sender';
+        $('modalReplyTitle').value = 'Re: ' + msgData.title;
+        $('modalReplyMsg').value = '';
+        $('replyFile').value = '';
+        $('replyFileChosen').style.display = 'none';
+        $('replyFileZone').style.display = 'block';
+        replySection.style.display = 'block';
+      } else {
+        replySection.style.display = 'none';
+      }
+
+      overlay.classList.add('open');
+
+      if (isInbox && !msgData.is_read) {
+        fetchJSON('/supervisor/api/notifications/' + msgData.notification_id + '/read', { method: 'POST' })
+          .then(() => loadMessages())
+          .catch(() => { });
+      }
+    }
+
+    function closeModal() {
+      overlay.classList.remove('open');
+      state.currentMsg = null;
+    }
+
+    list.addEventListener('click', e => {
+      const card = e.target.closest('.sn-msg');
+      if (!card) return;
+      const id = parseInt(card.dataset.id);
+      const tab = card.dataset.tab;
+      const rows = tab === 'inbox' ? (state._inboxRows || []) : (state._sentRows || []);
+      const msg = rows.find(r => r.notification_id === id);
+      if (msg) openModal(msg, tab);
+    });
+
+    $('modalClose').addEventListener('click', closeModal);
+    $('modalCancelBtn').addEventListener('click', closeModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+    $('modalReplyForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const fd = new FormData($('modalReplyForm'));
+      try {
+        const data = await postForm('/supervisor/api/notifications/send', fd);
+        showToast(data.message || 'Reply sent!');
+        closeModal();
+        state.tab = 'sent';
+        document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent'));
+        showMainTab('messages');
+        await loadMessages();
+      } catch (e) { showToast(e.message, true); }
+    });
+
+    $('snSendForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value) && !$('snSpecific').value) {
+        showToast('Please choose a specific receiver.', true); return;
+      }
+      const fd = new FormData($('snSendForm'));
+      if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value);
+      if (!$('snUrgent').checked) fd.delete('urgent');
+      try {
+        const data = await postForm('/supervisor/api/notifications/send', fd);
+        showToast(data.message || 'Message sent successfully.');
+        $('snSendForm').reset();
+        $('snFile').value = '';
+        $('snFileChosen').style.display = 'none';
+        $('snFileZone').style.display = 'block';
+        updateSpecificWrap();
+        closeCompose();
+        state.tab = 'sent';
+        document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent'));
+        showMainTab('messages');
+        await loadMessages();
+      } catch (e) { showToast(e.message, true); }
+    });
+
+    $('snClearBtn').addEventListener('click', () => {
+      $('snSendForm').reset();
+      $('snFile').value = '';
+      $('snFileChosen').style.display = 'none';
+      $('snFileZone').style.display = 'block';
+      setTimeout(updateSpecificWrap, 0);
+    });
+
+    $('snScope').addEventListener('change', updateSpecificWrap);
+    $('snCourseScope').addEventListener('change', updateSpecificWrap);
+
+    document.querySelectorAll('.sn-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.tab = btn.dataset.tab;
+        document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b === btn));
+        loadMessages();
+      });
+    });
+
+    $('snMarkAllBtn').addEventListener('click', async () => {
+      try {
+        await fetchJSON('/supervisor/api/notifications/read-all', { method: 'POST' });
+        showToast('All messages marked as read.');
+        await loadMessages();
+      } catch (e) { showToast(e.message, true); }
+    });
+
+    function updateNoticePreview() {
+      $('noticePreviewTitle').textContent = ($('noticeTitle').value || 'Important Notice — APMS System') + ' · ' + courseLabel($('noticeCourseScope').value || 'both');
+      $('noticePreviewBody').textContent = $('noticeBody').value || 'Preview will appear here.';
+      $('noticePreviewHl').textContent = $('noticeHighlight').value || '';
+    }
+
+    async function loadNotice() {
+      try {
+        const data = await fetchJSON('/supervisor/api/important-notice');
+        const n = data.notice || {};
+        $('noticeTitle').value = n.title || 'Important Notice — APMS System';
+        $('noticeBody').value = n.body || '';
+        $('noticeHighlight').value = n.highlight_text || '';
+        $('noticeBtn1').value = n.button1_text || 'ⓘ How does the system work?';
+        $('noticeBtn2').value = n.button2_text || '⬆ Project Upload Guide';
+        $('noticeBtn3').value = n.button3_text || '⚙ Roles & Permissions';
+        $('noticeCourseScope').value = n.course_scope || 'both';
+        updateNoticePreview();
+      } catch (err) { showToast(err.message, true); }
+    }
+
+    ['noticeTitle', 'noticeBody', 'noticeHighlight'].forEach(id => $(id).addEventListener('input', updateNoticePreview));
+    $('noticeCourseScope').addEventListener('change', updateNoticePreview);
+    $('reloadNoticeBtn').addEventListener('click', loadNotice);
+    $('noticeForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const payload = {
+        title: $('noticeTitle').value.trim(),
+        body: $('noticeBody').value.trim(),
+        highlight_text: $('noticeHighlight').value.trim(),
+        button1_text: $('noticeBtn1').value.trim(),
+        button2_text: $('noticeBtn2').value.trim(),
+        button3_text: $('noticeBtn3').value.trim(),
+        course_scope: $('noticeCourseScope').value
+      };
+      try {
+        const data = await fetchJSON('/supervisor/api/important-notice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        showToast(data.message || 'Notice updated.');
+        updateNoticePreview();
+      } catch (err) { showToast(err.message, true); }
+    });
+
+    loadOptions().then(updateSpecificWrap);
+    loadMessages();
+    loadNotice();
+  })();
+</script>
 {% endblock %}

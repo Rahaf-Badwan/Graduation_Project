@@ -188,3 +188,9 @@ function timeAgo(dateStr) {
 document.addEventListener("DOMContentLoaded", () => {
   loadDashboard(currentCourse);
 });
+
+function switchRole() {
+  fetch('/head/api/switch-role', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  .then(r => r.json())
+  .then(d => { if (d.success) window.location.href = '/supervisor/dashboard'; });
+}
