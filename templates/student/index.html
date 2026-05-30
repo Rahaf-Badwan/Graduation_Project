@@ -520,7 +520,10 @@
     const sourceUploaded = fileUploaded(files, 'source_code');
     const targetCourse = d.target_course || 'COMP4200';
     const isComp4300 = targetCourse === 'COMP4300';
-    const deadlines = (d.deadlines || []).filter(dl => !(isComp4300 && dl.deadline_type === 'timeline'));
+    const comp4300Window = d.comp4300_submission_window || {};
+    const comp4300Published = Boolean(comp4300Window.deliverable_id);
+    const comp4300WindowOpen = Boolean(comp4300Window.is_active);
+    const deadlines = d.deadlines || [];
     const readiness = Number(milestone.overall ?? overall ?? 0);
 
     document.getElementById('stat-student').textContent = safeText(d.student_name);
@@ -551,7 +554,11 @@
     document.getElementById('report-chip').textContent = finalUploaded
       ? 'Milestones: final report submitted'
       : isComp4300
-        ? 'Final project: not submitted yet'
+        ? comp4300WindowOpen
+          ? `Final submission: ${milestoneSubmitted} of ${milestoneTotal} submitted`
+          : comp4300Published
+            ? 'Final submission window: closed'
+            : 'Final submission window: not published yet'
       : milestoneTotal
         ? `Milestones: ${milestoneSubmitted} of ${milestoneTotal} submitted`
         : 'Milestones: timeline not published yet';
@@ -569,9 +576,17 @@
       setActionLink('next-action-primary', isComp4300 ? '/student/submit' : '/student/timeline', isComp4300 ? 'Project Files' : 'View Timeline');
       setActionLink('next-action-secondary', '/student/submit', 'Project Files');
     } else if (isComp4300) {
-      document.getElementById('next-action-title').textContent = 'Prepare final project files';
-      document.getElementById('next-action-copy').textContent = 'Your COMP4200 milestones are cleared after promotion. Use the project files page for COMP4300 submissions.';
-      setActionLink('next-action-primary', '/student/submit', 'Project Files');
+      document.getElementById('next-action-title').textContent = comp4300WindowOpen
+        ? 'Submit your final project'
+        : comp4300Published
+          ? 'Final submission window is closed'
+          : 'Prepare final project files';
+      document.getElementById('next-action-copy').textContent = comp4300WindowOpen
+        ? 'The COMP4300 final submission window is open. Upload your final report before the deadline.'
+        : comp4300Published
+          ? 'The COMP4300 final submission deadline has passed. The published milestone remains visible in your timeline.'
+          : 'The coordinator has not published the COMP4300 final submission window yet. Keep your project files ready.';
+      setActionLink('next-action-primary', comp4300WindowOpen ? '/student/submit' : '/student/timeline', comp4300WindowOpen ? 'Submit Project' : 'View Timeline');
       setActionLink('next-action-secondary', '/student/submit', 'Project Files');
     } else if (milestoneTotal) {
       document.getElementById('next-action-title').textContent = 'Continue milestone submissions';
@@ -597,20 +612,30 @@
       {
         title: isComp4300 ? 'COMP4300 workspace' : 'Timeline submissions',
         meta: isComp4300
-          ? 'COMP4200 timeline milestones were cleared after promotion.'
+          ? comp4300WindowOpen
+            ? `${milestoneSubmitted} submitted from ${milestoneTotal} published final submission milestone.`
+            : comp4300Published
+              ? 'The published final submission milestone is closed.'
+              : 'Waiting for the coordinator to publish the final submission milestone.'
           : milestoneTotal ? `${milestoneSubmitted} submitted from ${milestoneTotal} published milestones.` : 'Waiting for the coordinator to publish timeline milestones.',
-        tag: isComp4300 ? 'Reset' : milestoneTotal ? `${readiness}%` : 'Waiting',
-        icon: isComp4300 ? 'sync_alt' : milestoneTotal && milestoneSubmitted >= milestoneTotal ? 'task_alt' : 'flag',
-        done: isComp4300 || (milestoneTotal > 0 && milestoneSubmitted >= milestoneTotal),
-        waiting: !isComp4300 && milestoneTotal > 0 && milestoneSubmitted < milestoneTotal
+        tag: milestoneTotal ? `${readiness}%` : 'Waiting',
+        icon: milestoneTotal && milestoneSubmitted >= milestoneTotal ? 'task_alt' : 'flag',
+        done: milestoneTotal > 0 && milestoneSubmitted >= milestoneTotal,
+        waiting: milestoneTotal > 0 && milestoneSubmitted < milestoneTotal
       },
       {
         title: 'Final report package',
-        meta: finalUploaded ? safeText(files.final_report?.uploaded_at, 'Uploaded') : 'End-of-semester item. Prepare material gradually, submit when the window opens.',
-        tag: finalUploaded ? 'Submitted' : 'Later',
-        icon: finalUploaded ? 'check' : 'calendar_month',
+        meta: finalUploaded
+          ? safeText(files.final_report?.uploaded_at, 'Uploaded')
+          : isComp4300 && comp4300WindowOpen
+            ? 'The COMP4300 final submission window is open. Upload the final report before the deadline.'
+            : isComp4300 && comp4300Published
+              ? 'The COMP4300 final submission window is closed.'
+              : 'End-of-semester item. Prepare material gradually, submit when the window opens.',
+        tag: finalUploaded ? 'Submitted' : isComp4300 && comp4300WindowOpen ? 'Open' : isComp4300 && comp4300Published ? 'Closed' : 'Later',
+        icon: finalUploaded ? 'check' : isComp4300 && comp4300WindowOpen ? 'upload_file' : 'calendar_month',
         done: finalUploaded,
-        waiting: false
+        waiting: !finalUploaded && isComp4300 && comp4300WindowOpen
       },
       {
         title: 'Source code package',
@@ -668,8 +693,8 @@
         const subLabel = isTimeline
           ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:2px">Timeline Milestone</div>`
           : '';
-        const actionBtn = isTimeline
-          ? `<a href="/student/timeline"
+        const actionBtn = isTimeline && dl.submission_open
+          ? `<a href="${escapeHtml(dl.submit_url || '/student/timeline')}"
                style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;
                       color:#fff;background:var(--green);border-radius:8px;padding:5px 10px;
                       text-decoration:none;white-space:nowrap;flex-shrink:0;transition:opacity .15s"

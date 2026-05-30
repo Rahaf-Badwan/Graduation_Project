@@ -105,11 +105,31 @@
   </script>
 
   <script>
+    let coordinatorEvaluationBadgeTimer = null;
+
+    function stopCoordinatorEvaluationBadgePolling() {
+      if (coordinatorEvaluationBadgeTimer) {
+        clearInterval(coordinatorEvaluationBadgeTimer);
+        coordinatorEvaluationBadgeTimer = null;
+      }
+      window.removeEventListener('focus', loadCoordinatorEvaluationBadge);
+      const badge = document.getElementById('coordEvaluationBadge');
+      if (badge) badge.style.display = 'none';
+    }
+
     async function loadCoordinatorEvaluationBadge() {
       try {
         const res = await fetch('/api/coordinator/evaluation/unread-count', {
           headers: { 'Accept': 'application/json' }
         });
+
+        if (res.status === 401 || res.status === 403) {
+          stopCoordinatorEvaluationBadgePolling();
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(`Evaluation badge request failed (${res.status})`);
+        }
 
         const data = await res.json().catch(() => ({ count: 0 }));
         const count = Number(data.count || 0);
@@ -127,7 +147,7 @@
 
     document.addEventListener('DOMContentLoaded', loadCoordinatorEvaluationBadge);
     window.addEventListener('focus', loadCoordinatorEvaluationBadge);
-    setInterval(loadCoordinatorEvaluationBadge, 30000);
+    coordinatorEvaluationBadgeTimer = setInterval(loadCoordinatorEvaluationBadge, 30000);
   </script>
 
   <div id="toast" class="toast"></div>

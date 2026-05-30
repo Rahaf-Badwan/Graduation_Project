@@ -285,6 +285,76 @@
       align-items: start;
     }
 
+    #pg-exams .submission-folder {
+      border: 1px solid #e7eee9;
+      background: var(--color-background-primary);
+      border-radius: 16px;
+      padding: 13px;
+    }
+
+    #pg-exams .submission-folder-header,
+    #pg-exams .submission-file-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    #pg-exams .submission-files {
+      display: grid;
+      gap: 0;
+      margin-top: 12px;
+      border-top: 1px solid #e7eee9;
+    }
+
+    #pg-exams .submission-file-row {
+      padding: 11px 0;
+      border-bottom: 1px solid #e7eee9;
+    }
+
+    #pg-exams .submission-file-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    #pg-exams .submission-file-name {
+      color: var(--color-text-primary);
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 3px;
+    }
+
+    #pg-exams .submission-student-row {
+      padding: 12px 0;
+      border-bottom: 1px solid #e7eee9;
+    }
+
+    #pg-exams .submission-student-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    #pg-exams .submission-student-header,
+    #pg-exams .submission-attachment {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    #pg-exams .submission-attachments {
+      display: grid;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    #pg-exams .submission-attachment {
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: var(--color-background-tertiary);
+    }
+
     #pg-exams .submission-title {
       font-weight: 900;
       color: var(--color-text-primary);
@@ -1069,6 +1139,56 @@
     document.getElementById('subOther').textContent = other;
   }
 
+  function submissionFolderKey(file) {
+    const courseCode = normalizeCourseScope(file);
+    const title = String(file.submission_title || file.file_type || 'Submission').trim().toLowerCase();
+    return `${courseCode}:title:${title}`;
+  }
+
+  function groupSubmissionFiles(files) {
+    const folders = new Map();
+
+    files.forEach(file => {
+      const key = submissionFolderKey(file);
+      if (!folders.has(key)) {
+        folders.set(key, {
+          submission_title: file.submission_title || file.file_type || 'Submission',
+          course_code: normalizeCourseScope(file),
+          course_label: file.course_label,
+          files: []
+        });
+      }
+      folders.get(key).files.push(file);
+    });
+
+    return Array.from(folders.values());
+  }
+
+  function groupStudentSubmissions(files) {
+    const submissions = new Map();
+
+    files.forEach(file => {
+      const projectId = String(file.project_id || '').trim();
+      const key = projectId
+        ? `project:${projectId}`
+        : `${file.source || 'file'}:${file.source_id || ''}:${file.submitted_by || ''}`;
+
+      if (!submissions.has(key)) {
+        submissions.set(key, {
+          project_id: file.project_id,
+          project_title: file.project_title,
+          submitted_by: file.submitted_by,
+          team_members: file.team_members,
+          supervisor_name: file.supervisor_name,
+          files: []
+        });
+      }
+      submissions.get(key).files.push(file);
+    });
+
+    return Array.from(submissions.values());
+  }
+
   function renderSubmissionFiles() {
     const box = document.getElementById('submissionFilesBox');
     const status = document.getElementById('submissionStatus');
@@ -1103,7 +1223,7 @@
     }
 
     if (status) {
-      status.textContent = `${files.length} shown`;
+      status.textContent = `${groupSubmissionFiles(files).length} folder(s) shown - ${files.length} file(s)`;
     }
 
     if (!files.length) {
@@ -1111,30 +1231,65 @@
       return;
     }
 
-    box.innerHTML = files.map(file => {
-      const courseCode = normalizeCourseScope(file);
-      const downloadUrl = file.download_url || '';
-      const downloadButton = downloadUrl
-        ? `<a class="btn btn-primary" href="${safeSubmissionText(downloadUrl)}" target="_blank" rel="noopener">Download</a>`
-        : `<button class="btn btn-outline" type="button" disabled>No file</button>`;
+    box.innerHTML = groupSubmissionFiles(files).map(folder => {
+      const studentSubmissions = groupStudentSubmissions(folder.files);
+      const submissionRows = studentSubmissions.map(submission => {
+        const projectFiles = submission.files.filter(file => file.source === 'project');
+        const downloadAllButton = submission.project_id && projectFiles.length > 1
+          ? `<a class="btn btn-primary" href="/api/coordinator/projects/${safeSubmissionText(submission.project_id)}/files/download-all">Download All (.zip)</a>`
+          : '';
+        const attachments = submission.files.map(file => {
+          const downloadUrl = file.download_url || '';
+          const downloadButton = downloadUrl
+            ? `<a class="btn btn-outline" href="${safeSubmissionText(downloadUrl)}" target="_blank" rel="noopener">Download</a>`
+            : `<button class="btn btn-outline" type="button" disabled>No file</button>`;
 
-      return `
-        <div class="submission-card">
-          <div>
-            <span class="submission-badge">${safeSubmissionText(courseCode)} · ${safeSubmissionText(file.course_label || '')}</span>
-            <div class="submission-title">${safeSubmissionText(file.submission_title || file.file_type || 'Submission')}</div>
-            <div class="submission-meta">
-              <b>Project:</b> ${safeSubmissionText(file.project_title || '—')}<br>
-              <b>Submitted by:</b> ${safeSubmissionText(file.submitted_by || '—')}<br>
-              <b>Team:</b> ${safeSubmissionText(file.team_members || '—')}<br>
-              <b>Supervisor:</b> ${safeSubmissionText(file.supervisor_name || '—')}<br>
-              <b>File:</b> ${safeSubmissionText(file.file_name || '—')}
-              ${file.file_size_mb ? ` · ${safeSubmissionText(file.file_size_mb)} MB` : ''}<br>
-              <b>Uploaded at:</b> ${safeSubmissionText(file.uploaded_at || '—')}
+          return `
+            <div class="submission-attachment">
+              <div class="submission-meta">
+                <b>${safeSubmissionText((file.file_type || 'attachment').replaceAll('_', ' '))}:</b>
+                ${safeSubmissionText(file.file_name || '-')}
+                ${file.file_size_mb ? ` &middot; ${safeSubmissionText(file.file_size_mb)} MB` : ''}
+              </div>
+              ${downloadButton}
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="submission-student-row">
+            <div class="submission-student-header">
+              <div>
+                <div class="submission-file-name">${safeSubmissionText(submission.submitted_by || 'Student Submission')}</div>
+                <div class="submission-meta">
+                  <b>Project:</b> ${safeSubmissionText(submission.project_title || '-')}<br>
+                  <b>Team:</b> ${safeSubmissionText(submission.team_members || '-')}<br>
+                  <b>Supervisor:</b> ${safeSubmissionText(submission.supervisor_name || '-')}<br>
+                  <b>Attachments:</b> ${submission.files.length}
+                </div>
+              </div>
+              <div>${downloadAllButton}</div>
+            </div>
+            <div class="submission-attachments">
+              ${attachments}
             </div>
           </div>
-          <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;justify-content:flex-end;">
-            ${downloadButton}
+        `;
+      }).join('');
+
+      return `
+        <div class="submission-folder">
+          <div class="submission-folder-header">
+            <div>
+              <span class="submission-badge">${safeSubmissionText(folder.course_code)} &middot; ${safeSubmissionText(folder.course_label || '')}</span>
+              <div class="submission-title">${safeSubmissionText(folder.submission_title || 'Submission')}</div>
+              <div class="submission-meta">
+                <b>Student submissions:</b> ${studentSubmissions.length}
+              </div>
+            </div>
+          </div>
+          <div class="submission-files">
+            ${submissionRows}
           </div>
         </div>
       `;
@@ -1163,10 +1318,6 @@
 
       submissionFilesState = data.files || [];
       renderSubmissionFiles();
-
-      if (status) {
-        status.textContent = `${submissionFilesState.length} file(s) loaded`;
-      }
     } catch (err) {
       submissionFilesState = [];
       updateSubmissionStats(submissionFilesState);

@@ -128,16 +128,31 @@ def _render_login(**context):
 def login_page():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
-    return _render_login()
+
+    # Messages saved here are used after redirecting from POST /login.
+    # This prevents the browser from showing "Resubmit the form?" on refresh.
+    error = session.pop("login_error", None)
+    uid = session.pop("login_uid", "")
+    return _render_login(error=error, university_id=uid)
 
 
-@app.route("/login", methods=["POST", "GET"])
+@app.route("/login", methods=["GET"])
+def login_get():
+    return redirect(url_for("login_page"))
+
+
+@app.route("/login", methods=["POST"])
 def login():
     uid = request.form.get("university_id", "").strip()
     pwd = request.form.get("password", "").strip()
 
+    def back_to_login(error_message):
+        session["login_error"] = error_message
+        session["login_uid"] = uid
+        return redirect(url_for("login_page"))
+
     if not uid or not pwd:
-        return _render_login(error="Please fill in all fields.")
+        return back_to_login("Please fill in all fields.")
 
     try:
         db = get_db()
@@ -149,13 +164,16 @@ def login():
         cursor.close()
         db.close()
     except Exception as e:
-        return _render_login(error=f"Database error: {e}")
+        return back_to_login(f"Database error: {e}")
 
     if not user:
-        return _render_login(error="Invalid University ID or password.")
+        return back_to_login("Invalid University ID or password.")
 
     if not bcrypt.checkpw(pwd.encode(), user["password_hash"].encode()):
-        return _render_login(error="Invalid University ID or password.")
+        return back_to_login("Invalid University ID or password.")
+
+    session.pop("login_error", None)
+    session.pop("login_uid", None)
 
     session["user_id"] = user["user_id"]
     session["university_id"] = user["university_id"]
@@ -171,6 +189,7 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login_page"))
+
 
 
 # ─── Forgot Password ─────────────────────────────────────────────────────

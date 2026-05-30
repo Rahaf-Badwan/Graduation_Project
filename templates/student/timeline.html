@@ -679,8 +679,9 @@
         const isMineAndOpen = prev && prev.submitted_by_me && isOpen;
 
         /* Final report → go to submit project page; others → upload modal */
+        const submitUrl = item.submit_url || `/student/submit?timeline_item_id=${item.item_id}`;
         const finalLink = (label, icon, style = '') =>
-          `<a href="/student/submit?timeline_item_id=${item.item_id}" class="timeline-submit-link"
+          `<a href="${safeText(submitUrl)}" class="timeline-submit-link"
                style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;${style}">
                <span class="material-symbols-outlined" style="font-size:15px">${icon}</span>${label}
              </a>`;

@@ -17,34 +17,39 @@
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
       <span class="sb-label">Dashboard</span>
     </a>
-    <a id="studentRegistrationNav" class="sb-item {% if request.path == '/student/registration' %}on{% endif %}"
+    {% if student_nav.show_registration %}
+    <a class="sb-item {% if request.path == '/student/registration' %}on{% endif %}"
       data-page="registration" href="/student/registration">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">app_registration</span></span>
       <span class="sb-label">Registration</span>
     </a>
-    <a id="submitProjectNav"
+    {% endif %}
+    {% if student_nav.show_submit %}
+    <a
       class="sb-item {% if request.path == '/student/submit' %}on{% endif %}"
-      data-page="submit" href="/student/submit"
-      style="display:none">
+      data-page="submit" href="{{ student_nav.submit_url }}">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">upload_file</span></span>
       <span class="sb-label">Submit Project</span>
     </a>
-    <a id="timelineNav" class="sb-item {% if request.path == '/student/timeline' %}on{% endif %}" data-page="timeline"
-      href="/student/timeline" style="display:none">
+    {% endif %}
+    {% if student_nav.is_registered %}
+    <a class="sb-item {% if request.path == '/student/timeline' %}on{% endif %}" data-page="timeline"
+      href="/student/timeline">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">timeline</span></span>
       <span class="sb-label">Student Timeline</span>
     </a>
-    <a id="feedbackNav" class="sb-item {% if request.path == '/student/feedback' %}on{% endif %}" data-page="feedback"
-      href="/student/feedback" style="display:none">
+    <a class="sb-item {% if request.path == '/student/feedback' %}on{% endif %}" data-page="feedback"
+      href="/student/feedback">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">reviews</span></span>
       <span class="sb-label">Feedback</span>
     </a>
    
-    <a id="challengesNav" class="sb-item {% if request.path == '/student/challenges' %}on{% endif %}" data-page="challenges"
-      href="/student/challenges" style="display:none">
+    <a class="sb-item {% if request.path == '/student/challenges' %}on{% endif %}" data-page="challenges"
+      href="/student/challenges">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">flag</span></span>
       <span class="sb-label">Challenges &amp; Reflections</span>
     </a>
+    {% endif %}
      <a class="sb-item {% if request.path == '/student/result' %}on{% endif %}" data-page="result"
       href="/student/result">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">workspace_premium</span></span>
@@ -75,60 +80,6 @@
   </div>
 </div>
 <script>
-  // Show Submit Project only when a final submission milestone is active
-  (function () {
-    var submitLink = document.getElementById('submitProjectNav');
-    if (!submitLink) return;
-    function checkFinalWindow() {
-      fetch('/student/api/final-submission-window')
-        .then(r => r.json())
-        .then(function(data) {
-          if (data.is_active) {
-            // Update href with milestone_id so submit page knows which item
-            submitLink.href = '/student/submit?milestone_id=' + (data.item_id || '');
-            submitLink.style.display = '';
-          } else {
-            submitLink.style.display = 'none';
-          }
-        })
-        .catch(function() { submitLink.style.display = 'none'; });
-    }
-    checkFinalWindow();
-    // Re-check every 60 seconds (catches deadline passing)
-    setInterval(checkFinalWindow, 60000);
-  })();
-
-  // Show Timeline, Feedback, Challenges only when student is registered
-  (function () {
-    var navIds = ['timelineNav', 'feedbackNav', 'challengesNav'];
-    function checkRegistration() {
-      fetch('/student/api/registration-check')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          navIds.forEach(function(id) {
-            var el = document.getElementById(id);
-            if (!el) return;
-            el.style.display = data.registered ? '' : 'none';
-          });
-        })
-        .catch(function() { });
-    }
-    checkRegistration();
-  })();
-
-  (function () {
-    const link = document.getElementById('studentRegistrationNav');
-    if (!link) return;
-    fetch('/student/api/distribution-window-status')
-      .then(r => r.json())
-      .then(data => {
-        if (!data.is_open && window.location.pathname !== '/student/registration') {
-          link.style.display = 'none';
-        }
-      })
-      .catch(() => { });
-  })();
-
   // Dynamic notification badge
   (function () {
     function updateBadge() {

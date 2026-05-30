@@ -11,7 +11,9 @@ from flask import (
 import csv
 import io
 import math
+import os
 import random
+import zipfile
 import bcrypt
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -1486,13 +1488,27 @@ def api_coordinator_submission_files():
             params = []
             where = """
                 WHERE COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
-                  AND EXISTS (
-                      SELECT 1
-                      FROM deadlines d
-                      WHERE d.semester_id = s.semester_id
-                        AND d.deadline_type = 'file_submission'
-                        AND (d.project_id IS NULL OR d.project_id = p.project_id)
-                        AND d.deadline_date < CURDATE()
+                  AND (
+                      EXISTS (
+                          SELECT 1
+                          FROM deadlines d
+                          WHERE d.semester_id = s.semester_id
+                            AND d.deadline_type = 'file_submission'
+                            AND (d.project_id IS NULL OR d.project_id = p.project_id)
+                            AND d.deadline_date < CURDATE()
+                      )
+                      OR (
+                          s.course_code = 'COMP4300'
+                          AND EXISTS (
+                              SELECT 1
+                              FROM coordinator_deliverables cd
+                              WHERE cd.semester_id = s.semester_id
+                                AND cd.course_scope = 'graduation_project'
+                                AND cd.title = 'Graduation Project Final Submission'
+                                AND cd.is_published = TRUE
+                                AND cd.due_at < NOW()
+                          )
+                      )
                   )
             """
             if academic_year:
@@ -1506,6 +1522,19 @@ def api_coordinator_submission_files():
                        pf.file_data IS NOT NULL AS has_file_data,
                        p.title AS project_title, p.project_type,
                        s.course_code,
+                       COALESCE(
+                           (
+                               SELECT cd.title
+                               FROM coordinator_deliverables cd
+                               WHERE cd.semester_id = s.semester_id
+                                 AND cd.course_scope = 'graduation_project'
+                                 AND cd.title = 'Graduation Project Final Submission'
+                                 AND cd.is_published = TRUE
+                               ORDER BY cd.deliverable_id DESC
+                               LIMIT 1
+                           ),
+                           'Project File Submission'
+                       ) AS submission_title,
                        ANY_VALUE(COALESCE(u.full_name, primary_user.full_name, '')) AS submitted_by,
                        ANY_VALUE(sup_u.full_name) AS supervisor_name,
                        GROUP_CONCAT(DISTINCT tm_u.full_name ORDER BY tm_u.full_name SEPARATOR ', ') AS team_members
@@ -1528,7 +1557,7 @@ def api_coordinator_submission_files():
                 {where}
                 GROUP BY pf.file_id, pf.project_id, pf.file_type, pf.file_name,
                          pf.file_path, pf.file_size_mb, pf.uploaded_at,
-                         p.title, p.project_type, s.course_code
+                         p.title, p.project_type, s.semester_id, s.course_code
                 ORDER BY pf.uploaded_at DESC, pf.file_id DESC
                 """,
                 tuple(params),
@@ -1542,9 +1571,8 @@ def api_coordinator_submission_files():
                         "source_id": row.get("file_id"),
                         "project_id": row.get("project_id"),
                         "file_type": (row.get("file_type") or "project_file"),
-                        "submission_title": (row.get("file_type") or "project_file")
-                        .replace("_", " ")
-                        .title(),
+                        "submission_title": row.get("submission_title")
+                        or "Project File Submission",
                         "course_scope": course_code,
                         "course_label": _course_label_for_code(course_code),
                         "project_title": row.get("project_title") or "Untitled Project",
@@ -1581,6 +1609,18 @@ def api_coordinator_submission_files():
                        ti.milestone_label,
                        p.title AS project_title,
                        u.full_name AS submitted_by,
+                       sup_u.full_name AS supervisor_name,
+                       (
+                           SELECT GROUP_CONCAT(
+                               DISTINCT tm_u.full_name
+                               ORDER BY tm_pm.is_primary_contact DESC, tm_u.full_name
+                               SEPARATOR ', '
+                           )
+                           FROM project_members tm_pm
+                           JOIN students tm_st ON tm_st.student_id = tm_pm.student_id
+                           JOIN users tm_u ON tm_u.user_id = tm_st.user_id
+                           WHERE tm_pm.project_id = ms.project_id
+                       ) AS team_members,
                        ms.file_data IS NOT NULL AS has_file_data
                 FROM milestone_submissions ms
                 JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
@@ -1589,6 +1629,8 @@ def api_coordinator_submission_files():
                 JOIN students st ON st.student_id = ms.student_id
                 JOIN users u ON u.user_id = st.user_id
                 LEFT JOIN projects p ON p.project_id = ms.project_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
                 {where}
                 ORDER BY ms.submitted_at DESC, ms.submission_id DESC
                 """,
@@ -1607,6 +1649,8 @@ def api_coordinator_submission_files():
                         "course_label": "Project Introduction",
                         "project_title": row.get("project_title")
                         or "Project Introduction Timeline",
+                        "supervisor_name": row.get("supervisor_name") or "",
+                        "team_members": row.get("team_members") or "",
                         "submitted_by": row.get("submitted_by") or "Unknown student",
                         "file_name": row.get("file_name") or "Open file",
                         "file_path": "",
@@ -1637,7 +1681,19 @@ def api_coordinator_submission_files():
                        cd.title AS deliverable_title,
                        cd.course_scope,
                        p.title AS project_title,
-                       u.full_name AS submitted_by
+                       u.full_name AS submitted_by,
+                       sup_u.full_name AS supervisor_name,
+                       (
+                           SELECT GROUP_CONCAT(
+                               DISTINCT tm_u.full_name
+                               ORDER BY tm_pm.is_primary_contact DESC, tm_u.full_name
+                               SEPARATOR ', '
+                           )
+                           FROM project_members tm_pm
+                           JOIN students tm_st ON tm_st.student_id = tm_pm.student_id
+                           JOIN users tm_u ON tm_u.user_id = tm_st.user_id
+                           WHERE tm_pm.project_id = cds.project_id
+                       ) AS team_members
                 FROM coordinator_deliverable_submissions cds
                 JOIN coordinator_deliverables cd
                   ON cd.deliverable_id = cds.deliverable_id
@@ -1645,6 +1701,8 @@ def api_coordinator_submission_files():
                 JOIN students st ON st.student_id = cds.student_id
                 JOIN users u ON u.user_id = st.user_id
                 LEFT JOIN projects p ON p.project_id = cds.project_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
                 {where}
                 ORDER BY cds.submitted_at DESC, cds.submission_id DESC
                 """,
@@ -1668,6 +1726,8 @@ def api_coordinator_submission_files():
                         "course_label": _course_label_for_code(course_code),
                         "project_title": row.get("project_title")
                         or _course_label_for_code(course_code),
+                        "supervisor_name": row.get("supervisor_name") or "",
+                        "team_members": row.get("team_members") or "",
                         "submitted_by": row.get("submitted_by") or "Unknown student",
                         "file_name": row.get("file_name") or "Open file",
                         "file_path": row.get("file_path") or "",
@@ -1735,6 +1795,56 @@ def api_coordinator_download_project_file(file_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/projects/<int:project_id>/files/download-all")
+@login_required(role="coordinator")
+def api_coordinator_download_project_files(project_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT p.title AS project_title, pf.file_id, pf.file_name, pf.file_data
+            FROM project_files pf
+            JOIN projects p ON p.project_id = pf.project_id
+            WHERE pf.project_id = %s
+              AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+              AND pf.file_data IS NOT NULL
+            ORDER BY pf.file_type, pf.file_id
+            """,
+            (project_id,),
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        db.close()
+
+        if not rows:
+            return jsonify({"error": "No downloadable files found for this project."}), 404
+
+        archive = io.BytesIO()
+        used_names = set()
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for row in rows:
+                original_name = secure_filename(row.get("file_name") or "")
+                file_name = original_name or f"project_file_{row['file_id']}"
+                if file_name in used_names:
+                    stem, extension = os.path.splitext(file_name)
+                    file_name = f"{stem}_{row['file_id']}{extension}"
+                used_names.add(file_name)
+                zip_file.writestr(file_name, bytes(row["file_data"]))
+
+        archive.seek(0)
+        project_name = secure_filename(rows[0].get("project_title") or "")
+        archive_name = f"{project_name or f'project_{project_id}'}_files.zip"
+        return Response(
+            archive.getvalue(),
+            mimetype="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{archive_name}"'},
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @coordinator_bp.route(
     "/api/coordinator/milestone-submissions/<int:submission_id>/download"
