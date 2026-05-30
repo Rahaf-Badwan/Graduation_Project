@@ -8971,8 +8971,10 @@ def coordinator_profile_api():
         conn.close()
 
 @coordinator_bp.route("/api/coordinator/evaluation/unread-count", methods=["GET"])
-@login_required(role="coordinator")
 def api_coordinator_evaluation_unread_count():
+    # Return 0 silently if not logged in as coordinator (avoids 401 log noise from expired sessions)
+    if session.get("role") != "coordinator" or "user_id" not in session:
+        return jsonify({"count": 0})
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
