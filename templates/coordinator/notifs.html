@@ -1112,10 +1112,46 @@
       catch (e) { showToast(e.message, true); }
     }
 
+    function normalizeCourseScope(row) {
+      if (!row) return 'both';
+
+      const rawScope = String(row.course_scope || '').trim();
+      if (rawScope === 'introduction' || rawScope === 'graduation_project' || rawScope === 'both') {
+        return rawScope;
+      }
+
+      const rawCode = String(row.course_code || '').trim().toUpperCase();
+      if (rawCode === 'COMP4200') return 'introduction';
+      if (rawCode === 'COMP4300') return 'graduation_project';
+
+      const key = String(row.section_key || '').trim();
+      if (key.startsWith('s:')) return 'introduction';
+      if (key.startsWith('p:')) return 'graduation_project';
+
+      if (row.project_id && !row.section_id) return 'graduation_project';
+
+      return 'both';
+    }
+
     function optionCourseLabel(row) {
-      const scope = row.course_scope || '';
-      const code = row.course_code || (scope === 'graduation_project' ? 'COMP4300' : scope === 'introduction' ? 'COMP4200' : 'Both');
-      return code;
+      const scope = normalizeCourseScope(row);
+      if (row && row.course_code) return row.course_code;
+      if (scope === 'graduation_project') return 'COMP4300';
+      if (scope === 'introduction') return 'COMP4200';
+      return 'Both';
+    }
+
+    function mergeUniqueRows(keyName, ...groups) {
+      const seen = new Set();
+      const merged = [];
+      groups.flat().filter(Boolean).forEach(row => {
+        const key = row[keyName] || row.user_id || row.section_key || row.section_id || row.project_id || JSON.stringify(row);
+        if (!seen.has(String(key))) {
+          seen.add(String(key));
+          merged.push(row);
+        }
+      });
+      return merged;
     }
 
     function sendScopeNeedsCourse(scope) {
@@ -1152,11 +1188,13 @@
 
     function filterByCourse(rows) {
       const selected = courseScopeForSend();
-      if (selected === 'both') return rows || [];
-      return (rows || []).filter(row => {
-        const scope = row.course_scope || (row.course_code === 'COMP4300' ? 'graduation_project' : row.course_code === 'COMP4200' ? 'introduction' : 'both');
-        return scope === selected || scope === 'both';
-      });
+      const cleanRows = rows || [];
+      if (selected === 'both') return cleanRows;
+      return cleanRows.filter(row => normalizeCourseScope(row) === selected);
+    }
+
+    function renderEmptySpecificOption(select, text) {
+      select.insertAdjacentHTML('beforeend', '<option value="" disabled>' + esc(text) + '</option>');
     }
 
     function updateSpecificWrap() {
@@ -1173,19 +1211,31 @@
         placeholder = 'Choose doctor...';
         rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' — ' + esc(d.university_id || '') + '</option>'));
       } else if (scope === 'student') {
-        rows = filterByCourse(state.options.students || []);
-        if (!rows.length && selectedCourse === 'graduation_project') rows = state.options.comp4300_students || [];
-        if (!rows.length && selectedCourse === 'introduction') rows = state.options.comp4200_students || [];
+        const allStudents = mergeUniqueRows(
+          'student_id',
+          state.options.students || [],
+          state.options.comp4200_students || [],
+          state.options.comp4300_students || []
+        );
+        rows = filterByCourse(allStudents);
         placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 student...' : selectedCourse === 'introduction' ? 'Choose COMP4200 student...' : 'Choose student...';
         rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + ' — ' + esc(optionCourseLabel(s)) + '</option>'));
       } else if (scope === 'section') {
-        rows = filterByCourse(state.options.sections || []);
+        const allSections = mergeUniqueRows(
+          'section_key',
+          state.options.sections || [],
+          state.options.projects || []
+        );
+        rows = filterByCourse(allSections);
         placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 project...' : selectedCourse === 'introduction' ? 'Choose COMP4200 section...' : 'Choose section/project...';
-        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
+        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id || ('p:' + sec.project_id)) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name || sec.title || ('Project ' + (sec.project_id || ''))) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || sec.student_count || 0) + ' students)</option>'));
       }
 
       if (['doctor', 'student', 'section'].includes(scope)) {
         select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>');
+        if (!rows.length) {
+          renderEmptySpecificOption(select, 'No receivers found for this course.');
+        }
         wrap.style.display = 'flex';
       } else {
         wrap.style.display = 'none';

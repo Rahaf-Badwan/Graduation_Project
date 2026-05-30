@@ -527,11 +527,6 @@ request.path.startswith('/head') else 'student/base.html') %}
       </select>
       <select id="apType">
         <option value="">All Types</option>
-        <option value="web">Web Application</option>
-        <option value="mobile">Mobile App</option>
-        <option value="ai">Artificial Intelligence</option>
-        <option value="security">Security</option>
-        <option value="other">Other</option>
       </select>
       <select id="apSupervisor">
         <option value="">All Supervisors</option>
@@ -605,21 +600,28 @@ request.path.startswith('/head') else 'student/base.html') %}
 
     function typeInfo(raw) {
       const t = (raw || '').toLowerCase();
-      if (t.includes('ai')) return { cls: 'ai', abbr: 'AI' };
-      if (t.includes('mobile')) return { cls: 'mobile', abbr: 'MOB' };
-      if (t.includes('security')) return { cls: 'security', abbr: 'SEC' };
-      if (t.includes('web')) return { cls: 'web', abbr: 'WEB' };
+      if (t.includes('ai'))                   return { cls: 'ai',       abbr: 'AI'  };
+      if (t.includes('mobile'))               return { cls: 'mobile',   abbr: 'MOB' };
+      if (t.includes('security'))             return { cls: 'security', abbr: 'SEC' };
+      if (t.includes('web'))                  return { cls: 'web',      abbr: 'WEB' };
+      if (t.includes('database'))             return { cls: 'db',       abbr: 'DB'  };
+      if (t.includes('software_engineering')) return { cls: 'se',       abbr: 'SE'  };
       return { cls: 'other', abbr: 'OTH' };
     }
 
+    const TYPE_LABELS = {
+      web: 'Web Application',
+      mobile: 'Mobile App',
+      ai: 'Artificial Intelligence',
+      security: 'Security',
+      databases: 'Databases',
+      software_engineering: 'Software Engineering',
+      other: 'Other'
+    };
+
     function typeLabel(raw) {
-      return ({
-        web: 'Web App',
-        mobile: 'Mobile',
-        ai: 'AI',
-        security: 'Security',
-        other: 'Other'
-      }[raw] || raw || '-');
+      if (!raw) return '-';
+      return raw.split(',').map(t => TYPE_LABELS[t.trim()] || t.trim()).join(', ');
     }
 
     function scoreClass(score) {
@@ -672,7 +674,8 @@ request.path.startswith('/head') else 'student/base.html') %}
           $('apScoreBtn').style.display = 'none';
         }
 
-        fillYears(data.years || []);
+        fillYears(data.years || [], data.has_unknown_year || false);
+        fillTypes(data.project_types || []);
         fillSupervisors(data.supervisors || []);
         renderMeta(data.total || 0);
         renderProjects(data.projects || []);
@@ -682,9 +685,9 @@ request.path.startswith('/head') else 'student/base.html') %}
       }
     }
 
-    function fillYears(years) {
+    function fillYears(years, hasUnknown) {
       const yearSelect = $('apYear');
-      if (yearSelect.options.length > 1 || !years.length) return;
+      if (yearSelect.options.length > 1) return;
 
       years.forEach(year => {
         const option = document.createElement('option');
@@ -693,7 +696,26 @@ request.path.startswith('/head') else 'student/base.html') %}
         yearSelect.appendChild(option);
       });
 
+      if (hasUnknown) {
+        const opt = document.createElement('option');
+        opt.value = '__unknown__';
+        opt.textContent = 'Unknown';
+        yearSelect.appendChild(opt);
+      }
+
       yearSelect.value = state.year;
+    }
+
+    function fillTypes(types) {
+      const sel = $('apType');
+      if (sel.options.length > 1 || !types.length) return;
+      types.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = TYPE_LABELS[t] || t;
+        sel.appendChild(opt);
+      });
+      sel.value = state.type;
     }
 
     function fillSupervisors(supervisors) {
@@ -702,7 +724,7 @@ request.path.startswith('/head') else 'student/base.html') %}
 
       supervisors.forEach(supervisor => {
         const option = document.createElement('option');
-        option.value = supervisor.id;
+        option.value = supervisor.name;
         option.textContent = supervisor.name;
         supervisorSelect.appendChild(option);
       });
@@ -737,7 +759,7 @@ request.path.startswith('/head') else 'student/base.html') %}
             <div class="ap-info">
               <div class="ap-title">${esc(project.title)}</div>
               <div class="ap-sub">
-                ${esc(project.supervisor_name)} &middot; ${esc(project.academic_year)} &middot; ${typeLabel(project.project_type)}
+                ${esc(project.supervisor_name || '-')} &middot; ${esc(project.academic_year || 'Unknown')} &middot; ${typeLabel(project.project_type)}
               </div>
             </div>
             ${score !== null ? `<span class="score-chip ${scoreClass(score)} ${state.showScores ? '' : 'hidden'}">${score}</span>` : ''}
@@ -806,7 +828,7 @@ request.path.startswith('/head') else 'student/base.html') %}
         const project = data.project;
 
         $('vmTitle').textContent = project.title;
-        $('vmSubtitle').textContent = `${project.academic_year} - ${typeLabel(project.project_type)}`;
+        $('vmSubtitle').textContent = `${project.academic_year || 'Unknown'} - ${typeLabel(project.project_type)}`;
 
         if (data.report_url) {
           $('vmNoPdf').style.display = 'none';
@@ -823,7 +845,7 @@ request.path.startswith('/head') else 'student/base.html') %}
         $('vmInfo').innerHTML = `
           <div>
             <div class="vm-section-title">Project Details</div>
-            <div class="vm-row"><span class="vm-row-label">Year</span><span class="vm-row-val">${esc(project.academic_year)}</span></div>
+            <div class="vm-row"><span class="vm-row-label">Year</span><span class="vm-row-val">${esc(project.academic_year || 'Unknown')}</span></div>
             <div class="vm-row"><span class="vm-row-label">Type</span><span class="vm-row-val">${typeLabel(project.project_type)}</span></div>
             <div class="vm-row"><span class="vm-row-label">Supervisor</span><span class="vm-row-val">${esc(project.supervisor_name || '-')}</span></div>
             ${score !== null ? `<div class="vm-row"><span class="vm-row-label">Score</span><span class="vm-row-val"><span class="score-chip ${scoreClass(score)}" style="width:auto;height:auto;padding:3px 10px;border-radius:999px;display:inline-flex">${score}</span></span></div>` : ''}
