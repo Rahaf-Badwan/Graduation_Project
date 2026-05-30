@@ -624,7 +624,54 @@ def _head_notification_recipients(cursor, scope, value=None, course_scope="both"
         )
         return [r["user_id"] for r in cursor.fetchall()]
 
-    if scope == "students":
+    if scope in {"students", "all_students", "comp4200_students", "comp4300_students"}:
+        target_scope = course_scope
+        if scope == "comp4200_students":
+            target_scope = "introduction"
+        elif scope == "comp4300_students":
+            target_scope = "graduation_project"
+
+        if target_scope == "graduation_project":
+            cursor.execute("""
+                SELECT DISTINCT u.user_id
+                FROM projects p
+                JOIN semesters sem ON sem.semester_id = p.semester_id
+                JOIN project_members pm ON pm.project_id = p.project_id
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE sem.course_code = 'COMP4300'
+                  AND u.role = 'student'
+                  AND u.is_active = TRUE
+            """)
+            return [r["user_id"] for r in cursor.fetchall()]
+
+        if target_scope == "introduction":
+            if _head_table_exists(cursor, "student_course_results"):
+                cursor.execute("""
+                    SELECT DISTINCT u.user_id
+                    FROM student_course_results scr
+                    JOIN semesters sem ON sem.semester_id = scr.semester_id
+                    JOIN students st ON st.student_id = scr.student_id
+                    JOIN users u ON u.user_id = st.user_id
+                    WHERE sem.course_code = 'COMP4200'
+                      AND u.role = 'student'
+                      AND u.is_active = TRUE
+                """)
+                rows = [r["user_id"] for r in cursor.fetchall()]
+                if rows:
+                    return rows
+            if _head_table_exists(cursor, "student_distribution_sections") and _head_table_exists(cursor, "section_students"):
+                cursor.execute("""
+                    SELECT DISTINCT u.user_id
+                    FROM section_students ss
+                    JOIN students st ON st.student_id = ss.student_id
+                    JOIN users u ON u.user_id = st.user_id
+                    WHERE u.role = 'student' AND u.is_active = TRUE
+                """)
+                rows = [r["user_id"] for r in cursor.fetchall()]
+                if rows:
+                    return rows
+
         cursor.execute("SELECT user_id FROM users WHERE role = 'student' AND is_active = TRUE")
         return [r["user_id"] for r in cursor.fetchall()]
 
@@ -871,7 +918,7 @@ def api_head_notifications_send():
     title = (data.get("title") or "").strip()
     message = (data.get("message") or "").strip()
     urgent = str(data.get("urgent") or "").lower() in ("1", "true", "on", "yes")
-    can_reply = str(data.get("can_reply", "1")).lower() in ("1", "true", "on", "yes")
+    can_reply = str(data.get("can_reply") or "0").lower() in ("1", "true", "on", "yes")
     reply_to_notification_id = data.get("reply_to_notification_id") or data.get("notification_id")
     course_scope = (data.get("course_scope") or "both").strip()
 

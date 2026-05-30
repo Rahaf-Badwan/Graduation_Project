@@ -7,8 +7,8 @@
 {% block content %}
 <style>
   :root {
-    --sn-green: #2e7d42;
-    --sn-green-dark: #205c31;
+    --sn-green: #1f7a3b;
+    --sn-green-dark: #145a2b;
     --sn-green-soft: #eef9f1;
     --sn-border: #e4ece7;
     --sn-muted: #667085;
@@ -40,45 +40,9 @@
     padding: 8px 10px 88px
   }
 
-  .main-notif-tabs {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 0 0 16px
-  }
-
-  .main-notif-tab {
-    border: 1px solid #d7e3dc;
-    background: var(--color-background-primary);
-    color: var(--color-text-primary);
-    padding: 10px 14px;
-    border-radius: 999px;
-    font-weight: 900;
-    cursor: pointer;
-    transition: background .15s, color .15s, border-color .15s, box-shadow .15s
-  }
-
-  .main-notif-tab:hover {
-    box-shadow: 0 5px 14px rgba(16, 24, 40, .06)
-  }
-
-  .main-notif-tab.on {
-    background: var(--sn-green);
-    color: #fff;
-    border-color: var(--sn-green)
-  }
-
-  .notif-tab-pane {
-    display: none
-  }
-
-  .notif-tab-pane.active {
-    display: block
-  }
-
   .sn-messages-card {
     width: 100%;
-    min-height: calc(100vh - 190px)
+    min-height: calc(100vh - 150px)
   }
 
   .sn-card {
@@ -130,6 +94,22 @@
     gap: 12px
   }
 
+  @media(max-width:700px) {
+    .sn-form-row {
+      grid-template-columns: 1fr
+    }
+
+    .sn-card-hd {
+      align-items: flex-start;
+      flex-direction: column
+    }
+
+    .sn-head-actions {
+      width: 100%;
+      justify-content: space-between
+    }
+  }
+
   .sn-field {
     display: flex;
     flex-direction: column;
@@ -166,10 +146,11 @@
   .sn-field select:focus,
   .sn-field textarea:focus {
     border-color: var(--sn-green);
-    box-shadow: 0 0 0 4px rgba(46, 125, 66, .12);
+    box-shadow: 0 0 0 4px rgba(31, 122, 59, .12);
     background: var(--color-background-primary)
   }
 
+  /* File drop zone */
   .sn-file-zone {
     border: 2px dashed #c9ddcf;
     border-radius: 14px;
@@ -245,7 +226,7 @@
     transition: transform .15s, box-shadow .15s, opacity .15s;
     background: var(--sn-green);
     color: #fff;
-    box-shadow: 0 6px 16px rgba(46, 125, 66, .18)
+    box-shadow: 0 6px 16px rgba(31, 122, 59, .18)
   }
 
   .sn-btn:hover {
@@ -257,6 +238,13 @@
     background: var(--color-background-tertiary);
     color: var(--green);
     border: 1px solid #cfe0d4;
+    box-shadow: none
+  }
+
+  .sn-btn.danger {
+    background: var(--coral-light);
+    color: #b42318;
+    border: 1px solid #fecaca;
     box-shadow: none
   }
 
@@ -299,7 +287,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-height: calc(100vh - 340px)
+    min-height: calc(100vh - 310px)
   }
 
   .sn-msg {
@@ -316,7 +304,7 @@
   }
 
   .sn-msg:hover {
-    box-shadow: 0 10px 24px rgba(46, 125, 66, .10);
+    box-shadow: 0 10px 24px rgba(31, 122, 59, .10);
     transform: translateY(-1px);
     border-color: #c9decf
   }
@@ -403,27 +391,17 @@
     color: var(--green)
   }
 
-  .sn-att-badge,
-  .course-pill {
+  .sn-att-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     font-size: 11px;
     font-weight: 800;
+    color: #6b7280;
+    background: var(--color-background-tertiary);
     border-radius: 999px;
     padding: 4px 9px;
-    margin-top: 6px;
-    margin-right: 6px
-  }
-
-  .sn-att-badge {
-    color: #6b7280;
-    background: var(--color-background-tertiary)
-  }
-
-  .course-pill {
-    color: var(--green);
-    background: var(--green-light)
+    margin-top: 6px
   }
 
   .sn-empty {
@@ -436,6 +414,7 @@
     font-size: 14px
   }
 
+  /* Compose drawer */
   .sn-drawer-overlay {
     display: none;
     position: fixed;
@@ -454,7 +433,7 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(560px, 94vw);
+    width: min(520px, 94vw);
     background: var(--color-background-primary);
     z-index: 190;
     box-shadow: -18px 0 44px rgba(15, 23, 42, .18);
@@ -510,7 +489,7 @@
     background: var(--sn-green);
     color: #fff;
     font-size: 24px;
-    box-shadow: 0 14px 30px rgba(46, 125, 66, .30);
+    box-shadow: 0 14px 30px rgba(31, 122, 59, .30);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -520,7 +499,7 @@
 
   .sn-fab:hover {
     transform: translateY(-2px) scale(1.03);
-    box-shadow: 0 18px 36px rgba(46, 125, 66, .34)
+    box-shadow: 0 18px 36px rgba(31, 122, 59, .34)
   }
 
   .sn-fab::after {
@@ -566,6 +545,7 @@
     transform: translateY(-50%) translateX(0)
   }
 
+  /* ── Message Modal ── */
   .sn-overlay {
     display: none;
     position: fixed;
@@ -694,81 +674,6 @@
     display: none
   }
 
-  .sn-reply-policy {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-    padding: 10px 12px;
-    border: 1px solid #d8e2dc;
-    border-radius: 14px;
-    background: var(--color-background-tertiary);
-    color: var(--color-text-primary);
-    font-size: 13px;
-    line-height: 1.45;
-    margin-bottom: 13px;
-  }
-
-  .sn-reply-policy input {
-    margin-top: 2px;
-    flex-shrink: 0;
-  }
-
-  .sn-no-reply-note {
-    border: 1px dashed #cddbd2;
-    border-radius: 14px;
-    background: var(--color-background-tertiary);
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    font-weight: 700;
-    padding: 11px 12px;
-    margin-top: 12px;
-  }
-
-
-  /* Important Notice tab: kept from the coordinator page */
-  .notice-preview {
-    border-left: 5px solid #2e7d42;
-    background: var(--color-background-tertiary);
-    border-radius: 14px;
-    padding: 13px 14px;
-    margin-top: 8px
-  }
-
-  .notice-preview-title {
-    font-weight: 900;
-    color: var(--color-text-primary);
-    margin-bottom: 8px
-  }
-
-  .notice-preview-body {
-    font-size: 13px;
-    color: var(--color-text-primary);
-    line-height: 1.55;
-    white-space: pre-wrap
-  }
-
-  .notice-preview-hl {
-    color: #b42318;
-    font-weight: 900;
-    margin-top: 8px
-  }
-
-  @media(max-width:700px) {
-    .sn-form-row {
-      grid-template-columns: 1fr
-    }
-
-    .sn-card-hd {
-      align-items: flex-start;
-      flex-direction: column
-    }
-
-    .sn-head-actions {
-      width: 100%;
-      justify-content: space-between
-    }
-  }
-
   @media(max-width:560px) {
     .sn-shell {
       padding: 8px 8px 96px
@@ -809,49 +714,17 @@
     --sn-muted: var(--color-text-secondary);
     --sn-text: var(--color-text-primary);
   }
-  html[data-theme="dark"] .sn-card {
-    background: var(--color-background-primary);
-    border-color: var(--color-border-tertiary);
-    box-shadow: none;
-  }
-  html[data-theme="dark"] .sn-card-hd {
-    background: var(--color-background-secondary) !important;
-    border-bottom-color: var(--color-border-tertiary);
-  }
+  html[data-theme="dark"] .sn-card { background: var(--color-background-primary); border-color: var(--color-border-tertiary); box-shadow: none; }
+  html[data-theme="dark"] .sn-card-hd { background: var(--color-background-secondary) !important; border-bottom-color: var(--color-border-tertiary); }
   html[data-theme="dark"] .sn-card-sub { color: var(--color-text-secondary); }
   html[data-theme="dark"] .sn-tabs { background: var(--color-background-primary); }
-  html[data-theme="dark"] .sn-tab {
-    background: var(--color-background-tertiary);
-    border-color: var(--color-border-tertiary);
-    color: var(--color-text-primary);
-  }
-  html[data-theme="dark"] .sn-tab.on {
-    background: var(--green);
-    border-color: var(--green);
-    color: #fff;
-  }
-  html[data-theme="dark"] .main-notif-tab {
-    background: var(--color-background-tertiary);
-    border-color: var(--color-border-tertiary);
-    color: var(--color-text-primary);
-  }
-  html[data-theme="dark"] .main-notif-tab.on {
-    background: var(--green);
-    border-color: var(--green);
-    color: #fff;
-  }
-  html[data-theme="dark"] .sn-msg {
-    background: var(--color-background-primary);
-    border-color: var(--color-border-tertiary);
-  }
-  html[data-theme="dark"] .sn-msg:hover {
-    border-color: var(--green);
-    box-shadow: 0 4px 12px rgba(0,0,0,.35);
-  }
-  html[data-theme="dark"] .sn-msg.unread {
-    background: var(--color-background-tertiary) !important;
-    border-color: var(--green) !important;
-  }
+  html[data-theme="dark"] .sn-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+  html[data-theme="dark"] .main-notif-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .main-notif-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
+  html[data-theme="dark"] .sn-msg { background: var(--color-background-primary); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-msg:hover { border-color: var(--green); box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+  html[data-theme="dark"] .sn-msg.unread { background: var(--color-background-tertiary) !important; border-color: var(--green) !important; }
   html[data-theme="dark"] .sn-msg-title  { color: var(--color-text-primary) !important; }
   html[data-theme="dark"] .sn-msg-meta   { color: var(--color-text-secondary); }
   html[data-theme="dark"] .sn-msg-preview { color: var(--color-text-secondary); }
@@ -859,57 +732,40 @@
   html[data-theme="dark"] .sn-pill.unread-pill { background: var(--amber-light); color: var(--amber); }
   html[data-theme="dark"] .sn-pill.sent-pill   { background: var(--green-light); color: var(--green); }
   html[data-theme="dark"] .course-pill { background: var(--green-light); color: var(--green); }
-  html[data-theme="dark"] .sn-att-badge {
-    background: var(--color-background-tertiary);
-    color: var(--color-text-secondary);
-  }
+  html[data-theme="dark"] .sn-att-badge { background: var(--color-background-tertiary); color: var(--color-text-secondary); }
   html[data-theme="dark"] .sn-btn { background: var(--green); }
-  html[data-theme="dark"] .sn-btn.secondary {
-    background: var(--color-background-tertiary);
-    color: var(--green);
-    border-color: var(--color-border-tertiary);
-  }
-  html[data-theme="dark"] .sn-field input,
-  html[data-theme="dark"] .sn-field select,
-  html[data-theme="dark"] .sn-field textarea {
-    background: var(--color-background-secondary);
-    border-color: var(--color-border-tertiary);
-    color: var(--color-text-primary);
-  }
-  html[data-theme="dark"] .sn-file-zone {
-    background: var(--color-background-secondary);
-    border-color: var(--color-border-tertiary);
-  }
+  html[data-theme="dark"] .sn-btn.secondary { background: var(--color-background-tertiary); color: var(--green); border-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-field input, html[data-theme="dark"] .sn-field select, html[data-theme="dark"] .sn-field textarea { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-file-zone { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); }
   html[data-theme="dark"] .sn-file-zone-label { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-empty {
-    background: var(--color-background-secondary);
-    border-color: var(--color-border-tertiary);
-    color: var(--color-text-secondary);
-  }
+  html[data-theme="dark"] .sn-empty { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-secondary); }
   html[data-theme="dark"] .sn-modal { background: var(--color-background-primary); }
-  html[data-theme="dark"] .sn-modal-hd {
-    background: var(--color-background-secondary);
-    border-bottom-color: var(--color-border-tertiary);
-  }
-  html[data-theme="dark"] .sn-modal-title  { color: var(--color-text-primary); }
-  html[data-theme="dark"] .sn-modal-close  { color: var(--color-text-secondary); }
+  html[data-theme="dark"] .sn-modal-hd { background: var(--color-background-secondary); border-bottom-color: var(--color-border-tertiary); }
+  html[data-theme="dark"] .sn-modal-title { color: var(--color-text-primary); }
+  html[data-theme="dark"] .sn-modal-close { color: var(--color-text-secondary); }
   html[data-theme="dark"] .sn-modal-msg-meta { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-modal-msg-body {
-    background: var(--color-background-tertiary);
-    border-color: var(--color-border-tertiary);
-    color: var(--color-text-primary);
-  }
+  html[data-theme="dark"] .sn-modal-msg-body { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
   html[data-theme="dark"] .sn-modal-divider { background: var(--color-border-tertiary); }
   html[data-theme="dark"] .sn-compose-drawer { background: var(--color-background-primary); }
-  html[data-theme="dark"] .sn-drawer-close {
-    background: var(--color-background-tertiary);
-    border-color: var(--color-border-tertiary);
-    color: var(--green);
-  }
-  html[data-theme="dark"] .notice-preview {
-    border-left-color: var(--green);
-    background: var(--color-background-tertiary);
-  }
+  html[data-theme="dark"] .sn-drawer-close { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--green); }
+
+
+  .main-notif-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px; }
+  .main-notif-tab { border:1px solid #d7e3dc; background:var(--color-background-primary); color:var(--color-text-primary); padding:10px 14px; border-radius:999px; font-weight:900; cursor:pointer; transition:background .15s,color .15s,border-color .15s,box-shadow .15s; }
+  .main-notif-tab:hover { box-shadow:0 5px 14px rgba(16,24,40,.06); }
+  .main-notif-tab.on { background:var(--sn-green); color:#fff; border-color:var(--sn-green); }
+  .notif-tab-pane { display:none; }
+  .notif-tab-pane.active { display:block; }
+  .course-pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:var(--green); background:var(--green-light); border-radius:999px; padding:4px 9px; margin-top:6px; margin-right:6px; }
+  .sn-reply-policy { display:flex; gap:8px; align-items:flex-start; padding:10px 12px; border:1px solid #d8e2dc; border-radius:14px; background:var(--color-background-tertiary); color:var(--color-text-primary); font-size:13px; line-height:1.45; margin-bottom:13px; }
+  .sn-reply-policy input { margin-top:2px; flex-shrink:0; }
+  .sn-no-reply-note { border:1px dashed #cddbd2; border-radius:14px; background:var(--color-background-tertiary); color:var(--color-text-secondary); font-size:13px; font-weight:700; padding:11px 12px; margin-top:12px; }
+  .notice-preview { border-left:5px solid var(--sn-green); background:var(--color-background-tertiary); border-radius:14px; padding:13px 14px; margin-top:8px; }
+  .notice-preview-title { font-weight:900; color:var(--color-text-primary); margin-bottom:8px; }
+  .notice-preview-body { font-size:13px; color:var(--color-text-primary); line-height:1.55; white-space:pre-wrap; }
+  .notice-preview-hl { color:#b42318; font-weight:900; margin-top:8px; }
+  html[data-theme="dark"] .sn-card-hd { background:var(--color-background-secondary) !important; border-bottom-color:var(--color-border-tertiary); }
+
 </style>
 
 <div class="page page-single on" id="pg-notifs">
@@ -1256,10 +1112,46 @@
       catch (e) { showToast(e.message, true); }
     }
 
+    function normalizeCourseScope(row) {
+      if (!row) return 'both';
+
+      const rawScope = String(row.course_scope || '').trim();
+      if (rawScope === 'introduction' || rawScope === 'graduation_project' || rawScope === 'both') {
+        return rawScope;
+      }
+
+      const rawCode = String(row.course_code || '').trim().toUpperCase();
+      if (rawCode === 'COMP4200') return 'introduction';
+      if (rawCode === 'COMP4300') return 'graduation_project';
+
+      const key = String(row.section_key || '').trim();
+      if (key.startsWith('s:')) return 'introduction';
+      if (key.startsWith('p:')) return 'graduation_project';
+
+      if (row.project_id && !row.section_id) return 'graduation_project';
+
+      return 'both';
+    }
+
     function optionCourseLabel(row) {
-      const scope = row.course_scope || '';
-      const code = row.course_code || (scope === 'graduation_project' ? 'COMP4300' : scope === 'introduction' ? 'COMP4200' : 'Both');
-      return code;
+      const scope = normalizeCourseScope(row);
+      if (row && row.course_code) return row.course_code;
+      if (scope === 'graduation_project') return 'COMP4300';
+      if (scope === 'introduction') return 'COMP4200';
+      return 'Both';
+    }
+
+    function mergeUniqueRows(keyName, ...groups) {
+      const seen = new Set();
+      const merged = [];
+      groups.flat().filter(Boolean).forEach(row => {
+        const key = row[keyName] || row.user_id || row.section_key || row.section_id || row.project_id || JSON.stringify(row);
+        if (!seen.has(String(key))) {
+          seen.add(String(key));
+          merged.push(row);
+        }
+      });
+      return merged;
     }
 
     function sendScopeNeedsCourse(scope) {
@@ -1296,11 +1188,13 @@
 
     function filterByCourse(rows) {
       const selected = courseScopeForSend();
-      if (selected === 'both') return rows || [];
-      return (rows || []).filter(row => {
-        const scope = row.course_scope || (row.course_code === 'COMP4300' ? 'graduation_project' : row.course_code === 'COMP4200' ? 'introduction' : 'both');
-        return scope === selected || scope === 'both';
-      });
+      const cleanRows = rows || [];
+      if (selected === 'both') return cleanRows;
+      return cleanRows.filter(row => normalizeCourseScope(row) === selected);
+    }
+
+    function renderEmptySpecificOption(select, text) {
+      select.insertAdjacentHTML('beforeend', '<option value="" disabled>' + esc(text) + '</option>');
     }
 
     function updateSpecificWrap() {
@@ -1317,19 +1211,31 @@
         placeholder = 'Choose doctor...';
         rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' — ' + esc(d.university_id || '') + '</option>'));
       } else if (scope === 'student') {
-        rows = filterByCourse(state.options.students || []);
-        if (!rows.length && selectedCourse === 'graduation_project') rows = state.options.comp4300_students || [];
-        if (!rows.length && selectedCourse === 'introduction') rows = state.options.comp4200_students || [];
+        const allStudents = mergeUniqueRows(
+          'student_id',
+          state.options.students || [],
+          state.options.comp4200_students || [],
+          state.options.comp4300_students || []
+        );
+        rows = filterByCourse(allStudents);
         placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 student...' : selectedCourse === 'introduction' ? 'Choose COMP4200 student...' : 'Choose student...';
         rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + ' — ' + esc(optionCourseLabel(s)) + '</option>'));
       } else if (scope === 'section') {
-        rows = filterByCourse(state.options.sections || []);
+        const allSections = mergeUniqueRows(
+          'section_key',
+          state.options.sections || [],
+          state.options.projects || []
+        );
+        rows = filterByCourse(allSections);
         placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 project...' : selectedCourse === 'introduction' ? 'Choose COMP4200 section...' : 'Choose section/project...';
-        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
+        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id || ('p:' + sec.project_id)) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name || sec.title || ('Project ' + (sec.project_id || ''))) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || sec.student_count || 0) + ' students)</option>'));
       }
 
       if (['doctor', 'student', 'section'].includes(scope)) {
         select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>');
+        if (!rows.length) {
+          renderEmptySpecificOption(select, 'No receivers found for this course.');
+        }
         wrap.style.display = 'flex';
       } else {
         wrap.style.display = 'none';
