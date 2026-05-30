@@ -4461,7 +4461,7 @@ def change_password():
 
 
 def _ensure_notif_attachment_columns(cursor):
-    """Add attachment columns to notifications table if they don't exist yet."""
+    """Add notification attachment/reply-control columns if they don't exist yet."""
     cursor.execute("""
         SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
@@ -4479,6 +4479,17 @@ def _ensure_notif_attachment_columns(cursor):
             "ALTER TABLE notifications ADD COLUMN attachment_data MEDIUMBLOB    DEFAULT NULL"
         )
 
+    cursor.execute("""
+        SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = 'notifications'
+          AND COLUMN_NAME  = 'can_reply'
+        """)
+    if not (cursor.fetchone() or {}).get("cnt"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read"
+        )
+
 
 def _student_notif_row_to_json(row):
     """Convert a notification row dict to safe JSON-serialisable values."""
@@ -4488,6 +4499,7 @@ def _student_notif_row_to_json(row):
     if clean.get("created_at") is not None:
         clean["created_at"] = str(clean["created_at"])
     clean["is_read"] = bool(clean.get("is_read"))
+    clean["can_reply"] = bool(clean.get("can_reply", 1))
     clean["course_scope"] = clean.get("course_scope") or "both"
     clean["has_attachment"] = bool(clean.get("attachment_name"))
     clean.pop("attachment_data", None)  # never send binary over JSON
@@ -4573,7 +4585,7 @@ def api_student_notifications_inbox():
         cursor.execute(
             """
             SELECT n.notification_id, n.notification_type, n.title, n.message,
-                   n.course_scope, n.is_read, n.created_at,
+                   n.course_scope, n.is_read, COALESCE(n.can_reply, 1) AS can_reply, n.created_at,
                    n.attachment_name, n.attachment_mime,
                    sender.user_id  AS sender_user_id,
                    sender.full_name AS sender_name,
@@ -4605,7 +4617,7 @@ def api_student_notifications_sent():
         cursor.execute(
             """
             SELECT n.notification_id, n.title, n.message, n.notification_type,
-                   n.course_scope, n.created_at,
+                   n.course_scope, COALESCE(n.can_reply, 1) AS can_reply, n.created_at,
                    n.attachment_name, n.attachment_mime,
                    recip.full_name AS recipient_name,
                    recip.role      AS recipient_role
@@ -4640,6 +4652,7 @@ def api_student_notifications_send():
     title = (request.form.get("title") or "").strip()
     message = (request.form.get("message") or "").strip()
     value = request.form.get("value")
+    reply_to_notification_id = request.form.get("reply_to_notification_id")
 
     if not title:
         return jsonify({"error": "Please enter a title for your memo."}), 400
@@ -4721,27 +4734,28 @@ def api_student_notifications_send():
                 recipients = [row["user_id"]]
 
         elif scope == "reply":
-            # Reply to any sender of a notification received by this student
+            # Reply only if the original received notification allows replies.
             if not value:
                 return jsonify({"error": "Missing reply recipient."}), 400
+            if not reply_to_notification_id:
+                return jsonify({"error": "This reply cannot be sent because the original message was not identified."}), 400
+
             cursor.execute(
                 """
-                SELECT DISTINCT n.sender_id FROM notifications n
-                WHERE n.recipient_id = %s AND n.sender_id = %s
+                SELECT n.notification_id, n.sender_id, COALESCE(n.can_reply, 1) AS can_reply
+                FROM notifications n
+                WHERE n.notification_id = %s
+                  AND n.recipient_id = %s
+                  AND n.sender_id = %s
                 LIMIT 1
                 """,
-                (user_id, int(value)),
+                (int(reply_to_notification_id), user_id, int(value)),
             )
             row = cursor.fetchone()
             if not row:
-                return (
-                    jsonify(
-                        {
-                            "error": "You can only reply to someone who sent you a message."
-                        }
-                    ),
-                    403,
-                )
+                return jsonify({"error": "Original message was not found for this reply."}), 404
+            if not bool(row.get("can_reply", 1)):
+                return jsonify({"error": "Replies are disabled for this message."}), 403
             recipients = [int(value)]
 
         recipients = sorted({int(r) for r in recipients if int(r) != int(user_id)})
@@ -4753,8 +4767,8 @@ def api_student_notifications_send():
                 """
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
-                     course_scope, is_read, attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, 'system', %s, %s, 'both', FALSE, %s, %s, %s)
+                     course_scope, is_read, can_reply, attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, 'system', %s, %s, 'both', FALSE, TRUE, %s, %s, %s)
                 """,
                 (recipient_id, user_id, title, message, att_name, att_mime, att_data),
             )

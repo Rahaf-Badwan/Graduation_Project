@@ -757,7 +757,7 @@
       <div class="sn-card-hd">
         <div>
           <div class="sn-card-title">Messages</div>
-          <div class="sn-card-sub">Click a message to open, read, and reply.</div>
+          <div class="sn-card-sub">Click a message to open and read. Replies appear only when allowed.</div>
         </div>
         <div class="sn-head-actions">
           <button class="sn-btn secondary" id="snMarkAllBtn" type="button">Mark All Read</button>
@@ -856,6 +856,7 @@
         <form id="modalReplyForm" enctype="multipart/form-data">
           <input type="hidden" id="modalReplyUserId" name="value">
           <input type="hidden" name="scope" value="reply">
+          <input type="hidden" id="modalReplyNotificationId" name="reply_to_notification_id">
           <div class="sn-field">
             <input id="modalReplyTitle" name="title" placeholder="Re: …" maxlength="250" required>
           </div>
@@ -880,6 +881,7 @@
           </div>
         </form>
       </div>
+      <div id="modalNoReplyNotice" class="sn-empty" style="display:none;margin-top:12px">Replies are disabled for this message.</div>
     </div>
   </div>
 </div>
@@ -1038,6 +1040,7 @@
         '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
         '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
         (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
+        (r.can_reply === false ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
         '</div>' +
         '</article>'
       ).join('');
@@ -1057,6 +1060,7 @@
         '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
         '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
         (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
+        (r.can_reply === false ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
         '</div>' +
         '</article>'
       ).join('');
@@ -1105,8 +1109,11 @@
 
       // Reply section only for inbox AND if there's a real sender
       const replySection = $('modalReplySection');
-      if (isInbox && msgData.sender_user_id) {
+      const noReplyNotice = $('modalNoReplyNotice');
+      const repliesAllowed = msgData.can_reply !== false;
+      if (isInbox && msgData.sender_user_id && repliesAllowed) {
         $('modalReplyUserId').value = msgData.sender_user_id;
+        $('modalReplyNotificationId').value = msgData.notification_id;
         $('modalReplyTo').textContent = msgData.sender_name || 'sender';
         $('modalReplyTitle').value = 'Re: ' + msgData.title;
         $('modalReplyMsg').value = '';
@@ -1115,8 +1122,12 @@
         $('replyFileChosen').style.display = 'none';
         $('replyFileZone').style.display = 'block';
         replySection.style.display = 'block';
+        if (noReplyNotice) noReplyNotice.style.display = 'none';
       } else {
         replySection.style.display = 'none';
+        if (noReplyNotice) {
+          noReplyNotice.style.display = (isInbox && msgData.sender_user_id && !repliesAllowed) ? 'block' : 'none';
+        }
       }
 
       overlay.classList.add('open');

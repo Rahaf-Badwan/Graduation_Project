@@ -694,6 +694,37 @@
     display: none
   }
 
+  .sn-reply-policy {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid #d8e2dc;
+    border-radius: 14px;
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 13px;
+  }
+
+  .sn-reply-policy input {
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .sn-no-reply-note {
+    border: 1px dashed #cddbd2;
+    border-radius: 14px;
+    background: var(--color-background-tertiary);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 11px 12px;
+    margin-top: 12px;
+  }
+
+
   /* Important Notice tab: kept from the coordinator page */
   .notice-preview {
     border-left: 5px solid #2e7d42;
@@ -892,7 +923,7 @@
       <div class="sn-card-hd">
         <div>
           <div class="sn-card-title">Messages</div>
-          <div class="sn-card-sub">Click a message to open, read, reply, and download attachments.</div>
+          <div class="sn-card-sub">Click a message to open, read, reply when allowed, and download attachments.</div>
         </div>
         <div class="sn-head-actions">
           <button class="sn-btn secondary" id="snMarkAllBtn" type="button">Mark All Read</button>
@@ -979,9 +1010,9 @@
                 <option value="all_students">All Students / selected course</option>
                 <option value="comp4200_students">All COMP4200 Students</option>
                 <option value="comp4300_students">All COMP4300 Students</option>
-                <option value="all_sections">All COMP4200 Sections</option>
+                <option value="all_sections">All Sections / Projects for selected course</option>
                 <option value="doctor">One Doctor</option>
-                <option value="section">One COMP4200 Section</option>
+                <option value="section">One Section / Project</option>
                 <option value="student">One Student</option>
               </select>
             </div>
@@ -990,12 +1021,12 @@
               <select id="snSpecific" name="value"></select>
             </div>
           </div>
-          <div class="sn-field">
-            <label for="snCourseScope">Message for</label>
-            <select id="snCourseScope" name="course_scope" required>
+          <div class="sn-field" id="courseScopeWrap" style="display:none">
+            <label for="sendCourseScope">Message for</label>
+            <select id="sendCourseScope" name="course_scope">
               <option value="introduction">Project Introduction / COMP4200</option>
               <option value="graduation_project">Graduation Project / COMP4300</option>
-              <option value="both">Both</option>
+              <option value="both">Both Courses</option>
             </select>
           </div>
           <div class="sn-field">
@@ -1008,6 +1039,13 @@
           </div>
           <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--color-text-primary);margin-bottom:13px;">
             <input type="checkbox" id="snUrgent" name="urgent" value="1"> Mark as urgent
+          </label>
+          <label class="sn-reply-policy" for="snAllowReply">
+            <input type="checkbox" id="snAllowReply" name="allow_reply" value="1" checked>
+            <span>
+              <strong>Allow recipient to reply</strong><br>
+              Uncheck this if this memo is only an announcement and should not show a reply box.
+            </span>
           </label>
           <div class="sn-field">
             <label>Attachment <span style="font-weight:400;color:#9ca3af">(optional, max 10 MB)</span></label>
@@ -1049,6 +1087,7 @@
         <div class="sn-modal-reply-title">↩ Reply to <span id="modalReplyTo"></span></div>
         <form id="modalReplyForm" enctype="multipart/form-data">
           <input type="hidden" id="modalReplyUserId" name="value">
+          <input type="hidden" id="modalReplyToNotificationId" name="reply_to_notification_id">
           <input type="hidden" name="scope" value="reply">
           <input type="hidden" id="modalReplyCourseScope" name="course_scope" value="both">
           <div class="sn-field">
@@ -1074,6 +1113,9 @@
             <button class="sn-btn small" type="submit">Send Reply</button>
           </div>
         </form>
+      </div>
+      <div class="sn-no-reply-note" id="modalNoReplyNote" style="display:none">
+        Replies are disabled for this message.
       </div>
     </div>
   </div>
@@ -1150,6 +1192,16 @@
       return ({ introduction: 'Project Introduction', graduation_project: 'Graduation Project', both: 'Both Courses' }[scope] || 'Both Courses');
     }
 
+    function repliesAllowed(message) {
+      return message && message.can_reply !== false && message.can_reply !== 0 && message.can_reply !== '0';
+    }
+
+    function replyBadge(message) {
+      return repliesAllowed(message)
+        ? '<span class="course-pill">↩ Replies allowed</span>'
+        : '<span class="sn-att-badge">🚫 No replies</span>';
+    }
+
     function wireFileZone(zoneId, inputId, chosenId, nameId, removeId) {
       const zone = $(zoneId);
       const input = $(inputId);
@@ -1204,8 +1256,57 @@
       catch (e) { showToast(e.message, true); }
     }
 
-    function updateSpecificWrap() {
+    function optionCourseLabel(row) {
+      const scope = row.course_scope || '';
+      const code = row.course_code || (scope === 'graduation_project' ? 'COMP4300' : scope === 'introduction' ? 'COMP4200' : 'Both');
+      return code;
+    }
+
+    function sendScopeNeedsCourse(scope) {
+      return ['all_students', 'students', 'student', 'section', 'all_sections'].includes(scope);
+    }
+
+    function courseScopeForSend() {
       const scope = $('snScope').value;
+      if (scope === 'comp4200_students') return 'introduction';
+      if (scope === 'comp4300_students') return 'graduation_project';
+      if (sendScopeNeedsCourse(scope)) return $('sendCourseScope').value || 'both';
+      return 'both';
+    }
+
+    function toggleCourseScopeField() {
+      const scope = $('snScope').value;
+      const wrap = $('courseScopeWrap');
+      const courseSelect = $('sendCourseScope');
+      if (!wrap || !courseSelect) return;
+
+      if (sendScopeNeedsCourse(scope)) {
+        wrap.style.display = 'flex';
+      } else {
+        wrap.style.display = 'none';
+        if (scope === 'comp4200_students') {
+          courseSelect.value = 'introduction';
+        } else if (scope === 'comp4300_students') {
+          courseSelect.value = 'graduation_project';
+        } else {
+          courseSelect.value = 'both';
+        }
+      }
+    }
+
+    function filterByCourse(rows) {
+      const selected = courseScopeForSend();
+      if (selected === 'both') return rows || [];
+      return (rows || []).filter(row => {
+        const scope = row.course_scope || (row.course_code === 'COMP4300' ? 'graduation_project' : row.course_code === 'COMP4200' ? 'introduction' : 'both');
+        return scope === selected || scope === 'both';
+      });
+    }
+
+    function updateSpecificWrap() {
+      toggleCourseScopeField();
+      const scope = $('snScope').value;
+      const selectedCourse = courseScopeForSend();
       const wrap = $('snSpecificWrap');
       const select = $('snSpecific');
       select.innerHTML = '';
@@ -1216,22 +1317,15 @@
         placeholder = 'Choose doctor...';
         rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' — ' + esc(d.university_id || '') + '</option>'));
       } else if (scope === 'student') {
-        const courseScope = $('snCourseScope').value;
-        if (courseScope === 'graduation_project') {
-          rows = state.options.comp4300_students || [];
-          placeholder = 'Choose COMP4300 student...';
-        } else if (courseScope === 'introduction') {
-          rows = state.options.comp4200_students || [];
-          placeholder = 'Choose COMP4200 student...';
-        } else {
-          rows = state.options.students || [];
-          placeholder = 'Choose student...';
-        }
-        rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + '</option>'));
+        rows = filterByCourse(state.options.students || []);
+        if (!rows.length && selectedCourse === 'graduation_project') rows = state.options.comp4300_students || [];
+        if (!rows.length && selectedCourse === 'introduction') rows = state.options.comp4200_students || [];
+        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 student...' : selectedCourse === 'introduction' ? 'Choose COMP4200 student...' : 'Choose student...';
+        rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + ' — ' + esc(optionCourseLabel(s)) + '</option>'));
       } else if (scope === 'section') {
-        rows = state.options.sections || [];
-        placeholder = 'Choose section...';
-        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_id) + '">' + esc(sec.section_name) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
+        rows = filterByCourse(state.options.sections || []);
+        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 project...' : selectedCourse === 'introduction' ? 'Choose COMP4200 section...' : 'Choose section/project...';
+        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
       }
 
       if (['doctor', 'student', 'section'].includes(scope)) {
@@ -1253,7 +1347,7 @@
         '<span class="sn-pill ' + (r.is_read ? 'read' : 'unread-pill') + '">' + (r.is_read ? 'Read' : 'New') + '</span>' +
         '</div>' +
         '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
-        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + replyBadge(r) + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
         '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
         '</div>' +
         '</article>'
@@ -1271,7 +1365,7 @@
         '<span class="sn-pill sent-pill">Sent</span>' +
         '</div>' +
         '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
-        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + replyBadge(r) + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
         '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
         '</div>' +
         '</article>'
@@ -1317,8 +1411,10 @@
       }
 
       const replySection = $('modalReplySection');
-      if (isInbox && msgData.sender_user_id) {
+      const noReplyNote = $('modalNoReplyNote');
+      if (isInbox && msgData.sender_user_id && repliesAllowed(msgData)) {
         $('modalReplyUserId').value = msgData.sender_user_id;
+        $('modalReplyToNotificationId').value = msgData.notification_id;
         $('modalReplyCourseScope').value = msgData.course_scope || 'both';
         $('modalReplyTo').textContent = msgData.sender_name || 'sender';
         $('modalReplyTitle').value = 'Re: ' + msgData.title;
@@ -1327,8 +1423,10 @@
         $('replyFileChosen').style.display = 'none';
         $('replyFileZone').style.display = 'block';
         replySection.style.display = 'block';
+        noReplyNote.style.display = 'none';
       } else {
         replySection.style.display = 'none';
+        noReplyNote.style.display = (isInbox && msgData.sender_user_id && !repliesAllowed(msgData)) ? 'block' : 'none';
       }
 
       overlay.classList.add('open');
@@ -1380,11 +1478,14 @@
       }
       const fd = new FormData($('snSendForm'));
       if (['doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value);
+      fd.set('course_scope', courseScopeForSend());
       if (!$('snUrgent').checked) fd.delete('urgent');
+      fd.set('allow_reply', $('snAllowReply').checked ? '1' : '0');
       try {
         const data = await postForm('/api/coordinator/notifications/send', fd);
         showToast(data.message || 'Memo sent successfully.');
         $('snSendForm').reset();
+        $('snAllowReply').checked = true;
         $('snFile').value = '';
         $('snFileChosen').style.display = 'none';
         $('snFileZone').style.display = 'block';
@@ -1399,6 +1500,7 @@
 
     $('snClearBtn').addEventListener('click', () => {
       $('snSendForm').reset();
+      $('snAllowReply').checked = true;
       $('snFile').value = '';
       $('snFileChosen').style.display = 'none';
       $('snFileZone').style.display = 'block';
@@ -1406,7 +1508,7 @@
     });
 
     $('snScope').addEventListener('change', updateSpecificWrap);
-    $('snCourseScope').addEventListener('change', updateSpecificWrap);
+    $('sendCourseScope').addEventListener('change', updateSpecificWrap);
 
     document.querySelectorAll('.sn-tab').forEach(btn => {
       btn.addEventListener('click', () => {
