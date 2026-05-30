@@ -6216,3 +6216,164 @@ SELECT u.user_id, u.university_id, u.full_name, u.email,
             FROM users u
             JOIN faculty f ON f.user_id = u.user_id
             WHERE u.user_id = 3;
+
+-- ============================================================
+--  SUPERVISOR NAME OVERRIDE FOR ARCHIVED PROJECTS
+--  Fixes the mismatch between the supervisor shown in the right
+--  panel (from DB) and the supervisor name inside the PDF report.
+--  supervisor_name_override stores the real name from the PDF.
+-- ============================================================
+
+SET @db := DATABASE();
+
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE projects ADD COLUMN supervisor_name_override VARCHAR(255) NULL COMMENT ''Real supervisor name from the archived PDF report''',
+        'SELECT "projects.supervisor_name_override already exists"'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME   = 'projects'
+      AND COLUMN_NAME  = 'supervisor_name_override'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Fix supervisor_id = 0 to NULL so LEFT JOINs work cleanly.
+SET SQL_SAFE_UPDATES = 0;
+UPDATE projects SET supervisor_id = NULL WHERE supervisor_id = 0;
+SET SQL_SAFE_UPDATES = 1;
+
+-- Add year_override column (same concept as supervisor_name_override).
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE projects ADD COLUMN year_override VARCHAR(20) NULL COMMENT ''Academic year from the PDF report''',
+        'SELECT "projects.year_override already exists"'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME   = 'projects'
+      AND COLUMN_NAME  = 'year_override'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Populate year_override for archived projects — extracted from each PDF.
+-- Projects with no year found in PDF are left NULL (shown as empty).
+SET SQL_SAFE_UPDATES = 0;
+
+-- 2022/2023
+UPDATE projects SET year_override = '2022/2023' WHERE status = 'archived' AND title = 'Smart Invoice';
+UPDATE projects SET year_override = '2022/2023' WHERE status = 'archived' AND title = 'Kitchen Station Management System';
+UPDATE projects SET year_override = '2022/2023' WHERE status = 'archived' AND title = 'DreamsJob Recruitment Platform';
+UPDATE projects SET year_override = '2022/2023' WHERE status = 'archived' AND title = 'YallaRehla Travel App';
+UPDATE projects SET year_override = '2022/2023' WHERE status = 'archived' AND title = 'Wasselha Delivery System';
+-- 2023/2024
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Home Sweet Home Real Estate';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Prediction of Anti-Cancer Peptide ACP-XG';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'PharmaApp Pharmacy Management';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Palestine Charity Platform';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Gamified Trip Planner App';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'TechSpotter Tech News Platform';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Multi-Environment Video Game';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Birzeit Library Chatbot';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Policy Peek Policy Analyzer';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'LifeActive Health Tracker';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Tronix Electronics Web Application';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'GoHelp Volunteer Platform';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'KhatClarifier AI Writing Tool';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Darak Real Estate Marketplace';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Flora Palestine Plant Guide';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Max Scheduling System';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Nossrah Arabic Learning App';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Wanderlust in Palestine Travel App';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Medica Healthcare App';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'BZU Note Share App';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Plestia Events Platform';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'Baby Voice Identification App';
+UPDATE projects SET year_override = '2023/2024' WHERE status = 'archived' AND title = 'CampusConnect University Network';
+-- 2024/2025
+UPDATE projects SET year_override = '2024/2025' WHERE status = 'archived' AND title = 'Sal7ly Maintenance App';
+UPDATE projects SET year_override = '2024/2025' WHERE status = 'archived' AND title = 'Monitoring World News System';
+UPDATE projects SET year_override = '2024/2025' WHERE status = 'archived' AND title = 'Ackerra Fitness Platform';
+-- 2025/2026
+UPDATE projects SET year_override = '2025/2026' WHERE status = 'archived' AND title = 'StudentHub';
+UPDATE projects SET year_override = '2025/2026' WHERE status = 'archived' AND title = 'Birzeit University Insurance System';
+UPDATE projects SET year_override = '2025/2026' WHERE status = 'archived' AND title = 'Wedding Planning System';
+-- NULL — no year stated in PDF
+UPDATE projects SET year_override = NULL WHERE status = 'archived' AND title IN (
+    'FitScoop Fitness Platform',
+    'Student Digital Guide',
+    'Smart School Portal',
+    'ConvoConvert Communication Tool',
+    'Wasselni Transportation App',
+    'PayWithPalKoin Payment System',
+    'Nomad Travel Companion App',
+    'CarPal Car Sharing App',
+    'E-Voting System Using Blockchain',
+    'Traffic Light Synchronization Optimizer'
+);
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- ── Set the correct supervisor names for archived projects ─────────────────
+-- These names come from the real PDF reports submitted by the students.
+-- Add more rows here whenever you identify a mismatch from a PDF.
+
+-- Full list verified from each PDF file (44 projects):
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE projects SET supervisor_name_override = 'Dr. Sobhi Ahmed'         WHERE title = 'Smart Invoice'                            AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Samer Zein'          WHERE title = 'Kitchen Station Management System'        AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Bassem Sayrafi'      WHERE title = 'DreamsJob Recruitment Platform'           AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Anas Arram'              WHERE title = 'YallaRehla Travel App'                    AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Ms. Hanaa Qasrawi'       WHERE title = 'StudentHub'                               AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Yousef Hassouneh'    WHERE title = 'Wasselha Delivery System'                 AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Murad Njoum'         WHERE title = 'Home Sweet Home Real Estate'              AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Samer Zein'          WHERE title = 'Birzeit University Insurance System'      AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Ruba Awadallah'      WHERE title = 'Sal7ly Maintenance App'                   AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Mustafa Jarrar'          WHERE title = 'Monitoring World News System'             AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Radi Jarrar'         WHERE title = 'Prediction of Anti-Cancer Peptide ACP-XG' AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Wahbeh Mousa'            WHERE title = 'FitScoop Fitness Platform'                AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Mrs. Karmel Shehadeh'    WHERE title = 'Wedding Planning System'                  AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Asem Kitana'         WHERE title = 'PharmaApp Pharmacy Management'            AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Ali Jaber'           WHERE title = 'Student Digital Guide'                    AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Mamoun Nawahdah'     WHERE title = 'Palestine Charity Platform'               AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Mamoun Nawahdah'     WHERE title = 'Gamified Trip Planner App'                AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Prof. Yousef Sabbah'     WHERE title = 'TechSpotter Tech News Platform'           AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Prof. Yousef Sabbah'     WHERE title = 'Multi-Environment Video Game'             AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Radi Jarrar'         WHERE title = 'Birzeit Library Chatbot'                  AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Murad Njoum'         WHERE title = 'Policy Peek Policy Analyzer'              AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Yousef Hassouneh'    WHERE title = 'LifeActive Health Tracker'                AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Mr. Saadeddin Hroub'     WHERE title = 'Tronix Electronics Web Application'       AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Iyad Jaber'          WHERE title = 'Smart School Portal'                     AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Radi Jarrar'         WHERE title = 'GoHelp Volunteer Platform'                AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Ahmed Abusnaina'     WHERE title = 'KhatClarifier AI Writing Tool'            AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Mustafa Jarrar'      WHERE title = 'ConvoConvert Communication Tool'          AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Bassem Sayrafi'      WHERE title = 'Wasselni Transportation App'              AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Ali Jaber'           WHERE title = 'Ackerra Fitness Platform'                 AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Yousef Hassouneh'    WHERE title = 'Darak Real Estate Marketplace'            AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Murad Njoum'         WHERE title = 'Flora Palestine Plant Guide'              AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Ahmed Abusnaina'     WHERE title = 'Max Scheduling System'                    AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Ruba Awadallah'      WHERE title = 'PayWithPalKoin Payment System'            AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Bassem Sayrafi'      WHERE title = 'Nomad Travel Companion App'               AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Nael Qaraeen'            WHERE title = 'CarPal Car Sharing App'                   AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Ruba Awadallah'      WHERE title = 'E-Voting System Using Blockchain'         AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Sobhi Ahmad'         WHERE title = 'Nossrah Arabic Learning App'              AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Sobhi Ahmad'         WHERE title = 'Wanderlust in Palestine Travel App'       AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Asem Kitana'         WHERE title = 'Medica Healthcare App'                    AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Yousef Sabbah'       WHERE title = 'BZU Note Share App'                      AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Mr. Saadeddin Hroub'     WHERE title = 'Plestia Events Platform'                  AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Mohammed Helal'      WHERE title = 'Baby Voice Identification App'            AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Mohammed Helal'      WHERE title = 'Traffic Light Synchronization Optimizer'  AND status = 'archived';
+UPDATE projects SET supervisor_name_override = 'Dr. Naima Hirbawi'       WHERE title = 'CampusConnect University Network'         AND status = 'archived';
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- ============================================================
+--  END OF SUPERVISOR NAME OVERRIDE MIGRATION
+-- ============================================================

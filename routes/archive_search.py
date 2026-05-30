@@ -218,7 +218,7 @@ def api_archived_projects():
     q = (request.args.get("q") or "").strip()
     year = (request.args.get("year") or "").strip()
     ptype = (request.args.get("type") or "").strip()
-    sup_id = (request.args.get("supervisor") or "").strip()
+    sup_name = (request.args.get("supervisor") or "").strip()
     page = max(1, int(request.args.get("page", 1)))
     per_page = 20
     can_view_scores = _can_view_archive_scores()
@@ -232,19 +232,22 @@ def api_archived_projects():
 
         if q:
             where.append(
-                "(p.title LIKE %s OR p.keywords LIKE %s OR u.full_name LIKE %s)"
+                "(p.title LIKE %s OR p.keywords LIKE %s"
+                " OR p.supervisor_name_override LIKE %s)"
             )
             like = f"%{q}%"
             params += [like, like, like]
-        if year:
-            where.append("s.academic_year = %s")
+        if year == "__unknown__":
+            where.append("(p.year_override IS NULL OR p.year_override = '')")
+        elif year:
+            where.append("p.year_override = %s")
             params.append(year)
         if ptype:
             where.append("FIND_IN_SET(%s, p.project_type)")
             params.append(ptype)
-        if sup_id and sup_id.isdigit():
-            where.append("f.faculty_id = %s")
-            params.append(int(sup_id))
+        if sup_name:
+            where.append("p.supervisor_name_override = %s")
+            params.append(sup_name)
 
         where_sql = " AND ".join(where)
 
@@ -252,9 +255,6 @@ def api_archived_projects():
             f"""
             SELECT COUNT(*) AS cnt
             FROM   projects p
-            JOIN   semesters s ON s.semester_id = p.semester_id
-            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
-            LEFT JOIN users   u ON u.user_id    = f.user_id
             WHERE  {where_sql}
         """,
             params,
@@ -265,12 +265,9 @@ def api_archived_projects():
         cursor.execute(
             f"""
             SELECT p.project_id, p.title, p.project_type, p.final_score,
-                   p.submission_date, s.academic_year,
-                   u.full_name AS supervisor_name
+                   p.submission_date, p.year_override AS academic_year,
+                   p.supervisor_name_override AS supervisor_name
             FROM   projects p
-            JOIN   semesters s ON s.semester_id = p.semester_id
-            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
-            LEFT JOIN users   u ON u.user_id    = f.user_id
             WHERE  {where_sql}
             ORDER  BY p.submission_date DESC, p.project_id DESC
             LIMIT  %s OFFSET %s
@@ -293,30 +290,58 @@ def api_archived_projects():
                         if can_view_scores and r.get("final_score")
                         else None
                     ),
-                    "academic_year": r["academic_year"] or "",
-                    "supervisor_name": r["supervisor_name"] or "-",
+                    "academic_year": r["academic_year"] or None,
+                    "supervisor_name": r["supervisor_name"] or "",
                 }
             )
 
+        # Years from year_override only
         cursor.execute("""
-            SELECT DISTINCT s.academic_year
-            FROM projects p JOIN semesters s ON s.semester_id = p.semester_id
-            WHERE p.status = 'archived'
-            ORDER BY s.academic_year DESC
+            SELECT DISTINCT year_override AS academic_year
+            FROM projects
+            WHERE status = 'archived'
+              AND year_override IS NOT NULL
+              AND year_override <> ''
+            ORDER BY year_override DESC
         """)
         years = [row["academic_year"] for row in cursor.fetchall()]
 
+        # Check if any archived project has no year
         cursor.execute("""
-            SELECT DISTINCT f.faculty_id, u.full_name
-            FROM projects p
-            JOIN faculty f ON f.faculty_id = p.supervisor_id
-            JOIN users   u ON u.user_id    = f.user_id
-            WHERE p.status = 'archived' AND p.supervisor_id IS NOT NULL
-            ORDER BY u.full_name
+            SELECT COUNT(*) AS cnt FROM projects
+            WHERE status = 'archived'
+              AND (year_override IS NULL OR year_override = '')
         """)
-        supervisors = [
-            {"id": r["faculty_id"], "name": r["full_name"]} for r in cursor.fetchall()
-        ]
+        has_unknown = (cursor.fetchone() or {}).get("cnt", 0) > 0
+
+        # Collect all distinct supervisor names from override only
+        cursor.execute("""
+            SELECT DISTINCT p.supervisor_name_override AS sup_name
+            FROM projects p
+            WHERE p.status = 'archived'
+              AND p.supervisor_name_override IS NOT NULL
+              AND p.supervisor_name_override <> ''
+            ORDER BY sup_name
+        """)
+        supervisors = [{"name": r["sup_name"]} for r in cursor.fetchall()]
+
+        # Collect all distinct project types from archived projects
+        cursor.execute("""
+            SELECT DISTINCT project_type
+            FROM projects
+            WHERE status = 'archived' AND project_type IS NOT NULL AND project_type <> ''
+        """)
+        type_set = set()
+        for r in cursor.fetchall():
+            pt = r["project_type"]
+            if isinstance(pt, set):
+                type_set.update(pt)
+            elif pt:
+                for t in str(pt).split(","):
+                    t = t.strip()
+                    if t:
+                        type_set.add(t)
+        project_types = sorted(type_set)
 
         cursor.close()
         db.close()
@@ -327,7 +352,9 @@ def api_archived_projects():
                 "page": page,
                 "per_page": per_page,
                 "years": years,
+                "has_unknown_year": has_unknown,
                 "supervisors": supervisors,
+                "project_types": project_types,
                 "can_view_scores": can_view_scores,
             }
         )
@@ -348,12 +375,9 @@ def api_archived_project_detail(project_id):
             """
             SELECT p.project_id, p.title, p.abstract, p.keywords,
                    p.project_type, p.final_score, p.submission_date,
-                   s.academic_year,
-                   u.full_name AS supervisor_name
+                   p.year_override AS academic_year,
+                   p.supervisor_name_override AS supervisor_name
             FROM   projects p
-            JOIN   semesters s ON s.semester_id = p.semester_id
-            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
-            LEFT JOIN users   u ON u.user_id    = f.user_id
             WHERE  p.project_id = %s AND p.status = 'archived'
         """,
             (project_id,),
