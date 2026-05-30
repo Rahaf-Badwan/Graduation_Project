@@ -11,117 +11,261 @@
       <div class="field-wrap">
         <div class="field-label">Project</div>
         <select class="field-select" id="projSel">
-          <option>Taima Abed and her teams - APMS</option>
-          <option>Student Records System — Salma Al-Khatib</option>
-          <option>Delivery app — Kareem Awda</option>
+          <option value="">Loading your projects…</option>
         </select>
       </div>
     </div>
 
     <div class="card">
       <div class="card-hd"><span class="card-title">Project lifecycle timeline</span></div>
-      <div class="timeline">
-        <div class="tl-item">
-          <div class="tl-dot" style="background:var(--green-light);color:var(--green)">✓</div>
-          <div>
-            <div class="tl-title">Registration and assignment</div>
-            <div class="tl-meta">Completed · 25 January 2026</div>
-          </div>
-        </div>
-        <div class="tl-item">
-          <div class="tl-dot" style="background:var(--green-light);color:var(--green)">✓</div>
-          <div>
-            <div class="tl-title">Submitting initial files</div>
-            <div class="tl-meta">Completed · 1 February 2026</div>
-            <div class="tl-note">✓ Report ✓ Code — ✗ Required chips</div>
-          </div>
-        </div>
-        <div class="tl-item">
-          <div class="tl-dot" style="background:var(--sup-light);color:var(--sup)">↻</div>
-          <div>
-            <div class="tl-title">Initial review</div>
-            <div class="tl-meta"><span class="pill p-review" style="font-size:10px">Currently in progress</span></div>
-            <div class="tl-note">The supervisor will review the final report and provide feedback within 48 hours.</div>
-          </div>
-        </div>
-        <div class="tl-item">
-          <div class="tl-dot" style="background:var(--color-background-secondary);color:var(--color-text-secondary)">4
-          </div>
-          <div>
-            <div class="tl-title" style="color:var(--color-text-secondary)">Committee evaluation</div>
-            <div class="tl-meta">20 February 2026</div>
-          </div>
-        </div>
-        <div class="tl-item" style="margin-bottom:0">
-          <div class="tl-dot" style="background:var(--color-background-secondary);color:var(--color-text-secondary)">5
-          </div>
-          <div>
-            <div class="tl-title" style="color:var(--color-text-secondary)">Results and archiving</div>
-            <div class="tl-meta">28 February 2026</div>
-          </div>
-        </div>
+      <div class="timeline" id="progressTimeline">
+        <div style="text-align:center;padding:26px;color:var(--color-text-secondary);font-size:13px">Loading timeline…</div>
       </div>
     </div>
   </div>
 
   <div>
     <div class="card">
-      <div class="card-hd"><span class="card-title">APMS progress details</span></div>
+      <div class="card-hd"><span class="card-title" id="detailsTitle">Progress details</span></div>
       <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;margin-bottom:12px">
-        <div
-          style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-          <span style="color:var(--color-text-secondary)">Application date</span><span>1 February 2026</span></div>
-        <div
-          style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-          <span style="color:var(--color-text-secondary)">Last update</span><span>5 February 2026</span></div>
-        <div
-          style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-          <span style="color:var(--color-text-secondary)">Uploaded files</span><span>2 / 3</span></div>
-        <div style="display:flex;justify-content:space-between;padding:5px 0"><span
-            style="color:var(--color-text-secondary)">Feedback provided</span><span>1</span></div>
-      </div>
-      <div class="prog-wrap">
-        <div class="prog-label"><span>Final report</span><span>85%</span></div>
-        <div class="prog-bg">
-          <div class="prog-fill" style="width:85%;background:var(--green)"></div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+          <span style="color:var(--color-text-secondary)">Application date</span><span id="appDate">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+          <span style="color:var(--color-text-secondary)">Last update</span><span id="lastUpdate">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+          <span style="color:var(--color-text-secondary)">Uploaded files</span><span id="uploadedFiles">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+          <span style="color:var(--color-text-secondary)">Feedback provided</span><span id="feedbackCount">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0">
+          <span style="color:var(--color-text-secondary)">Timeline source</span><span id="timelineSource">—</span>
         </div>
       </div>
+
       <div class="prog-wrap">
-        <div class="prog-label"><span>Source code</span><span>70%</span></div>
-        <div class="prog-bg">
-          <div class="prog-fill" style="width:70%;background:var(--blue)"></div>
-        </div>
+        <div class="prog-label"><span>Final report</span><span id="reportPct">0%</span></div>
+        <div class="prog-bg"><div class="prog-fill" id="reportBar" style="width:0%;background:var(--green)"></div></div>
       </div>
       <div class="prog-wrap">
-        <div class="prog-label"><span>Presentation slides</span><span>60%</span></div>
-        <div class="prog-bg">
-          <div class="prog-fill" style="width:60%;background:var(--sup-mid)"></div>
-        </div>
+        <div class="prog-label"><span>Source code</span><span id="codePct">0%</span></div>
+        <div class="prog-bg"><div class="prog-fill" id="codeBar" style="width:0%;background:var(--blue)"></div></div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-label"><span>Presentation slides</span><span id="presentationPct">0%</span></div>
+        <div class="prog-bg"><div class="prog-fill" id="presentationBar" style="width:0%;background:var(--sup-mid)"></div></div>
       </div>
       <div class="prog-wrap" style="margin:0">
-        <div class="prog-label"><span>Overall progress</span><span>78%</span></div>
-        <div class="prog-bg">
-          <div class="prog-fill" style="width:78%;background:var(--sup-mid)"></div>
-        </div>
+        <div class="prog-label"><span>Overall progress</span><span id="overallPct">0%</span></div>
+        <div class="prog-bg"><div class="prog-fill" id="overallBar" style="width:0%;background:var(--sup-mid)"></div></div>
       </div>
+
+      <div id="latestNotes" style="margin-top:14px"></div>
     </div>
 
-    <div class="card">
-      <div class="card-hd"><span class="card-title">Add a follow-up note</span></div>
-      <div class="field-wrap">
-        <div class="field-label">Note</div><textarea class="field-textarea" style="min-height:70px"
-          placeholder="Record your observations on the student's progress..."></textarea>
-      </div>
-      <div class="field-wrap">
-        <div class="field-label">State</div>
-        <select class="field-select">
-          <option>On the right track</option>
-          <option>Follow-up needed</option>
-          <option>Late — Urgent</option>
-        </select>
-      </div>
-      <div class="btn-row"><button class="btn btn-primary">Save note</button></div>
-    </div>
+    <div id="progressError" style="display:none;color:var(--coral);font-size:13px;background:rgba(220,50,50,.07);border-radius:6px;padding:8px 12px;margin-bottom:12px"></div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  let currentProjectId = null;
+
+  function esc(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function pagePrefix() {
+    return window.location.pathname.replace(/\/progress\/?$/, '');
+  }
+
+  function apiPaths(path) {
+    const prefixed = pagePrefix() + '/api/supervisor/progress' + path;
+    const direct = '/api/supervisor/progress' + path;
+    return prefixed === direct ? [direct] : [prefixed, direct];
+  }
+
+  async function fetchJSON(paths, options = {}) {
+    const urls = Array.isArray(paths) ? paths : [paths];
+    let lastError = null;
+
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          headers: {
+            'Accept': 'application/json',
+            ...(options.headers || {})
+          },
+          ...options
+        });
+
+        const text = await res.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; }
+        catch (e) { throw new Error('Server error (' + res.status + ').'); }
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Request failed (' + res.status + ').');
+        }
+
+        return data;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error('Request failed.');
+  }
+
+  function timelineIcon(state, index) {
+    if (state === 'completed') {
+      return '<div class="tl-dot" style="background:var(--green-light);color:var(--green)">✓</div>';
+    }
+    if (state === 'late') {
+      return '<div class="tl-dot" style="background:var(--amber-light);color:var(--amber)">!</div>';
+    }
+    if (state === 'missing') {
+      return '<div class="tl-dot" style="background:var(--coral-light);color:var(--coral)">✕</div>';
+    }
+    if (state === 'in_progress') {
+      return '<div class="tl-dot" style="background:var(--sup-light);color:var(--sup)">↻</div>';
+    }
+    return '<div class="tl-dot" style="background:var(--color-background-secondary);color:var(--color-text-secondary)">' + index + '</div>';
+  }
+
+  function renderTimeline(items) {
+    const box = $('progressTimeline');
+
+    if (!items || !items.length) {
+      box.innerHTML = '<div style="text-align:center;padding:26px;color:var(--color-text-secondary);font-size:13px">No timeline data.</div>';
+      return;
+    }
+
+    box.innerHTML = items.map((item, idx) => `
+      <div class="tl-item" ${idx === items.length - 1 ? 'style="margin-bottom:0"' : ''}>
+        ${timelineIcon(item.state, idx + 1)}
+        <div>
+          <div class="tl-title" ${['pending','missing'].includes(item.state) ? 'style="color:var(--color-text-secondary)"' : ''}>${esc(item.title)}</div>
+          <div class="tl-meta">${esc(item.meta || '')}</div>
+          ${item.note ? `<div class="tl-note">${esc(item.note)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function setProgress(name, value) {
+    value = Math.max(0, Math.min(100, Number(value || 0)));
+    $(name + 'Pct').textContent = value + '%';
+    $(name + 'Bar').style.width = value + '%';
+  }
+
+  function renderNotes(notes) {
+    const box = $('latestNotes');
+    if (!notes || !notes.length) {
+      box.innerHTML = '';
+      return;
+    }
+
+    const stateLabels = {
+      on_track: 'On track',
+      follow_up_needed: 'Follow-up needed',
+      urgent: 'Urgent'
+    };
+
+    box.innerHTML = `
+      <div style="font-size:13px;font-weight:800;color:var(--color-text-primary);margin:14px 0 8px">Latest follow-up notes</div>
+      ${notes.map(note => `
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:9px 10px;margin-bottom:8px;background:var(--color-background-tertiary)">
+          <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--color-text-secondary);margin-bottom:5px">
+            <span>${esc(stateLabels[note.state] || note.state)}</span>
+            <span>${esc(note.created_at || '')}</span>
+          </div>
+          <div style="font-size:13px;color:var(--color-text-primary);line-height:1.45">${esc(note.note_text)}</div>
+        </div>
+      `).join('')}
+    `;
+  }
+
+  function showError(message) {
+    $('progressError').textContent = message;
+    $('progressError').style.display = 'block';
+  }
+
+  function clearMessages() {
+    $('progressError').style.display = 'none';
+  }
+
+  async function loadProjects() {
+    const sel = $('projSel');
+    try {
+      const data = await fetchJSON(apiPaths('/projects'));
+      const projects = data.projects || [];
+
+      if (!projects.length) {
+        sel.innerHTML = '<option value="">No projects assigned</option>';
+        renderTimeline([]);
+        return;
+      }
+
+      sel.innerHTML = projects.map(project => {
+        const label = `${project.title}${project.members ? ' — ' + project.members : ''}`;
+        return `<option value="${esc(project.project_id)}">${esc(label)}</option>`;
+      }).join('');
+
+      currentProjectId = projects[0].project_id;
+      sel.value = currentProjectId;
+      await loadProjectDetails(currentProjectId);
+    } catch (err) {
+      sel.innerHTML = '<option value="">Could not load projects</option>';
+      showError(err.message);
+    }
+  }
+
+  async function loadProjectDetails(projectId) {
+    if (!projectId) return;
+    currentProjectId = projectId;
+    clearMessages();
+
+    try {
+      const data = await fetchJSON(apiPaths('/' + encodeURIComponent(projectId)));
+      const project = data.project || {};
+      const files = data.files || {};
+      const progress = data.progress || {};
+
+      $('detailsTitle').textContent = (project.title || 'Project') + ' progress details';
+      $('appDate').textContent = project.submission_date || '—';
+      $('lastUpdate').textContent = project.updated_at || '—';
+      $('uploadedFiles').textContent = String(files.total || 0);
+      $('feedbackCount').textContent = String(data.feedback_count || 0);
+      $('timelineSource').textContent = data.timeline_source === 'exam_distribution' ? 'Exam Distribution' : 'Fallback';
+
+      setProgress('report', progress.final_report || 0);
+      setProgress('code', progress.source_code || 0);
+      setProgress('presentation', progress.presentation || 0);
+      setProgress('overall', progress.overall || 0);
+
+      renderTimeline(data.timeline || []);
+      renderNotes(data.notes || []);
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  $('projSel').addEventListener('change', function () {
+    loadProjectDetails(this.value);
+  });
+
+  loadProjects();
+})();
+</script>
 {% endblock %}
