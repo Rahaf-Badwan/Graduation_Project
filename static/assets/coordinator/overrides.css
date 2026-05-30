@@ -15,14 +15,99 @@
 .sidebar.collapsed .sb-section {
   display: none;
 }
+/* ── Sidebar items — identical to student style.css ── */
 .coordinator-nav .sb-item {
   display: flex;
   align-items: center;
-  text-decoration: none;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  color: var(--color-text-secondary) !important;
+  border-left: 3px solid transparent;
+  transition: background .15s, color .15s, border-color .15s;
+  white-space: nowrap;
+  position: relative;
+  text-decoration: none !important;
 }
-.coordinator-nav .sb-item:visited {
-  color: inherit;
+.coordinator-nav .sb-item:visited { color: var(--color-text-secondary) !important; }
+.coordinator-nav .sb-item:hover {
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary) !important;
 }
+.coordinator-nav .sb-item.on {
+  background: var(--green-light);
+  color: var(--green) !important;
+  font-weight: 600 !important;
+  border-left-color: var(--green);
+}
+.sidebar .sb-icon {
+  font-size: 17px;
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.sidebar .sb-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebar .sb-id {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.sidebar .sb-role {
+  font-size: 10px;
+  background: var(--green-light);
+  color: var(--green);
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: inline-block;
+  margin-top: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sidebar .sb-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--green-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green);
+  margin: 0 auto 6px;
+  flex-shrink: 0;
+}
+.sidebar .sb-badge {
+  margin-left: auto;
+  background: #E24B4A;
+  color: #fff;
+  font-size: 9px;
+  border-radius: 20px;
+  padding: 1px 6px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.sidebar .sb-footer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color .15s;
+  white-space: nowrap;
+}
+.sidebar .sb-footer-item:hover { color: var(--color-text-primary); }
 .content-area {
   background: var(--color-background-secondary);
 }
@@ -51,7 +136,7 @@
    COORDINATOR DARK MODE
    ══════════════════════════════════════════ */
 
-/* ── Sidebar shell ── */
+/* ── Sidebar dark mode — identical to student style.css ── */
 html[data-theme="dark"] .sidebar {
   background: var(--color-background-primary);
   border-right-color: var(--color-border-tertiary);
@@ -61,21 +146,22 @@ html[data-theme="dark"] .sb-profile {
 }
 html[data-theme="dark"] .sb-profile:hover { background: var(--color-background-tertiary); }
 html[data-theme="dark"] .sb-avatar {
-  background: var(--accent-light);
+  background: var(--green-light);
   color: #6ec97e;
 }
 html[data-theme="dark"] .sb-name { color: var(--color-text-primary); }
+html[data-theme="dark"] .sb-id   { color: var(--color-text-secondary); }
 html[data-theme="dark"] .sb-role {
-  background: var(--accent-light);
+  background: var(--green-light);
   color: #6ec97e;
 }
 html[data-theme="dark"] .sb-item          { color: #c9d1d9 !important; }
-html[data-theme="dark"] .sb-item:hover    { background: var(--color-background-tertiary); color: #e2e8f0 !important; }
-html[data-theme="dark"] .sb-item.on       { background: var(--accent-light); color: #6ec97e !important; border-left-color: var(--green); }
-html[data-theme="dark"] .sb-toggle        { color: #c9d1d9 !important; }
+html[data-theme="dark"] .sb-item:hover    { color: #e2e8f0 !important; background: var(--color-background-tertiary); }
+html[data-theme="dark"] .sb-item.on       { background: var(--green-light); color: #6ec97e !important; border-left-color: var(--green); }
 html[data-theme="dark"] .sb-footer        { border-top-color: var(--color-border-tertiary); }
 html[data-theme="dark"] .sb-footer-item   { color: #c9d1d9 !important; }
 html[data-theme="dark"] .sb-footer-item:hover { color: #e2e8f0 !important; }
+html[data-theme="dark"] .sb-toggle        { color: #c9d1d9 !important; }
 
 /* ── Topbar ── */
 html[data-theme="dark"] .topbar {
