@@ -628,7 +628,6 @@ COORDINATOR_PAGES = {
     "dashboard": "coordinator/index.html",
     "registration": "coordinator/registration.html",
     "hours": "coordinator/hours.html",
-    "review": "coordinator/review.html",
     "committee": "coordinator/committee.html",
     "evaluation": "coordinator/evaluation.html",
     "lectures": "coordinator/lectures.html",

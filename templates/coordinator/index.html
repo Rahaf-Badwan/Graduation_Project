@@ -17,7 +17,7 @@
 
   /* TOP STAT BAR */
   #pg-dashboard .top-stat-bar {
-    display: grid; grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(3, 1fr);
     background: var(--color-background-primary); border-bottom: 1.5px solid #e8edea; margin-bottom: 20px;
   }
   #pg-dashboard .top-stat-item {
@@ -196,11 +196,9 @@
     #pg-dashboard .qa-grid { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 640px) {
-    #pg-dashboard .top-stat-bar { grid-template-columns: 1fr 1fr; }
-    #pg-dashboard .top-stat-item:nth-child(2) { border-right: none; }
-    #pg-dashboard .top-stat-item:nth-child(3),
-    #pg-dashboard .top-stat-item:nth-child(4) { border-top: 1.5px solid #e8edea; }
-    #pg-dashboard .top-stat-item:nth-child(4) { border-right: none; }
+    #pg-dashboard .top-stat-bar { grid-template-columns: 1fr; }
+    #pg-dashboard .top-stat-item { border-right: none; border-bottom: 1.5px solid #e8edea; }
+    #pg-dashboard .top-stat-item:last-child { border-bottom: none; }
     #pg-dashboard .top-stat-num { font-size: 24px; }
     #pg-dashboard .top-stat-item { padding: 14px 16px 12px; }
     #pg-dashboard .qa-grid { grid-template-columns: 1fr 1fr; }
@@ -209,7 +207,7 @@
 
 <!-- legacy compat -->
 <div class="dashboard-hidden-values">
-  <div id="dashTotalProjects">0</div><div id="dashAwaitingReview">0</div>
+  <div id="dashTotalProjects">0</div>
   <div id="dashUnderEvaluation">0</div><div id="dashAccepted">0</div>
   <div id="dashRejected">0</div>
 </div>
@@ -221,10 +219,6 @@
   <div class="top-stat-item">
     <div class="top-stat-num green loading" id="statTotal">—</div>
     <div class="top-stat-lbl">Projects this semester</div>
-  </div>
-  <div class="top-stat-item">
-    <div class="top-stat-num teal loading" id="statAwaiting">—</div>
-    <div class="top-stat-lbl">Awaiting review</div>
   </div>
   <div class="top-stat-item">
     <div class="top-stat-num orange loading" id="statEvaluation">—</div>
@@ -258,10 +252,7 @@
           <div class="qa-icon" style="background:var(--purple-light);color:var(--purple)"><span class="material-symbols-outlined">assignment_ind</span></div>
           <div><div class="qa-label">Distribution</div><div class="qa-sub">Student registration</div></div>
         </a>
-        <a class="qa-card" href="/coordinator/hours">
-          <div class="qa-icon" style="background:var(--amber-light);color:var(--amber)"><span class="material-symbols-outlined">schedule</span></div>
-          <div><div class="qa-label">Faculty Hours</div><div class="qa-sub">Supervisor load</div></div>
-        </a>
+       
         <a class="qa-card" href="/coordinator/lectures">
           <div class="qa-icon" style="background:var(--color-background-tertiary);color:var(--color-text-secondary)"><span class="material-symbols-outlined">menu_book</span></div>
           <div><div class="qa-label">Lectures</div><div class="qa-sub">Deliverables & timeline</div></div>
@@ -435,7 +426,6 @@ async function loadDashboard() {
     const abt = d.archive_by_type || {};
 
     setEl('statTotal',      s.total_projects   ?? 0);
-    setEl('statAwaiting',   s.awaiting_review  ?? 0);
     setEl('statEvaluation', s.under_evaluation ?? 0);
     setEl('statStudents',   s.active_students  ?? 0);
     setEl('miniAccepted',   s.accepted         ?? 0);
@@ -455,51 +445,21 @@ async function loadDashboard() {
     }
 
     /* legacy */
-    ({dashTotalProjects:s.total_projects, dashAwaitingReview:s.awaiting_review,
-      dashUnderEvaluation:s.under_evaluation, dashAccepted:s.accepted, dashRejected:s.rejected
-    }) && Object.entries({dashTotalProjects:s.total_projects, dashAwaitingReview:s.awaiting_review,
+    Object.entries({dashTotalProjects:s.total_projects,
       dashUnderEvaluation:s.under_evaluation, dashAccepted:s.accepted, dashRejected:s.rejected
     }).forEach(([id,val])=>{ const e=document.getElementById(id); if(e) e.textContent=String(val??0); });
 
-    window._lastProjects = d.latest_projects || [];
     window._lastAbt = abt;
     window._lastDashStats = s;
-    renderProjects(window._lastProjects);
     renderTypeChart(abt);
     renderWorkflow(s);
   } catch(e) {
     console.error(e);
-    document.getElementById('projList').innerHTML =
-      '<div class="dash-empty"><div class="dash-empty-icon">⚠️</div>Could not load data.</div>';
+
   }
 }
 
-/* ── Projects list ── */
-function renderProjects(list) {
-  const el = document.getElementById('projList');
-  if (!el) return;
-  if (!list.length) {
-    el.innerHTML = `<div class="dash-empty">
-      <div class="dash-empty-icon">📁</div>
-      No projects this semester yet
-      <div class="dash-empty-hint">Projects will appear here once students submit.</div>
-    </div>`;
-    return;
-  }
-  el.innerHTML = list.map(p => {
-    const color = statusColor(p.status);
-    const label = STATUS_LABEL[p.status] || p.status;
-    const meta  = [p.supervisor_name, p.team_members].filter(Boolean).join(' · ');
-    return `<div class="proj-row" onclick="window.location.href='/coordinator/review'">
-      <div class="proj-info">
-        <div class="proj-title">${esc(p.title)}</div>
-        <div class="proj-meta">${esc(meta||'—')}</div>
-      </div>
-      <span class="proj-badge" style="background:${color}18;color:${color}">${esc(label)}</span>
-    </div>`;
-  }).join('');
-}
-
+/* ── Projects list removed: dashboard no longer links to Review page ── */
 /* ── Bar chart ── */
 function renderTypeChart(abt) {
   const canvas = document.getElementById('typeBarChart');
@@ -546,7 +506,6 @@ function renderWorkflow(s) {
   const total = Math.max(s.total_projects||1, 1);
   const dark = isDark();
   const items = [
-    { label:'Awaiting review',     val:s.awaiting_review ||0, color: dark ? '#fbbf24' : '#c58a17' },
     { label:'Under evaluation',    val:s.under_evaluation||0, color: dark ? '#a78bfa' : '#7c3aed' },
     { label:'Accepted / Archived', val:s.accepted        ||0, color: dark ? '#4ade80' : '#2e7d42' },
   ];
@@ -618,7 +577,6 @@ new MutationObserver(() => {
     renderTypeChart(window._lastAbt);
   }
   if (window._lastProjects) {
-    renderProjects(window._lastProjects);
   }
 }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 </script>
