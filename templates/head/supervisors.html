@@ -6,9 +6,6 @@
 {% block content %}
 <div class="page on" id="pg-supervisors">
 
-  <!-- ══════════════════════════════════════════════
-       TWO-COLUMN LAYOUT
-  ══════════════════════════════════════════════ -->
   <div class="two-col" style="align-items:start">
 
     <!-- ─────────────────────────────────────────
@@ -16,17 +13,28 @@
     ───────────────────────────────────────────── -->
     <div class="card">
       <div class="card-hd">
-        <span class="card-title">List of Active Supervisors</span>
+        <span class="card-title">Active Supervisors</span>
+        <span id="active-count-badge"
+              style="background:var(--teal-light);color:var(--teal);
+                     font-size:11px;font-weight:700;padding:2px 8px;
+                     border-radius:20px;margin-left:8px">—</span>
       </div>
 
-      <!-- Dynamic list injected by supervisors.js -->
+      <!-- Search -->
+      <div style="margin-bottom:12px">
+        <input id="sup-search" type="text" class="field-input"
+               placeholder="Search by name or specialization…"
+               oninput="filterSupervisors(this.value)"
+               style="width:100%;font-size:12px"/>
+      </div>
+
       <div id="supervisors-list"
            style="display:flex;flex-direction:column;gap:8px;min-height:60px">
-        <div class="empty-state" style="color:var(--color-text-secondary);font-size:13px;padding:16px 0">
+        <div style="color:var(--color-text-secondary);font-size:13px;padding:16px 0">
           Loading supervisors…
         </div>
       </div>
-    </div><!-- /left card -->
+    </div>
 
 
     <!-- ─────────────────────────────────────────
@@ -34,144 +42,99 @@
     ───────────────────────────────────────────── -->
     <div style="display:flex;flex-direction:column;gap:16px">
 
-      <!-- ── Stats Summary ───────────────────── -->
+      <!-- ── Stats ── -->
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Supervisor Statistics Summary</span>
+          <span class="card-title">Statistics</span>
         </div>
-
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
           <div class="stat">
-            <div class="stat-num" id="stat-active-supervisors"
-                 style="color:var(--teal);font-size:20px">—</div>
-            <div class="stat-label">Active Supervisors</div>
-          </div>
-          <div class="stat">
-            <div class="stat-num" id="stat-avg-projects"
+            <div class="stat-num" id="stat-total"
                  style="color:var(--blue);font-size:20px">—</div>
-            <div class="stat-label">Avg Projects/Supervisor</div>
+            <div class="stat-label">Total Supervisors</div>
           </div>
           <div class="stat">
-            <div class="stat-num" id="stat-highest-avg"
-                 style="color:var(--green);font-size:20px">—</div>
-            <div class="stat-label">Highest Average</div>
+            <div class="stat-num" id="stat-active"
+                 style="color:var(--teal);font-size:20px">—</div>
+            <div class="stat-label">Active</div>
           </div>
           <div class="stat">
-            <div class="stat-num" id="stat-lowest-avg"
+            <div class="stat-num" id="stat-pending"
                  style="color:var(--amber);font-size:20px">—</div>
-            <div class="stat-label">Lowest Average</div>
+            <div class="stat-label">Pending Activation</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num" id="stat-projects"
+                 style="color:var(--green);font-size:20px">—</div>
+            <div class="stat-label">Total Projects</div>
           </div>
         </div>
-
         <div id="distribution-banner"
              style="padding:10px;background:var(--teal-light);border-radius:var(--rm);
                     font-size:12px;color:var(--teal)">
           ✓ Loading distribution data…
         </div>
-      </div><!-- /stats card -->
+      </div>
 
 
-      <!-- ── Add New Supervisor ──────────────── -->
+      <!-- ── Add Supervisor ── -->
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Add New Supervisor</span>
         </div>
-
-        <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px">
-          Select a supervisor from the list below to activate their account.
+        <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">
+          The supervisor will be added as inactive and can activate their account via
+          the <strong>/activate</strong> page.
         </p>
 
-        <!-- Inactive supervisors table -->
-        <div style="overflow-x:auto;border:0.5px solid var(--color-border-tertiary);
-                    border-radius:var(--rm);margin-bottom:4px">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead>
-              <tr style="background:var(--color-background-secondary)">
-                <th style="padding:8px 10px;text-align:left;font-weight:600;
-                           color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)">
-                  Name
-                </th>
-                <th style="padding:8px 10px;text-align:left;font-weight:600;
-                           color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)">
-                  Specialization
-                </th>
-                <th style="padding:8px 10px;text-align:left;font-weight:600;
-                           color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)">
-                  Exp.
-                </th>
-                <th style="padding:8px 10px;text-align:center;font-weight:600;
-                           color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody id="inactive-supervisor-tbody">
-              <tr>
-                <td colspan="4" style="padding:12px;text-align:center;
-                                       color:var(--color-text-secondary)">
-                  Loading…
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="field-wrap">
+          <div class="field-label">Full Name</div>
+          <input id="add-name" class="field-input" type="text" placeholder="Dr. …"/>
         </div>
-        <div id="inactive-empty"
-             style="display:none;font-size:12px;color:var(--green);padding:6px 0">
-          ✓ All supervisors in the system are already active.
+        <div class="field-wrap">
+          <div class="field-label">University ID (4 digits)</div>
+          <input id="add-uid" class="field-input" type="text"
+                 placeholder="1234" maxlength="4"/>
         </div>
-      </div><!-- /add card -->
+        <div class="field-wrap">
+          <div class="field-label">Email</div>
+          <input id="add-email" class="field-input" type="email"
+                 placeholder="name@university.edu"/>
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Specialization</div>
+          <input id="add-spec" class="field-input" type="text"
+                 placeholder="e.g. Software Engineering"/>
+        </div>
 
-    </div><!-- /right column -->
+        <div id="add-error"
+             style="font-size:12px;color:var(--red,#dc2626);margin-bottom:8px;min-height:16px"></div>
+
+        <div class="btn-row">
+          <button id="add-btn" class="btn btn-primary"
+                  style="width:100%" onclick="addSupervisor()">
+            Add Supervisor ↗
+          </button>
+        </div>
+      </div>
+
+
+
+
+    </div><!-- /right col -->
   </div><!-- /two-col -->
 
 
   <!-- ══════════════════════════════════════════════
-       HOURS SIDEBAR PANEL
-       Shown when the user clicks "Hours" in the sidebar.
-       In your base template add a nav item that toggles
-       class "hours-panel-open" on #pg-supervisors, OR
-       simply show this as a floating right panel.
-  ══════════════════════════════════════════════ -->
-  <div id="hours-panel"
-       style="display:none;position:fixed;top:0;right:0;width:300px;height:100vh;
-              background:var(--color-background);border-left:1px solid var(--color-border-tertiary);
-              z-index:200;overflow-y:auto;padding:20px 16px;box-shadow:-4px 0 20px rgba(0,0,0,.08)">
-
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <span style="font-weight:700;font-size:15px">Supervisor Hours</span>
-      <button onclick="closeHoursPanel()"
-              style="background:none;border:none;cursor:pointer;font-size:18px;
-                     color:var(--color-text-secondary)">✕</button>
-    </div>
-
-    <!-- List -->
-    <div id="hours-list" style="display:flex;flex-direction:column"></div>
-
-    <!-- Total -->
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--color-border-tertiary);
-                display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:12px;color:var(--color-text-secondary)">Total Hours</span>
-      <span id="hours-total"
-            style="font-weight:700;color:var(--teal);font-size:14px">0 hrs</span>
-    </div>
-
-    <!-- Send button -->
-    <div class="btn-row" style="margin-top:16px">
-      <button id="send-hours-btn" class="btn btn-primary" style="width:100%">
-        Send to Coordinator ↗
-      </button>
-    </div>
-  </div><!-- /hours-panel -->
-
-
-  <!-- ══════════════════════════════════════════════
        ACTIVATE SUPERVISOR MODAL
+       (Head activates on behalf of supervisor)
   ══════════════════════════════════════════════ -->
   <div id="supervisor-activate-modal"
        style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
-              z-index:300;display:none;align-items:center;justify-content:center">
+              z-index:300;align-items:center;justify-content:center">
     <div style="background:var(--color-background);border-radius:12px;padding:28px 24px;
-                width:360px;max-width:calc(100vw - 32px);box-shadow:0 8px 32px rgba(0,0,0,.18)">
+                width:360px;max-width:calc(100vw - 32px);
+                box-shadow:0 8px 32px rgba(0,0,0,.18)">
 
       <div style="font-weight:700;font-size:16px;margin-bottom:4px">
         Activate Supervisor
@@ -179,79 +142,39 @@
       <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:18px"
            id="activate-modal-name">—</div>
 
-      <!-- Hours -->
       <div class="field-wrap">
         <div class="field-label">Graduation Project Hours</div>
-        <input id="activate-hours" class="field-input" type="number" min="0" step="0.5"
-               placeholder="e.g. 6" />
+        <input id="activate-hours" class="field-input" type="number"
+               min="0" step="0.5" placeholder="e.g. 6"/>
       </div>
-
-      <!-- Password -->
       <div class="field-wrap">
         <div class="field-label">Set Password</div>
         <input id="activate-password" class="field-input" type="password"
-               placeholder="At least 8 characters" autocomplete="new-password" />
+               placeholder="At least 8 characters" autocomplete="new-password"/>
       </div>
-
-      <!-- Confirm -->
       <div class="field-wrap">
         <div class="field-label">Confirm Password</div>
         <input id="activate-confirm" class="field-input" type="password"
-               placeholder="Repeat password" autocomplete="new-password" />
+               placeholder="Repeat password" autocomplete="new-password"/>
       </div>
 
-      <!-- Error -->
       <div id="activate-modal-error"
            style="font-size:12px;color:var(--red,#dc2626);margin-bottom:8px;min-height:18px"></div>
 
-      <!-- Buttons -->
       <div class="btn-row" style="gap:8px">
-        <button class="btn btn-secondary" onclick="closeActivateModal()" style="flex:1">
-          Cancel
-        </button>
-        <button class="btn btn-primary" onclick="submitActivateSupervisor()" style="flex:2">
-          Activate Account ↗
+        <button class="btn btn-secondary"
+                onclick="closeActivateModal()" style="flex:1">Cancel</button>
+        <button class="btn btn-primary"
+                onclick="submitActivateSupervisor()" style="flex:2">
+          Activate ↗
         </button>
       </div>
-
     </div>
-  </div><!-- /modal -->
+  </div>
 
 </div><!-- /pg-supervisors -->
 
-
-<!-- ── Hours panel toggle button (sidebar injection point) ── -->
-{% block extra_sidebar_items %}
-<li class="nav-item" id="nav-hours">
-  <a href="#" class="nav-link" onclick="toggleHoursPanel(event)">
-    <span class="nav-icon">⏱</span>
-    <span class="nav-label">Hours</span>
-  </a>
-</li>
-{% endblock %}
-
 {% block scripts %}
 <script src="{{ url_for('static', filename='assets/head/supervisors.js') }}"></script>
-<script>
-  function toggleHoursPanel(e) {
-    if (e) e.preventDefault();
-    const panel = document.getElementById('hours-panel');
-    if (panel) panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
-  }
-  function closeHoursPanel() {
-    const panel = document.getElementById('hours-panel');
-    if (panel) panel.style.display = 'none';
-  }
-  // Fix modal display toggle
-  window.closeActivateModal = function () {
-    document.getElementById('supervisor-activate-modal').style.display = 'none';
-  };
-  // Override showEl used in js to properly flex-center modal
-  const _origShowEl = HTMLElement.prototype; // just override inline
-  document.addEventListener('DOMContentLoaded', function () {
-    const modal = document.getElementById('supervisor-activate-modal');
-    if (modal) modal.style.display = 'none';
-  });
-</script>
 {% endblock %}
 {% endblock %}
