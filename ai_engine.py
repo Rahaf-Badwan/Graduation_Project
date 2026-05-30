@@ -267,6 +267,89 @@ ARABIC_FOLLOWUP_TERMS = (
     "تستخدمها",
 )
 
+ROLE_QUERY_TERMS = (
+    "supervisor",
+    "advisor",
+    "head",
+    "head of department",
+    "hod",
+    "coordinator",
+    "course coordinator",
+    "group member",
+    "group members",
+    "team member",
+    "team members",
+    "member",
+    "members",
+    "student group",
+    "committee",
+    "committee member",
+    "reader",
+    "responsible",
+    "faculty",
+    "doctor",
+    "السوبرفايزر",
+    "سوبرفايزر",
+    "المشرف",
+    "مشرف",
+    "مشرفين",
+    "الهيد",
+    "هيد",
+    "رئيس القسم",
+    "الكوردينيتر",
+    "الكوارديتر",
+    "الكواوردينيتر",
+    "كواردينيتر",
+    "كوردينيتر",
+    "منسق",
+    "منسقة",
+    "أعضاء الجروب",
+    "اعضاء الجروب",
+    "أعضاء القروب",
+    "اعضاء القروب",
+    "أعضاء الفريق",
+    "اعضاء الفريق",
+    "جروب",
+    "قروب",
+    "فريق",
+    "عضو",
+    "أعضاء",
+    "اعضاء",
+    "طالب",
+    "طلاب",
+    "لجنة",
+    "قارئ",
+    "مسؤول",
+)
+
+GROUP_MEMBER_TERMS = (
+    "group member",
+    "group members",
+    "team member",
+    "team members",
+    "members",
+    "student group",
+    "أعضاء الجروب",
+    "اعضاء الجروب",
+    "أعضاء القروب",
+    "اعضاء القروب",
+    "أعضاء الفريق",
+    "اعضاء الفريق",
+    "جروب",
+    "قروب",
+    "فريق",
+    "اعضاء",
+    "أعضاء",
+)
+
+ROLE_GLOSSARY = """APMS role glossary:
+- Head / Head of Department: the department-level user who can manage high-level course setup, assign coordinators, and oversee faculty/project workflows.
+- Coordinator: the faculty member assigned to coordinate a COMP4200/COMP4300 semester, manage project review workflow, notices, sections, committees, and deadlines.
+- Supervisor / Advisor: the faculty member supervising a student project and following its progress.
+- Group member / Team member: a student linked to a project team through project_members, or to a student group through student_groups.
+- Committee member / Reader / Responsible faculty: faculty assigned to project discussion/evaluation committees or report reading tasks.
+Use these meanings when users use Arabic/English mixed terms such as السوبرفايزر, الهيد, الكوردينيتر, الجروب, group members."""
+
 
 def _read_json(path, default):
     try:
@@ -343,6 +426,19 @@ def _pattern_hit(text, patterns):
     return False
 
 
+def _contains_term(text, terms):
+    normalized = normalize(text)
+    return any(normalize(term) in normalized for term in terms)
+
+
+def is_role_query(question):
+    return _contains_term(question, ROLE_QUERY_TERMS)
+
+
+def is_group_member_query(question):
+    return _contains_term(question, GROUP_MEMBER_TERMS)
+
+
 def match_project(question):
     q = normalize(question)
     q_words = set(q.split())
@@ -391,6 +487,8 @@ def classify_intent(question, matched_project=None):
     q = normalize(question)
     apms_hint = any(normalize(hint) in q for hint in APMS_HINTS)
     if matched_project:
+        if is_group_member_query(question):
+            return "db_stats"
         if re.search(
             r"\b(compare|comparison|vs|versus|trend|average|avg|statistics|stats|how many|without supervisor)\b",
             q,
@@ -400,6 +498,8 @@ def classify_intent(question, matched_project=None):
         return "pdf_project"
     if _pattern_hit(q, GENERAL_PATTERNS) and not apms_hint:
         return "general"
+    if is_role_query(question):
+        return "db_stats"
     if _pattern_hit(q, DB_PATTERNS):
         return "db_stats"
     if _pattern_hit(q, PROJECT_PATTERNS) or apms_hint:
@@ -464,12 +564,13 @@ def _section_score_bonus(question, chunk):
         (("technology", "technologies", "tools", "تقنية", "تقنيات", "تكنولوجيا", "أدوات", "ادوات"), ("technology", "technologies", "tools")),
         (("methodology", "method", "منهجية", "طريقة", "الية", "آلية"), ("methodology", "method")),
         (("feature", "features", "functionality", "functionalities", "ميزة", "ميزات", "مميزات", "خصائص"), ("feature", "features", "use case", "requirements", "objectives")),
-        (("supervisor", "supervised", "advisor", "مشرف", "المشرف", "مين اشرف", "من اشرف"), ("supervisor", "supervised by", "first supervisor")),
+        (("supervisor", "supervised", "advisor", "السوبرفايزر", "سوبرفايزر", "مشرف", "المشرف", "مين اشرف", "من اشرف"), ("supervisor", "supervised by", "first supervisor")),
+        (("group member", "group members", "team member", "team members", "students", "أعضاء الجروب", "اعضاء الجروب", "أعضاء الفريق", "اعضاء الفريق"), ("prepared by", "students", "supervisor", "submitted by", "team")),
     ]
     for question_terms, chunk_terms in section_groups:
         if any(normalize(term) in q for term in question_terms) and any(normalize(term) in c for term in chunk_terms):
             bonus += 1.25
-    if any(normalize(term) in q for term in ("supervisor", "supervised", "advisor", "مشرف", "المشرف", "مين", "من")):
+    if any(normalize(term) in q for term in ("supervisor", "supervised", "advisor", "السوبرفايزر", "سوبرفايزر", "مشرف", "المشرف", "مين", "من")):
         if any(term in c for term in ("supervisor", "supervised by", "first supervisor")):
             bonus += 4.0
     if any(normalize(term) in q for term in ("feature", "features", "functionality", "functionalities", "ميزة", "ميزات", "مميزات", "خصائص", "وظائف")):
@@ -545,6 +646,10 @@ def _needs_neighbor_context(question):
             "مميزات",
             "مشرف",
             "المشرف",
+            "أعضاء",
+            "اعضاء",
+            "جروب",
+            "فريق",
         )
     )
 
@@ -582,7 +687,7 @@ def search_pdf_context(question, project=None, top_k=6):
     selected_indices = []
     include_neighbors = _needs_neighbor_context(question)
     q_norm = normalize(question)
-    if any(normalize(term) in q_norm for term in ("supervisor", "supervised", "advisor", "مشرف", "المشرف", "مين", "من")):
+    if any(normalize(term) in q_norm for term in ("supervisor", "supervised", "advisor", "مشرف", "المشرف", "مين", "من")) or is_group_member_query(question):
         selected_indices.extend(idx for idx in (0, 1) if idx < len(chunks))
     for idx, _, _ in selected:
         for next_idx in (idx, idx + 1) if include_neighbors else (idx,):
@@ -620,9 +725,27 @@ def _query(cursor, sql, params=None):
     return cursor.fetchall()
 
 
-def fetch_db_context(question):
+def _display_db_value(value):
+    if isinstance(value, set):
+        return ", ".join(sorted(str(item) for item in value))
+    return value
+
+
+def _display_faculty_name(row):
+    title = (row.get("title") or "").strip()
+    name = (row.get("full_name") or "").strip()
+    if title and not name.lower().startswith(title.lower()):
+        return f"{title} {name}".strip()
+    return name
+
+
+def fetch_db_context(question, project=None):
     q = normalize(question)
     parts = []
+    role_query = is_role_query(question)
+    group_query = is_group_member_query(question)
+    if role_query:
+        parts.append(ROLE_GLOSSARY)
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -639,9 +762,120 @@ def fetch_db_context(question):
         if rows:
             parts.append("Archived projects from APMS database:")
             parts.extend(
-                f"- {row['title']} | type={row.get('project_type')} | score={row.get('final_score', 'N/A')}"
+                f"- {row['title']} | type={_display_db_value(row.get('project_type'))} | score={row.get('final_score', 'N/A')}"
                 for row in rows
             )
+
+        if project and group_query:
+            project_title = project.get("title", "")
+            rows = _query(
+                cursor,
+                """
+                SELECT p.project_id, p.title
+                FROM projects p
+                WHERE p.title = %s OR p.title_en = %s
+                LIMIT 1
+                """,
+                (project_title, project_title),
+            )
+            if rows:
+                row = rows[0]
+                member_rows = _query(
+                    cursor,
+                    """
+                    SELECT u.full_name, u.email, u.university_id, pm.is_primary_contact
+                    FROM project_members pm
+                    JOIN students st ON st.student_id = pm.student_id
+                    JOIN users u ON u.user_id = st.user_id
+                    WHERE pm.project_id = %s
+                    ORDER BY pm.is_primary_contact DESC, u.full_name
+                    """,
+                    (row["project_id"],),
+                )
+                parts.append(f"\nProject group members from APMS database for {row.get('title')}:")
+                if member_rows:
+                    parts.extend(
+                        "- {full_name} | id={university_id} | email={email} | primary_contact={primary}".format(
+                            primary=bool(member.get("is_primary_contact")),
+                            **member,
+                        )
+                        for member in member_rows
+                    )
+                else:
+                    parts.append("- No project_members records found for this project.")
+
+        if role_query and not project:
+            rows = _query(
+                cursor,
+                """
+                SELECT u.role, u.full_name, u.email, u.university_id,
+                       f.title, f.specialization, f.years_experience
+                FROM users u
+                LEFT JOIN faculty f ON f.user_id = u.user_id
+                WHERE u.is_active = TRUE
+                  AND u.role IN ('head_of_department', 'coordinator', 'supervisor')
+                ORDER BY CASE u.role
+                    WHEN 'head_of_department' THEN 1
+                    WHEN 'coordinator' THEN 2
+                    WHEN 'supervisor' THEN 3
+                    ELSE 4
+                END, u.full_name
+                LIMIT 80
+                """,
+            )
+            if rows:
+                parts.append("\nActive APMS faculty users by role:")
+                parts.extend(
+                    "- {role}: {name} | email={email} | specialization={specialization}".format(
+                        role=row.get("role"),
+                        name=_display_faculty_name(row),
+                        email=row.get("email"),
+                        specialization=row.get("specialization") or "N/A",
+                    )
+                    for row in rows
+                )
+
+            rows = _query(
+                cursor,
+                """
+                SELECT u.full_name, u.email, f.title, s.academic_year,
+                       s.semester_number, s.course_code, s.is_active
+                FROM coordinator_assignments ca
+                JOIN faculty f ON f.faculty_id = ca.faculty_id
+                JOIN users u ON u.user_id = f.user_id
+                JOIN semesters s ON s.semester_id = ca.semester_id
+                ORDER BY s.is_active DESC, s.academic_year DESC, s.semester_number DESC
+                LIMIT 20
+                """,
+            )
+            if rows:
+                parts.append("\nCoordinator assignments:")
+                parts.extend(
+                    "- {name} | {course_code} {academic_year} semester={semester_number} | active={active}".format(
+                        name=_display_faculty_name(row),
+                        active=bool(row.get("is_active")),
+                        **row,
+                    )
+                    for row in rows
+                )
+
+        if group_query and not project:
+            rows = _query(
+                cursor,
+                """
+                SELECT p.title, GROUP_CONCAT(u.full_name ORDER BY u.full_name SEPARATOR ', ') AS members
+                FROM projects p
+                JOIN project_members pm ON pm.project_id = p.project_id
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users u ON u.user_id = st.user_id
+                GROUP BY p.project_id, p.title
+                ORDER BY p.updated_at DESC
+                LIMIT 25
+                """,
+            )
+            if rows:
+                parts.append("\nProject group member examples:")
+                parts.extend(f"- {row['title']}: {row.get('members')}" for row in rows)
 
         if re.search(r"supervisor|مشرف|top|best|افضل|أفضل", q, re.IGNORECASE):
             try:
@@ -831,6 +1065,13 @@ def build_user_prompt(question, context, reply_to=None):
             "If the user asks who supervised the project, answer from the title-page or project metadata excerpts. "
             "Give the supervisor name if present; do not say it is unavailable when the context contains a Supervisor field."
         )
+    if is_role_query(question):
+        parts.append(
+            "If the user asks about APMS roles or people, use the role glossary and database rows. "
+            "Recognize mixed Arabic/English terms such as السوبرفايزر=supervisor, الهيد=head of department, "
+            "الكوردينيتر=coordinator, and أعضاء الجروب/group members=project team students. "
+            "When names are available in the context, answer with the names instead of a generic definition."
+        )
     if reply_to:
         parts.append(f'The user is replying to:\n"{reply_to}"\n')
     if context:
@@ -903,12 +1144,23 @@ def ask_apms_ai(question, reply_to=None, conversation_context=None):
         prefix = "Based on uploaded PDFs:"
         system = SYSTEM_APMS
     elif intent == "db_stats":
-        context = fetch_db_context(question)
+        context = fetch_db_context(question, project)
         if project:
             context += "\n\nAlso matched project: " + project.get("title", "")
-            meta = project_meta_from_db(project.get("title", ""))
+            meta = (
+                project_meta_from_catalog(project)
+                if is_group_member_query(question)
+                else project_meta_from_db(project.get("title", ""))
+            )
             if meta:
                 context += "\n" + meta
+            if is_group_member_query(question):
+                pdf_context = search_pdf_context(
+                    f"{project.get('title', '')}\n{question}\nteam members group members students prepared by title page",
+                    project,
+                )
+                if pdf_context.get("text"):
+                    context += "\n\nPDF excerpts for project people/team members:\n" + pdf_context.get("text", "")
         prefix = "Based on APMS data:"
         system = SYSTEM_APMS
     else:
