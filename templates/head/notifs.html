@@ -7,13 +7,13 @@
 {% block content %}
 <style>
   :root {
-    --sn-green: #2e7d42;
-    --sn-green-dark: #205c31;
-    --sn-green-soft: #f4faf6;
-    --sn-border: #e8eeeb;
-    --sn-muted: #7a8f82;
-    --sn-text: #1e3326;
-    --sn-bg: #f8fbf9;
+    --sn-green: #1f7a3b;
+    --sn-green-dark: #145a2b;
+    --sn-green-soft: #eef9f1;
+    --sn-border: #e4ece7;
+    --sn-muted: #667085;
+    --sn-text: #172b1d;
+    --sn-bg: #f6faf7;
   }
 
   #pg-notifs {
@@ -37,48 +37,19 @@
     width: 100%;
     max-width: none !important;
     margin: 0;
-    padding: 6px 10px 88px
+    padding: 8px 10px 88px
   }
-
-  .main-notif-tabs {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin: 0 0 12px
-  }
-
-  .main-notif-tab {
-    border: 1px solid #d7e3dc;
-    background: var(--color-background-primary);
-    color: var(--color-text-primary);
-    padding: 10px 14px;
-    border-radius: 999px;
-    font-weight: 500;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background .15s, color .15s, border-color .15s
-  }
-
-  .main-notif-tab:hover { background: #f4faf6; }
-
-  .main-notif-tab.on {
-    background: var(--sn-green);
-    color: #fff;
-    border-color: var(--sn-green)
-  }
-
-  .notif-tab-pane { display: none }
-  .notif-tab-pane.active { display: block }
 
   .sn-messages-card {
     width: 100%;
-    min-height: calc(100vh - 190px)
+    min-height: calc(100vh - 150px)
   }
 
   .sn-card {
     background: var(--color-background-primary);
     border: 1px solid var(--sn-border);
-    border-radius: 14px;
+    border-radius: 22px;
+    box-shadow: 0 14px 36px rgba(16, 24, 40, .07);
     overflow: hidden
   }
 
@@ -86,10 +57,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--sn-border);
-    background: #fff
+    gap: 14px;
+    padding: 18px 22px;
+    border-bottom: 1px solid #edf2ef;
+    background: linear-gradient(180deg, #fff, #fbfdfb)
   }
 
   .sn-card-title {
@@ -102,16 +73,17 @@
   .sn-card-sub {
     font-size: 12px;
     color: var(--sn-muted);
-    margin-top: 2px;
-    font-weight: 400
+    margin-top: 4px
   }
 
-  .sn-body { padding: 14px 18px }
+  .sn-body {
+    padding: 18px 22px
+  }
 
   .sn-head-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-wrap: wrap;
     justify-content: flex-end
   }
@@ -119,14 +91,30 @@
   .sn-form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px
+    gap: 12px
+  }
+
+  @media(max-width:700px) {
+    .sn-form-row {
+      grid-template-columns: 1fr
+    }
+
+    .sn-card-hd {
+      align-items: flex-start;
+      flex-direction: column
+    }
+
+    .sn-head-actions {
+      width: 100%;
+      justify-content: space-between
+    }
   }
 
   .sn-field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    margin-bottom: 10px
+    gap: 7px;
+    margin-bottom: 13px
   }
 
   .sn-field label {
@@ -145,29 +133,28 @@
     background: var(--color-background-primary);
     outline: none;
     font-family: inherit;
-    font-weight: 400;
-    color: var(--sn-text);
-    transition: border-color .15s, box-shadow .15s
+    transition: border-color .15s, box-shadow .15s, background .15s
   }
 
   .sn-field textarea {
-    min-height: 100px;
+    min-height: 118px;
     resize: vertical;
-    line-height: 1.5
+    line-height: 1.55
   }
 
   .sn-field input:focus,
   .sn-field select:focus,
   .sn-field textarea:focus {
     border-color: var(--sn-green);
-    box-shadow: 0 0 0 4px rgba(46, 125, 66, .12);
+    box-shadow: 0 0 0 4px rgba(31, 122, 59, .12);
     background: var(--color-background-primary)
   }
 
+  /* File drop zone */
   .sn-file-zone {
-    border: 1.5px dashed #cddbd2;
-    border-radius: 8px;
-    padding: 12px;
+    border: 2px dashed #c9ddcf;
+    border-radius: 14px;
+    padding: 15px;
     text-align: center;
     cursor: pointer;
     transition: border-color .15s, background .15s, transform .15s;
@@ -192,13 +179,14 @@
   }
 
   .sn-file-zone-label {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--sn-muted);
-    pointer-events: none;
-    font-weight: 400
+    pointer-events: none
   }
 
-  .sn-file-zone-label strong { color: var(--sn-green); font-weight: 500 }
+  .sn-file-zone-label strong {
+    color: var(--sn-green)
+  }
 
   .sn-file-chosen {
     display: none;
@@ -217,30 +205,34 @@
     cursor: pointer;
     color: #b42318;
     margin-left: auto;
-    font-size: 14px;
+    font-size: 16px;
     line-height: 1
   }
 
   .sn-actions {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     justify-content: flex-end;
-    margin-top: 8px
+    margin-top: 10px
   }
 
   .sn-btn {
     border: 0;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-weight: 500;
-    font-size: 13px;
+    border-radius: 14px;
+    padding: 10px 16px;
+    font-weight: 900;
+    font-size: 14px;
     cursor: pointer;
-    transition: opacity .15s, transform .15s;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
     background: var(--sn-green);
-    color: #fff
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(31, 122, 59, .18)
   }
 
-  .sn-btn:hover { opacity: .9; transform: translateY(-1px) }
+  .sn-btn:hover {
+    opacity: .94;
+    transform: translateY(-1px)
+  }
 
   .sn-btn.secondary {
     background: var(--color-background-tertiary);
@@ -249,10 +241,17 @@
     box-shadow: none
   }
 
+  .sn-btn.danger {
+    background: var(--coral-light);
+    color: #b42318;
+    border: 1px solid #fecaca;
+    box-shadow: none
+  }
+
   .sn-btn.small {
-    padding: 6px 10px;
+    padding: 7px 11px;
     font-size: 12px;
-    border-radius: 7px
+    border-radius: 11px
   }
 
   .sn-tabs {
@@ -268,13 +267,15 @@
     color: var(--color-text-primary);
     padding: 9px 17px;
     border-radius: 999px;
-    font-weight: 500;
-    font-size: 12px;
+    font-weight: 900;
+    font-size: 13px;
     cursor: pointer;
-    transition: background .15s, color .15s, border-color .15s
+    transition: background .15s, color .15s, border-color .15s, box-shadow .15s
   }
 
-  .sn-tab:hover { background: #f4faf6 }
+  .sn-tab:hover {
+    box-shadow: 0 5px 14px rgba(16, 24, 40, .06)
+  }
 
   .sn-tab.on {
     background: var(--sn-green);
@@ -285,8 +286,8 @@
   .sn-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-height: calc(100vh - 340px)
+    gap: 12px;
+    min-height: calc(100vh - 310px)
   }
 
   .sn-msg {
@@ -295,31 +296,33 @@
     border-radius: 18px;
     padding: 15px 16px;
     display: grid;
-    grid-template-columns: 36px 1fr;
-    gap: 12px;
+    grid-template-columns: 42px 1fr;
+    gap: 14px;
     align-items: start;
     cursor: pointer;
-    transition: box-shadow .15s, border-color .15s, background .15s
+    transition: box-shadow .15s, transform .15s, border-color .15s, background .15s
   }
 
   .sn-msg:hover {
-    box-shadow: 0 4px 12px rgba(46, 125, 66, .07);
+    box-shadow: 0 10px 24px rgba(31, 122, 59, .10);
+    transform: translateY(-1px);
     border-color: #c9decf
   }
 
   .sn-msg.unread {
-    background: #fafdfb;
-    border-color: #c8dece
+    background: linear-gradient(90deg, #f0faf2, #fff);
+    border-color: #b9dfc3
   }
 
   .sn-msg-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 18px;
+    font-weight: 900;
     flex-shrink: 0
   }
 
@@ -337,22 +340,21 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 2px
+    gap: 10px;
+    margin-bottom: 4px
   }
 
   .sn-msg-title {
-    font-weight: 500;
+    font-weight: 900;
     color: var(--sn-text);
-    font-size: 13.5px;
-    line-height: 1.3
+    font-size: 15.5px;
+    line-height: 1.35
   }
 
   .sn-msg-meta {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--sn-muted);
-    margin-bottom: 4px;
-    font-weight: 400
+    margin-bottom: 6px
   }
 
   .sn-msg-preview {
@@ -362,14 +364,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
-    line-height: 1.4;
-    font-weight: 400
+    line-height: 1.45
   }
 
   .sn-pill {
-    font-size: 10px;
-    font-weight: 500;
-    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 900;
+    padding: 5px 10px;
     border-radius: 999px;
     white-space: nowrap;
     flex-shrink: 0
@@ -390,67 +391,63 @@
     color: var(--green)
   }
 
-  .sn-att-badge,
-  .course-pill {
+  .sn-att-badge {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    font-size: 10px;
-    font-weight: 500;
-    border-radius: 999px;
-    padding: 3px 7px;
-    margin-top: 4px;
-    margin-right: 4px
-  }
-
-  .sn-att-badge {
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
     color: #6b7280;
-    background: var(--color-background-tertiary)
-  }
-
-  .course-pill {
-    color: var(--green);
-    background: var(--green-light)
+    background: var(--color-background-tertiary);
+    border-radius: 999px;
+    padding: 4px 9px;
+    margin-top: 6px
   }
 
   .sn-empty {
-    padding: 24px;
+    padding: 28px;
     border: 1px dashed #cddbd2;
-    border-radius: 10px;
+    border-radius: 16px;
     color: var(--sn-muted);
     text-align: center;
     background: var(--color-background-tertiary);
     font-size: 14px
   }
 
+  /* Compose drawer */
   .sn-drawer-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, .35);
-    z-index: 180
+    background: rgba(15, 23, 42, .42);
+    z-index: 180;
+    backdrop-filter: blur(2px)
   }
 
-  .sn-drawer-overlay.open { display: block }
+  .sn-drawer-overlay.open {
+    display: block
+  }
 
   .sn-compose-drawer {
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(560px, 94vw);
+    width: min(520px, 94vw);
     background: var(--color-background-primary);
     z-index: 190;
-    box-shadow: -8px 0 32px rgba(15, 23, 42, .12);
+    box-shadow: -18px 0 44px rgba(15, 23, 42, .18);
     transform: translateX(105%);
-    transition: transform .22s ease;
-    border-radius: 16px 0 0 16px;
+    transition: transform .24s ease;
+    border-radius: 22px 0 0 22px;
     display: flex;
     flex-direction: column;
     overflow: hidden
   }
 
-  .sn-compose-drawer.open { transform: translateX(0) }
+  .sn-compose-drawer.open {
+    transform: translateX(0)
+  }
 
   .sn-compose-drawer .sn-card {
     height: 100%;
@@ -464,11 +461,12 @@
   .sn-compose-drawer .sn-body {
     overflow: auto;
     flex: 1;
-    padding-bottom: 24px
+    padding-bottom: 28px
   }
 
   .sn-drawer-close {
-    width: 30px; height: 30px;
+    width: 36px;
+    height: 36px;
     border-radius: 999px;
     border: 1px solid #d8e2dc;
     background: var(--color-background-tertiary);
@@ -476,41 +474,48 @@
     font-size: 21px;
     line-height: 1;
     cursor: pointer;
-    font-weight: 400
+    font-weight: 800
   }
 
   .sn-fab {
     position: fixed;
-    right: 24px; bottom: 24px;
+    right: 28px;
+    bottom: 28px;
     z-index: 160;
-    width: 48px; height: 48px;
+    width: 58px;
+    height: 58px;
     border-radius: 999px;
     border: 0;
     background: var(--sn-green);
     color: #fff;
-    font-size: 20px;
-    box-shadow: 0 6px 20px rgba(46, 125, 66, .25);
+    font-size: 24px;
+    box-shadow: 0 14px 30px rgba(31, 122, 59, .30);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform .15s, opacity .15s
+    transition: transform .15s, box-shadow .15s, opacity .15s
   }
 
-  .sn-fab:hover { transform: translateY(-2px); opacity: .92 }
+  .sn-fab:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 18px 36px rgba(31, 122, 59, .34)
+  }
 
   .sn-fab::after {
     content: attr(data-tooltip);
     position: absolute;
-    right: 58px; top: 50%;
-    transform: translateY(-50%) translateX(6px);
+    right: 70px;
+    top: 50%;
+    transform: translateY(-50%) translateX(8px);
     background: #111827;
     color: #fff;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 800;
     white-space: nowrap;
-    padding: 6px 10px;
-    border-radius: 8px;
+    padding: 8px 11px;
+    border-radius: 10px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, .20);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -540,27 +545,31 @@
     transform: translateY(-50%) translateX(0)
   }
 
+  /* ── Message Modal ── */
   .sn-overlay {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,.38);
+    background: rgba(0, 0, 0, .45);
     z-index: 220;
     align-items: center;
     justify-content: center;
-    padding: 16px
+    padding: 16px;
+    backdrop-filter: blur(2px)
   }
 
-  .sn-overlay.open { display: flex }
+  .sn-overlay.open {
+    display: flex
+  }
 
   .sn-modal {
     background: var(--color-background-primary);
     border-radius: 22px;
     width: 100%;
-    max-width: 580px;
-    max-height: 88vh;
+    max-width: 650px;
+    max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 16px 48px rgba(0,0,0,.16);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .22);
     display: flex;
     flex-direction: column
   }
@@ -585,19 +594,21 @@
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 18px;
-    color: #7a8f82;
+    font-size: 22px;
+    color: #667085;
     line-height: 1;
     padding: 0
   }
 
-  .sn-modal-body { padding: 16px 18px; flex: 1 }
+  .sn-modal-body {
+    padding: 18px 21px;
+    flex: 1
+  }
 
   .sn-modal-msg-meta {
-    font-size: 11px;
-    color: #7a8f82;
-    margin-bottom: 8px;
-    font-weight: 400
+    font-size: 12px;
+    color: #667085;
+    margin-bottom: 6px
   }
 
   .sn-modal-msg-body {
@@ -615,15 +626,15 @@
   .sn-modal-att-link {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    font-weight: 500;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 800;
     color: var(--sn-green);
     background: var(--green-light);
     border-radius: 10px;
     padding: 7px 12px;
     text-decoration: none;
-    margin-bottom: 12px
+    margin-bottom: 14px
   }
 
   .sn-modal-att-link:hover {
@@ -645,53 +656,22 @@
 
   .sn-toast {
     position: fixed;
-    right: 20px; bottom: 88px;
+    right: 22px;
+    bottom: 98px;
     z-index: 999;
     background: #111827;
     color: #fff;
-    padding: 10px 14px;
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0,0,0,.18);
-    display: none;
-    max-width: 320px;
-    font-size: 13px;
-    font-weight: 500
-  }
-
-  .sn-specific-wrap { display: none }
-
-  .notice-preview {
-    border-left: 5px solid #2e7d42;
-    background: var(--color-background-tertiary);
+    padding: 12px 16px;
     border-radius: 14px;
-    padding: 13px 14px;
-    margin-top: 8px
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
+    display: none;
+    max-width: 360px;
+    font-size: 14px;
+    font-weight: 700
   }
 
-  .notice-preview-title {
-    font-weight: 900;
-    color: var(--color-text-primary);
-    margin-bottom: 8px
-  }
-
-  .notice-preview-body {
-    font-size: 13px;
-    color: var(--color-text-primary);
-    line-height: 1.55;
-    white-space: pre-wrap
-  }
-
-  .notice-preview-hl {
-    color: #b42318;
-    font-weight: 500;
-    margin-top: 6px;
-    font-size: 12px
-  }
-
-  @media(max-width:700px) {
-    .sn-form-row { grid-template-columns: 1fr }
-    .sn-card-hd { align-items: flex-start; flex-direction: column }
-    .sn-head-actions { width: 100%; justify-content: space-between }
+  .sn-specific-wrap {
+    display: none
   }
 
   @media(max-width:560px) {
@@ -768,7 +748,24 @@
   html[data-theme="dark"] .sn-modal-divider { background: var(--color-border-tertiary); }
   html[data-theme="dark"] .sn-compose-drawer { background: var(--color-background-primary); }
   html[data-theme="dark"] .sn-drawer-close { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--green); }
-  html[data-theme="dark"] .notice-preview { border-left-color: var(--green); background: var(--color-background-tertiary); }
+
+
+  .main-notif-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px; }
+  .main-notif-tab { border:1px solid #d7e3dc; background:var(--color-background-primary); color:var(--color-text-primary); padding:10px 14px; border-radius:999px; font-weight:900; cursor:pointer; transition:background .15s,color .15s,border-color .15s,box-shadow .15s; }
+  .main-notif-tab:hover { box-shadow:0 5px 14px rgba(16,24,40,.06); }
+  .main-notif-tab.on { background:var(--sn-green); color:#fff; border-color:var(--sn-green); }
+  .notif-tab-pane { display:none; }
+  .notif-tab-pane.active { display:block; }
+  .course-pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:var(--green); background:var(--green-light); border-radius:999px; padding:4px 9px; margin-top:6px; margin-right:6px; }
+  .sn-reply-policy { display:flex; gap:8px; align-items:flex-start; padding:10px 12px; border:1px solid #d8e2dc; border-radius:14px; background:var(--color-background-tertiary); color:var(--color-text-primary); font-size:13px; line-height:1.45; margin-bottom:13px; }
+  .sn-reply-policy input { margin-top:2px; flex-shrink:0; }
+  .sn-no-reply-note { border:1px dashed #cddbd2; border-radius:14px; background:var(--color-background-tertiary); color:var(--color-text-secondary); font-size:13px; font-weight:700; padding:11px 12px; margin-top:12px; }
+  .notice-preview { border-left:5px solid var(--sn-green); background:var(--color-background-tertiary); border-radius:14px; padding:13px 14px; margin-top:8px; }
+  .notice-preview-title { font-weight:900; color:var(--color-text-primary); margin-bottom:8px; }
+  .notice-preview-body { font-size:13px; color:var(--color-text-primary); line-height:1.55; white-space:pre-wrap; }
+  .notice-preview-hl { color:#b42318; font-weight:900; margin-top:8px; }
+  html[data-theme="dark"] .sn-card-hd { background:var(--color-background-secondary) !important; border-bottom-color:var(--color-border-tertiary); }
+
 </style>
 
 <div class="page page-single on" id="pg-notifs">
@@ -782,7 +779,7 @@
       <div class="sn-card-hd">
         <div>
           <div class="sn-card-title">Messages</div>
-          <div class="sn-card-sub">Click a message to open, read, and download attachments. Replies appear only when allowed.</div>
+          <div class="sn-card-sub">Click a message to open, read, reply, and download attachments.</div>
         </div>
         <div class="sn-head-actions">
           <button class="sn-btn secondary" id="snMarkAllBtn" type="button">Mark All Read</button>
@@ -867,10 +864,10 @@
                 <option value="coordinators">All Coordinators</option>
                 <option value="coordinator">One Coordinator</option>
                 <option value="doctors">All Doctors / Supervisors</option>
-                <option value="all_sections">All Sections</option>
+                <option value="all_sections">All Sections / Projects for selected course</option>
                 <option value="doctor">One Doctor</option>
-                <option value="section">One Section</option>
-                <option value="students">All Students</option>
+                <option value="section">One Section / Project</option>
+                <option value="students">All Students / selected course</option>
                 <option value="student">One Student</option>
               </select>
             </div>
@@ -879,7 +876,7 @@
               <select id="snSpecific" name="value"></select>
             </div>
           </div>
-          <div class="sn-field">
+          <div class="sn-field" id="courseScopeWrap" style="display:none">
             <label for="snCourseScope">Message for</label>
             <select id="snCourseScope" name="course_scope" required>
               <option value="introduction">Project Introduction / COMP4200</option>
@@ -897,6 +894,10 @@
           </div>
           <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--color-text-primary);margin-bottom:13px;">
             <input type="checkbox" id="snUrgent" name="urgent" value="1"> Mark as urgent
+          </label>
+          <label class="sn-reply-policy">
+            <input type="checkbox" id="snCanReply" name="can_reply" value="1" checked>
+            <span><b>Allow recipient to reply</b><br>Uncheck this if this message is only an announcement.</span>
           </label>
           <div class="sn-field">
             <label>Attachment <span style="font-weight:400;color:#9ca3af">(optional, max 10 MB)</span></label>
@@ -965,7 +966,7 @@
           </div>
         </form>
       </div>
-      <div id="modalNoReplyNotice" class="sn-empty" style="display:none;margin-top:12px">Replies are disabled for this message.</div>
+      <div class="sn-no-reply-note" id="modalNoReplyNote" style="display:none">Replies are disabled for this message.</div>
     </div>
   </div>
 </div>
@@ -1101,6 +1102,23 @@
       return code;
     }
 
+    function sendScopeNeedsCourse(scope) {
+      return ['students', 'all_students', 'student', 'section', 'all_sections'].includes(scope);
+    }
+
+    function toggleCourseScopeField() {
+      const scope = $('snScope').value;
+      const wrap = $('courseScopeWrap');
+      const select = $('snCourseScope');
+      if (!wrap || !select) return;
+      if (sendScopeNeedsCourse(scope)) {
+        wrap.style.display = 'flex';
+      } else {
+        wrap.style.display = 'none';
+        select.value = 'both';
+      }
+    }
+
     function filterByCourse(rows) {
       const selected = $('snCourseScope').value || 'both';
       if (selected === 'both') return rows || [];
@@ -1108,6 +1126,7 @@
     }
 
     function updateSpecificWrap() {
+      toggleCourseScopeField();
       const scope = $('snScope').value;
       const selectedCourse = $('snCourseScope').value || 'both';
       const wrap = $('snSpecificWrap');
@@ -1156,8 +1175,7 @@
         '<span class="sn-pill ' + (r.is_read ? 'read' : 'unread-pill') + '">' + (r.is_read ? 'Read' : 'New') + '</span>' +
         '</div>' +
         '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
-        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') +
-        (r.can_reply === false ? '<span class="sn-att-badge">🚫 Replies disabled</span>' : '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '<span class="sn-att-badge">' + (r.can_reply === false ? 'No replies' : 'Replies allowed') + '</span></div>' +
         '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
         '</div>' +
         '</article>'
@@ -1175,8 +1193,7 @@
         '<span class="sn-pill sent-pill">Sent</span>' +
         '</div>' +
         '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
-        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') +
-        (r.can_reply === false ? '<span class="sn-att-badge">🚫 Replies disabled</span>' : '') + '</div>' +
+        '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '<span class="sn-att-badge">' + (r.can_reply === false ? 'No replies' : 'Replies allowed') + '</span></div>' +
         '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
         '</div>' +
         '</article>'
@@ -1222,8 +1239,8 @@
       }
 
       const replySection = $('modalReplySection');
-      const noReplyNotice = $('modalNoReplyNotice');
-      const repliesAllowed = msgData.can_reply !== false;
+      const noReplyNote = $('modalNoReplyNote');
+      const repliesAllowed = !(msgData.can_reply === false || msgData.can_reply === 0 || msgData.can_reply === '0');
       if (isInbox && msgData.sender_user_id && repliesAllowed) {
         $('modalReplyUserId').value = msgData.sender_user_id;
         $('modalReplyNotificationId').value = msgData.notification_id;
@@ -1235,12 +1252,10 @@
         $('replyFileChosen').style.display = 'none';
         $('replyFileZone').style.display = 'block';
         replySection.style.display = 'block';
-        if (noReplyNotice) noReplyNotice.style.display = 'none';
+        if (noReplyNote) noReplyNote.style.display = 'none';
       } else {
         replySection.style.display = 'none';
-        if (noReplyNotice) {
-          noReplyNotice.style.display = (isInbox && msgData.sender_user_id && !repliesAllowed) ? 'block' : 'none';
-        }
+        if (noReplyNote) noReplyNote.style.display = (isInbox && msgData.sender_user_id && !repliesAllowed) ? 'block' : 'none';
       }
 
       overlay.classList.add('open');
@@ -1293,6 +1308,7 @@
       const fd = new FormData($('snSendForm'));
       if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value);
       if (!$('snUrgent').checked) fd.delete('urgent');
+      fd.set('can_reply', $('snCanReply') && $('snCanReply').checked ? '1' : '0');
       try {
         const data = await postForm('/head/api/notifications/send', fd);
         showToast(data.message || 'Message sent successfully.');

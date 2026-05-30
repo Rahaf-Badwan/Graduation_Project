@@ -185,6 +185,9 @@ def _ensure_supervisor_notification_schema(cursor):
                 NOT NULL DEFAULT 'both'
             """)
 
+        if not _supervisor_db_column_exists(cursor, "notifications", "can_reply"):
+            cursor.execute("ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read")
+
         if not _supervisor_db_column_exists(cursor, "notifications", "attachment_name"):
             cursor.execute("ALTER TABLE notifications ADD COLUMN attachment_name VARCHAR(255) NULL")
 
@@ -209,6 +212,7 @@ def _row_to_json(row):
     r["course_scope"] = r.get("course_scope") or "both"
     r["created_at"] = str(r.get("created_at")) if r.get("created_at") else None
     r["has_attachment"] = bool(r.get("has_attachment"))
+    r["can_reply"] = bool(r.get("can_reply", True))
     if not r["has_attachment"]:
         r["attachment_name"] = None
         r["attachment_mime"] = None
@@ -650,6 +654,26 @@ def sent():
     return jsonify({"sent": rows})
 
 
+
+def _supervisor_reply_allowed(cursor, notification_id, current_user_id, target_user_id):
+    """Allow reply only when the original received notification has can_reply = 1."""
+    if not notification_id:
+        return False
+    can_reply_expr = "COALESCE(can_reply, 1)" if _supervisor_db_column_exists(cursor, "notifications", "can_reply") else "1"
+    cursor.execute(
+        f"""
+        SELECT notification_id
+        FROM notifications
+        WHERE notification_id = %s
+          AND recipient_id = %s
+          AND sender_id = %s
+          AND {can_reply_expr} = 1
+        LIMIT 1
+        """,
+        (notification_id, current_user_id, target_user_id),
+    )
+    return cursor.fetchone() is not None
+
 # ============================================================
 # API: Send Notification
 # ============================================================
@@ -671,6 +695,8 @@ def send():
     message = (data.get("message") or "").strip()
     urgent = str(data.get("urgent") or "").lower() in ("1", "true", "on", "yes")
     course_scope = (data.get("course_scope") or "both").strip()
+    can_reply = str(data.get("can_reply", data.get("allow_reply", "0"))).lower() in ("1", "true", "on", "yes")
+    reply_to_notification_id = data.get("reply_to_notification_id") or data.get("notification_id")
 
     if course_scope not in {"introduction", "graduation_project", "both"}:
         return jsonify({"error": "Please choose the course scope."}), 400
@@ -699,6 +725,19 @@ def send():
     _ensure_supervisor_notification_schema(cursor)
     recipients = _supervisor_notification_recipients(cursor, scope, value, course_scope)
     sender_id = session.get("user_id")
+
+    if scope == "reply":
+        raw_recipients = [int(r) for r in recipients if r]
+        if not raw_recipients:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No recipients found for this choice."}), 404
+        target_user_id = raw_recipients[0]
+        if not _supervisor_reply_allowed(cursor, reply_to_notification_id, sender_id, target_user_id):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Replies are disabled for this message."}), 403
+        can_reply = True
     recipients = sorted({int(r) for r in recipients if int(r) != int(sender_id)})
     if not recipients:
         cursor.close()
@@ -712,10 +751,10 @@ def send():
             cursor.execute("""
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
-                     course_scope, related_project_id, is_read,
+                     course_scope, related_project_id, is_read, can_reply,
                      attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s)
-            """, (r, sender_id, notification_type, title, message, course_scope, attachment_name, attachment_mime, attachment_data))
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s)
+            """, (r, sender_id, notification_type, title, message, course_scope, 1 if can_reply else 0, attachment_name, attachment_mime, attachment_data))
         else:
             cursor.execute("""
                 INSERT INTO notifications
