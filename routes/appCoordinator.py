@@ -3464,6 +3464,7 @@ def api_coordinator_distribution_data():
             LEFT JOIN faculty fsup ON fsup.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = fsup.user_id
             WHERE p.semester_id = %s
+              AND p.status <> 'solo_pending'
             GROUP BY
                 p.project_id,
                 p.title,
@@ -3485,7 +3486,9 @@ def api_coordinator_distribution_data():
             SELECT st.student_id, u.university_id, u.full_name
             FROM students st
             JOIN users u ON u.user_id = st.user_id
-            WHERE EXISTS (
+            WHERE u.role = 'student'
+              AND u.is_active = TRUE
+              AND EXISTS (
                 SELECT 1
                 FROM student_course_results scr
                 WHERE scr.student_id = st.student_id
@@ -3494,12 +3497,21 @@ def api_coordinator_distribution_data():
                   AND scr.promoted_to_semester_id IS NULL
                   AND scr.promoted_at IS NULL
             )
+            AND EXISTS (
+                SELECT 1
+                FROM project_members pm
+                JOIN projects p ON p.project_id = pm.project_id
+                WHERE pm.student_id = st.student_id
+                  AND p.semester_id = %s
+                  AND p.status = 'solo_pending'
+            )
             AND NOT EXISTS (
                 SELECT 1
                 FROM project_members pm
                 JOIN projects p ON p.project_id = pm.project_id
                 WHERE pm.student_id = st.student_id
                   AND p.semester_id = %s
+                  AND p.status <> 'solo_pending'
             )
             AND NOT EXISTS (
                 SELECT 1
@@ -3508,7 +3520,11 @@ def api_coordinator_distribution_data():
             )
             ORDER BY u.full_name
             """,
-            (semester["semester_id"], semester["semester_id"]),
+            (
+                semester["semester_id"],
+                semester["semester_id"],
+                semester["semester_id"],
+            ),
         )
         unassigned = cursor.fetchall()
 
@@ -3556,6 +3572,63 @@ def api_coordinator_distribution_data():
                 "professors": fetch_supervisors(),
             }
         )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/delete-group/<int:project_id>", methods=["DELETE"])
+@login_required(role="coordinator")
+def api_delete_group(project_id):
+    """Remove a COMP4200 group entirely so its students can re-register."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        # Confirm the project belongs to an active COMP4200 semester
+        cursor.execute(
+            """
+            SELECT p.project_id
+            FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
+                             AND s.course_code = 'COMP4200'
+            WHERE p.project_id = %s
+            LIMIT 1
+            """,
+            (project_id,),
+        )
+        if not cursor.fetchone():
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Group not found or not a COMP4200 group."}), 404
+
+        # Clean up records not covered by CASCADE
+        for tbl_col in [
+            ("notifications", "project_id"),
+            ("deadlines", "project_id"),
+            ("project_report_readers", "project_id"),
+        ]:
+            tbl, col = tbl_col
+            try:
+                cursor.execute(f"DELETE FROM `{tbl}` WHERE `{col}` = %s", (project_id,))
+            except Exception:
+                pass  # table may not exist
+
+        try:
+            cursor.execute(
+                "DELETE FROM section_completion_status WHERE course_scope = 'introduction' AND reference_id = %s",
+                (project_id,),
+            )
+        except Exception:
+            pass
+
+        # Delete the project — CASCADE handles project_members, project_files,
+        # project_progress, project_lifecycle
+        cursor.execute("DELETE FROM projects WHERE project_id = %s", (project_id,))
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Group deleted. Students can now re-register."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -3708,14 +3781,16 @@ def api_add_section():
         return jsonify({"error": "Invalid student id."}), 400
 
     if not section_name or not supervisor_id:
-        return jsonify({"error": "section_name and supervisor_id are required."}), 400
+        return jsonify({"error": "group_name and supervisor_id are required."}), 400
 
     if len(student_ids) == 0:
         return jsonify({"error": "Please choose at least 1 student."}), 400
 
     if len(student_ids) > 3:
-        return jsonify({"error": "A section can contain at most 3 students."}), 400
+        return jsonify({"error": "A group can contain at most 3 students."}), 400
 
+    db = None
+    cursor = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -3728,12 +3803,14 @@ def api_add_section():
 
         cursor.execute(
             """
-            SELECT section_id
-            FROM student_distribution_sections
-            WHERE LOWER(TRIM(section_name)) = LOWER(TRIM(%s))
+            SELECT project_id
+            FROM projects
+            WHERE semester_id = %s
+              AND LOWER(TRIM(COALESCE(NULLIF(group_name, ''), CONCAT('Group ', project_id)))) =
+                  LOWER(TRIM(%s))
             LIMIT 1
             """,
-            (section_name,),
+            (semester["semester_id"], section_name),
         )
         if cursor.fetchone():
             cursor.close()
@@ -3741,7 +3818,7 @@ def api_add_section():
             return (
                 jsonify(
                     {
-                        "error": "This section name already exists. Please choose another name."
+                        "error": "This group name already exists. Please choose another name."
                     }
                 ),
                 400,
@@ -3780,6 +3857,8 @@ def api_add_section():
             FROM students st
             JOIN users u ON u.user_id = st.user_id
             WHERE st.student_id IN ({placeholders})
+              AND u.role = 'student'
+              AND u.is_active = TRUE
               AND EXISTS (
                   SELECT 1
                   FROM student_course_results scr
@@ -3789,12 +3868,21 @@ def api_add_section():
                     AND scr.promoted_to_semester_id IS NULL
                     AND scr.promoted_at IS NULL
               )
+              AND EXISTS (
+                  SELECT 1
+                  FROM project_members pm
+                  JOIN projects p ON p.project_id = pm.project_id
+                  WHERE pm.student_id = st.student_id
+                    AND p.semester_id = %s
+                    AND p.status = 'solo_pending'
+              )
               AND NOT EXISTS (
                   SELECT 1
                   FROM project_members pm
                   JOIN projects p ON p.project_id = pm.project_id
                   WHERE pm.student_id = st.student_id
                     AND p.semester_id = %s
+                    AND p.status <> 'solo_pending'
               )
               AND NOT EXISTS (
                   SELECT 1
@@ -3802,7 +3890,11 @@ def api_add_section():
                   WHERE ss.student_id = st.student_id
               )
         """
-        params = tuple(student_ids) + (semester["semester_id"], semester["semester_id"])
+        params = tuple(student_ids) + (
+            semester["semester_id"],
+            semester["semester_id"],
+            semester["semester_id"],
+        )
         cursor.execute(query, params)
         students = cursor.fetchall()
 
@@ -3818,33 +3910,82 @@ def api_add_section():
 
         cursor.execute(
             """
-            INSERT INTO student_distribution_sections (section_name, supervisor_id, entered_by)
-            VALUES (%s, %s, %s)
+            INSERT INTO projects
+                (group_name, title, project_type, semester_id, supervisor_id,
+                 status, submission_date)
+            VALUES (%s, '', '', %s, %s, 'submitted', CURDATE())
             """,
-            (section_name, supervisor_id, session.get("user_id")),
+            (section_name, semester["semester_id"], supervisor_id),
         )
-        section_id = cursor.lastrowid
+        project_id = cursor.lastrowid
 
-        for sid in student_ids:
+        for index, sid in enumerate(student_ids):
             cursor.execute(
                 """
-                INSERT INTO section_students (section_id, student_id)
-                VALUES (%s, %s)
+                DELETE p
+                FROM projects p
+                JOIN project_members pm ON pm.project_id = p.project_id
+                WHERE pm.student_id = %s
+                  AND p.semester_id = %s
+                  AND p.status = 'solo_pending'
                 """,
-                (section_id, sid),
+                (sid, semester["semester_id"]),
+            )
+            cursor.execute(
+                """
+                INSERT INTO project_members
+                    (project_id, student_id, is_primary_contact)
+                VALUES (%s, %s, %s)
+                """,
+                (project_id, sid, index == 0),
             )
 
-        _notify_section_students(cursor, section_id, session.get("user_id"))
+        cursor.execute(
+            """
+            SELECT u.full_name
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE f.faculty_id = %s
+            LIMIT 1
+            """,
+            (supervisor_id,),
+        )
+        supervisor = cursor.fetchone() or {}
+        supervisor_name = supervisor.get("full_name") or "your assigned supervisor"
+        team_names = ", ".join(student["full_name"] for student in students)
+        notification_message = (
+            f"You have been added to {section_name}. "
+            f"Your supervisor is {supervisor_name}. "
+            f"Team members: {team_names}."
+        )
+
+        for recipient_id in _project_student_user_ids(cursor, project_id):
+            _insert_notification(
+                cursor,
+                recipient_id,
+                session.get("user_id"),
+                "supervisor_assigned",
+                "Project Team and Supervisor Assignment",
+                notification_message,
+                project_id,
+                "introduction",
+            )
 
         db.commit()
         cursor.close()
         db.close()
 
         return jsonify(
-            {"message": "Section created successfully.", "section_id": section_id}
+            {"message": "Group created successfully.", "project_id": project_id}
         )
 
     except Exception as e:
+        if db:
+            db.rollback()
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
         return jsonify({"error": str(e)}), 500
 
 
@@ -6495,7 +6636,7 @@ def api_add_students_to_existing_section():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        active_semester = _get_active_semester(cursor)
+        active_semester = _get_active_comp4200_semester(cursor)
 
         if not active_semester:
             cursor.close()
@@ -6569,19 +6710,33 @@ def api_add_students_to_existing_section():
             FROM students st
             JOIN users u ON u.user_id = st.user_id
             WHERE st.student_id IN ({placeholders})
+              AND u.role = 'student'
+              AND u.is_active = TRUE
+              AND EXISTS (
+                  SELECT 1
+                  FROM project_members pm
+                  JOIN projects p ON p.project_id = pm.project_id
+                  WHERE pm.student_id = st.student_id
+                    AND p.semester_id = %s
+                    AND p.status = 'solo_pending'
+              )
               AND NOT EXISTS (
                   SELECT 1
                   FROM project_members pm
                   JOIN projects p ON p.project_id = pm.project_id
                   WHERE pm.student_id = st.student_id
                     AND p.semester_id = %s
+                    AND p.status <> 'solo_pending'
               )
               AND NOT EXISTS (
                   SELECT 1
                   FROM section_students ss
                   WHERE ss.student_id = st.student_id
               )
-        """, tuple(student_ids) + (active_semester["semester_id"],))
+        """, tuple(student_ids) + (
+            active_semester["semester_id"],
+            active_semester["semester_id"],
+        ))
 
         valid_students = cursor.fetchall()
 
@@ -6621,6 +6776,245 @@ def api_add_students_to_existing_section():
             "ok": False,
             "error": str(e)
         }), 500
+
+
+@coordinator_bp.route("/api/coordinator/groups-with-space", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_groups_with_space():
+    """Return submitted project groups that have fewer than 3 members (for adding solo students)."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _get_active_comp4200_semester(cursor)
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"groups": []})
+
+        group_name_expr = (
+            "COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id))"
+            if _db_column_exists(cursor, "projects", "group_name")
+            else "CONCAT('Group ', p.project_id)"
+        )
+
+        cursor.execute(f"""
+            SELECT p.project_id,
+                   {group_name_expr} AS group_name,
+                   p.title,
+                   GROUP_CONCAT(u.full_name ORDER BY pm.is_primary_contact DESC SEPARATOR ', ') AS team_members,
+                   COUNT(pm.student_id) AS member_count
+            FROM projects p
+            JOIN project_members pm ON pm.project_id = p.project_id
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE p.semester_id = %s
+              AND p.status = 'submitted'
+            GROUP BY p.project_id, p.title
+            HAVING member_count < 3
+            ORDER BY p.project_id DESC
+        """, (semester["semester_id"],))
+
+        groups = cursor.fetchall()
+        cursor.close(); db.close()
+        return jsonify({"groups": groups})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/groups/add-student", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_add_student_to_group():
+    """Add unassigned solo student(s) to an existing submitted project group."""
+    data = request.get_json(silent=True) or {}
+    project_id = data.get("project_id")
+    student_ids = data.get("student_ids") or []
+
+    if not project_id or not student_ids:
+        return jsonify({"error": "project_id and student_ids are required."}), 400
+
+    try:
+        project_id = int(project_id)
+        student_ids = sorted({int(student_id) for student_id in student_ids})
+    except Exception:
+        return jsonify({"error": "Invalid project or student id."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        semester = _get_active_comp4200_semester(cursor)
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No active COMP4200 semester found."}), 400
+
+        # Verify the target is an active COMP4200 submitted group.
+        cursor.execute(
+            """
+            SELECT project_id, status, semester_id
+            FROM projects
+            WHERE project_id = %s
+              AND semester_id = %s
+              AND status = 'submitted'
+            """,
+            (project_id, semester["semester_id"]),
+        )
+        project = cursor.fetchone()
+        if not project:
+            cursor.close(); db.close()
+            return jsonify({"error": "Active COMP4200 submitted group not found."}), 400
+
+        # Check current member count
+        cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM project_members WHERE project_id = %s", (project_id,)
+        )
+        current_count = cursor.fetchone()["cnt"]
+
+        if current_count + len(student_ids) > 3:
+            cursor.close(); db.close()
+            return jsonify({"error": f"Adding {len(student_ids)} student(s) would exceed 3 members."}), 400
+
+        existing_member_user_ids = _project_student_user_ids(cursor, project_id)
+        added = []
+        for student_id in student_ids:
+            # Only a student who explicitly registered solo can be moved into a group.
+            cursor.execute("""
+                SELECT p.project_id
+                FROM projects p
+                JOIN project_members pm ON pm.project_id = p.project_id
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE pm.student_id = %s
+                  AND p.semester_id = %s
+                  AND p.status = 'solo_pending'
+                  AND u.role = 'student'
+                  AND u.is_active = TRUE
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM section_students ss
+                      WHERE ss.student_id = pm.student_id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM project_members other_pm
+                      JOIN projects other_p ON other_p.project_id = other_pm.project_id
+                      WHERE other_pm.student_id = pm.student_id
+                        AND other_p.semester_id = p.semester_id
+                        AND other_p.status <> 'solo_pending'
+                  )
+                LIMIT 1
+            """, (student_id, project["semester_id"]))
+            solo = cursor.fetchone()
+            if not solo:
+                db.rollback()
+                cursor.close()
+                db.close()
+                return jsonify({"error": "One or more selected students are not waiting as solo registrations."}), 400
+
+            cursor.execute(
+                "DELETE FROM projects WHERE project_id = %s AND status = 'solo_pending'",
+                (solo["project_id"],),
+            )
+
+            cursor.execute(
+                "INSERT INTO project_members (project_id, student_id, is_primary_contact) VALUES (%s, %s, 0)",
+                (project_id, student_id),
+            )
+            added.append(student_id)
+
+        group_name_expr = (
+            "COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id))"
+            if _db_column_exists(cursor, "projects", "group_name")
+            else "CONCAT('Group ', p.project_id)"
+        )
+        cursor.execute(
+            f"""
+            SELECT {group_name_expr} AS group_name,
+                   p.title,
+                   COALESCE(u_sup.full_name, 'Not assigned yet') AS supervisor_name,
+                   COALESCE(
+                       GROUP_CONCAT(
+                           DISTINCT u_student.full_name
+                           ORDER BY pm.is_primary_contact DESC, u_student.full_name
+                           SEPARATOR ', '
+                       ),
+                       ''
+                   ) AS team_members
+            FROM projects p
+            LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+            LEFT JOIN project_members pm ON pm.project_id = p.project_id
+            LEFT JOIN students st ON st.student_id = pm.student_id
+            LEFT JOIN users u_student ON u_student.user_id = st.user_id
+            WHERE p.project_id = %s
+            GROUP BY p.project_id, p.title, u_sup.full_name
+            """,
+            (project_id,),
+        )
+        group = cursor.fetchone() or {}
+        group_name = group.get("group_name") or f"Group {project_id}"
+        project_title = group.get("title") or "Not specified"
+        supervisor_name = group.get("supervisor_name") or "Not assigned yet"
+        team_members = group.get("team_members") or "Not listed yet"
+
+        placeholders = ",".join(["%s"] * len(added))
+        cursor.execute(
+            f"""
+            SELECT u.user_id, u.full_name
+            FROM students st
+            JOIN users u ON u.user_id = st.user_id
+            WHERE st.student_id IN ({placeholders})
+            """,
+            tuple(added),
+        )
+        added_students = cursor.fetchall()
+        added_names = ", ".join(student["full_name"] for student in added_students)
+
+        for student in added_students:
+            _insert_notification(
+                cursor,
+                student["user_id"],
+                session.get("user_id"),
+                "system",
+                "You Have Been Added to a Project Team",
+                (
+                    f"You have been added to team: {group_name}.\n"
+                    f"Project: {project_title}.\n"
+                    f"Supervisor: {supervisor_name}.\n"
+                    f"Team members: {team_members}."
+                ),
+                project_id,
+                "introduction",
+            )
+
+        joined_verb = "has" if len(added_students) == 1 else "have"
+        for recipient_id in existing_member_user_ids:
+            _insert_notification(
+                cursor,
+                recipient_id,
+                session.get("user_id"),
+                "system",
+                "New Team Member Added",
+                (
+                    f"{added_names} {joined_verb} been added to your team: {group_name}.\n"
+                    f"Project: {project_title}.\n"
+                    f"Supervisor: {supervisor_name}.\n"
+                    f"Team members: {team_members}."
+                ),
+                project_id,
+                "introduction",
+            )
+
+        db.commit()
+        cursor.close(); db.close()
+        return jsonify({"ok": True, "message": f"Added {len(added)} student(s) to the group successfully."})
+    except Exception as e:
+        try:
+            db.rollback()
+            cursor.close()
+            db.close()
+        except Exception:
+            pass
+        return jsonify({"error": str(e)}), 500
 
 
 @coordinator_bp.route("/api/coordinator/sections/delete", methods=["POST"])
@@ -6778,6 +7172,12 @@ def api_committee_generate():
         db.close()
         return jsonify(payload)
     except Exception as e:
+        if db:
+            db.rollback()
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
         return jsonify({"error": str(e)}), 500
 
 

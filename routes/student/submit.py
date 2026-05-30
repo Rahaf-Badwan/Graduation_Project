@@ -1350,8 +1350,32 @@ def api_milestone_submit():
         proj_row = cursor.fetchone()
         project_id = proj_row["project_id"] if proj_row else None
         project_title = (proj_row or {}).get("title") or "your team project"
+        intro_section = _student_intro_section(cursor, student_id)
+        section_id = (intro_section or {}).get("section_id")
+        if section_id:
+            project_title = intro_section.get("section_name") or "your section"
 
-        if project_id:
+        if section_id:
+            cursor.execute(
+                """
+                SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
+                FROM milestone_submissions ms
+                JOIN students st ON st.student_id = ms.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE ms.item_id = %s
+                  AND EXISTS (
+                      SELECT 1
+                      FROM section_students ss_scope
+                      WHERE ss_scope.section_id = %s
+                        AND ss_scope.student_id = ms.student_id
+                        AND ms.submitted_at >= ss_scope.created_at
+                  )
+                ORDER BY ms.submitted_at DESC
+                LIMIT 1
+                """,
+                (int(item_id), section_id),
+            )
+        elif project_id:
             cursor.execute(
                 """
                 SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
@@ -1448,7 +1472,19 @@ def api_milestone_submit():
                 item.get("milestone_label") or "",
             ),
         )
-        if project_id:
+        if section_id:
+            actor_name = session.get("full_name") or "A section teammate"
+            milestone_title = item.get("title") or "a timeline milestone"
+            _notify_intro_section_team(
+                cursor,
+                section_id,
+                user_id,
+                "Timeline milestone submitted",
+                f'{actor_name} submitted "{milestone_title}" for "{project_title}".',
+                notification_type="file_uploaded",
+                exclude_user_id=user_id,
+            )
+        elif project_id:
             actor_name = session.get("full_name") or "A teammate"
             milestone_title = item.get("title") or "a timeline milestone"
             _notify_project_team(
@@ -1528,8 +1564,33 @@ def api_milestone_submissions_list():
         )
         proj_row = cursor.fetchone()
         project_id = proj_row["project_id"] if proj_row else None
+        intro_section = _student_intro_section(cursor, student_id)
+        section_id = (intro_section or {}).get("section_id")
 
-        if project_id:
+        if section_id:
+            cursor.execute(
+                """
+                SELECT ms.submission_id, ms.item_id, ms.file_name,
+                       ms.file_size_mb, ms.submitted_to, ms.submitted_at,
+                       ti.title AS milestone_title,
+                       u.full_name AS submitted_by,
+                       (ms.student_id = %s) AS submitted_by_me
+                FROM milestone_submissions ms
+                JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                JOIN students st ON st.student_id = ms.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM section_students ss_scope
+                    WHERE ss_scope.section_id = %s
+                      AND ss_scope.student_id = ms.student_id
+                      AND ms.submitted_at >= ss_scope.created_at
+                )
+                ORDER BY ms.submitted_at DESC
+                """,
+                (student_id, section_id),
+            )
+        elif project_id:
             cursor.execute(
                 """
                 SELECT ms.submission_id, ms.item_id, ms.file_name,

@@ -162,6 +162,20 @@
             Checking…
           </div>
         </div>
+
+        <!-- Solo Registration Option -->
+        <div class="card" style="margin-top:16px" id="soloCard">
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:10px">
+            Don't have a team yet?
+          </div>
+          <button class="btn btn-outline" id="soloRegBtn" type="button" style="font-size:13px;gap:6px;width:100%">
+            <span class="material-symbols-outlined icon-inline" style="font-size:16px">person</span>
+            Register Solo (No Team)
+          </button>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:8px;line-height:1.5">
+            You'll be registered individually. The coordinator will assign you to a group.
+          </div>
+        </div>
       </div>
 
     </div><!-- .two-col -->
@@ -172,8 +186,8 @@
     <div class="card" style="text-align:center;padding:48px 24px">
       <span class="material-symbols-outlined icon-inline"
         style="font-size:56px;color:var(--green,#22c55e)">check_circle</span>
-      <div style="font-size:20px;font-weight:700;margin:16px 0 8px">Registration Submitted!</div>
-      <div style="font-size:14px;color:var(--color-text-secondary);max-width:480px;margin:0 auto 24px">
+      <div id="successTitle" style="font-size:20px;font-weight:700;margin:16px 0 8px">Registration Submitted!</div>
+      <div id="successSubtitle" style="font-size:14px;color:var(--color-text-secondary);max-width:480px;margin:0 auto 24px">
         Your group has been registered successfully. The coordinator will review your submission
         and assign a supervisor.
       </div>
@@ -240,6 +254,7 @@
     const membersHint = document.getElementById("membersHint");
     const prefSelects = document.querySelectorAll(".pref-select");
     const submitBtn = document.getElementById("submitRegBtn");
+    const soloRegBtn = document.getElementById("soloRegBtn");
     const formError = document.getElementById("formError");
     const alreadyBanner = document.getElementById("alreadyBanner");
     const alreadyDetails = document.getElementById("alreadyDetails");
@@ -249,6 +264,8 @@
     const formSection = document.getElementById("formSection");
     const successScreen = document.getElementById("successScreen");
     const successDetails = document.getElementById("successDetails");
+    const successTitle = document.getElementById("successTitle");
+    const successSubtitle = document.getElementById("successSubtitle");
 
     /* ─ Helpers ──────────────────────────────────────── */
     function esc(s) {
@@ -379,16 +396,28 @@
 
         if (data.registered && data.project) {
           const p = data.project;
+          const isSolo = !!data.solo;
+
           // Show already-registered banner
           alreadyBanner.style.display = "";
-          alreadyDetails.innerHTML =
-            `Registered for: <b>${esc(p.title)}</b> &nbsp;·&nbsp; `
-            + `Team: <b>${esc(p.team_members)}</b> &nbsp;·&nbsp; `
-            + `Status: <span class="pill p-${p.status}">${esc(p.status.replace("_", " "))}</span>`;
+          if (isSolo) {
+            alreadyDetails.innerHTML =
+              `Registered as <b>Solo</b> &nbsp;·&nbsp; `
+              + `Status: <span style="color:var(--orange,#f59e0b);font-weight:600">Waiting for group assignment</span>`;
+          } else {
+            alreadyDetails.innerHTML =
+              `Registered for: <b>${esc(p.title)}</b> &nbsp;·&nbsp; `
+              + `Team: <b>${esc(p.team_members)}</b> &nbsp;·&nbsp; `
+              + `Status: <span class="pill p-${p.status}">${esc(p.status.replace("_", " "))}</span>`;
+          }
 
           // Status card
-          statusContent.innerHTML =
-            `<div style="color:var(--green,#22c55e);font-weight:600;margin-bottom:6px">
+          statusContent.innerHTML = isSolo
+            ? `<div style="color:var(--orange,#f59e0b);font-weight:600;margin-bottom:6px">
+                 ⏳ Solo — Waiting for Assignment
+               </div>
+               <div style="color:var(--color-text-secondary)">The coordinator will assign you to a group.</div>`
+            : `<div style="color:var(--green,#22c55e);font-weight:600;margin-bottom:6px">
              ✓ Registered
            </div>
            <div><b>Project:</b> ${esc(p.title)}</div>
@@ -400,6 +429,8 @@
           // Disable the form
           submitBtn.disabled = true;
           submitBtn.textContent = "Already Registered";
+          soloRegBtn.disabled = true;
+          document.getElementById("soloCard").style.display = "none";
           addMemberBtn.style.display = "none";
           document.getElementById("regTitle").readOnly = true;
           prefSelects.forEach(s => s.disabled = true);
@@ -495,6 +526,55 @@
         showError("Network error. Please check your connection and try again.");
         submitBtn.disabled = false;
         submitBtn.textContent = "Register Group";
+      }
+    });
+
+    /* ─ Solo Submit ──────────────────────────────────── */
+    soloRegBtn.addEventListener("click", async () => {
+      hideError();
+      soloRegBtn.disabled = true;
+      soloRegBtn.textContent = "Submitting…";
+
+      try {
+        const res = await fetch("/student/api/distribution-submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "Solo Registration",
+            member_ids: [],
+            member_names: [],
+            preferred_supervisors: [],
+            solo: true,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.already_registered) {
+          showError("⚠️ " + data.error + "\n\nYou appear to be already registered. Please refresh the page.");
+          soloRegBtn.disabled = false;
+          soloRegBtn.innerHTML = '<span class="material-symbols-outlined icon-inline" style="font-size:16px">person</span> Register Solo (No Team)';
+          return;
+        }
+
+        if (!res.ok) {
+          showError(data.error || "Submission failed. Please try again.");
+          soloRegBtn.disabled = false;
+          soloRegBtn.innerHTML = '<span class="material-symbols-outlined icon-inline" style="font-size:16px">person</span> Register Solo (No Team)';
+          return;
+        }
+
+        formSection.style.display = "none";
+        successScreen.style.display = "";
+        successTitle.textContent = "Registration Submitted!";
+        successSubtitle.textContent = "You've been registered as a solo student. The coordinator will review your submission and assign you to a group.";
+        successDetails.innerHTML = `
+          <div style="margin-bottom:8px"><b>Registration Type:</b> Solo (No Team)</div>
+          <div style="color:var(--color-text-secondary)">The coordinator will assign you to a suitable group.</div>
+        `;
+      } catch {
+        showError("Network error. Please check your connection and try again.");
+        soloRegBtn.disabled = false;
+        soloRegBtn.innerHTML = '<span class="material-symbols-outlined icon-inline" style="font-size:16px">person</span> Register Solo (No Team)';
       }
     });
 

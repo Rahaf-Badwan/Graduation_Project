@@ -144,7 +144,8 @@ CREATE TABLE IF NOT EXISTS projects (
                         'committee_evaluation',
                         'accepted',
                         'rejected',
-                        'archived'
+                        'archived',
+                        'solo_pending'
                       )               NOT NULL DEFAULT 'draft',
     submission_date   DATE            NULL,
     coordinator_notes TEXT            NULL,
@@ -682,12 +683,6 @@ INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, 
 ('1220654', 'Rahaf Badwan',         '1220654@students.birzeit.edu', '$2b$12$eJmEAFs2Cci7.foj61N6tOthlgHqqs0XccNvIRuzvkK70jQixoWb.', 'student', 'RB', TRUE),
 ('1220670', 'Amna Abu Muslim',      '1220670@students.birzeit.edu', '$2b$12$1ONCgGY62binf5lUfYs6qekRIUhkUObqIs55tu.89rGMGOAsp0Llu', 'student', 'AM', TRUE),
 ('1220174', 'Tima Abd',             '1220174@students.birzeit.edu', '$2b$12$OxHQ1TKrYWOQ6UUw8pN15.APXR8zjzAvrJkpUPpnkDtJFPPAo92Z.', 'student', 'TA', TRUE),
-('1220110', 'Salma Al-Khatib',      '1220110@students.birzeit.edu', '$2b$12$vMKQhyFzsLAXJkchac2KyeS4L2N.cw9AWHSCnwupz/cfc8s3Tf43a', 'student', 'SK', TRUE),
-('1220087', 'Karim Odeh',           '1220087@students.birzeit.edu', '$2b$12$aXSk8fIneFnOLmEnPH72CetVM9RwKecmo6YySgL8Td0V5M/ZNC6YC', 'student', 'KO', TRUE),
-('1220500', 'Amjad Al-Rimawi',      '1220500@students.birzeit.edu', '$2b$12$KBaKlbUt93mL9.oY1xrFQ.U.kCXt2eqAOdTZDdWOGiKWm0AOPsjem', 'student', 'AR', TRUE),
-('1220600', 'Sara Musa',            '1220600@students.birzeit.edu', '$2b$12$x46jpXoonqATaqjWSIZwvO4Mnx39j4YFAsl6TAxhw7m6xwbA4j3BK', 'student', 'SM', TRUE),
-('1220700', 'Khaled Mansour',       '1220700@students.birzeit.edu', '$2b$12$UZ02VkxW0l/XRWRu/T5ireQ5fiRfRdS0IiRzxe5RlfqnSLAe59A9O', 'student', 'KM', TRUE),
-('1220800', 'Dana Ibrahim',         '1220800@students.birzeit.edu', '$2b$12$km.HzoX0aw6nFjI2m3U8sezhKNDXZh7IBlpH.CEwqZx/ZSEv2DYqy', 'student', 'DI', TRUE),
 ('1220900', 'Mona Nassar',          '1220900@students.birzeit.edu', '$2b$12$m/RTVrKRx.lsECFuFa6yguuR1rRxZO8i0QAxQun/7ojQZjq6M7D3G', 'student', 'MN', TRUE);
 
 
@@ -1845,107 +1840,6 @@ WHERE p.project_id IN (10, 11, 12);
 -- ============================================================
 --  END OF MIGRATION: student_course_results
 -- ============================================================
-
--- ============================================================
---  ADD 24 MORE STUDENTS
---  Safe re-run: skips existing university_id/user_id values
--- ============================================================
-
-USE apms_db;
-
-SET NAMES utf8mb4;
-
--- Temporary student password hash
-SET @student_pwd := '$2b$12$eJmEAFs2Cci7.foj61N6tOthlgHqqs0XccNvIRuzvkK70jQixoWb.';
-
-INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
-SELECT *
-FROM (
-    SELECT '1221001' AS university_id, 'Yousef Hamdan'      AS full_name, '1221001@students.birzeit.edu' AS email, @student_pwd AS password_hash, 'student' AS role, 'YH' AS avatar_initials, TRUE AS is_active
-    UNION ALL SELECT '1221002', 'Layan Daraghmeh',         '1221002@students.birzeit.edu', @student_pwd, 'student', 'LD', TRUE
-    UNION ALL SELECT '1221003', 'Noor Sawafta',            '1221003@students.birzeit.edu', @student_pwd, 'student', 'NS', TRUE
-    UNION ALL SELECT '1221004', 'Alaa Zakarneh',           '1221004@students.birzeit.edu', @student_pwd, 'student', 'AZ', TRUE
-    UNION ALL SELECT '1221005', 'Raneem Jaradat',          '1221005@students.birzeit.edu', @student_pwd, 'student', 'RJ', TRUE
-    UNION ALL SELECT '1221006', 'Malak Khoury',            '1221006@students.birzeit.edu', @student_pwd, 'student', 'MK', TRUE
-    UNION ALL SELECT '1221007', 'Hana Qasem',              '1221007@students.birzeit.edu', @student_pwd, 'student', 'HQ', TRUE
-    UNION ALL SELECT '1221008', 'Basil Jaber',             '1221008@students.birzeit.edu', @student_pwd, 'student', 'BJ', TRUE
-    UNION ALL SELECT '1221009', 'Jana Taqatqa',            '1221009@students.birzeit.edu', @student_pwd, 'student', 'JT', TRUE
-    UNION ALL SELECT '1221010', 'Omar Khatib',             '1221010@students.birzeit.edu', @student_pwd, 'student', 'OK', TRUE
-    UNION ALL SELECT '1221011', 'Reem Hammad',             '1221011@students.birzeit.edu', @student_pwd, 'student', 'RH', TRUE
-    UNION ALL SELECT '1221012', 'Yazan Abu Ayyash',        '1221012@students.birzeit.edu', @student_pwd, 'student', 'YA', TRUE
-    UNION ALL SELECT '1221013', 'Farah Odeh',              '1221013@students.birzeit.edu', @student_pwd, 'student', 'FO', TRUE
-    UNION ALL SELECT '1221014', 'Lina Barghouti',          '1221014@students.birzeit.edu', @student_pwd, 'student', 'LB', TRUE
-    UNION ALL SELECT '1221015', 'Mariam Salameh',          '1221015@students.birzeit.edu', @student_pwd, 'student', 'MS', TRUE
-    UNION ALL SELECT '1221016', 'Ali Shraim',              '1221016@students.birzeit.edu', @student_pwd, 'student', 'AS', TRUE
-    UNION ALL SELECT '1221017', 'Sama Dweikat',            '1221017@students.birzeit.edu', @student_pwd, 'student', 'SD', TRUE
-    UNION ALL SELECT '1221018', 'Husam Azzam',             '1221018@students.birzeit.edu', @student_pwd, 'student', 'HA', TRUE
-    UNION ALL SELECT '1221019', 'Aseel Masri',             '1221019@students.birzeit.edu', @student_pwd, 'student', 'AM', TRUE
-    UNION ALL SELECT '1221020', 'Rama Hamayel',            '1221020@students.birzeit.edu', @student_pwd, 'student', 'RH', TRUE
-    UNION ALL SELECT '1221021', 'Mahmoud Shtayyeh',        '1221021@students.birzeit.edu', @student_pwd, 'student', 'MS', TRUE
-    UNION ALL SELECT '1221022', 'Celine Nasser',           '1221022@students.birzeit.edu', @student_pwd, 'student', 'CN', TRUE
-    UNION ALL SELECT '1221023', 'Adam Zaid',               '1221023@students.birzeit.edu', @student_pwd, 'student', 'AZ', TRUE
-    UNION ALL SELECT '1221024', 'Shahd Abu Eisheh',        '1221024@students.birzeit.edu', @student_pwd, 'student', 'SA', TRUE
-) AS new_students
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM users u
-    WHERE u.university_id = new_students.university_id
-);
-
-INSERT IGNORE INTO students (user_id, enrollment_year)
-SELECT u.user_id, 2022
-FROM users u
-WHERE u.university_id IN (
-    '1221001','1221002','1221003','1221004','1221005','1221006',
-    '1221007','1221008','1221009','1221010','1221011','1221012',
-    '1221013','1221014','1221015','1221016','1221017','1221018',
-    '1221019','1221020','1221021','1221022','1221023','1221024'
-)
-AND u.role = 'student'
-AND NOT EXISTS (
-    SELECT 1
-    FROM students s
-    WHERE s.user_id = u.user_id
-);
-
--- Verification
-SELECT u.user_id, u.university_id, u.full_name, u.email, s.student_id, s.enrollment_year
-FROM users u
-LEFT JOIN students s ON s.user_id = u.user_id
-WHERE u.university_id IN (
-    '1221001','1221002','1221003','1221004','1221005','1221006',
-    '1221007','1221008','1221009','1221010','1221011','1221012',
-    '1221013','1221014','1221015','1221016','1221017','1221018',
-    '1221019','1221020','1221021','1221022','1221023','1221024'
-)
-ORDER BY u.university_id;
-
-
-CREATE TABLE IF NOT EXISTS discussion_rooms (
-    room_id    INT          PRIMARY KEY AUTO_INCREMENT,
-    room_name  VARCHAR(120) NOT NULL UNIQUE,
-    sort_order INT          NOT NULL DEFAULT 1,
-    is_active  BOOLEAN      NOT NULL DEFAULT TRUE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
--- ============================================================
--- Committee Plans (one committee can discuss multiple projects)
--- ============================================================
-CREATE TABLE IF NOT EXISTS committee_plans (
-    plan_id INT PRIMARY KEY AUTO_INCREMENT,
-    committee_name VARCHAR(150) NOT NULL,
-    academic_year VARCHAR(20) NOT NULL,
-    discussion_date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    room_id INT NOT NULL,
-    responsible_faculty_id INT NULL,
-    status ENUM('draft','scheduled','completed','cancelled') NOT NULL DEFAULT 'draft',
-    created_by INT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (room_id) REFERENCES discussion_rooms(room_id),
-    FOREIGN KEY (responsible_faculty_id) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
-    FOREIGN KEY (created_by) REFERENCES users(user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
 -- Committee Members (4 doctors, different majors)
@@ -4676,26 +4570,6 @@ CREATE TABLE IF NOT EXISTS section_students (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 3) Optional safe seed:
---    If after the full reset there are ZERO intro sections,
---    create three COMP4200 introduction sections using your real doctors.
---    This does NOT delete or overwrite anything.
--- ============================================================
-
-INSERT INTO student_distribution_sections (section_name, supervisor_id, entered_by)
-SELECT x.section_name, f.faculty_id, NULL
-FROM (
-    SELECT 'COMP4200 Introduction Section 1' AS section_name, 'Dr. Ruba Awadallah' AS doctor_name
-    UNION ALL SELECT 'COMP4200 Introduction Section 2', 'Dr. Iyad Jaber'
-    UNION ALL SELECT 'COMP4200 Introduction Section 3', 'Dr. Abdullah Krakeh'
-) x
-JOIN users u ON u.full_name = x.doctor_name
-JOIN faculty f ON f.user_id = u.user_id
-WHERE NOT EXISTS (
-    SELECT 1 FROM student_distribution_sections
-);
-
--- ============================================================
 -- 4) Real Graduation Project view
 --    Keeps demo projects in DB, but hides them from section results.
 -- ============================================================
@@ -5633,83 +5507,6 @@ SELECT
     COUNT(*) AS found_doctors
 FROM tmp_doctor_faculty;
 
--- ------------------------------------------------------------
--- 2) Create 30 COMP4200 students + 30 COMP4300 students
--- ------------------------------------------------------------
-DROP TEMPORARY TABLE IF EXISTS tmp_seed_students;
-CREATE TEMPORARY TABLE tmp_seed_students (
-    seq INT PRIMARY KEY,
-    course_code VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    university_id VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
-    full_name VARCHAR(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    email VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
-    initials VARCHAR(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
-);
-
-INSERT INTO tmp_seed_students (seq, course_code, university_id, full_name, email, initials) VALUES
--- COMP4200 students: 30 students, 3 per section
-(1,'COMP4200','4200001','COMP4200 Student 01','4200001@students.birzeit.edu','S01'),
-(2,'COMP4200','4200002','COMP4200 Student 02','4200002@students.birzeit.edu','S02'),
-(3,'COMP4200','4200003','COMP4200 Student 03','4200003@students.birzeit.edu','S03'),
-(4,'COMP4200','4200004','COMP4200 Student 04','4200004@students.birzeit.edu','S04'),
-(5,'COMP4200','4200005','COMP4200 Student 05','4200005@students.birzeit.edu','S05'),
-(6,'COMP4200','4200006','COMP4200 Student 06','4200006@students.birzeit.edu','S06'),
-(7,'COMP4200','4200007','COMP4200 Student 07','4200007@students.birzeit.edu','S07'),
-(8,'COMP4200','4200008','COMP4200 Student 08','4200008@students.birzeit.edu','S08'),
-(9,'COMP4200','4200009','COMP4200 Student 09','4200009@students.birzeit.edu','S09'),
-(10,'COMP4200','4200010','COMP4200 Student 10','4200010@students.birzeit.edu','S10'),
-(11,'COMP4200','4200011','COMP4200 Student 11','4200011@students.birzeit.edu','S11'),
-(12,'COMP4200','4200012','COMP4200 Student 12','4200012@students.birzeit.edu','S12'),
-(13,'COMP4200','4200013','COMP4200 Student 13','4200013@students.birzeit.edu','S13'),
-(14,'COMP4200','4200014','COMP4200 Student 14','4200014@students.birzeit.edu','S14'),
-(15,'COMP4200','4200015','COMP4200 Student 15','4200015@students.birzeit.edu','S15'),
-(16,'COMP4200','4200016','COMP4200 Student 16','4200016@students.birzeit.edu','S16'),
-(17,'COMP4200','4200017','COMP4200 Student 17','4200017@students.birzeit.edu','S17'),
-(18,'COMP4200','4200018','COMP4200 Student 18','4200018@students.birzeit.edu','S18'),
-(19,'COMP4200','4200019','COMP4200 Student 19','4200019@students.birzeit.edu','S19'),
-(20,'COMP4200','4200020','COMP4200 Student 20','4200020@students.birzeit.edu','S20'),
-(21,'COMP4200','4200021','COMP4200 Student 21','4200021@students.birzeit.edu','S21'),
-(22,'COMP4200','4200022','COMP4200 Student 22','4200022@students.birzeit.edu','S22'),
-(23,'COMP4200','4200023','COMP4200 Student 23','4200023@students.birzeit.edu','S23'),
-(24,'COMP4200','4200024','COMP4200 Student 24','4200024@students.birzeit.edu','S24'),
-(25,'COMP4200','4200025','COMP4200 Student 25','4200025@students.birzeit.edu','S25'),
-(26,'COMP4200','4200026','COMP4200 Student 26','4200026@students.birzeit.edu','S26'),
-(27,'COMP4200','4200027','COMP4200 Student 27','4200027@students.birzeit.edu','S27'),
-(28,'COMP4200','4200028','COMP4200 Student 28','4200028@students.birzeit.edu','S28'),
-(29,'COMP4200','4200029','COMP4200 Student 29','4200029@students.birzeit.edu','S29'),
-(30,'COMP4200','4200030','COMP4200 Student 30','4200030@students.birzeit.edu','S30'),
-
--- COMP4300 students: 30 students, 3 per project/group
-(31,'COMP4300','4300001','COMP4300 Student 01','4300001@students.birzeit.edu','G01'),
-(32,'COMP4300','4300002','COMP4300 Student 02','4300002@students.birzeit.edu','G02'),
-(33,'COMP4300','4300003','COMP4300 Student 03','4300003@students.birzeit.edu','G03'),
-(34,'COMP4300','4300004','COMP4300 Student 04','4300004@students.birzeit.edu','G04'),
-(35,'COMP4300','4300005','COMP4300 Student 05','4300005@students.birzeit.edu','G05'),
-(36,'COMP4300','4300006','COMP4300 Student 06','4300006@students.birzeit.edu','G06'),
-(37,'COMP4300','4300007','COMP4300 Student 07','4300007@students.birzeit.edu','G07'),
-(38,'COMP4300','4300008','COMP4300 Student 08','4300008@students.birzeit.edu','G08'),
-(39,'COMP4300','4300009','COMP4300 Student 09','4300009@students.birzeit.edu','G09'),
-(40,'COMP4300','4300010','COMP4300 Student 10','4300010@students.birzeit.edu','G10'),
-(41,'COMP4300','4300011','COMP4300 Student 11','4300011@students.birzeit.edu','G11'),
-(42,'COMP4300','4300012','COMP4300 Student 12','4300012@students.birzeit.edu','G12'),
-(43,'COMP4300','4300013','COMP4300 Student 13','4300013@students.birzeit.edu','G13'),
-(44,'COMP4300','4300014','COMP4300 Student 14','4300014@students.birzeit.edu','G14'),
-(45,'COMP4300','4300015','COMP4300 Student 15','4300015@students.birzeit.edu','G15'),
-(46,'COMP4300','4300016','COMP4300 Student 16','4300016@students.birzeit.edu','G16'),
-(47,'COMP4300','4300017','COMP4300 Student 17','4300017@students.birzeit.edu','G17'),
-(48,'COMP4300','4300018','COMP4300 Student 18','4300018@students.birzeit.edu','G18'),
-(49,'COMP4300','4300019','COMP4300 Student 19','4300019@students.birzeit.edu','G19'),
-(50,'COMP4300','4300020','COMP4300 Student 20','4300020@students.birzeit.edu','G20'),
-(51,'COMP4300','4300021','COMP4300 Student 21','4300021@students.birzeit.edu','G21'),
-(52,'COMP4300','4300022','COMP4300 Student 22','4300022@students.birzeit.edu','G22'),
-(53,'COMP4300','4300023','COMP4300 Student 23','4300023@students.birzeit.edu','G23'),
-(54,'COMP4300','4300024','COMP4300 Student 24','4300024@students.birzeit.edu','G24'),
-(55,'COMP4300','4300025','COMP4300 Student 25','4300025@students.birzeit.edu','G25'),
-(56,'COMP4300','4300026','COMP4300 Student 26','4300026@students.birzeit.edu','G26'),
-(57,'COMP4300','4300027','COMP4300 Student 27','4300027@students.birzeit.edu','G27'),
-(58,'COMP4300','4300028','COMP4300 Student 28','4300028@students.birzeit.edu','G28'),
-(59,'COMP4300','4300029','COMP4300 Student 29','4300029@students.birzeit.edu','G29'),
-(60,'COMP4300','4300030','COMP4300 Student 30','4300030@students.birzeit.edu','G30');
 
 INSERT IGNORE INTO users
     (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
@@ -5742,17 +5539,6 @@ CREATE TEMPORARY TABLE tmp_4200_sections (
     student_seq_3 INT NOT NULL
 );
 
-INSERT INTO tmp_4200_sections VALUES
-(1,  'COMP4200 Section 01', 1,  1,  2,  3),
-(2,  'COMP4200 Section 02', 2,  4,  5,  6),
-(3,  'COMP4200 Section 03', 3,  7,  8,  9),
-(4,  'COMP4200 Section 04', 4, 10, 11, 12),
-(5,  'COMP4200 Section 05', 5, 13, 14, 15),
-(6,  'COMP4200 Section 06', 6, 16, 17, 18),
-(7,  'COMP4200 Section 07', 7, 19, 20, 21),
-(8,  'COMP4200 Section 08', 8, 22, 23, 24),
-(9,  'COMP4200 Section 09', 9, 25, 26, 27),
-(10, 'COMP4200 Section 10', 10, 28, 29, 30);
 
 INSERT INTO student_distribution_sections (section_name, supervisor_id, entered_by)
 SELECT s.section_name, df.faculty_id, @coordinator_user_id

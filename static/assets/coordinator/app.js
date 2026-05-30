@@ -155,8 +155,9 @@ function committeeStatusBadge(status) {
 ========================= */
 function updateSelectedStudentsCount() {
   const el = document.getElementById('selectedStudentsCount');
-  if (!el) return;
-  el.textContent = getSelectedStudentIds().length;
+  const selectedCount = getSelectedStudentIds().length;
+  if (el) el.textContent = selectedCount;
+  updateSectionSupervisorAvailability(selectedCount);
 }
 
 function getSelectedStudentIds() {
@@ -276,10 +277,29 @@ function renderSupervisorOptions(professors) {
   select.innerHTML = '<option value="">Select supervisor...</option>';
   professors.forEach(prof => {
     const opt = document.createElement('option');
+    const remainingHours = Number(prof.remaining_hours || 0);
     opt.value = prof.faculty_id;
-    opt.textContent = `${prof.full_name} (${prof.assigned_projects} assigned groups)`;
+    opt.dataset.remainingHours = String(remainingHours);
+    opt.textContent = `${prof.full_name} (${prof.assigned_projects} assigned groups, ${remainingHours.toFixed(1)}h remaining)`;
     select.appendChild(opt);
   });
+  updateSectionSupervisorAvailability(getSelectedStudentIds().length);
+}
+
+function updateSectionSupervisorAvailability(selectedCount) {
+  const select = document.getElementById('sectionSupervisor');
+  if (!select) return;
+
+  const requiredHours = Math.max(Number(selectedCount) || 0, 1) * 0.5;
+  Array.from(select.options).forEach((option, index) => {
+    if (index === 0) return;
+    const remainingHours = Number(option.dataset.remainingHours || 0);
+    option.disabled = remainingHours < requiredHours;
+  });
+
+  if (select.selectedOptions[0]?.disabled) {
+    select.value = '';
+  }
 }
 
 function renderForms(forms, professors) {
@@ -296,6 +316,7 @@ function renderForms(forms, professors) {
     const currentSupervisorId = form.supervisor_id || '';
     const currentSupervisorName = form.final_supervisor || 'Not assigned';
     const selectId = `groupSupervisor_${form.project_id}`;
+    const safeGroupName = (form.group_name || 'this group').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
     const supervisorOptions = [
       '<option value="">Select supervisor...</option>',
@@ -319,8 +340,14 @@ function renderForms(forms, professors) {
             Current: ${escapeHtml(currentSupervisorName)}
           </div>
         </td>
-        <td>
+        <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-primary" type="button" onclick="assignGroupSupervisor(${form.project_id})">Save</button>
+          <button class="btn" type="button"
+            title="Remove group and free students to re-register"
+            style="background:#fee2e2;color:#b42318;border:1px solid #fecaca;padding:6px 10px"
+            onclick="deleteGroup(${form.project_id}, '${safeGroupName}')">
+            <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle">delete</span>
+          </button>
         </td>
         <td>${statusBadge(form.status)}</td>
       </tr>
@@ -333,7 +360,7 @@ function renderUnassignedStudents(students) {
   if (!unassignedBox) return;
 
   if (!students.length) {
-    unassignedBox.innerHTML = '<div>No unassigned students.</div>';
+    unassignedBox.innerHTML = '<div>No solo registrations waiting for assignment.</div>';
     updateSelectedStudentsCount();
     return;
   }
@@ -463,21 +490,33 @@ async function assignGroupSupervisor(projectId) {
   }
 }
 
+async function deleteGroup(projectId, groupName) {
+  if (!confirm(`Remove "${groupName}"?\n\nThis will delete the group and all its submission records. Students will be able to re-register.`)) return;
+
+  try {
+    const res  = await fetch(`/api/coordinator/delete-group/${projectId}`, { method: 'DELETE' });
+    const data = await readApiJson(res);
+    if (!res.ok) throw new Error(data.error || 'Failed to delete group.');
+    await loadDistributionData();
+  } catch (err) {
+    alert(err.message || 'Something went wrong.');
+  }
+}
+
 async function addSectionEntry() {
   const sectionName = document.getElementById('sectionName')?.value.trim();
   const supervisorId = document.getElementById('sectionSupervisor')?.value;
   const selectedStudents = getSelectedStudentIds();
   const msg = document.getElementById('sectionMsg');
-  const addBtn = document.querySelector('button[onclick="addSectionEntry()"]');
+  const addBtn = document.querySelector('button[onclick="createSectionNoDuplicate()"]');
 
   if (!sectionName || !supervisorId) {
     if (msg) {
       msg.style.color = '#c62828';
       msg.style.fontWeight = '600';
-      msg.textContent = 'Please enter the section name and choose a supervisor.';
+      msg.textContent = 'Please enter the group name and choose a supervisor.';
     }
-    alert('Please enter the section name and choose a supervisor.');
-    return;
+    throw new Error('Please enter the group name and choose a supervisor.');
   }
 
   if (!selectedStudents.length) {
@@ -486,8 +525,7 @@ async function addSectionEntry() {
       msg.style.fontWeight = '600';
       msg.textContent = 'Please choose at least one unassigned student.';
     }
-    alert('Please choose at least one unassigned student.');
-    return;
+    throw new Error('Please choose at least one unassigned student.');
   }
 
   if (selectedStudents.length > 3) {
@@ -496,8 +534,7 @@ async function addSectionEntry() {
       msg.style.fontWeight = '600';
       msg.textContent = 'You can choose at most 3 students.';
     }
-    alert('You can choose at most 3 students.');
-    return;
+    throw new Error('You can choose at most 3 students.');
   }
 
   try {
@@ -521,13 +558,13 @@ async function addSectionEntry() {
     const data = await readApiJson(res);
 
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to add section.');
+      throw new Error(data.error || 'Failed to create group.');
     }
 
     if (msg) {
       msg.style.color = 'green';
       msg.style.fontWeight = '600';
-      msg.textContent = data.message || 'Section added successfully.';
+      msg.textContent = data.message || 'Group created successfully.';
     }
 
     const sectionNameInput = document.getElementById('sectionName');
@@ -536,13 +573,14 @@ async function addSectionEntry() {
     if (sectionSupervisor) sectionSupervisor.value = '';
 
     await loadDistributionData();
+    return data;
   } catch (err) {
     if (msg) {
       msg.style.color = '#c62828';
       msg.style.fontWeight = '700';
-      msg.textContent = err.message || 'Something went wrong while adding the section.';
+      msg.textContent = err.message || 'Something went wrong while creating the group.';
     }
-    alert(err.message || 'Something went wrong while adding the section.');
+    throw err;
   } finally {
     if (addBtn) addBtn.disabled = false;
   }

@@ -310,6 +310,70 @@ def _notify_project_team(
         )
 
 
+def _student_intro_section(cursor, student_id):
+    """Return the current COMP4200 section for a student, if assigned."""
+    if (
+        not student_id
+        or not _table_exists_student(cursor, "student_distribution_sections")
+        or not _table_exists_student(cursor, "section_students")
+    ):
+        return None
+
+    cursor.execute(
+        """
+        SELECT sec.section_id, sec.section_name, ss.created_at AS joined_at
+        FROM section_students ss
+        JOIN student_distribution_sections sec ON sec.section_id = ss.section_id
+        WHERE ss.student_id = %s
+        ORDER BY sec.section_id DESC
+        LIMIT 1
+        """,
+        (student_id,),
+    )
+    return cursor.fetchone()
+
+
+def _notify_intro_section_team(
+    cursor,
+    section_id,
+    sender_id,
+    title,
+    message,
+    notification_type="system",
+    exclude_user_id=None,
+):
+    """Create a notification for every active student in a COMP4200 section."""
+    cursor.execute(
+        """
+        SELECT DISTINCT u.user_id
+        FROM section_students ss
+        JOIN students st ON st.student_id = ss.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE ss.section_id = %s
+          AND u.is_active = TRUE
+        """,
+        (section_id,),
+    )
+    recipients = []
+    for row in cursor.fetchall():
+        recipient_id = row.get("user_id")
+        if not recipient_id:
+            continue
+        if exclude_user_id is not None and int(recipient_id) == int(exclude_user_id):
+            continue
+        recipients.append(int(recipient_id))
+
+    for recipient_id in sorted(set(recipients)):
+        cursor.execute(
+            """
+            INSERT INTO notifications
+                (recipient_id, sender_id, notification_type, title, message, is_read)
+            VALUES (%s, %s, %s, %s, %s, FALSE)
+            """,
+            (recipient_id, sender_id, notification_type, title, message),
+        )
+
+
 def _student_intro_timeline_tables_ready(cursor):
     cursor.execute("""
         SELECT COUNT(*) AS cnt
@@ -403,7 +467,7 @@ def _student_published_intro_timeline(cursor):
 
 
 def _student_dashboard_milestone_progress(
-    cursor, student_id, project_id=None, final_report_uploaded=False
+    cursor, student_id, project_id=None, section_id=None, final_report_uploaded=False
 ):
     milestone_total = 0
     milestone_submitted = 0
@@ -432,7 +496,18 @@ def _student_dashboard_milestone_progress(
                   AND TABLE_NAME = 'milestone_submissions'
             """)
             if (cursor.fetchone() or {}).get("tbl_exists"):
-                if project_id:
+                if section_id:
+                    submit_where = """
+                          AND EXISTS (
+                              SELECT 1
+                              FROM section_students ss_scope
+                              WHERE ss_scope.section_id = %s
+                                AND ss_scope.student_id = ms.student_id
+                                AND ms.submitted_at >= ss_scope.created_at
+                          )
+                    """
+                    submit_params = (section_id,)
+                elif project_id:
                     submit_where = """
                           AND (
                                 ms.project_id = %s
@@ -1096,6 +1171,8 @@ __all__ = [
     "_student_course_context",
     "_cleanup_comp4200_state_for_promoted_student",
     "_notify_project_team",
+    "_student_intro_section",
+    "_notify_intro_section_team",
     "_student_intro_timeline_tables_ready",
     "_student_active_semester",
     "_target_semester_for_submission",

@@ -180,6 +180,25 @@ def api_dashboard_data():
         semester_id = sem["semester_id"]
         semester_start = _as_date(sem["start_date"])
         result["academic_year"] = sem["academic_year"] or ""
+        intro_section = None
+        is_section_workspace = False
+        if target_course == "COMP4200":
+            cursor.execute(
+                """
+                SELECT sec.section_id, sec.section_name, ss.created_at AS joined_at,
+                       u_sup.full_name AS supervisor_name
+                FROM section_students ss
+                JOIN student_distribution_sections sec
+                  ON sec.section_id = ss.section_id
+                JOIN faculty f_sup ON f_sup.faculty_id = sec.supervisor_id
+                JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+                WHERE ss.student_id = %s
+                ORDER BY sec.section_id DESC
+                LIMIT 1
+                """,
+                (student_id,),
+            )
+            intro_section = cursor.fetchone()
 
         # 4. Most used project types.
         # This chart is GLOBAL for all students and does NOT depend on the
@@ -223,6 +242,12 @@ def api_dashboard_data():
             (user_id, semester_id),
         )
         project = cursor.fetchone()
+        if intro_section and project and project.get("status") == "solo_pending":
+            project["title"] = intro_section.get("section_name") or "Assigned Section"
+            project["status"] = "section_assigned"
+            project["supervisor_name"] = intro_section.get("supervisor_name")
+            project["joined_at"] = intro_section.get("joined_at") or project.get("joined_at")
+            is_section_workspace = True
         if not project:
             if target_course == "COMP4300":
                 cursor.execute(
@@ -293,17 +318,11 @@ def api_dashboard_data():
                 milestone = _comp4300_dashboard_milestone_progress(
                     cursor, semester_id, final_report_uploaded=False
                 )
-            else:
-                milestone = _student_dashboard_milestone_progress(
-                    cursor, student_id, project_id=None, final_report_uploaded=False
+                result["milestone_progress"] = milestone
+                result["progress"]["overall"] = milestone["overall"]
+                result["deadlines"] = _comp4300_dashboard_deadlines(
+                    cursor, semester_id
                 )
-            result["milestone_progress"] = milestone
-            result["progress"]["overall"] = milestone["overall"]
-            result["deadlines"] = (
-                _comp4300_dashboard_deadlines(cursor, semester_id)
-                if target_course == "COMP4300"
-                else _student_intro_timeline_deadlines(cursor)
-            )
             return jsonify(_json_safe(result))
 
         project_id = project["project_id"]
@@ -313,12 +332,22 @@ def api_dashboard_data():
             "status": project["status"] or "",
             "project_type": _project_type_text(project.get("project_type")),
             "is_primary_contact": bool(project.get("is_primary_contact")),
+            "workspace_type": "section" if is_section_workspace else "project",
+            "section_id": intro_section.get("section_id") if is_section_workspace else None,
             "final_score": (
                 float(project["final_score"]) if project["final_score"] else None
             ),
         }
         result["supervisor_name"] = project["supervisor_name"] or "—"
         result["registration_date"] = _fmt_date(project.get("joined_at"))
+
+        # Flag: group exists but has no project idea/title yet (coordinator-assigned COMP4200 groups)
+        result["needs_title"] = (
+            target_course == "COMP4200"
+            and not is_section_workspace
+            and project.get("status") not in ("solo_pending",)
+            and not (project.get("title") or "").strip()
+        )
 
         # 5. File completion based on project_files uploads, not manual/random percentages.
         # Only the Final Report is required for dashboard completion.
@@ -400,6 +429,9 @@ def api_dashboard_data():
                 cursor,
                 student_id,
                 project_id=project_id,
+                section_id=(
+                    intro_section.get("section_id") if is_section_workspace else None
+                ),
                 final_report_uploaded=final_report_uploaded,
             )
         result["progress"]["overall"] = result["milestone_progress"]["overall"]
@@ -461,7 +493,7 @@ def api_dashboard_data():
                   AND  t.is_published = TRUE
                   AND  ti.is_deadline = TRUE
                   AND  COALESCE(ti.is_archived, FALSE) = FALSE
-                  AND  ti.due_date   >= CURDATE()
+                  AND  ti.due_date   >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
                 ORDER  BY ti.due_date ASC
                 """, (target_course,))
             for ti in cursor.fetchall():
@@ -533,16 +565,30 @@ def api_dashboard_data():
                 result["days_to_deadline"] = max((nearest_d - date.today()).days, 0)
 
         # 8. آخر 5 إشعارات
-        cursor.execute(
+        notification_scope = ""
+        notification_params = [user_id]
+        if is_section_workspace and intro_section.get("joined_at"):
+            notification_scope = """
+              AND (
+                    (
+                        n.title <> 'Timeline milestone submitted'
+                        AND n.title NOT LIKE 'Timeline Submission:%'
+                    )
+                 OR n.created_at >= %s
+              )
             """
+            notification_params.append(intro_section["joined_at"])
+        cursor.execute(
+            f"""
             SELECT n.title, n.message, n.notification_type, n.created_at, n.is_read,
                    sender.full_name AS sender_name
             FROM   notifications n
             LEFT JOIN users sender ON sender.user_id = n.sender_id
             WHERE  n.recipient_id = %s
+            {notification_scope}
             ORDER  BY n.created_at DESC LIMIT 5
             """,
-            (user_id,),
+            tuple(notification_params),
         )
         notifs = cursor.fetchall()
         result["notifications"] = [
@@ -557,17 +603,31 @@ def api_dashboard_data():
         result["unread_notifs"] = sum(1 for n in notifs if not n["is_read"])
 
         # 9. أعضاء الفريق
-        cursor.execute(
-            """
-            SELECT u.full_name, u.university_id,
-                   (st2.user_id = %s) AS is_me
-            FROM   project_members pm
-            JOIN   students st2 ON st2.student_id = pm.student_id
-            JOIN   users    u   ON u.user_id       = st2.user_id
-            WHERE  pm.project_id = %s
-            """,
-            (user_id, project_id),
-        )
+        if is_section_workspace:
+            cursor.execute(
+                """
+                SELECT u.full_name, u.university_id,
+                       (st2.user_id = %s) AS is_me
+                FROM section_students ss
+                JOIN students st2 ON st2.student_id = ss.student_id
+                JOIN users u ON u.user_id = st2.user_id
+                WHERE ss.section_id = %s
+                ORDER BY u.full_name
+                """,
+                (user_id, intro_section["section_id"]),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT u.full_name, u.university_id,
+                       (st2.user_id = %s) AS is_me
+                FROM   project_members pm
+                JOIN   students st2 ON st2.student_id = pm.student_id
+                JOIN   users    u   ON u.user_id       = st2.user_id
+                WHERE  pm.project_id = %s
+                """,
+                (user_id, project_id),
+            )
         result["team_members"] = [
             {
                 "full_name": m["full_name"],
@@ -631,3 +691,69 @@ def api_dashboard_data():
             pass
 
     return jsonify(_json_safe(result))
+
+
+@student_bp.route("/api/set-project-idea", methods=["POST"])
+@login_required(role="student")
+def api_set_project_idea():
+    """Allow any group member to enter/update the project idea title for COMP4200 coordinator-assigned groups."""
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    user_id = session.get("user_id")
+
+    if not title:
+        return jsonify({"error": "Please enter a project idea."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT p.project_id
+            FROM project_members pm
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN projects p  ON p.project_id  = pm.project_id
+            JOIN semesters s ON s.semester_id  = p.semester_id
+                            AND s.is_active = TRUE
+                            AND s.course_code = 'COMP4200'
+            WHERE st.user_id = %s
+              AND p.status NOT IN ('solo_pending', 'archived')
+            ORDER BY p.project_id DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No active COMP4200 group found."}), 404
+
+        cursor.execute(
+            "UPDATE projects SET title = %s WHERE project_id = %s",
+            (title, row["project_id"]),
+        )
+
+        # Get sender name for the notification
+        cursor.execute("SELECT full_name FROM users WHERE user_id = %s", (user_id,))
+        sender_row = cursor.fetchone()
+        sender_name = (sender_row or {}).get("full_name") or "A teammate"
+
+        # Notify the rest of the team
+        _notify_project_team(
+            cursor,
+            row["project_id"],
+            user_id,
+            "Project idea submitted",
+            f'{sender_name} entered the project idea: "{title}". No action needed from you.',
+            notification_type="system",
+            exclude_user_id=user_id,
+        )
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"message": "Project idea saved successfully."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

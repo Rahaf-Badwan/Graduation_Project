@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(mysql -u root -prahaf123 apms_db -e ' *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u root -prahaf123 apms_db -e \"SET FOREIGN_KEY_CHECKS=0; DELETE FROM section_students WHERE section_id BETWEEN 4 AND 13; DELETE FROM student_distribution_sections WHERE section_id BETWEEN 4 AND 13; SET FOREIGN_KEY_CHECKS=1;\" 2>$null)",
+      "PowerShell(& \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -u root -prahaf123 apms_db -e \"SET FOREIGN_KEY_CHECKS=0; DELETE FROM project_members WHERE project_id BETWEEN 56 AND 67; DELETE FROM project_members WHERE project_id BETWEEN 118 AND 168; DELETE FROM projects WHERE project_id BETWEEN 56 AND 67; DELETE FROM projects WHERE project_id BETWEEN 118 AND 168; SET FOREIGN_KEY_CHECKS=1;\" 2>$null)"
     ]
   }
 }

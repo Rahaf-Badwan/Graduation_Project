@@ -119,6 +119,28 @@ def api_student_intro_timeline():
             return jsonify(
                 {"timeline": None, "items": [], "message": "No active semester found."}
             )
+        cursor.execute(
+            """
+            SELECT 1
+            FROM project_members pm
+            JOIN projects p ON p.project_id = pm.project_id
+            WHERE pm.student_id = %s
+              AND p.semester_id = %s
+            LIMIT 1
+            """,
+            (student_row["student_id"], semester["semester_id"]),
+        )
+        if not cursor.fetchone():
+            cursor.close()
+            db.close()
+            return jsonify(
+                {
+                    "timeline": None,
+                    "items": [],
+                    "message": "Register your project group first to view timeline milestones.",
+                    "registration_required": True,
+                }
+            )
         timeline = _student_published_intro_timeline(cursor)
         if not timeline:
             cursor.close()

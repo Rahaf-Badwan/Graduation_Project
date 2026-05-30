@@ -122,9 +122,11 @@ def api_student_registration_check():
                 project["submission_date"], "isoformat"
             ):
                 project["submission_date"] = str(project["submission_date"])
+            is_solo = project.get("status") == "solo_pending"
             return jsonify(
                 {
                     "registered": True,
+                    "solo": is_solo,
                     "project": project,
                     "distribution_open": distribution_open,
                     "target_course": target_course,
@@ -182,11 +184,12 @@ def api_student_distribution_window_status():
 @login_required(role="student")
 def api_student_distribution_submit():
     data = request.get_json(silent=True) or {}
-    title = (data.get("title") or "").strip()
+    is_solo = bool(data.get("solo"))
+    title = (data.get("title") or "").strip() or ("Solo Registration" if is_solo else "")
     group_name = (data.get("group_name") or "").strip()
     abstract = (data.get("abstract") or "").strip()
     keywords = (data.get("keywords") or "").strip()
-    preferred = data.get("preferred_supervisors") or []
+    preferred = [] if is_solo else (data.get("preferred_supervisors") or [])
     member_ids = [
         str(x).strip() for x in (data.get("member_ids") or []) if str(x).strip()
     ]
@@ -319,13 +322,15 @@ def api_student_distribution_submit():
 
         has_group_name = _db_column_exists_student(cursor, "projects", "group_name")
 
+        proj_status = "solo_pending" if is_solo else "submitted"
+
         if has_group_name:
             cursor.execute(
                 """
                 INSERT INTO projects
                     (group_name, title, abstract, keywords, project_type, semester_id, status, submission_date,
                      preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
-                VALUES (%s, %s, %s, %s, '', %s, 'submitted', CURDATE(), %s, %s, %s)
+                VALUES (%s, %s, %s, %s, '', %s, %s, CURDATE(), %s, %s, %s)
                 """,
                 (
                     group_name or None,
@@ -333,6 +338,7 @@ def api_student_distribution_submit():
                     abstract or None,
                     keywords or None,
                     semester["semester_id"],
+                    proj_status,
                     pref_ids[0],
                     pref_ids[1],
                     pref_ids[2],
@@ -344,13 +350,14 @@ def api_student_distribution_submit():
                 INSERT INTO projects
                     (title, abstract, keywords, project_type, semester_id, status, submission_date,
                      preferred_supervisor_1, preferred_supervisor_2, preferred_supervisor_3)
-                VALUES (%s, %s, %s, '', %s, 'submitted', CURDATE(), %s, %s, %s)
+                VALUES (%s, %s, %s, '', %s, %s, CURDATE(), %s, %s, %s)
                 """,
                 (
                     title,
                     abstract or None,
                     keywords or None,
                     semester["semester_id"],
+                    proj_status,
                     pref_ids[0],
                     pref_ids[1],
                     pref_ids[2],
