@@ -1924,7 +1924,7 @@ def api_coordinator_download_deliverable_submission(submission_id):
 
 # ─── Coordinator Notifications / Messaging ───────────────────────────────
 def _ensure_notification_attachment_columns(cursor):
-    """Add attachment columns to notifications when the database has not been migrated yet."""
+    """Add notification messaging columns when the database has not been migrated yet."""
     if not _db_column_exists(cursor, "notifications", "attachment_name"):
         cursor.execute(
             "ALTER TABLE notifications ADD COLUMN attachment_name VARCHAR(255) NULL"
@@ -1937,13 +1937,23 @@ def _ensure_notification_attachment_columns(cursor):
         cursor.execute(
             "ALTER TABLE notifications ADD COLUMN attachment_data LONGBLOB NULL"
         )
+    if not _db_column_exists(cursor, "notifications", "can_reply"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read"
+        )
 
 
 def _notification_attachment_select_fields(cursor):
-    """Return safe SELECT fields for attachment metadata."""
+    """Return safe SELECT fields for attachment metadata and reply policy."""
+    attachment_fields = "NULL AS attachment_name, NULL AS attachment_mime, 0 AS has_attachment"
     if _db_column_exists(cursor, "notifications", "attachment_name"):
-        return "n.attachment_name, n.attachment_mime, n.attachment_data IS NOT NULL AS has_attachment"
-    return "NULL AS attachment_name, NULL AS attachment_mime, 0 AS has_attachment"
+        attachment_fields = "n.attachment_name, n.attachment_mime, n.attachment_data IS NOT NULL AS has_attachment"
+
+    reply_field = "1 AS can_reply"
+    if _db_column_exists(cursor, "notifications", "can_reply"):
+        reply_field = "COALESCE(n.can_reply, 1) AS can_reply"
+
+    return f"{attachment_fields}, {reply_field}"
 
 
 def _notification_row_to_json(row):
@@ -1954,6 +1964,7 @@ def _notification_row_to_json(row):
     if clean.get("created_at") is not None:
         clean["created_at"] = str(clean["created_at"])
     clean["is_read"] = bool(clean.get("is_read"))
+    clean["can_reply"] = bool(clean.get("can_reply", 1))
     clean["course_scope"] = clean.get("course_scope") or "both"
     clean["has_attachment"] = bool(clean.get("has_attachment"))
     if not clean["has_attachment"]:
@@ -2109,6 +2120,47 @@ def _all_active_student_user_ids(cursor):
     return [row["user_id"] for row in _all_active_student_rows(cursor)]
 
 
+
+def _comp4300_project_recipients(cursor, project_id=None):
+    """Return students and supervisor user IDs for COMP4300 projects."""
+    if not (_table_exists(cursor, "projects") and _table_exists(cursor, "project_members")):
+        return []
+
+    params = []
+    project_filter = ""
+    if project_id:
+        project_filter = "AND p.project_id = %s"
+        params.append(project_id)
+
+    cursor.execute(
+        f"""
+        SELECT DISTINCT recipient_id
+        FROM (
+            SELECT us.user_id AS recipient_id
+            FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
+            JOIN project_members pm ON pm.project_id = p.project_id
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users us ON us.user_id = st.user_id
+            WHERE s.course_code = 'COMP4300'
+              AND us.role = 'student'
+              AND us.is_active = TRUE
+              {project_filter}
+            UNION
+            SELECT u_sup.user_id AS recipient_id
+            FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
+            JOIN faculty f ON f.faculty_id = p.supervisor_id
+            JOIN users u_sup ON u_sup.user_id = f.user_id
+            WHERE s.course_code = 'COMP4300'
+              AND u_sup.is_active = TRUE
+              {project_filter}
+        ) x
+        """,
+        tuple(params + params),
+    )
+    return [r["recipient_id"] for r in cursor.fetchall()]
+
 def _notification_recipients(cursor, scope, value=None, course_scope="both"):
     """Return user_ids for the coordinator selected target."""
     scope = (scope or "").strip()
@@ -2164,6 +2216,12 @@ def _notification_recipients(cursor, scope, value=None, course_scope="both"):
         return [r["user_id"] for r in cursor.fetchall()]
 
     if scope == "section":
+        # For COMP4300 the "section" selector contains projects with values like p:12.
+        if course_scope == "graduation_project" or str(value or "").startswith("p:"):
+            project_id = str(value or "").replace("p:", "", 1)
+            return _comp4300_project_recipients(cursor, project_id)
+
+        section_id = str(value or "").replace("s:", "", 1)
         if not (
             _table_exists(cursor, "student_distribution_sections")
             and _table_exists(cursor, "section_students")
@@ -2187,37 +2245,35 @@ def _notification_recipients(cursor, scope, value=None, course_scope="both"):
                 WHERE sec.section_id = %s AND u_sup.is_active = TRUE
             ) x
             """,
-            (value, value),
+            (section_id, section_id),
         )
         return [r["recipient_id"] for r in cursor.fetchall()]
 
     if scope == "all_sections":
-        # All sections are COMP4200 introduction sections. For COMP4300, use project members instead.
-        if course_scope == "graduation_project":
-            return _student_user_ids_by_course(cursor, "COMP4300")
-        if not (
-            _table_exists(cursor, "student_distribution_sections")
-            and _table_exists(cursor, "section_students")
-        ):
-            return []
-        cursor.execute("""
-            SELECT DISTINCT recipient_id
-            FROM (
-                SELECT us.user_id AS recipient_id
-                FROM student_distribution_sections sec
-                JOIN section_students ss ON ss.section_id = sec.section_id
-                JOIN students st ON st.student_id = ss.student_id
-                JOIN users us ON us.user_id = st.user_id
-                WHERE us.is_active = TRUE
-                UNION
-                SELECT u_sup.user_id AS recipient_id
-                FROM student_distribution_sections sec
-                JOIN faculty f ON f.faculty_id = sec.supervisor_id
-                JOIN users u_sup ON u_sup.user_id = f.user_id
-                WHERE u_sup.is_active = TRUE
-            ) x
-            """)
-        return [r["recipient_id"] for r in cursor.fetchall()]
+        recipients = []
+        if course_scope in {"introduction", "both"}:
+            if _table_exists(cursor, "student_distribution_sections") and _table_exists(cursor, "section_students"):
+                cursor.execute("""
+                    SELECT DISTINCT recipient_id
+                    FROM (
+                        SELECT us.user_id AS recipient_id
+                        FROM student_distribution_sections sec
+                        JOIN section_students ss ON ss.section_id = sec.section_id
+                        JOIN students st ON st.student_id = ss.student_id
+                        JOIN users us ON us.user_id = st.user_id
+                        WHERE us.is_active = TRUE
+                        UNION
+                        SELECT u_sup.user_id AS recipient_id
+                        FROM student_distribution_sections sec
+                        JOIN faculty f ON f.faculty_id = sec.supervisor_id
+                        JOIN users u_sup ON u_sup.user_id = f.user_id
+                        WHERE u_sup.is_active = TRUE
+                    ) x
+                    """)
+                recipients.extend([r["recipient_id"] for r in cursor.fetchall()])
+        if course_scope in {"graduation_project", "both"}:
+            recipients.extend(_comp4300_project_recipients(cursor))
+        return sorted(set(recipients))
 
     if scope == "reply":
         cursor.execute(
@@ -2266,10 +2322,13 @@ def api_coordinator_notification_options():
             cursor, "section_students"
         ):
             cursor.execute("""
-                SELECT sec.section_id,
+                SELECT CONCAT('s:', sec.section_id) AS section_key,
+                       sec.section_id,
                        sec.section_name,
+                       'introduction' AS course_scope,
+                       'COMP4200' AS course_code,
                        u_sup.full_name AS supervisor_name,
-                       COUNT(ss.student_id) AS students_count
+                       COUNT(DISTINCT ss.student_id) AS students_count
                 FROM student_distribution_sections sec
                 JOIN faculty f ON f.faculty_id = sec.supervisor_id
                 JOIN users u_sup ON u_sup.user_id = f.user_id
@@ -2277,7 +2336,28 @@ def api_coordinator_notification_options():
                 GROUP BY sec.section_id, sec.section_name, u_sup.full_name
                 ORDER BY sec.section_id DESC
                 """)
-            sections = cursor.fetchall()
+            sections.extend(cursor.fetchall())
+
+        if _table_exists(cursor, "projects") and _table_exists(cursor, "project_members"):
+            cursor.execute("""
+                SELECT CONCAT('p:', p.project_id) AS section_key,
+                       p.project_id AS section_id,
+                       COALESCE(NULLIF(p.title, ''), CONCAT('COMP4300 Project ', p.project_id)) AS section_name,
+                       'graduation_project' AS course_scope,
+                       'COMP4300' AS course_code,
+                       COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+                       COUNT(DISTINCT pm.student_id) AS students_count
+                FROM projects p
+                JOIN semesters s ON s.semester_id = p.semester_id
+                LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+                LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
+                LEFT JOIN project_members pm ON pm.project_id = p.project_id
+                WHERE s.course_code = 'COMP4300'
+                GROUP BY p.project_id, p.title, u_sup.full_name
+                HAVING students_count > 0
+                ORDER BY p.project_id DESC
+                """)
+            sections.extend(cursor.fetchall())
 
         cursor.close()
         db.close()
@@ -2301,6 +2381,8 @@ def api_coordinator_notifications_inbox():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_notification_attachment_columns(cursor)
+        db.commit()
         attachment_fields = _notification_attachment_select_fields(cursor)
         cursor.execute(
             f"""
@@ -2331,6 +2413,8 @@ def api_coordinator_notifications_sent():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_notification_attachment_columns(cursor)
+        db.commit()
         attachment_fields = _notification_attachment_select_fields(cursor)
         cursor.execute(
             f"""
@@ -2373,6 +2457,8 @@ def api_coordinator_notifications_send():
     title = (data.get("title") or "").strip()
     message = (data.get("message") or "").strip()
     urgent = str(data.get("urgent") or "").lower() in ("1", "true", "on", "yes")
+    allow_reply = str(data.get("allow_reply") or "1").lower() in ("1", "true", "on", "yes")
+    reply_to_notification_id = data.get("reply_to_notification_id")
     course_scope = (data.get("course_scope") or "both").strip()
     allowed_course_scopes = {"introduction", "graduation_project", "both"}
 
@@ -2410,8 +2496,35 @@ def api_coordinator_notifications_send():
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_notification_attachment_columns(cursor)
-        recipients = _notification_recipients(cursor, scope, value, course_scope)
         sender_id = session.get("user_id")
+
+        if scope == "reply":
+            if not reply_to_notification_id:
+                cursor.close()
+                db.close()
+                return jsonify({"error": "This reply cannot be sent because the original message was not identified."}), 400
+            cursor.execute(
+                """
+                SELECT n.notification_id, n.sender_id, COALESCE(n.can_reply, 1) AS can_reply
+                FROM notifications n
+                WHERE n.notification_id = %s
+                  AND n.recipient_id = %s
+                  AND n.sender_id = %s
+                LIMIT 1
+                """,
+                (reply_to_notification_id, sender_id, value),
+            )
+            original_message = cursor.fetchone()
+            if not original_message:
+                cursor.close()
+                db.close()
+                return jsonify({"error": "Original message was not found for this reply."}), 404
+            if not bool(original_message.get("can_reply", 1)):
+                cursor.close()
+                db.close()
+                return jsonify({"error": "Replies are disabled for this message."}), 403
+
+        recipients = _notification_recipients(cursor, scope, value, course_scope)
         recipients = sorted({int(r) for r in recipients if int(r) != int(sender_id)})
 
         if not recipients:
@@ -2426,9 +2539,9 @@ def api_coordinator_notifications_send():
                 """
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
-                     course_scope, related_project_id, is_read,
+                     course_scope, related_project_id, is_read, can_reply,
                      attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s)
                 """,
                 (
                     recipient_id,
@@ -2437,6 +2550,7 @@ def api_coordinator_notifications_send():
                     title,
                     message,
                     course_scope,
+                    1 if allow_reply else 0,
                     attachment_name,
                     attachment_mime,
                     attachment_data,

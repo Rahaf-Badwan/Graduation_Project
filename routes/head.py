@@ -372,6 +372,10 @@ def _ensure_head_notification_schema(cursor):
             cursor.execute("ALTER TABLE notifications ADD COLUMN attachment_mime VARCHAR(120) NULL")
         if not _head_db_column_exists(cursor, "notifications", "attachment_data"):
             cursor.execute("ALTER TABLE notifications ADD COLUMN attachment_data LONGBLOB NULL")
+        if not _head_db_column_exists(cursor, "notifications", "can_reply"):
+            cursor.execute(
+                "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read"
+            )
 
     cursor.execute(
         """
@@ -400,6 +404,12 @@ def _head_notification_attachment_select_fields(cursor):
     return "NULL AS attachment_name, NULL AS attachment_mime, 0 AS has_attachment"
 
 
+def _head_notification_can_reply_select_field(cursor):
+    if _head_db_column_exists(cursor, "notifications", "can_reply"):
+        return "COALESCE(n.can_reply, 1) AS can_reply"
+    return "1 AS can_reply"
+
+
 def _head_notification_row_to_json(row):
     if not row:
         return row
@@ -407,6 +417,7 @@ def _head_notification_row_to_json(row):
     if clean.get("created_at") is not None:
         clean["created_at"] = str(clean["created_at"])
     clean["is_read"] = bool(clean.get("is_read"))
+    clean["can_reply"] = bool(clean.get("can_reply", True))
     clean["course_scope"] = clean.get("course_scope") or "both"
     clean["has_attachment"] = bool(clean.get("has_attachment"))
     if not clean["has_attachment"]:
@@ -536,6 +547,50 @@ def _head_comp4300_project_recipients(cursor, project_id=None):
         tuple(params + params),
     )
     return [r["recipient_id"] for r in cursor.fetchall()]
+
+def _head_reply_permission_check(cursor, original_notification_id, reply_to_user_id, current_user_id):
+    """
+    Return (allowed, error_message). A reply is allowed only when the original
+    inbox message belongs to the current user and has can_reply = 1.
+    """
+    has_can_reply = _head_db_column_exists(cursor, "notifications", "can_reply")
+    can_reply_expr = "COALESCE(can_reply, 1)" if has_can_reply else "1"
+
+    if original_notification_id:
+        cursor.execute(
+            f"""
+            SELECT notification_id
+            FROM notifications
+            WHERE notification_id = %s
+              AND recipient_id = %s
+              AND sender_id = %s
+              AND {can_reply_expr} = 1
+            LIMIT 1
+            """,
+            (original_notification_id, current_user_id, reply_to_user_id),
+        )
+        if cursor.fetchone():
+            return True, ""
+        return False, "Replies are disabled for this message."
+
+    # Backward-compatible fallback for older frontends that only send sender_id.
+    # It still refuses replies when no replyable received message exists.
+    cursor.execute(
+        f"""
+        SELECT notification_id
+        FROM notifications
+        WHERE recipient_id = %s
+          AND sender_id = %s
+          AND {can_reply_expr} = 1
+        ORDER BY created_at DESC, notification_id DESC
+        LIMIT 1
+        """,
+        (current_user_id, reply_to_user_id),
+    )
+    if cursor.fetchone():
+        return True, ""
+    return False, "Replies are disabled for this message."
+
 
 def _head_notification_recipients(cursor, scope, value=None, course_scope="both"):
     scope = (scope or "").strip()
@@ -741,12 +796,14 @@ def api_head_notifications_inbox():
         _ensure_head_notification_schema(cursor)
         db.commit()
         attachment_fields = _head_notification_attachment_select_fields(cursor)
+        can_reply_field = _head_notification_can_reply_select_field(cursor)
         cursor.execute(
             f"""
             SELECT n.notification_id, n.notification_type, n.title, n.message,
                    n.course_scope, n.related_project_id, n.is_read, n.created_at,
                    n.sender_id AS sender_user_id,
                    sender.full_name AS sender_name, sender.role AS sender_role,
+                   {can_reply_field},
                    {attachment_fields}
             FROM notifications n
             LEFT JOIN users sender ON sender.user_id = n.sender_id
@@ -773,12 +830,14 @@ def api_head_notifications_sent():
         _ensure_head_notification_schema(cursor)
         db.commit()
         attachment_fields = _head_notification_attachment_select_fields(cursor)
+        can_reply_field = _head_notification_can_reply_select_field(cursor)
         cursor.execute(
             f"""
             SELECT n.notification_id, n.title, n.message, n.notification_type,
                    n.course_scope, n.is_read, n.created_at,
                    n.recipient_id AS recipient_user_id,
                    recipient.full_name AS recipient_name, recipient.role AS recipient_role,
+                   {can_reply_field},
                    {attachment_fields}
             FROM notifications n
             JOIN users recipient ON recipient.user_id = n.recipient_id
@@ -812,6 +871,8 @@ def api_head_notifications_send():
     title = (data.get("title") or "").strip()
     message = (data.get("message") or "").strip()
     urgent = str(data.get("urgent") or "").lower() in ("1", "true", "on", "yes")
+    can_reply = str(data.get("can_reply", "1")).lower() in ("1", "true", "on", "yes")
+    reply_to_notification_id = data.get("reply_to_notification_id") or data.get("notification_id")
     course_scope = (data.get("course_scope") or "both").strip()
 
     if course_scope not in {"introduction", "graduation_project", "both"}:
@@ -839,8 +900,32 @@ def api_head_notifications_send():
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_head_notification_schema(cursor)
-        recipients = _head_notification_recipients(cursor, scope, value, course_scope)
+        db.commit()
+
         sender_id = session.get("user_id")
+        if scope == "reply":
+            try:
+                reply_to_user_id = int(value)
+            except (TypeError, ValueError):
+                cursor.close()
+                db.close()
+                return jsonify({"error": "Invalid reply receiver."}), 400
+
+            allowed, error_message = _head_reply_permission_check(
+                cursor,
+                reply_to_notification_id,
+                reply_to_user_id,
+                sender_id,
+            )
+            if not allowed:
+                cursor.close()
+                db.close()
+                return jsonify({"error": error_message}), 403
+
+            # Replies remain replyable by default, so the conversation can continue.
+            can_reply = True
+
+        recipients = _head_notification_recipients(cursor, scope, value, course_scope)
         recipients = sorted({int(r) for r in recipients if int(r) != int(sender_id)})
         if not recipients:
             cursor.close()
@@ -853,11 +938,22 @@ def api_head_notifications_send():
                 """
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
-                     course_scope, related_project_id, is_read,
+                     course_scope, related_project_id, is_read, can_reply,
                      attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s)
                 """,
-                (recipient_id, sender_id, notification_type, title, message, course_scope, attachment_name, attachment_mime, attachment_data),
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    course_scope,
+                    1 if can_reply else 0,
+                    attachment_name,
+                    attachment_mime,
+                    attachment_data,
+                ),
             )
 
         db.commit()
