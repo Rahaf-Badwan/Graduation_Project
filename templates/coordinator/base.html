@@ -11,8 +11,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
     rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='assets/coordinator/content.css') }}?v=20260525-sidebar" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='assets/coordinator/overrides.css') }}?v=20260525-sidebar" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/coordinator/content.css') }}?v=20260530-color" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/coordinator/overrides.css') }}?v=20260530-color" />
   <script>try{if(localStorage.getItem('apmsTheme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
   <script src="{{ url_for('static', filename='assets/js/theme.js') }}" defer></script>
 </head>
@@ -153,7 +153,7 @@
   <div id="toast" class="toast"></div>
 
   {% if '/committee' not in request.path %}
-  <script src="{{ url_for('static', filename='assets/coordinator/app.js') }}?v=20260525-sidebar"></script>
+  <script src="{{ url_for('static', filename='assets/coordinator/app.js') }}?v=20260530-color"></script>
   {% endif %}
 
   {% block extra_scripts %}{% endblock %}
