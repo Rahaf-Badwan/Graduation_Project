@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
 from routes.supervisor_profile import supervisor_profile_bp
+from routes.supervisor_progress_api import supervisor_progress_api_bp
 
 general_supervisors_bp = Blueprint(
     "general_supervisors",
@@ -21,6 +22,7 @@ general_supervisors_bp = Blueprint(
 )
 
 general_supervisors_bp.register_blueprint(supervisor_profile_bp)
+general_supervisors_bp.register_blueprint(supervisor_progress_api_bp)
 
 
 # ─── Dashboard ──────────────────────────────────────────────
@@ -43,6 +45,13 @@ def search():
 @login_required(role="supervisor")
 def notifs():
     return render_template("supervisor/notifs.html")
+
+
+# ─── Progress Page ──────────────────────────────────────────
+@general_supervisors_bp.route("/progress")
+@login_required(role="supervisor")
+def progress():
+    return render_template("supervisor/progress.html")
 
 
 # ─── AI Assistant ───────────────────────────────────────────

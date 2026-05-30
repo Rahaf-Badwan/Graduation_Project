@@ -5985,6 +5985,27 @@ INSERT INTO projects (semester_id, supervisor_id, title, project_type, status, f
 (5, 5, 'Online Exam Platform', 'web', 'accepted', 76.5),
 (5, 4, 'Inventory Management System', 'software_engineering', 'accepted', 88.5);
 
+ SELECT
+                u.user_id,
+                u.full_name,
+                u.university_id,
+                u.email,
+                u.is_active,
+                f.specialization,
+                COUNT(gp.project_id) AS project_count
+            FROM  users u
+            JOIN  faculty f ON f.user_id = u.user_id
+            LEFT  JOIN projects gp
+                ON gp.supervisor_id = f.faculty_id
+                     AND gp.status NOT IN ('cancelled', 'rejected', 'archived', 'draft')
+            WHERE u.role = 'supervisor'
+				AND project_count != 0
+            GROUP BY 
+                u.user_id, u.full_name, u.university_id,
+                u.email,   u.is_active,
+                f.specialization
+            ORDER BY u.full_name;
+
 
 INSERT INTO notifications (recipient_id, sender_id, notification_type, title, message, course_scope, is_read)
 VALUES (

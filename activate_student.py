@@ -3,7 +3,6 @@ from db import get_db
 import bcrypt, re
 
 
-
 activate_bp = Blueprint('activate', __name__)
 
 
@@ -11,107 +10,112 @@ activate_bp = Blueprint('activate', __name__)
 def activate_page():
     return render_template('activate_student.html')
 
-#check if the student in the database or not
+
+# ─────────────────────────────────────────────────────────────
+#  STUDENT  –  Step 1: Verify
+# ─────────────────────────────────────────────────────────────
 @activate_bp.route('/api/activate/verify', methods=['POST'])
 def api_verify_student():
     data = request.get_json(silent=True) or {}
 
-
-    full_name = (data.get('full_name') or '').strip()
+    full_name     = (data.get('full_name')     or '').strip()
     university_id = (data.get('university_id') or '').strip()
-    email = (data.get('email') or '').strip()
+    email         = (data.get('email')         or '').strip()
 
     if not full_name or not university_id or not email:
         return jsonify({'error': 'Please fill in all fields.'}), 400
+
     if not re.match(r'^\d{7}$', university_id):
         return jsonify({'error': 'The university ID number must be 7 digits.'}), 400
-    
+
     try:
-        db = get_db()
+        db     = get_db()
         cursor = db.cursor(dictionary=True)
 
         cursor.execute("""
-                     SELECT user_id, full_name, is_active
-                       FROM users 
-                       WHERE university_id = %s
-                            AND role = 'student'
-                       """, (university_id,))
+            SELECT user_id, full_name, is_active
+            FROM   users
+            WHERE  university_id = %s
+              AND  role = 'student'
+        """, (university_id,))
         student = cursor.fetchone()
         cursor.close()
         db.close()
 
         if not student:
-            return jsonify({'error': 'The information is inccorect or the accfount is not registered. Please contacat the department head.'}), 404
-        
+            return jsonify({'error': 'The information is incorrect or the account is not registered. Please contact the department head.'}), 404
+
         if student['is_active']:
             return jsonify({'error': 'The account is already activated. You can log in directly.'}), 409
-        
-        #the information is coorect and account is pending , can set password
+
         return jsonify({
-            'message': 'Your information has been verifies. Please create a password.',
+            'message': 'Your information has been verified. Please create a password.',
             'user_id': student['user_id']
         }), 200
+
     except Exception as e:
         return jsonify({'error': f'An error occurred: {e}'}), 500
 
-#the student set the password and activate account
+
+# ─────────────────────────────────────────────────────────────
+#  STUDENT  –  Step 2: Set Password
+# ─────────────────────────────────────────────────────────────
 @activate_bp.route('/api/activate/set-password', methods=['POST'])
 def api_set_password():
     data = request.get_json(silent=True) or {}
 
-    user_id = data.get('user_id')
+    user_id  = data.get('user_id')
     password = data.get('password', '')
-    confirm = data.get('confirm_password', '')
+    confirm  = data.get('confirm_password', '')
 
     if not user_id or not password:
         return jsonify({'error': 'Incomplete data.'}), 400
-    
+
     if password != confirm:
         return jsonify({'error': 'The two passwords do not match.'}), 400
-    
+
     if len(password) < 8:
         return jsonify({'error': 'The password must be at least 8 characters long.'}), 400
-    
+
     try:
-        db = get_db()
+        db     = get_db()
         cursor = db.cursor(dictionary=True)
 
-        #check if the account is not activate 
         cursor.execute("""
-               SELECT user_id FROM users
-                WHERE user_id = %s AND is_active = FALSE AND role ='student'
-                       """,(user_id,))
+            SELECT user_id FROM users
+            WHERE  user_id   = %s
+              AND  is_active = FALSE
+              AND  role      = 'student'
+        """, (user_id,))
         if not cursor.fetchone():
-            cursor.close()
-            db.close()
+            cursor.close(); db.close()
             return jsonify({'error': 'The request is invalid or the account is already activated.'}), 400
-       
-       
+
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-
         cursor.execute("""
-               UPDATE users
-               SET password_hash = %s,
-                       is_active = TRUE
-                WHERE user_id = %s
-                       """, (hashed, user_id))
-        
+            UPDATE users
+            SET    password_hash = %s,
+                   is_active     = TRUE
+            WHERE  user_id = %s
+        """, (hashed, user_id))
+
         db.commit()
         cursor.close()
         db.close()
 
         return jsonify({'message': 'Your account has been activated successfully.'}), 200
+
     except Exception as e:
         return jsonify({'error': f'An error occurred: {e}'}), 500
-        
+
+
+# ─────────────────────────────────────────────────────────────
+#  SUPERVISOR  –  Step 1: Verify
+#  university_id = 4 digits  (supervisors use 4-digit IDs)
+# ─────────────────────────────────────────────────────────────
 @activate_bp.route('/api/activate/supervisor/verify', methods=['POST'])
 def api_verify_supervisor():
-    """
-    Step 1 for supervisors.
-    Checks that the supervisor exists in users (role='supervisor', is_active=FALSE).
-    Returns user_id so the frontend can continue to set-password step.
-    """
     data = request.get_json(silent=True) or {}
 
     university_id = (data.get('university_id') or '').strip()
@@ -119,6 +123,10 @@ def api_verify_supervisor():
 
     if not university_id or not email:
         return jsonify({'error': 'Please fill in your university ID and email.'}), 400
+
+    # ── 4-digit ID for supervisors ──
+    if not re.match(r'^\d{4}$', university_id):
+        return jsonify({'error': 'Supervisor university ID must be 4 digits.'}), 400
 
     try:
         db     = get_db()
@@ -147,7 +155,7 @@ def api_verify_supervisor():
             }), 409
 
         return jsonify({
-            'message': f'Welcome, {sup["full_name"]}. Please set your hours and password.',
+            'message':   f'Welcome, {sup["full_name"]}. Please set your hours and password.',
             'user_id':   sup['user_id'],
             'full_name': sup['full_name'],
         }), 200
@@ -156,12 +164,11 @@ def api_verify_supervisor():
         return jsonify({'error': f'An error occurred: {e}'}), 500
 
 
+# ─────────────────────────────────────────────────────────────
+#  SUPERVISOR  –  Step 2: Set Hours + Password  →  Activate
+# ─────────────────────────────────────────────────────────────
 @activate_bp.route('/api/activate/supervisor/set-password', methods=['POST'])
 def api_supervisor_set_password():
-    """
-    Step 2 for supervisors.
-    Sets graduation_project_hours + password, activates the account.
-    """
     data = request.get_json(silent=True) or {}
 
     user_id  = data.get('user_id')
@@ -189,7 +196,7 @@ def api_supervisor_set_password():
         db     = get_db()
         cursor = db.cursor(dictionary=True)
 
-        # Confirm account is still inactive
+        # Make sure account is still inactive
         cursor.execute("""
             SELECT u.user_id, f.faculty_id
             FROM   users   u
@@ -201,15 +208,12 @@ def api_supervisor_set_password():
         row = cursor.fetchone()
 
         if not row:
-            cursor.close()
-            db.close()
-            return jsonify({
-                'error': 'Supervisor not found or already active.'
-            }), 404
+            cursor.close(); db.close()
+            return jsonify({'error': 'Supervisor not found or already active.'}), 404
 
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-        # Activate the user account
+        # Activate the user
         cursor.execute("""
             UPDATE users
             SET    password_hash = %s,
@@ -217,19 +221,14 @@ def api_supervisor_set_password():
             WHERE  user_id = %s
         """, (hashed, user_id))
 
-        # Store hours on faculty row
-        cursor.execute("""
-            UPDATE faculty
-            SET    graduation_project_hours = %s
-            WHERE  faculty_id = %s
-        """, (hours_val, row['faculty_id']))
+       
 
-        # Also store in faculty_load_settings for the active semester
+        # Store in faculty_load_settings for the active semester
         cursor.execute("""
             SELECT semester_id FROM semesters
             WHERE  is_active = TRUE
-            ORDER BY semester_id DESC
-            LIMIT 1
+            ORDER  BY semester_id DESC
+            LIMIT  1
         """)
         sem = cursor.fetchone()
         if sem:
@@ -251,6 +250,3 @@ def api_supervisor_set_password():
 
     except Exception as e:
         return jsonify({'error': f'An error occurred: {e}'}), 500
-
-
- 

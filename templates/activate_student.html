@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='login_style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <style>
+    /* ── Dark mode: student card ── */
     html[data-theme="dark"] .card {
       background: #161b22 !important;
       box-shadow: 0 2px 24px rgba(0,0,0,0.5) !important;
@@ -23,15 +24,6 @@
       border-color: #30363d !important;
       color: #e2e8f0 !important;
     }
-    html[data-theme="dark"] #fullName,
-    html[data-theme="dark"] #universityId,
-    html[data-theme="dark"] #email,
-    html[data-theme="dark"] #password,
-    html[data-theme="dark"] #confirmPassword {
-      background: #1e2128 !important;
-      border-color: #30363d !important;
-      color: #e2e8f0 !important;
-    }
     html[data-theme="dark"] [style*="color:#6b7280"] { color: #8b949e !important; }
     html[data-theme="dark"] [style*="color: #6b7280"] { color: #8b949e !important; }
     html[data-theme="dark"] [style*="border:0.5px solid #e5e7eb"]:not(input) {
@@ -42,117 +34,281 @@
     html[data-theme="dark"] [style*="background:#e5e7eb"] { background: #30363d !important; }
     html[data-theme="dark"] #activate-theme-btn { background: #161b22 !important; border-color: #30363d !important; color: #c9d1d9 !important; }
     html[data-theme="dark"] #activate-theme-btn:hover { background: #21262d !important; }
+
+    /* ── Dark mode: supervisor card ── */
+    html[data-theme="dark"] #sup-card .card {
+      background: #161b22 !important;
+      box-shadow: 0 2px 24px rgba(0,0,0,0.5) !important;
+    }
+    html[data-theme="dark"] #sup-card .card > div:first-child {
+      background: #1c2128 !important;
+      border-bottom-color: #30363d !important;
+    }
+    html[data-theme="dark"] #sup-pill-2 { background: #30363d !important; }
+    html[data-theme="dark"] #supervisor-id,
+    html[data-theme="dark"] #supervisor-email,
+    html[data-theme="dark"] #sup-password,
+    html[data-theme="dark"] #sup-confirmPassword,
+    html[data-theme="dark"] #sup-hours {
+      background: #1e2128 !important;
+      border-color: #30363d !important;
+      color: #e2e8f0 !important;
+    }
+    html[data-theme="dark"] #sup-card [style*="color:#6b7280"] { color: #8b949e !important; }
+    html[data-theme="dark"] #sup-card [style*="color: #6b7280"] { color: #8b949e !important; }
+    html[data-theme="dark"] #sup-card [style*="border:0.5px solid #e5e7eb"]:not(input) {
+      border-color: #30363d !important;
+      color: #4ade80 !important;
+    }
+    html[data-theme="dark"] #sup-card [style*="color:#065f46"] { color: #4ade80 !important; }
+    html[data-theme="dark"] #sup-card [style*="background:#e5e7eb"] { background: #30363d !important; }
+
+    /* ── Role tabs ── */
+    html[data-theme="dark"] #tab-student,
+    html[data-theme="dark"] #tab-supervisor {
+      border-color: #30363d !important;
+    }
+    html[data-theme="dark"] #tab-supervisor { color: #4ade80 !important; }
   </style>
 </head>
 <body>
 
-<div class="hero" style="min-height:100vh; display:flex; align-items:center; justify-content:center; ; padding:24px;">
+<div class="hero" style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
   <div style="width:100%; max-width:440px;">
 
-    <div class="card" style="padding:0; overflow:hidden; background:#fff; border-radius:12px; box-shadow:0 2px 16px rgba(0,0,0,0.07);">
-      
-      <!-- card-hd -->
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:0.5px solid #e5e7eb;">
-        <span style="font-size:14px; font-weight:600; color:var(--green);" id="card-title">Activate Account</span>
-        <div style="display:flex; gap:6px;">
-          <div style="height:4px; width:32px; border-radius:99px; background:#2d6a38; transition:background 0.3s;" id="pill-1"></div>
-          <div style="height:4px; width:32px; border-radius:99px; background:#e5e7eb; transition:background 0.3s;" id="pill-2"></div>
-        </div>
-      </div>
+    <!-- ── Role toggle tabs ── -->
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button id="tab-student" onclick="switchRole('student')" style="
+        flex:1; padding:8px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;
+        background:#2d6a38; color:#fff; border:none;">
+        Student
+      </button>
+      <button id="tab-supervisor" onclick="switchRole('supervisor')" style="
+        flex:1; padding:8px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;
+        background:transparent; color:var(--green); border:0.5px solid #e5e7eb;">
+        Supervisor
+      </button>
+    </div>
 
-      <div style="padding:20px;">
+    <!-- ══════════════════════════════════════
+         STUDENT FLOW
+    ══════════════════════════════════════ -->
+    <div id="student-card">
+      <div class="card" style="padding:0; overflow:hidden; background:#fff; border-radius:12px; box-shadow:0 2px 16px rgba(0,0,0,0.07);">
 
-        <!-- Phase 1 -->
-        <div id="phase-verify">
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Full Name</div>
-            <input id="fullName" type="text" autocomplete="off" name="student_full-name" placeholder="e.g. Taima Abed"
-              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+        <!-- card-hd -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:0.5px solid #e5e7eb;">
+          <span style="font-size:14px; font-weight:600; color:var(--green);" id="card-title">Activate Account</span>
+          <div style="display:flex; gap:6px;">
+            <div style="height:4px; width:32px; border-radius:99px; background:#2d6a38; transition:background 0.3s;" id="pill-1"></div>
+            <div style="height:4px; width:32px; border-radius:99px; background:#e5e7eb; transition:background 0.3s;" id="pill-2"></div>
           </div>
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID</div>
-            <input id="universityId" type="text"  maxlength="7"  placeholder="7-digit-number"
-              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
-          </div>
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
-            <input id="email" type="email" name="student_email" autocomplete="off" placeholder="student@students.birzeit.edu" 
-              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
-          </div>
-          <div style="margin-top:18px;">
-            <button id="verifyBtn" onclick="verifyStudent()" style="
-              width:100%; padding:9px; background:#2d6a38; color:#fff;
-              border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
-              Verify Identity ↗
-            </button>
-          </div>
-          <div id="verify-feedback" style="display:none; margin-top:12px;"></div>
         </div>
 
-        <!-- Phase 2 -->
-        <div id="phase-password" style="display:none;">
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
-            <input id="password" type="password" placeholder="At least 8 characters" oninput="updateStrength()"
-              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
-            <div style="height:3px; background:#e5e7eb; border-radius:99px; margin-top:6px; overflow:hidden;">
-              <div id="strength-bar" style="height:100%; border-radius:99px; width:0%; transition:width 0.3s, background 0.3s;"></div>
+        <div style="padding:20px;">
+
+          <!-- Phase 1 -->
+          <div id="phase-verify">
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Full Name</div>
+              <input id="fullName" type="text" autocomplete="off" name="student_full-name" placeholder="e.g. Taima Abed"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID</div>
+              <input id="universityId" type="text" maxlength="7" placeholder="7-digit student ID"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
+              <input id="email" type="email" name="student_email" autocomplete="off" placeholder="student@students.birzeit.edu"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="margin-top:18px;">
+              <button id="verifyBtn" onclick="verifyStudent()" style="
+                width:100%; padding:9px; background:#2d6a38; color:#fff;
+                border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
+                Verify Identity ↗
+              </button>
+            </div>
+            <div id="verify-feedback" style="display:none; margin-top:12px;"></div>
+          </div>
+
+          <!-- Phase 2 -->
+          <div id="phase-password" style="display:none;">
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
+              <input id="password" type="password" placeholder="At least 8 characters" oninput="updateStrength()"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+              <div style="height:3px; background:#e5e7eb; border-radius:99px; margin-top:6px; overflow:hidden;">
+                <div id="strength-bar" style="height:100%; border-radius:99px; width:0%; transition:width 0.3s, background 0.3s;"></div>
+              </div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Confirm Password</div>
+              <input id="confirmPassword" type="password" placeholder="Re-enter your password"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:18px;">
+              <button id="setPassBtn" onclick="setPassword()" style="
+                flex:1; padding:9px; background:#2d6a38; color:#fff;
+                border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
+                Activate Account ↗
+              </button>
+              <button onclick="resetToStep1()" style="
+                flex:1; padding:9px; background:transparent; color:var(--green);
+                border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
+                Back
+              </button>
+            </div>
+            <div id="pass-feedback" style="display:none; margin-top:12px;"></div>
+          </div>
+
+          <!-- Not Found -->
+          <div id="phase-not-found" style="display:none; text-align:center; padding:12px 0 4px;">
+            <span class="material-symbols-outlined" style="font-size:36px; color:#f59e0b; margin-bottom:10px; display:block;">warning</span>
+            <div style="font-size:14px; font-weight:600; color:var(--green); margin-bottom:6px;">Account Not Found</div>
+            <div style="font-size:13px; color:#6b7280; line-height:1.6;">
+              Your details don't match any registered student.<br>
+              Please contact your <strong>Head of Department</strong> to register your account first.
+            </div>
+            <div style="margin-top:20px;">
+              <button onclick="resetToStep1()" style="
+                width:100%; padding:9px; background:transparent; color:var(--green);
+                border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
+                Try Again
+              </button>
             </div>
           </div>
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Confirm Password</div>
-            <input id="confirmPassword" type="password" placeholder="Re-enter your password"
-              style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
-          </div>
-          <div style="display:flex; gap:8px; margin-top:18px;">
-            <button id="setPassBtn" onclick="setPassword()" style="
-              flex:1; padding:9px; background:#2d6a38; color:#fff;
-              border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
-              Activate Account ↗
-            </button>
-            <button onclick="resetToStep1()" style="
-              flex:1; padding:9px; background:transparent; color:var(--green);
-              border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
-              Back
-            </button>
-          </div>
-          <div id="pass-feedback" style="display:none; margin-top:12px;"></div>
-        </div>
 
-        <!--  Not Found -->
-        <div id="phase-not-found" style="display:none; text-align:center; padding:12px 0 4px;">
-          <div style="font-size:36px; margin-bottom:10px;"><span class="material-symbols-outlined" style="font-size:36px; color:#f59e0b; margin-bottom:10px; display:block;">warning</span></div>
-          <div style="font-size:14px; font-weight:600; color:var(--green); margin-bottom:6px;">Account Not Found</div>
-          <div style="font-size:13px; color:#6b7280; line-height:1.6;">
-            Your details don't match any registered student.<br>
-            Please contact your <strong>Head of Department</strong> to register your account first.
+          <!-- Success -->
+          <div id="phase-success" style="display:none; text-align:center; padding:12px 0 4px;">
+            <span class="material-symbols-outlined" style="font-size:36px; color:#10b981; margin-bottom:10px; display:block;">check_circle</span>
+            <div style="font-size:14px; font-weight:600; color:#065f46; margin-bottom:6px;">Account Activated!</div>
+            <div style="font-size:13px; color:#6b7280; line-height:1.6;">
+              Your account is now active. You can log in using your university ID and the password you just set.
+            </div>
+            <a href="/login" style="display:inline-block; margin-top:16px; font-size:13px; font-weight:500; color:var(--green); text-decoration:none;">
+              Go to Login →
+            </a>
           </div>
-          <div style="margin-top:20px;">
-            <button onclick="resetToStep1()" style="
-              width:100%; padding:9px; background:transparent; color:var(--green);
-              border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
-              Try Again
-            </button>
-          </div>
-        </div>
 
-        <!--  Success -->
-        <div id="phase-success" style="display:none; text-align:center; padding:12px 0 4px;">
-          <div style="font-size:36px; margin-bottom:10px;"><span class="material-symbols-outlined" style="font-size:36px; color:#10b981; margin-bottom:10px; display:block;">check_circle</span></div>
-          <div style="font-size:14px; font-weight:600; color:#065f46; margin-bottom:6px;">Account Activated!</div>
-          <div style="font-size:13px; color:#6b7280; line-height:1.6;">
-            Your account is now active. You can log in using your university ID and the password you just set.
-          </div>
-          <a href="/login" style="display:inline-block; margin-top:16px; font-size:13px; font-weight:500; color:var(--green); text-decoration:none;">
-            Go to Login →
-          </a>
         </div>
-
       </div>
-    </div>
+    </div><!-- /student-card -->
+
+
+    <!-- ══════════════════════════════════════
+         SUPERVISOR FLOW
+    ══════════════════════════════════════ -->
+    <div id="sup-card" style="display:none;">
+      <div class="card" style="padding:0; overflow:hidden; background:#fff; border-radius:12px; box-shadow:0 2px 16px rgba(0,0,0,0.07);">
+
+        <!-- card-hd -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 20px 14px; border-bottom:0.5px solid #e5e7eb;">
+          <span style="font-size:14px; font-weight:600; color:var(--green);" id="sup-card-title">Activate Account</span>
+          <div style="display:flex; gap:6px;">
+            <div style="height:4px; width:32px; border-radius:99px; background:#2d6a38; transition:background 0.3s;" id="sup-pill-1"></div>
+            <div style="height:4px; width:32px; border-radius:99px; background:#e5e7eb; transition:background 0.3s;" id="sup-pill-2"></div>
+          </div>
+        </div>
+
+        <div style="padding:20px;">
+
+          <!-- Sup Phase 1: Verify -->
+          <div id="sup-phase-verify">
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID (4 digits)</div>
+              <input id="supervisor-id" type="text" maxlength="4" placeholder="e.g. 1234"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
+              <input id="supervisor-email" type="email" placeholder="supervisor@birzeit.edu"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="margin-top:18px;">
+              <button id="sup-verifyBtn" onclick="verifySupervisor()" style="
+                width:100%; padding:9px; background:#2d6a38; color:#fff;
+                border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
+                Verify Identity ↗
+              </button>
+            </div>
+            <div id="sup-verify-feedback" style="display:none; margin-top:12px;"></div>
+          </div>
+
+          <!-- Sup Phase 2: Hours + Password -->
+          <div id="sup-phase-password" style="display:none;">
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Graduation Project Hours</div>
+              <input id="sup-hours" type="number" min="0" step="0.5" placeholder="e.g. 3"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
+              <input id="sup-password" type="password" placeholder="At least 8 characters" oninput="updateSupStrength()"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+              <div style="height:3px; background:#e5e7eb; border-radius:99px; margin-top:6px; overflow:hidden;">
+                <div id="sup-strength-bar" style="height:100%; border-radius:99px; width:0%; transition:width 0.3s, background 0.3s;"></div>
+              </div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Confirm Password</div>
+              <input id="sup-confirmPassword" type="password" placeholder="Re-enter your password"
+                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:18px;">
+              <button id="sup-setPassBtn" onclick="setSupPassword()" style="
+                flex:1; padding:9px; background:#2d6a38; color:#fff;
+                border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;">
+                Activate Account ↗
+              </button>
+              <button onclick="resetSupToStep1()" style="
+                flex:1; padding:9px; background:transparent; color:var(--green);
+                border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
+                Back
+              </button>
+            </div>
+            <div id="sup-pass-feedback" style="display:none; margin-top:12px;"></div>
+          </div>
+
+          <!-- Sup Not Found -->
+          <div id="sup-phase-not-found" style="display:none; text-align:center; padding:12px 0 4px;">
+            <span class="material-symbols-outlined" style="font-size:36px; color:#f59e0b; margin-bottom:10px; display:block;">warning</span>
+            <div style="font-size:14px; font-weight:600; color:var(--green); margin-bottom:6px;">Account Not Found</div>
+            <div style="font-size:13px; color:#6b7280; line-height:1.6;">
+              Your details don't match any registered supervisor.<br>
+              Please contact the <strong>Head of Department</strong> to register your account first.
+            </div>
+            <div style="margin-top:20px;">
+              <button onclick="resetSupToStep1()" style="
+                width:100%; padding:9px; background:transparent; color:var(--green);
+                border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; cursor:pointer;">
+                Try Again
+              </button>
+            </div>
+          </div>
+
+          <!-- Sup Success -->
+          <div id="sup-phase-success" style="display:none; text-align:center; padding:12px 0 4px;">
+            <span class="material-symbols-outlined" style="font-size:36px; color:#10b981; margin-bottom:10px; display:block;">check_circle</span>
+            <div style="font-size:14px; font-weight:600; color:#065f46; margin-bottom:6px;">Account Activated!</div>
+            <div style="font-size:13px; color:#6b7280; line-height:1.6;">
+              Your supervisor account is now active. You can log in using your university ID and the password you just set.
+            </div>
+            <a href="/login" style="display:inline-block; margin-top:16px; font-size:13px; font-weight:500; color:var(--green); text-decoration:none;">
+              Go to Login →
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /sup-card -->
+
   </div>
 </div>
 
+<!-- Theme toggle button -->
 <button id="activate-theme-btn" onclick="toggleLoginTheme()" title="Toggle dark / light mode" style="
   position:fixed; top:14px; right:14px; z-index:999;
   background:#fff; border:1px solid #e0e0e0; border-radius:8px;
@@ -175,7 +331,7 @@
     if (ico) ico.textContent = isDark ? 'light_mode' : 'dark_mode';
     var btn = document.getElementById('activate-theme-btn');
     if (btn) {
-      btn.style.color    = isDark ? '#c9d1d9' : '#555';
+      btn.style.color       = isDark ? '#c9d1d9' : '#555';
       btn.style.background  = isDark ? '#1e2128' : '#fff';
       btn.style.borderColor = isDark ? '#30363d' : '#e0e0e0';
     }
@@ -185,5 +341,4 @@
   });
 </script>
 </body>
-
 </html>
