@@ -242,7 +242,10 @@
         <div class="form-grid" style="margin-bottom:12px">
           <div class="field-wrap">
             <div class="field-label">New Group Name</div>
-            <input class="field-input" id="sectionName" placeholder="Group 01" />
+            <input class="field-input" id="sectionName" placeholder="Loading..." readonly />
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-top:5px">
+              The group number is generated automatically from the existing COMP4200 groups.
+            </div>
           </div>
 
           <div class="field-wrap">
@@ -441,30 +444,71 @@
     return data;
   }
 
+  async function loadNextGroupName() {
+    const input = document.getElementById('sectionName');
+    if (!input) return;
+
+    input.value = '';
+    input.placeholder = 'Loading...';
+
+    try {
+      const data = await apiJson('/api/coordinator/next-group-name');
+      input.value = data.group_name || 'Group 01';
+      input.placeholder = data.group_name || 'Group 01';
+    } catch (err) {
+      input.value = '';
+      input.placeholder = 'Auto generated when you create the group';
+      console.error(err);
+    }
+  }
+
   async function createSectionNoDuplicate() {
     const input = document.getElementById('sectionName');
-    const sectionName = input ? input.value.trim() : '';
+    let sectionName = input ? input.value.trim() : '';
+    const supervisorSelect = document.getElementById('sectionSupervisor');
+    const supervisorId = supervisorSelect ? supervisorSelect.value : '';
+    const studentIds = getSelectedStudentIds();
 
     if (!sectionName) {
-      setSectionMessage('Please write a group name.', 'error');
+      await loadNextGroupName();
+      sectionName = input ? input.value.trim() : '';
+    }
+
+    if (!supervisorId) {
+      setSectionMessage('Please choose a supervisor.', 'error');
       return;
     }
 
-    if (isSectionNameAlreadyUsed(sectionName)) {
-      setSectionMessage('This group name already exists. Please choose another name.', 'error');
-      if (input) input.focus();
+    if (studentIds.length === 0) {
+      setSectionMessage('Please select at least one student.', 'error');
       return;
     }
 
-    if (typeof addSectionEntry !== 'function') {
-      setSectionMessage('Create group function is not loaded.', 'error');
+    if (studentIds.length > 3) {
+      setSectionMessage('You cannot select more than 3 students.', 'error');
       return;
+    }
+
+    if (sectionName && isSectionNameAlreadyUsed(sectionName)) {
+      await loadNextGroupName();
+      sectionName = input ? input.value.trim() : '';
     }
 
     setSectionMessage('Creating group...', 'loading');
 
     try {
-      const result = await addSectionEntry();
+      const result = await apiJson('/api/coordinator/add-section', {
+        method: 'POST',
+        body: JSON.stringify({
+          section_name: sectionName,
+          supervisor_id: supervisorId,
+          student_ids: studentIds
+        })
+      });
+
+      if (input) {
+        input.value = result.group_name || sectionName;
+      }
 
       setSectionMessage(
         result.message || 'Group created successfully.',
@@ -691,6 +735,7 @@
     }
 
     await loadExistingGroupsForSelect();
+    await loadNextGroupName();
     updateSelectedStudentsCount();
   }
 

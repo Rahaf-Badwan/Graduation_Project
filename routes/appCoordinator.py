@@ -13,6 +13,7 @@ import io
 import math
 import os
 import random
+import re
 import zipfile
 import bcrypt
 from collections import defaultdict
@@ -3796,6 +3797,80 @@ def api_assign_group_supervisor():
         return jsonify({"error": str(e)}), 500
 
 
+
+
+def _next_comp4200_group_name(cursor, semester_id):
+    """
+    Generate the next COMP4200 group name automatically.
+
+    Example:
+    Existing groups: Group 01, Group 02, Group 10
+    Next group:      Group 11
+
+    This is calculated in Python instead of REGEXP_SUBSTR so it works on
+    more MySQL versions.
+    """
+    if not semester_id:
+        return "Group 01"
+
+    if _db_column_exists(cursor, "projects", "group_name"):
+        cursor.execute(
+            """
+            SELECT COALESCE(NULLIF(group_name, ''), CONCAT('Group ', project_id)) AS group_name
+            FROM projects
+            WHERE semester_id = %s
+              AND status <> 'solo_pending'
+            """,
+            (semester_id,),
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT CONCAT('Group ', project_id) AS group_name
+            FROM projects
+            WHERE semester_id = %s
+              AND status <> 'solo_pending'
+            """,
+            (semester_id,),
+        )
+
+    max_no = 0
+    for row in cursor.fetchall():
+        name = str(row.get("group_name") or "")
+        match = re.search(r"(\d+)", name)
+        if match:
+            max_no = max(max_no, int(match.group(1)))
+
+    return f"Group {max_no + 1:02d}"
+
+
+@coordinator_bp.route("/api/coordinator/next-group-name", methods=["GET"])
+@login_required(role="coordinator")
+def api_next_comp4200_group_name():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        semester = _get_active_comp4200_semester(cursor)
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify({"ok": False, "error": "No active COMP4200 semester found."}), 400
+
+        group_name = _next_comp4200_group_name(cursor, semester["semester_id"])
+
+        cursor.close()
+        db.close()
+
+        return jsonify({
+            "ok": True,
+            "group_name": group_name
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @coordinator_bp.route("/api/coordinator/add-section", methods=["POST"])
 @login_required(role="coordinator")
 def api_add_section():
@@ -3809,8 +3884,8 @@ def api_add_section():
     except Exception:
         return jsonify({"error": "Invalid student id."}), 400
 
-    if not section_name or not supervisor_id:
-        return jsonify({"error": "group_name and supervisor_id are required."}), 400
+    if not supervisor_id:
+        return jsonify({"error": "Supervisor is required."}), 400
 
     if len(student_ids) == 0:
         return jsonify({"error": "Please choose at least 1 student."}), 400
@@ -3829,6 +3904,9 @@ def api_add_section():
             cursor.close()
             db.close()
             return jsonify({"error": "No active semester found."}), 400
+
+        if not section_name:
+            section_name = _next_comp4200_group_name(cursor, semester["semester_id"])
 
         cursor.execute(
             """
@@ -4005,7 +4083,7 @@ def api_add_section():
         db.close()
 
         return jsonify(
-            {"message": "Group created successfully.", "project_id": project_id}
+            {"message": f"{section_name} created successfully.", "project_id": project_id, "group_name": section_name}
         )
 
     except Exception as e:
