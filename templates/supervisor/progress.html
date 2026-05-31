@@ -1,71 +1,265 @@
 {% extends 'supervisor/base.html' %}
-{% block page_title %}Progress{% endblock %}
+{% block page_title %}Submitted Files{% endblock %}
 {% block page_id %}progress{% endblock %}
-{% block topbar_title %}Progress{% endblock %}
+{% block topbar_title %}Submitted Files{% endblock %}
 
 {% block content %}
-<div class="two-col" style="align-items:start">
-  <div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title">Choose a project to follow</span></div>
-      <div class="field-wrap">
-        <div class="field-label">Project</div>
-        <select class="field-select" id="projSel">
-          <option value="">Loading your projects…</option>
+<div class="page page-single on" id="pg-supervisor-submissions">
+  <style>
+    #pg-supervisor-submissions {
+      display: block !important;
+      padding: 20px 22px 90px !important;
+    }
+
+    #pg-supervisor-submissions .submission-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    #pg-supervisor-submissions .submission-toolbar input,
+    #pg-supervisor-submissions .submission-toolbar select {
+      border: 1px solid #d8e2dc;
+      border-radius: 12px;
+      padding: 9px 11px;
+      background: var(--color-background-primary);
+      outline: none;
+      font-size: 13px;
+    }
+
+    #pg-supervisor-submissions .submission-toolbar input:focus,
+    #pg-supervisor-submissions .submission-toolbar select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.10);
+    }
+
+    #pg-supervisor-submissions .submission-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    #pg-supervisor-submissions .submission-stat {
+      border: 1px solid #e7eee9;
+      background: var(--color-background-tertiary);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    #pg-supervisor-submissions .submission-stat b {
+      display: block;
+      font-size: 22px;
+      color: var(--color-text-primary);
+      line-height: 1;
+    }
+
+    #pg-supervisor-submissions .submission-stat span {
+      display: block;
+      margin-top: 5px;
+      font-size: 12px;
+      color: #667085;
+      font-weight: 700;
+    }
+
+    #pg-supervisor-submissions .submission-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    #pg-supervisor-submissions .submission-folder {
+      border: 1px solid #e7eee9;
+      background: var(--color-background-primary);
+      border-radius: 16px;
+      padding: 13px;
+    }
+
+    #pg-supervisor-submissions .submission-folder-header,
+    #pg-supervisor-submissions .submission-student-header,
+    #pg-supervisor-submissions .submission-attachment {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    #pg-supervisor-submissions .submission-files {
+      display: grid;
+      gap: 0;
+      margin-top: 12px;
+      border-top: 1px solid #e7eee9;
+    }
+
+    #pg-supervisor-submissions .submission-student-row {
+      padding: 12px 0;
+      border-bottom: 1px solid #e7eee9;
+    }
+
+    #pg-supervisor-submissions .submission-student-row:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    #pg-supervisor-submissions .submission-attachments {
+      display: grid;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    #pg-supervisor-submissions .submission-attachment {
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: var(--color-background-tertiary);
+    }
+
+    #pg-supervisor-submissions .submission-file-name {
+      color: var(--color-text-primary);
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 3px;
+    }
+
+    #pg-supervisor-submissions .submission-title {
+      font-weight: 900;
+      color: var(--color-text-primary);
+      margin-bottom: 5px;
+    }
+
+    #pg-supervisor-submissions .submission-meta {
+      color: #667085;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    #pg-supervisor-submissions .submission-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 900;
+      background: var(--green-light);
+      color: var(--accent);
+      margin-bottom: 5px;
+    }
+
+    #pg-supervisor-submissions .empty {
+      padding: 18px;
+      border: 1px dashed #d7e3dc;
+      border-radius: 14px;
+      color: #667085;
+      background: var(--color-background-tertiary);
+      line-height: 1.5;
+    }
+
+    #pg-supervisor-submissions .info-box {
+      border-left: 5px solid #2e7d42;
+      background: var(--color-background-tertiary);
+      border-radius: 14px;
+      padding: 13px 14px;
+      color: var(--color-text-primary);
+      line-height: 1.55;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+
+
+    #pg-supervisor-submissions .project-card {
+      border: 1px solid #e7eee9;
+      background: var(--color-background-primary);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    #pg-supervisor-submissions .project-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    #pg-supervisor-submissions .project-title {
+      font-size: 15px;
+      font-weight: 950;
+      color: var(--color-text-primary);
+      margin-bottom: 5px;
+    }
+
+    #pg-supervisor-submissions .project-submissions {
+      margin-top: 12px;
+      border-top: 1px solid #e7eee9;
+      display: grid;
+      gap: 0;
+    }
+
+    #pg-supervisor-submissions .no-submissions {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px dashed #d7e3dc;
+      border-radius: 12px;
+      color: #667085;
+      background: var(--color-background-tertiary);
+      font-size: 13px;
+    }
+
+    @media (max-width: 760px) {
+      #pg-supervisor-submissions .submission-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #pg-supervisor-submissions .submission-folder-header,
+      #pg-supervisor-submissions .project-header,
+      #pg-supervisor-submissions .submission-student-header,
+      #pg-supervisor-submissions .submission-attachment {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <div class="card">
+    <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <span class="card-title">Student Submitted Files</span>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+          This page shows only submitted files for projects assigned to you as supervisor.
+        </div>
+      </div>
+
+      <button class="btn btn-outline" type="button" onclick="loadSupervisorSubmissionFiles()">Refresh</button>
+    </div>
+
+    <div class="info-box">
+      Projects are shown first. Under each project you will see its submitted files. If a project has no submissions yet, the project still appears.
+    </div>
+
+    <div class="submission-toolbar">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <select id="submissionCourseFilter" onchange="renderSupervisorSubmissionFiles()">
+          <option value="all">All Courses</option>
+          <option value="COMP4200">COMP4200</option>
+          <option value="COMP4300">COMP4300</option>
         </select>
+
+        <input id="submissionSearch" type="search" placeholder="Search student, project, file..."
+          oninput="renderSupervisorSubmissionFiles()">
       </div>
+
+      <div id="submissionStatus" style="font-size:12px;color:#667085;font-weight:800;">Loading...</div>
     </div>
 
-    <div class="card">
-      <div class="card-hd"><span class="card-title">Project lifecycle timeline</span></div>
-      <div class="timeline" id="progressTimeline">
-        <div style="text-align:center;padding:26px;color:var(--color-text-secondary);font-size:13px">Loading timeline…</div>
-      </div>
-    </div>
-  </div>
-
-  <div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title" id="detailsTitle">Progress details</span></div>
-      <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-          <span style="color:var(--color-text-secondary)">Application date</span><span id="appDate">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-          <span style="color:var(--color-text-secondary)">Last update</span><span id="lastUpdate">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-          <span style="color:var(--color-text-secondary)">Uploaded files</span><span id="uploadedFiles">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
-          <span style="color:var(--color-text-secondary)">Feedback provided</span><span id="feedbackCount">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:5px 0">
-          <span style="color:var(--color-text-secondary)">Timeline source</span><span id="timelineSource">—</span>
-        </div>
-      </div>
-
-      <div class="prog-wrap">
-        <div class="prog-label"><span>Final report</span><span id="reportPct">0%</span></div>
-        <div class="prog-bg"><div class="prog-fill" id="reportBar" style="width:0%;background:var(--green)"></div></div>
-      </div>
-      <div class="prog-wrap">
-        <div class="prog-label"><span>Source code</span><span id="codePct">0%</span></div>
-        <div class="prog-bg"><div class="prog-fill" id="codeBar" style="width:0%;background:var(--blue)"></div></div>
-      </div>
-      <div class="prog-wrap">
-        <div class="prog-label"><span>Presentation slides</span><span id="presentationPct">0%</span></div>
-        <div class="prog-bg"><div class="prog-fill" id="presentationBar" style="width:0%;background:var(--sup-mid)"></div></div>
-      </div>
-      <div class="prog-wrap" style="margin:0">
-        <div class="prog-label"><span>Overall progress</span><span id="overallPct">0%</span></div>
-        <div class="prog-bg"><div class="prog-fill" id="overallBar" style="width:0%;background:var(--sup-mid)"></div></div>
-      </div>
-
-      <div id="latestNotes" style="margin-top:14px"></div>
+    <div class="submission-grid">
+      <div class="submission-stat"><b id="subTotal">0</b><span>Total Files</span></div>
+      <div class="submission-stat"><b id="sub4200">0</b><span>COMP4200</span></div>
+      <div class="submission-stat"><b id="sub4300">0</b><span>COMP4300</span></div>
+      <div class="submission-stat"><b id="subOther">0</b><span>Other</span></div>
     </div>
 
-    <div id="progressError" style="display:none;color:var(--coral);font-size:13px;background:rgba(220,50,50,.07);border-radius:6px;padding:8px 12px;margin-bottom:12px"></div>
+    <div id="submissionFilesBox" class="submission-list">
+      <div class="empty">Loading student submissions...</div>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -73,199 +267,274 @@
 {% block extra_scripts %}
 <script>
 (function () {
-  const $ = id => document.getElementById(id);
-  let currentProjectId = null;
+  let submissionFilesState = [];
+  let supervisorProjectsState = [];
 
-  function esc(value) {
+  function safeText(value) {
     return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
   }
 
-  function pagePrefix() {
-    return window.location.pathname.replace(/\/progress\/?$/, '');
+  function normalizeCourseScope(item) {
+    const raw = String(item.course_scope || item.course_code || '').trim();
+    if (raw === 'COMP4200' || raw === 'introduction') return 'COMP4200';
+    if (raw === 'COMP4300' || raw === 'graduation_project') return 'COMP4300';
+    const label = String(item.course_label || '').toLowerCase();
+    if (label.includes('introduction')) return 'COMP4200';
+    if (label.includes('graduation')) return 'COMP4300';
+    return raw || 'Other';
   }
 
-  function apiPaths(path) {
-    const prefixed = pagePrefix() + '/api/supervisor/progress' + path;
-    const direct = '/api/supervisor/progress' + path;
-    return prefixed === direct ? [direct] : [prefixed, direct];
+  function updateSubmissionStats(files, projects) {
+    const total = files.length;
+    const c4200 = projects.filter(p => normalizeCourseScope(p) === 'COMP4200').length;
+    const c4300 = projects.filter(p => normalizeCourseScope(p) === 'COMP4300').length;
+    const other = projects.length - c4200 - c4300;
+
+    document.getElementById('subTotal').textContent = total;
+    document.getElementById('sub4200').textContent = c4200;
+    document.getElementById('sub4300').textContent = c4300;
+    document.getElementById('subOther').textContent = other;
   }
 
-  async function fetchJSON(paths, options = {}) {
-    const urls = Array.isArray(paths) ? paths : [paths];
-    let lastError = null;
+  function filesForProject(project, files) {
+    const projectId = String(project.project_id || '').trim();
+    return files.filter(file => String(file.project_id || '').trim() === projectId);
+  }
 
-    for (const url of urls) {
-      try {
-        const res = await fetch(url, {
-          headers: {
-            'Accept': 'application/json',
-            ...(options.headers || {})
-          },
-          ...options
+  function projectMatchesSearch(project, files, q) {
+    if (!q) return true;
+    const projectFiles = filesForProject(project, files);
+    const haystack = [
+      project.title,
+      project.members,
+      project.status,
+      project.course_code,
+      project.course_label,
+      project.submission_date,
+      project.updated_at,
+      ...projectFiles.flatMap(file => [
+        file.submission_title,
+        file.submitted_by,
+        file.file_name,
+        file.file_type,
+        file.uploaded_at,
+        file.team_members
+      ])
+    ].join(' ').toLowerCase();
+
+    return haystack.includes(q);
+  }
+
+  function groupProjectFilesBySubmission(files) {
+    const groups = new Map();
+
+    files.forEach(file => {
+      const key = [
+        file.submission_title || file.file_type || 'Submission',
+        file.submitted_by || '',
+        file.uploaded_at || '',
+        file.source || '',
+        file.source_id || ''
+      ].join('|');
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          submission_title: file.submission_title || file.file_type || 'Submission',
+          submitted_by: file.submitted_by || 'Student Submission',
+          uploaded_at: file.uploaded_at || '',
+          files: []
         });
-
-        const text = await res.text();
-        let data = {};
-        try { data = text ? JSON.parse(text) : {}; }
-        catch (e) { throw new Error('Server error (' + res.status + ').'); }
-
-        if (!res.ok || data.error) {
-          throw new Error(data.error || 'Request failed (' + res.status + ').');
-        }
-
-        return data;
-      } catch (err) {
-        lastError = err;
       }
-    }
 
-    throw lastError || new Error('Request failed.');
+      groups.get(key).files.push(file);
+    });
+
+    return Array.from(groups.values());
   }
 
-  function timelineIcon(state, index) {
-    if (state === 'completed') {
-      return '<div class="tl-dot" style="background:var(--green-light);color:var(--green)">✓</div>';
-    }
-    if (state === 'late') {
-      return '<div class="tl-dot" style="background:var(--amber-light);color:var(--amber)">!</div>';
-    }
-    if (state === 'missing') {
-      return '<div class="tl-dot" style="background:var(--coral-light);color:var(--coral)">✕</div>';
-    }
-    if (state === 'in_progress') {
-      return '<div class="tl-dot" style="background:var(--sup-light);color:var(--sup)">↻</div>';
-    }
-    return '<div class="tl-dot" style="background:var(--color-background-secondary);color:var(--color-text-secondary)">' + index + '</div>';
-  }
-
-  function renderTimeline(items) {
-    const box = $('progressTimeline');
-
-    if (!items || !items.length) {
-      box.innerHTML = '<div style="text-align:center;padding:26px;color:var(--color-text-secondary);font-size:13px">No timeline data.</div>';
-      return;
+  function renderProjectSubmissions(projectFiles) {
+    if (!projectFiles.length) {
+      return '<div class="no-submissions">No submissions yet.</div>';
     }
 
-    box.innerHTML = items.map((item, idx) => `
-      <div class="tl-item" ${idx === items.length - 1 ? 'style="margin-bottom:0"' : ''}>
-        ${timelineIcon(item.state, idx + 1)}
-        <div>
-          <div class="tl-title" ${['pending','missing'].includes(item.state) ? 'style="color:var(--color-text-secondary)"' : ''}>${esc(item.title)}</div>
-          <div class="tl-meta">${esc(item.meta || '')}</div>
-          ${item.note ? `<div class="tl-note">${esc(item.note)}</div>` : ''}
-        </div>
+    const groups = groupProjectFilesBySubmission(projectFiles);
+
+    return `
+      <div class="project-submissions">
+        ${groups.map(group => {
+          const attachments = group.files.map(file => {
+            const downloadUrl = file.download_url || '';
+            const downloadButton = downloadUrl
+              ? `<a class="btn btn-outline" href="${safeText(downloadUrl)}" target="_blank" rel="noopener">Download</a>`
+              : `<button class="btn btn-outline" type="button" disabled>No file</button>`;
+
+            return `
+              <div class="submission-attachment">
+                <div class="submission-meta">
+                  <b>${safeText((file.file_type || 'attachment').replaceAll('_', ' '))}:</b>
+                  ${safeText(file.file_name || '-')}
+                  ${file.file_size_mb ? ` &middot; ${safeText(file.file_size_mb)} MB` : ''}
+                  ${file.uploaded_at ? ` &middot; Submitted: ${safeText(file.uploaded_at)}` : ''}
+                </div>
+                ${downloadButton}
+              </div>
+            `;
+          }).join('');
+
+          return `
+            <div class="submission-student-row">
+              <div class="submission-student-header">
+                <div>
+                  <div class="submission-file-name">${safeText(group.submission_title)}</div>
+                  <div class="submission-meta">
+                    <b>Submitted by:</b> ${safeText(group.submitted_by)}<br>
+                    <b>Attachments:</b> ${group.files.length}
+                    ${group.uploaded_at ? `<br><b>Submitted at:</b> ${safeText(group.uploaded_at)}` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="submission-attachments">
+                ${attachments}
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
-    `).join('');
-  }
-
-  function setProgress(name, value) {
-    value = Math.max(0, Math.min(100, Number(value || 0)));
-    $(name + 'Pct').textContent = value + '%';
-    $(name + 'Bar').style.width = value + '%';
-  }
-
-  function renderNotes(notes) {
-    const box = $('latestNotes');
-    if (!notes || !notes.length) {
-      box.innerHTML = '';
-      return;
-    }
-
-    const stateLabels = {
-      on_track: 'On track',
-      follow_up_needed: 'Follow-up needed',
-      urgent: 'Urgent'
-    };
-
-    box.innerHTML = `
-      <div style="font-size:13px;font-weight:800;color:var(--color-text-primary);margin:14px 0 8px">Latest follow-up notes</div>
-      ${notes.map(note => `
-        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:9px 10px;margin-bottom:8px;background:var(--color-background-tertiary)">
-          <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--color-text-secondary);margin-bottom:5px">
-            <span>${esc(stateLabels[note.state] || note.state)}</span>
-            <span>${esc(note.created_at || '')}</span>
-          </div>
-          <div style="font-size:13px;color:var(--color-text-primary);line-height:1.45">${esc(note.note_text)}</div>
-        </div>
-      `).join('')}
     `;
   }
 
-  function showError(message) {
-    $('progressError').textContent = message;
-    $('progressError').style.display = 'block';
+  function renderSupervisorSubmissionFiles() {
+    const box = document.getElementById('submissionFilesBox');
+    const status = document.getElementById('submissionStatus');
+    if (!box) return;
+
+    const course = document.getElementById('submissionCourseFilter')?.value || 'all';
+    const q = (document.getElementById('submissionSearch')?.value || '').trim().toLowerCase();
+
+    let projects = supervisorProjectsState.slice();
+    let files = submissionFilesState.slice();
+
+    if (course !== 'all') {
+      projects = projects.filter(project => normalizeCourseScope(project) === course);
+      const allowedIds = new Set(projects.map(project => String(project.project_id || '')));
+      files = files.filter(file => allowedIds.has(String(file.project_id || '')));
+    }
+
+    if (q) {
+      projects = projects.filter(project => projectMatchesSearch(project, files, q));
+      const allowedIds = new Set(projects.map(project => String(project.project_id || '')));
+      files = files.filter(file => allowedIds.has(String(file.project_id || '')));
+    }
+
+    updateSubmissionStats(files, projects);
+
+    if (status) {
+      status.textContent = `${projects.length} project(s) shown - ${files.length} submitted file(s)`;
+    }
+
+    if (!projects.length) {
+      box.innerHTML = '<div class="empty">No projects found for this filter.</div>';
+      return;
+    }
+
+    box.innerHTML = projects.map(project => {
+      const projectFiles = filesForProject(project, files);
+
+      return `
+        <div class="project-card">
+          <div class="project-header">
+            <div>
+              <span class="submission-badge">
+                ${safeText(normalizeCourseScope(project))} &middot; ${safeText(project.course_label || '')}
+              </span>
+              <div class="project-title">${safeText(project.title || 'Untitled Project')}</div>
+              <div class="submission-meta">
+                <b>Team:</b> ${safeText(project.members || '-')}<br>
+                <b>Status:</b> ${safeText(project.status || '-')}<br>
+                <b>Submissions:</b> ${projectFiles.length}
+              </div>
+            </div>
+          </div>
+
+          ${renderProjectSubmissions(projectFiles)}
+        </div>
+      `;
+    }).join('');
   }
 
-  function clearMessages() {
-    $('progressError').style.display = 'none';
-  }
+  async function loadSupervisorSubmissionFiles() {
+    const box = document.getElementById('submissionFilesBox');
+    const status = document.getElementById('submissionStatus');
 
-  async function loadProjects() {
-    const sel = $('projSel');
+    if (box) {
+      box.innerHTML = '<div class="empty">Loading student submissions...</div>';
+    }
+
+    if (status) {
+      status.textContent = 'Loading...';
+    }
+
     try {
-      const data = await fetchJSON(apiPaths('/projects'));
-      const projects = data.projects || [];
+      const urls = [
+        '/supervisor/api/supervisor/progress/submissions',
+        '/general-supervisor/api/supervisor/progress/submissions',
+        '/api/supervisor/progress/submissions'
+      ];
 
-      if (!projects.length) {
-        sel.innerHTML = '<option value="">No projects assigned</option>';
-        renderTimeline([]);
-        return;
+      let data = {};
+      let lastError = null;
+
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, {
+            headers: { 'Accept': 'application/json' }
+          });
+
+          const text = await res.text();
+          data = text ? JSON.parse(text) : {};
+
+          if (!res.ok || data.error) {
+            throw new Error(data.error || ('Request failed: ' + res.status));
+          }
+
+          lastError = null;
+          break;
+        } catch (err) {
+          lastError = err;
+        }
       }
 
-      sel.innerHTML = projects.map(project => {
-        const label = `${project.title}${project.members ? ' — ' + project.members : ''}`;
-        return `<option value="${esc(project.project_id)}">${esc(label)}</option>`;
-      }).join('');
+      if (lastError) {
+        throw lastError;
+      }
 
-      currentProjectId = projects[0].project_id;
-      sel.value = currentProjectId;
-      await loadProjectDetails(currentProjectId);
+      supervisorProjectsState = data.projects || [];
+      submissionFilesState = data.files || [];
+      renderSupervisorSubmissionFiles();
     } catch (err) {
-      sel.innerHTML = '<option value="">Could not load projects</option>';
-      showError(err.message);
+      supervisorProjectsState = [];
+      submissionFilesState = [];
+      updateSubmissionStats(submissionFilesState, supervisorProjectsState);
+
+      if (box) {
+        box.innerHTML = `<div class="empty">Submission files error: ${safeText(err.message)}</div>`;
+      }
+
+      if (status) {
+        status.textContent = 'Error';
+      }
     }
   }
 
-  async function loadProjectDetails(projectId) {
-    if (!projectId) return;
-    currentProjectId = projectId;
-    clearMessages();
+  window.loadSupervisorSubmissionFiles = loadSupervisorSubmissionFiles;
+  window.renderSupervisorSubmissionFiles = renderSupervisorSubmissionFiles;
 
-    try {
-      const data = await fetchJSON(apiPaths('/' + encodeURIComponent(projectId)));
-      const project = data.project || {};
-      const files = data.files || {};
-      const progress = data.progress || {};
-
-      $('detailsTitle').textContent = (project.title || 'Project') + ' progress details';
-      $('appDate').textContent = project.submission_date || '—';
-      $('lastUpdate').textContent = project.updated_at || '—';
-      $('uploadedFiles').textContent = String(files.total || 0);
-      $('feedbackCount').textContent = String(data.feedback_count || 0);
-      $('timelineSource').textContent = data.timeline_source === 'exam_distribution' ? 'Exam Distribution' : 'Fallback';
-
-      setProgress('report', progress.final_report || 0);
-      setProgress('code', progress.source_code || 0);
-      setProgress('presentation', progress.presentation || 0);
-      setProgress('overall', progress.overall || 0);
-
-      renderTimeline(data.timeline || []);
-      renderNotes(data.notes || []);
-    } catch (err) {
-      showError(err.message);
-    }
-  }
-
-  $('projSel').addEventListener('change', function () {
-    loadProjectDetails(this.value);
-  });
-
-  loadProjects();
+  document.addEventListener('DOMContentLoaded', loadSupervisorSubmissionFiles);
 })();
 </script>
 {% endblock %}
