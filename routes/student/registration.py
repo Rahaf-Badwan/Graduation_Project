@@ -18,16 +18,22 @@ from .common import *
 @student_bp.route("/registration")
 @login_required(role="student")
 def registration():
+    db = None
+    cursor = None
+    context = {}
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        context = _student_course_context(cursor, session.get("user_id"))
-        cursor.close()
-        db.close()
-        if context.get("target_course") == "COMP4300":
-            return redirect(url_for("student.dashboard"))
+        context = _student_workspace_context(cursor, session.get("user_id"))
     except Exception:
         pass
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+    if context.get("workspace_ready"):
+        return redirect(url_for("student.dashboard"))
     return render_template("student/registration.html")
 
 

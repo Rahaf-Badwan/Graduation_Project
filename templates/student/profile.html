@@ -144,17 +144,5 @@
     input.type = hidden ? 'text' : 'password';
     btn.textContent = hidden ? '🙈' : '👁';
   }
-  (function () {
-    fetch('/student/api/topbar-info')
-      .then(r => r.json())
-      .then(d => {
-        var badge = document.getElementById('profileCourseBadge');
-        if (badge) badge.textContent = d.course_code || 'COMP4200';
-      })
-      .catch(() => {
-        var badge = document.getElementById('profileCourseBadge');
-        if (badge) badge.textContent = 'COMP4200';
-      });
-  })();
 </script>
 {% endblock %}

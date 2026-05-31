@@ -1340,7 +1340,7 @@ def api_coordinator_grad_final_submission_save():
 
         cursor.execute(
             """
-            SELECT deliverable_id
+            SELECT deliverable_id, published_at
             FROM coordinator_deliverables
             WHERE semester_id = %s
               AND course_scope = 'graduation_project'
@@ -1351,6 +1351,7 @@ def api_coordinator_grad_final_submission_save():
             (semester_id,),
         )
         existing = cursor.fetchone()
+        was_published = bool((existing or {}).get("published_at"))
         if existing:
             deliverable_id = existing["deliverable_id"]
             cursor.execute(
@@ -1408,9 +1409,18 @@ def api_coordinator_grad_final_submission_save():
         sent_count = 0
         if publish:
             recipients = sorted(set(_deliverable_student_user_ids(cursor, semester_id, "graduation_project")))
+            notification_title = (
+                "COMP4300 Final Submission Republished"
+                if was_published
+                else "COMP4300 Final Submission Published"
+            )
             msg = (
-                f"COMP4300 final submission is now open: {title}. "
-                f"Starts: {start_at.strftime('%Y-%m-%d %H:%M')}. "
+                (
+                    f"COMP4300 final submission was republished: {title}. "
+                    if was_published
+                    else f"COMP4300 final submission is now open: {title}. "
+                )
+                + f"Starts: {start_at.strftime('%Y-%m-%d %H:%M')}. "
                 f"Deadline: {due_at.strftime('%Y-%m-%d %H:%M')}. "
                 "Open it from your student timeline."
             )
@@ -1420,7 +1430,7 @@ def api_coordinator_grad_final_submission_save():
                     recipient_id,
                     session.get("user_id"),
                     "deadline_reminder",
-                    "COMP4300 Final Submission Published",
+                    notification_title,
                     msg,
                     None,
                     "graduation_project",
@@ -1472,6 +1482,47 @@ def _download_static_path(file_path):
     return redirect(url_for("static", filename=clean_path))
 
 
+_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL = """
+    (
+        EXISTS (
+            SELECT 1
+            FROM deadlines d
+            WHERE d.semester_id = s.semester_id
+              AND d.deadline_type = 'file_submission'
+              AND (d.project_id IS NULL OR d.project_id = p.project_id)
+              AND d.deadline_date < CURDATE()
+        )
+        OR (
+            s.course_code = 'COMP4300'
+            AND EXISTS (
+                SELECT 1
+                FROM coordinator_deliverables cd_final
+                WHERE cd_final.semester_id = s.semester_id
+                  AND cd_final.course_scope = 'graduation_project'
+                  AND cd_final.title = 'Graduation Project Final Submission'
+                  AND cd_final.is_published = TRUE
+                  AND cd_final.due_at < NOW()
+            )
+        )
+    )
+"""
+
+
+_COORDINATOR_MILESTONE_SUBMISSION_CLOSED_SQL = """
+    ti.due_date IS NOT NULL
+    AND TIMESTAMP(
+        ti.due_date,
+        COALESCE(NULLIF(TRIM(ti.due_time), ''), '23:59:59')
+    ) < NOW()
+"""
+
+
+_COORDINATOR_DELIVERABLE_SUBMISSION_CLOSED_SQL = """
+    COALESCE(cd.due_at, TIMESTAMP(cd.due_date, '23:59:59')) IS NOT NULL
+    AND COALESCE(cd.due_at, TIMESTAMP(cd.due_date, '23:59:59')) < NOW()
+"""
+
+
 @coordinator_bp.route("/api/coordinator/submission-files", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_submission_files():
@@ -1487,29 +1538,7 @@ def api_coordinator_submission_files():
             params = []
             where = """
                 WHERE COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
-                  AND (
-                      EXISTS (
-                          SELECT 1
-                          FROM deadlines d
-                          WHERE d.semester_id = s.semester_id
-                            AND d.deadline_type = 'file_submission'
-                            AND (d.project_id IS NULL OR d.project_id = p.project_id)
-                            AND d.deadline_date < CURDATE()
-                      )
-                      OR (
-                          s.course_code = 'COMP4300'
-                          AND EXISTS (
-                              SELECT 1
-                              FROM coordinator_deliverables cd
-                              WHERE cd.semester_id = s.semester_id
-                                AND cd.course_scope = 'graduation_project'
-                                AND cd.title = 'Graduation Project Final Submission'
-                                AND cd.is_published = TRUE
-                                AND cd.due_at < NOW()
-                          )
-                      )
-                  )
-            """
+                  AND """ + _COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL
             if academic_year:
                 where += " AND s.academic_year = %s"
                 params.append(academic_year)
@@ -1594,7 +1623,11 @@ def api_coordinator_submission_files():
 
         if _table_exists(cursor, "milestone_submissions"):
             params = []
-            where = """WHERE ms.submitted_to IN ('coordinator', 'both')"""
+            where = (
+                """WHERE ms.submitted_to IN ('coordinator', 'both')
+                     AND """
+                + _COORDINATOR_MILESTONE_SUBMISSION_CLOSED_SQL
+            )
             if academic_year:
                 where += " AND s.academic_year = %s"
                 params.append(academic_year)
@@ -1667,7 +1700,7 @@ def api_coordinator_submission_files():
 
         if _table_exists(cursor, "coordinator_deliverable_submissions"):
             params = []
-            where = "WHERE 1=1"
+            where = "WHERE " + _COORDINATOR_DELIVERABLE_SUBMISSION_CLOSED_SQL
             if academic_year:
                 where += " AND s.academic_year = %s"
                 params.append(academic_year)
@@ -1761,11 +1794,14 @@ def api_coordinator_download_project_file(file_id):
         cursor = db.cursor(dictionary=True)
 
         cursor.execute(
-            """
+            f"""
             SELECT pf.file_name, pf.file_path, pf.file_data, pf.file_mime
             FROM project_files pf
+            JOIN projects p ON p.project_id = pf.project_id
+            JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.file_id = %s
               AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+              AND {_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL}
             """,
             (file_id,),
         )
@@ -1803,13 +1839,15 @@ def api_coordinator_download_project_files(project_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
         cursor.execute(
-            """
+            f"""
             SELECT p.title AS project_title, pf.file_id, pf.file_name, pf.file_data
             FROM project_files pf
             JOIN projects p ON p.project_id = pf.project_id
+            JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.project_id = %s
               AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
               AND pf.file_data IS NOT NULL
+              AND {_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL}
             ORDER BY pf.file_type, pf.file_id
             """,
             (project_id,),
@@ -1854,12 +1892,13 @@ def api_coordinator_download_milestone_submission(submission_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
         cursor.execute(
-            """
+            f"""
             SELECT ms.file_name, ms.file_data, ms.file_mime
             FROM milestone_submissions ms
             JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
             WHERE ms.submission_id = %s
               AND ms.submitted_to IN ('coordinator', 'both')
+              AND {_COORDINATOR_MILESTONE_SUBMISSION_CLOSED_SQL}
             """,
             (submission_id,),
         )
@@ -1889,14 +1928,13 @@ def api_coordinator_download_deliverable_submission(submission_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
         cursor.execute(
-            """
+            f"""
             SELECT cds.file_name, cds.file_path, cds.file_data, cds.file_mime
             FROM coordinator_deliverable_submissions cds
             JOIN coordinator_deliverables cd
               ON cd.deliverable_id = cds.deliverable_id
             WHERE cds.submission_id = %s
-              AND cd.due_date IS NOT NULL
-              AND cd.due_date < CURDATE()
+              AND {_COORDINATOR_DELIVERABLE_SUBMISSION_CLOSED_SQL}
             """,
             (submission_id,),
         )
@@ -3105,6 +3143,7 @@ def api_coordinator_intro_timeline_publish():
         timeline = _get_or_create_intro_timeline(
             cursor, semester["semester_id"], session.get("user_id")
         )
+        was_published = bool(timeline.get("published_at"))
         cursor.execute(
             "SELECT COUNT(*) AS cnt FROM comp4200_timeline_items WHERE timeline_id = %s",
             (timeline["timeline_id"],),
@@ -3163,7 +3202,18 @@ def api_coordinator_intro_timeline_publish():
             for r in cursor.fetchall()
             if r.get("user_id") != session.get("user_id")
         ]
-        msg = "The coordinator published the Project Introduction timeline. Open Student Timeline to view all milestones and deadlines."
+        notification_title = (
+            "Project Introduction Timeline Republished"
+            if was_published
+            else "Project Introduction Timeline Published"
+        )
+        msg = (
+            "The coordinator republished the Project Introduction timeline. "
+            "Open Student Timeline to view the updated milestones and deadlines."
+            if was_published
+            else "The coordinator published the Project Introduction timeline. "
+            "Open Student Timeline to view all milestones and deadlines."
+        )
         notification_count = 0
         for uid in recipients:
             _insert_notification(
@@ -3171,36 +3221,12 @@ def api_coordinator_intro_timeline_publish():
                 uid,
                 session.get("user_id"),
                 "deadline_reminder",
-                "Project Introduction Timeline Published",
+                notification_title,
                 msg,
                 None,
                 "introduction",
             )
             notification_count += 1
-            for item in items:
-                label = item.get("milestone_label") or item.get("title")
-                open_text = (
-                    f" Opens: {item['start_date']}." if item.get("start_date") else ""
-                )
-                due_text = f" Deadline: {item['due_date']}."
-                details = (item.get("description") or "").strip()
-                item_message = (
-                    f"A timeline submission has been posted: {label}."
-                    f"{open_text}{due_text} Open Student Timeline to view it."
-                )
-                if details:
-                    item_message += f" Details: {details}"
-                _insert_notification(
-                    cursor,
-                    uid,
-                    session.get("user_id"),
-                    "deadline_reminder",
-                    f"Timeline Submission: {label}",
-                    item_message,
-                    None,
-                    "introduction",
-                )
-                notification_count += 1
         db.commit()
         payload = _intro_timeline_payload(
             cursor, semester["semester_id"], session.get("user_id")
@@ -3730,14 +3756,17 @@ def api_assign_group_supervisor():
         new_name = new_supervisor.get("full_name") or "your supervisor"
         old_name = project.get("old_supervisor_name")
         changed = bool(project.get("supervisor_id"))
-        title = "Supervisor Changed" if changed else "Supervisor Assigned"
+        title = "Supervisor Changed" if changed else "Project Approved and Supervisor Assigned"
         if changed:
             message = (
                 f"Your project supervisor has been changed"
                 f"{f' from {old_name}' if old_name else ''} to {new_name}."
             )
         else:
-            message = f"{new_name} has been assigned as your project supervisor."
+            message = (
+                f"Your project has been approved. {new_name} has been assigned "
+                "as your project supervisor. Your student workspace is now available."
+            )
         if project.get("title"):
             message += f" Project: {project['title']}."
 
@@ -3751,7 +3780,7 @@ def api_assign_group_supervisor():
                 title,
                 message,
                 project_id,
-                "graduation_project",
+                "introduction",
             )
             sent_count += 1
 
@@ -4653,7 +4682,7 @@ def api_coordinator_project_files(project_id):
             return jsonify({"files": []})
 
         cursor.execute(
-            """
+            f"""
             SELECT
                 pf.file_id,
                 pf.project_id,
@@ -4665,8 +4694,10 @@ def api_coordinator_project_files(project_id):
                 pf.file_data IS NOT NULL AS has_file_data
             FROM project_files pf
             JOIN projects p ON p.project_id = pf.project_id
+            JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.project_id = %s
               AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+              AND {_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL}
             ORDER BY pf.uploaded_at DESC, pf.file_id DESC
             """,
             (project_id,),
@@ -8885,26 +8916,36 @@ def coordinator_profile_api():
     cur = conn.cursor(dictionary=True)
 
     try:
+        _ensure_user_profile_extra_table(cur)
+        conn.commit()
+
         has_office_number = _db_column_exists(cur, "faculty", "office_number")
-        office_select = (
-            "COALESCE(f.office_number, 'Science Building — 214') AS office_number"
+        faculty_office_select = (
+            "NULLIF(TRIM(f.office_number), '')"
             if has_office_number
-            else "'Science Building — 214' AS office_number"
+            else "NULL"
+        )
+        office_select = (
+            "COALESCE(NULLIF(TRIM(upe.office_number), ''), "
+            f"{faculty_office_select}, '') AS office_number"
         )
 
         cur.execute(f"""
             SELECT
                 u.user_id,
+                u.university_id,
                 u.full_name,
                 u.email,
                 u.avatar_initials,
                 u.role,
                 f.faculty_id,
                 f.specialization,
+                f.years_experience,
                 {office_select},
                 COALESCE(s.course_code, 'COMP4200') AS course_code
             FROM users u
             LEFT JOIN faculty f ON f.user_id = u.user_id
+            LEFT JOIN user_profile_extra upe ON upe.user_id = u.user_id
             LEFT JOIN coordinator_assignments ca ON ca.faculty_id = f.faculty_id
             LEFT JOIN semesters s ON s.semester_id = ca.semester_id
             WHERE u.user_id = %s
@@ -8917,50 +8958,11 @@ def coordinator_profile_api():
         if not profile:
             return jsonify({"ok": False, "error": "Profile not found"}), 404
 
-        cur.execute("""
-            SELECT COUNT(*) AS total_projects
-            FROM projects
-        """)
-        projects_overseen = cur.fetchone()["total_projects"] or 0
-
-        cur.execute("""
-            SELECT COUNT(*) AS accepted_projects
-            FROM projects
-            WHERE status IN ('accepted', 'archived')
-        """)
-        accepted_projects = cur.fetchone()["accepted_projects"] or 0
-
-        cur.execute("""
-            SELECT COUNT(*) AS committees_formed
-            FROM committees
-        """)
-        committees_formed = cur.fetchone()["committees_formed"] or 0
-
-        cur.execute("""
-            SELECT ROUND(AVG(final_score), 1) AS average_score
-            FROM projects
-            WHERE final_score IS NOT NULL
-        """)
-        avg_row = cur.fetchone()
-        average_score = (
-            avg_row["average_score"]
-            if avg_row and avg_row["average_score"] is not None
-            else 0
-        )
-
-        acceptance_rate = 0
-        if projects_overseen:
-            acceptance_rate = round((accepted_projects / projects_overseen) * 100)
+        profile["course_label"] = "COMP4200 / COMP4300"
 
         return jsonify({
             "ok": True,
-            "profile": _json_safe_value(profile),
-            "stats": {
-                "projects_overseen": int(projects_overseen),
-                "acceptance_rate": int(acceptance_rate),
-                "committees_formed": int(committees_formed),
-                "average_score": float(average_score or 0)
-            }
+            "profile": _json_safe_value(profile)
         })
 
     except Exception as e:
@@ -9010,128 +9012,6 @@ def _ensure_user_profile_extra_table(cursor):
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
-
-
-@coordinator_bp.route("/api/coordinator/profile", methods=["GET"])
-@login_required(role="coordinator")
-def api_coordinator_profile_get():
-    try:
-        user_id = session.get("user_id")
-
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        _ensure_user_profile_extra_table(cursor)
-        db.commit()
-
-        cursor.execute(
-            """
-            SELECT 
-                u.user_id,
-                u.full_name,
-                u.email,
-                u.avatar_initials,
-                u.role,
-                COALESCE(f.title, 'Coordinator') AS title,
-                COALESCE(upe.office_number, '') AS office_number
-            FROM users u
-            LEFT JOIN faculty f ON f.user_id = u.user_id
-            LEFT JOIN user_profile_extra upe ON upe.user_id = u.user_id
-            WHERE u.user_id = %s
-            LIMIT 1
-            """,
-            (user_id,),
-        )
-
-        profile = cursor.fetchone()
-
-        cursor.close()
-        db.close()
-
-        if not profile:
-            return jsonify({"error": "Profile not found."}), 404
-
-        profile["course_label"] = "COMP4200 / COMP4300"
-
-        return jsonify({"profile": profile})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@coordinator_bp.route("/api/coordinator/profile", methods=["POST"])
-@login_required(role="coordinator")
-def api_coordinator_profile_update():
-    try:
-        user_id = session.get("user_id")
-        data = request.get_json(silent=True) or {}
-
-        full_name = (data.get("full_name") or "").strip()
-        email = (data.get("email") or "").strip()
-        office_number = (data.get("office_number") or "").strip()
-
-        if not full_name:
-            return jsonify({"error": "Full name is required."}), 400
-
-        if not email:
-            return jsonify({"error": "Email is required."}), 400
-
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        _ensure_user_profile_extra_table(cursor)
-
-        cursor.execute(
-            """
-            SELECT user_id
-            FROM users
-            WHERE email = %s AND user_id <> %s
-            LIMIT 1
-            """,
-            (email, user_id),
-        )
-
-        if cursor.fetchone():
-            cursor.close()
-            db.close()
-            return jsonify({"error": "This email is already used by another user."}), 400
-
-        avatar_initials = "".join(
-            part[0].upper()
-            for part in full_name.split()
-            if part.strip()
-        )[:2] or "CO"
-
-        cursor.execute(
-            """
-            UPDATE users
-            SET full_name = %s,
-                email = %s,
-                avatar_initials = %s
-            WHERE user_id = %s
-            """,
-            (full_name, email, avatar_initials, user_id),
-        )
-
-        cursor.execute(
-            """
-            INSERT INTO user_profile_extra (user_id, office_number)
-            VALUES (%s, %s)
-            ON DUPLICATE KEY UPDATE office_number = VALUES(office_number)
-            """,
-            (user_id, office_number),
-        )
-
-        db.commit()
-
-        session["full_name"] = full_name
-        session["avatar_initials"] = avatar_initials
-
-        cursor.close()
-        db.close()
-
-        return jsonify({"message": "Profile updated successfully."})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 @coordinator_bp.route("/api/coordinator/change-password", methods=["POST"])
@@ -9240,99 +9120,3 @@ def switch_to_supervisor():
     session["faculty_id"] = faculty["faculty_id"]
 
     return redirect(url_for("supervisor_dashboard"))
-
-
-@coordinator_bp.route("/api/coordinator/profile", methods=["POST"])
-@login_required(role="coordinator")
-def coordinator_profile_update_api():
-    user_id = session.get("user_id")
-    data = request.get_json(silent=True) or {}
-
-    full_name = (data.get("full_name") or "").strip()
-    email = (data.get("email") or "").strip()
-    office_number = (data.get("office_number") or "").strip()
-    specialization = (data.get("specialization") or "").strip()
-
-    if not full_name:
-        return jsonify({"ok": False, "error": "Full name is required"}), 400
-
-    if not email:
-        return jsonify({"ok": False, "error": "Email is required"}), 400
-
-    allowed_specs = {
-        "software_engineering",
-        "artificial_intelligence",
-        "web_development",
-        "mobile",
-        "security_networks",
-        "databases",
-        "other"
-    }
-
-    if specialization not in allowed_specs:
-        specialization = "software_engineering"
-
-    initials = "".join([part[0].upper() for part in full_name.split()[:2] if part])[:5]
-
-    conn = get_db()
-    cur = conn.cursor(dictionary=True)
-
-    try:
-        has_office_number = _db_column_exists(cur, "faculty", "office_number")
-
-        cur.execute("""
-            SELECT user_id
-            FROM users
-            WHERE email = %s AND user_id <> %s
-            LIMIT 1
-        """, (email, user_id))
-
-        if cur.fetchone():
-            return jsonify({"ok": False, "error": "This email is already used by another user"}), 400
-
-        cur.execute("""
-            UPDATE users
-            SET full_name = %s,
-                email = %s,
-                avatar_initials = %s
-            WHERE user_id = %s
-        """, (full_name, email, initials, user_id))
-
-        cur.execute("""
-            SELECT faculty_id
-            FROM faculty
-            WHERE user_id = %s
-            LIMIT 1
-        """, (user_id,))
-
-        faculty = cur.fetchone()
-
-        if faculty:
-            if has_office_number:
-                cur.execute("""
-                    UPDATE faculty
-                    SET specialization = %s,
-                        office_number = %s
-                    WHERE user_id = %s
-                """, (specialization, office_number, user_id))
-            else:
-                cur.execute("""
-                    UPDATE faculty
-                    SET specialization = %s
-                    WHERE user_id = %s
-                """, (specialization, user_id))
-
-        conn.commit()
-
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-    finally:
-        cur.close()
-        conn.close()
-
-    return jsonify({
-        "ok": True,
-        "message": "Profile updated successfully"
-    })

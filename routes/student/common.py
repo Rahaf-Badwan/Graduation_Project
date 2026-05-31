@@ -269,6 +269,7 @@ def _notify_project_team(
     message,
     notification_type="system",
     exclude_user_id=None,
+    course_scope=None,
 ):
     """Create a notification for every active student in a project team."""
     cursor.execute(
@@ -291,23 +292,45 @@ def _notify_project_team(
             continue
         recipients.append(int(recipient_id))
 
+    include_course_scope = course_scope and _db_column_exists_student(
+        cursor, "notifications", "course_scope"
+    )
     for recipient_id in sorted(set(recipients)):
-        cursor.execute(
-            """
-            INSERT INTO notifications
-                (recipient_id, sender_id, notification_type, title, message,
-                 related_project_id, is_read)
-            VALUES (%s, %s, %s, %s, %s, %s, FALSE)
-            """,
-            (
-                recipient_id,
-                sender_id,
-                notification_type,
-                title,
-                message,
-                project_id,
-            ),
-        )
+        if include_course_scope:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     course_scope, related_project_id, is_read)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE)
+                """,
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    course_scope,
+                    project_id,
+                ),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     related_project_id, is_read)
+                VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+                """,
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    project_id,
+                ),
+            )
 
 
 def _student_intro_section(cursor, student_id):
@@ -482,10 +505,12 @@ def _student_dashboard_milestone_progress(
                 SELECT COUNT(DISTINCT ti.item_id) AS total
                 FROM comp4200_timeline_items ti
                 JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
-                WHERE tl.is_published = TRUE
+                WHERE tl.timeline_id = %s
+                  AND tl.is_published = TRUE
                   AND ti.is_deadline = TRUE
                   AND COALESCE(ti.is_archived, FALSE) = FALSE
-                """
+                """,
+                (timeline["timeline_id"],),
             )
             milestone_total = int((cursor.fetchone() or {}).get("total") or 0)
 
@@ -531,10 +556,13 @@ def _student_dashboard_milestone_progress(
                     FROM milestone_submissions ms
                     JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
                     JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
-                    WHERE tl.is_published = TRUE
+                    WHERE tl.timeline_id = %s
+                      AND tl.is_published = TRUE
+                      AND ti.is_deadline = TRUE
+                      AND COALESCE(ti.is_archived, FALSE) = FALSE
                     {submit_where}
                     """,
-                    submit_params,
+                    (timeline["timeline_id"], *submit_params),
                 )
                 milestone_submitted = int(
                     (cursor.fetchone() or {}).get("submitted") or 0
@@ -546,12 +574,15 @@ def _student_dashboard_milestone_progress(
                     FROM milestone_submissions ms
                     JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
                     JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
-                    WHERE tl.is_published = TRUE
+                    WHERE tl.timeline_id = %s
+                      AND tl.is_published = TRUE
+                      AND ti.is_deadline = TRUE
+                      AND COALESCE(ti.is_archived, FALSE) = FALSE
                     {submit_where}
                     ORDER BY ms.submitted_at DESC
                     LIMIT 1
                     """,
-                    submit_params,
+                    (timeline["timeline_id"], *submit_params),
                 )
                 last_row = cursor.fetchone() or {}
                 last_milestone_submission = _fmt_date(last_row.get("submitted_at"))
@@ -709,44 +740,66 @@ def _student_final_submission_window(cursor, student_id):
     }
 
 
-def _student_sidebar_context(cursor, user_id):
-    """Build sidebar visibility before the student page is rendered."""
-    from datetime import datetime
-
+def _student_workspace_context(cursor, user_id):
+    """Return whether a COMP4200 student may enter the project workspace."""
     course_context = _student_course_context(cursor, user_id)
     student_id = course_context.get("student_id")
     target_course = course_context.get("target_course") or "COMP4200"
 
-    registered = False
-    if student_id:
+    if target_course != "COMP4200":
+        return {
+            **course_context,
+            "is_registered": True,
+            "workspace_ready": True,
+            "registration_only": False,
+        }
+
+    project = None
+    semester = _get_active_semester_st(cursor)
+    if student_id and semester:
         cursor.execute(
             """
-            SELECT 1
+            SELECT p.project_id, p.status, p.supervisor_id
             FROM project_members pm
             JOIN projects p ON p.project_id = pm.project_id
-            JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pm.student_id = %s
-              AND s.is_active = TRUE
+              AND p.semester_id = %s
+            ORDER BY
+                CASE WHEN p.status = 'solo_pending' THEN 1 ELSE 0 END,
+                p.project_id DESC
             LIMIT 1
             """,
-            (student_id,),
+            (student_id, semester["semester_id"]),
         )
-        registered = bool(cursor.fetchone())
+        project = cursor.fetchone()
 
-    registration_open = False
-    if target_course == "COMP4200":
-        semester = _get_active_semester_st(cursor)
-        registration_open = bool((semester or {}).get("distribution_open"))
-        close_at = (semester or {}).get("distribution_close_at")
-        if close_at:
-            registration_open = registration_open and datetime.now() < close_at
+    registered = bool(project)
+    workspace_ready = bool(
+        project
+        and project.get("status") != "solo_pending"
+        and project.get("supervisor_id")
+    )
+    return {
+        **course_context,
+        "is_registered": registered,
+        "workspace_ready": workspace_ready,
+        "registration_only": not workspace_ready,
+        "project_id": project.get("project_id") if project else None,
+    }
+
+
+def _student_sidebar_context(cursor, user_id):
+    """Build sidebar visibility before the student page is rendered."""
+    workspace = _student_workspace_context(cursor, user_id)
+    student_id = workspace.get("student_id")
 
     submit_window = _student_final_submission_window(cursor, student_id)
     return {
-        "target_course": target_course,
-        "is_registered": registered,
-        "show_registration": target_course == "COMP4200" and registration_open,
-        "show_submit": bool(submit_window.get("is_active")),
+        **workspace,
+        "show_registration": bool(workspace.get("registration_only")),
+        "show_submit": bool(
+            workspace.get("workspace_ready") and submit_window.get("is_active")
+        ),
         "submit_url": submit_window.get("submit_url") or "/student/submit",
     }
 
@@ -1181,6 +1234,7 @@ __all__ = [
     "_student_intro_timeline_deadlines",
     "_comp4300_final_submission_window",
     "_student_final_submission_window",
+    "_student_workspace_context",
     "_student_sidebar_context",
     "_is_submission_open",
     "_coerce_positive_int",

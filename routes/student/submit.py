@@ -769,6 +769,19 @@ def api_submit_project():
 
         _sync_lifecycle(cursor, project_id)
 
+        if target_course == "COMP4300" and action == "updated" and not is_draft:
+            actor_name = session.get("full_name") or "A teammate"
+            _notify_project_team(
+                cursor,
+                project_id,
+                user_id,
+                "COMP4300 submission updated",
+                f'{actor_name} updated the COMP4300 final submission for "{title}".',
+                notification_type="file_uploaded",
+                exclude_user_id=user_id,
+                course_scope="graduation_project",
+            )
+
         db.commit()
         cursor.close()
         db.close()
@@ -996,14 +1009,20 @@ def api_upload_file():
 
         if file_type == "final_report" and not had_final_submission:
             actor_name = session.get("full_name") or "A teammate"
+            is_comp4300 = target_course == "COMP4300"
             _notify_project_team(
                 cursor,
                 project_id,
                 user_id,
-                "Project submitted",
-                f'{actor_name} submitted the final report for "{project_title}".',
+                "COMP4300 submission submitted" if is_comp4300 else "Project submitted",
+                (
+                    f'{actor_name} submitted the COMP4300 final submission for "{project_title}".'
+                    if is_comp4300
+                    else f'{actor_name} submitted the final report for "{project_title}".'
+                ),
                 notification_type="file_uploaded",
                 exclude_user_id=user_id,
+                course_scope="graduation_project" if is_comp4300 else "introduction",
             )
 
         # ── Sync lifecycle after file upload ──
@@ -1078,7 +1097,14 @@ def api_clear_submission():
         # تحقق إنه الطالب هو الـ primary contact
         cursor.execute(
             """
-            SELECT p.project_id, pm.is_primary_contact
+            SELECT p.project_id, p.title, s.course_code, pm.is_primary_contact,
+                   EXISTS (
+                       SELECT 1
+                       FROM project_files pf
+                       WHERE pf.project_id = p.project_id
+                         AND pf.file_type = 'final_report'
+                         AND pf.upload_status = 'uploaded'
+                   ) AS had_final_submission
             FROM   project_members pm
             JOIN   students st ON st.student_id = pm.student_id
             JOIN   projects p  ON p.project_id  = pm.project_id
@@ -1475,24 +1501,26 @@ def api_milestone_submit():
         if section_id:
             actor_name = session.get("full_name") or "A section teammate"
             milestone_title = item.get("title") or "a timeline milestone"
+            action_text = "updated" if is_resubmit else "submitted"
             _notify_intro_section_team(
                 cursor,
                 section_id,
                 user_id,
-                "Timeline milestone submitted",
-                f'{actor_name} submitted "{milestone_title}" for "{project_title}".',
+                f"Timeline milestone {action_text}",
+                f'{actor_name} {action_text} "{milestone_title}" for "{project_title}".',
                 notification_type="file_uploaded",
                 exclude_user_id=user_id,
             )
         elif project_id:
             actor_name = session.get("full_name") or "A teammate"
             milestone_title = item.get("title") or "a timeline milestone"
+            action_text = "updated" if is_resubmit else "submitted"
             _notify_project_team(
                 cursor,
                 project_id,
                 user_id,
-                "Timeline milestone submitted",
-                f'{actor_name} submitted "{milestone_title}" for "{project_title}".',
+                f"Timeline milestone {action_text}",
+                f'{actor_name} {action_text} "{milestone_title}" for "{project_title}".',
                 notification_type="file_uploaded",
                 exclude_user_id=user_id,
             )

@@ -15,7 +15,7 @@
   <script src="{{ url_for('static', filename='assets/js/theme.js') }}" defer></script>
 </head>
 
-<body data-page="{% block page_id %}dashboard{% endblock %}">
+<body data-app-role="student" data-page="{% block page_id %}dashboard{% endblock %}">
   <div class="app-wrapper">
     <div class="shell">
 
@@ -30,13 +30,15 @@
             </div>
           </div>
           <div class="tb-right">
-            <div class="tb-profile-btn" onclick="window.location.href='/student/profile'" title="My Profile">
+            {% if not student_nav.registration_only %}
+            <div class="tb-profile-btn" data-student-href="/student/profile" role="link" tabindex="0" title="My Profile">
               {{ session.avatar_initials }}
             </div>
-            <div class="tb-notif" onclick="window.location.href='/student/notifs'" title="Notifications">
+            <div class="tb-notif" data-student-href="/student/notifs" role="link" tabindex="0" title="Notifications">
               <span class="material-symbols-outlined icon-inline">notifications</span>
               <div class="tb-notif-badge" id="notif-badge" style="display:none"></div>
             </div>
+            {% endif %}
             <button class="tb-theme-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Switch to dark mode">
               <span class="material-symbols-outlined icon-inline">dark_mode</span>
             </button>
@@ -46,6 +48,10 @@
 
         <div class="content-area">
           {% block content %}{% endblock %}
+        </div>
+        <div class="student-nav-loader" role="status" aria-live="polite">
+          <span class="student-nav-spinner" aria-hidden="true"></span>
+          <span>Loading page...</span>
         </div>
       </div>
     </div>
@@ -78,44 +84,6 @@
       border: 2px solid var(--color-background-primary, #fff);
     }
   </style>
-  <script>
-    (function () {
-      function updateNotifBadge() {
-        fetch('/student/api/notifications/unread-count')
-          .then(r => r.json())
-          .then(d => {
-            var count = d.unread || 0;
-            var badge = document.getElementById('notif-badge');
-            if (!badge) return;
-            if (count > 0) {
-              badge.textContent = count > 99 ? '99+' : count;
-              badge.style.display = '';
-            } else {
-              badge.style.display = 'none';
-            }
-          })
-          .catch(() => { });
-      }
-      updateNotifBadge();
-      setInterval(updateNotifBadge, 60000);
-    })();
-  </script>
-  <script>
-    (function () {
-      fetch('/student/api/topbar-info')
-        .then(r => r.json())
-        .then(d => {
-          var el = document.getElementById('tbSub');
-          if (!el) return;
-          var year = d.academic_year ? ' · Semester ' + d.academic_year : '';
-          el.textContent = (d.course_code || 'COMP4200') + year;
-        })
-        .catch(() => {
-          var el = document.getElementById('tbSub');
-          if (el) el.textContent = 'COMP4200';
-        });
-    })();
-  </script>
 </body>
 
 </html>

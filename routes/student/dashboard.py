@@ -571,7 +571,7 @@ def api_dashboard_data():
             notification_scope = """
               AND (
                     (
-                        n.title <> 'Timeline milestone submitted'
+                        n.title NOT LIKE 'Timeline milestone %'
                         AND n.title NOT LIKE 'Timeline Submission:%'
                     )
                  OR n.created_at >= %s

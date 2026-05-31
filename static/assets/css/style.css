@@ -445,6 +445,40 @@ body {
   min-height: 0
 }
 
+body.student-nav-leaving .content-area {
+  display: none
+}
+
+.student-nav-loader {
+  flex: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600
+}
+
+body.student-nav-leaving .student-nav-loader {
+  display: flex
+}
+
+.student-nav-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-tertiary);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: student-nav-spin .7s linear infinite
+}
+
+@keyframes student-nav-spin {
+  to {
+    transform: rotate(360deg)
+  }
+}
+
 .page {
   display: none;
   padding: 20px;

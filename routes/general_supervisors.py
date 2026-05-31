@@ -12,7 +12,6 @@ import bcrypt
 from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
-from routes.supervisor_profile import supervisor_profile_bp
 from routes.supervisor_progress_api import supervisor_progress_api_bp
 
 general_supervisors_bp = Blueprint(
@@ -21,7 +20,6 @@ general_supervisors_bp = Blueprint(
     url_prefix="/general-supervisor"
 )
 
-general_supervisors_bp.register_blueprint(supervisor_profile_bp)
 general_supervisors_bp.register_blueprint(supervisor_progress_api_bp)
 
 
@@ -62,24 +60,69 @@ def ai():
 
 
 # ─── Profile ────────────────────────────────────────────────
-@general_supervisors_bp.route("/profile")
-@login_required(role="supervisor")
-def profile():
-    user_id = session["user_id"]
+def _load_supervisor_profile_user(include_password=False):
+    """Load one complete supervisor profile for direct or switched sessions."""
+    db = None
+    cursor = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute(
-            """
-            SELECT user_id, university_id, full_name, email, avatar_initials
-            FROM users
-            WHERE user_id = %s
-            """,
-            (user_id,),
-        )
+        password_field = ", u.password_hash" if include_password else ""
+        faculty_id = session.get("faculty_id")
+        if faculty_id:
+            cursor.execute(
+                f"""
+                SELECT u.user_id, u.university_id, u.full_name, u.email,
+                       u.avatar_initials, f.faculty_id, f.specialization,
+                       f.years_experience, f.title, f.office_number
+                       {password_field}
+                FROM users u
+                JOIN faculty f ON f.user_id = u.user_id
+                WHERE f.faculty_id = %s
+                LIMIT 1
+                """,
+                (faculty_id,),
+            )
+        else:
+            cursor.execute(
+                f"""
+                SELECT u.user_id, u.university_id, u.full_name, u.email,
+                       u.avatar_initials, f.faculty_id, f.specialization,
+                       f.years_experience, f.title, f.office_number
+                       {password_field}
+                FROM users u
+                LEFT JOIN faculty f ON f.user_id = u.user_id
+                WHERE u.user_id = %s
+                LIMIT 1
+                """,
+                (session.get("user_id"),),
+            )
         user = cursor.fetchone()
-        cursor.close()
-        db.close()
+        if not user:
+            return None
+
+        title = (user.get("title") or "Dr.").strip()
+        full_name = (user.get("full_name") or "").strip()
+        if full_name.lower().startswith(f"{title.lower()} "):
+            user["display_name"] = full_name
+        else:
+            user["display_name"] = f"{title} {full_name}".strip()
+        if not user.get("avatar_initials"):
+            parts = [part for part in full_name.replace("Dr.", "").split() if part]
+            user["avatar_initials"] = "".join(part[0].upper() for part in parts[:2])
+        return user
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+@general_supervisors_bp.route("/profile")
+@login_required(role="supervisor")
+def profile():
+    try:
+        user = _load_supervisor_profile_user()
     except Exception:
         user = None
 
@@ -95,31 +138,14 @@ def profile():
 @general_supervisors_bp.route("/profile/change-password", methods=["POST"])
 @login_required(role="supervisor")
 def change_password():
-    user_id = session["user_id"]
     current_pwd = request.form.get("current_password", "").strip()
     new_pwd = request.form.get("new_password", "").strip()
     confirm_pwd = request.form.get("confirm_password", "").strip()
 
-    def get_user():
-        try:
-            db = get_db()
-            cursor = db.cursor(dictionary=True)
-            cursor.execute(
-                """
-                SELECT user_id, password_hash
-                FROM users
-                WHERE user_id = %s
-                """,
-                (user_id,),
-            )
-            u = cursor.fetchone()
-            cursor.close()
-            db.close()
-            return u
-        except Exception:
-            return None
-
-    user = get_user()
+    try:
+        user = _load_supervisor_profile_user(include_password=True)
+    except Exception:
+        user = None
 
     if not current_pwd or not new_pwd or not confirm_pwd:
         return render_template("supervisor/profile.html", user=user, pwd_error="Fill all fields", pwd_success=None)
@@ -139,7 +165,7 @@ def change_password():
         cursor = db.cursor()
         cursor.execute(
             "UPDATE users SET password_hash = %s WHERE user_id = %s",
-            (hashed, user_id),
+            (hashed, user["user_id"]),
         )
         db.commit()
         cursor.close()

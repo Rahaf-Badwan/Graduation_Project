@@ -2,286 +2,170 @@
 
 {% block page_title %}Profile{% endblock %}
 {% block page_id %}profile{% endblock %}
-{% block topbar_title %}Profile{% endblock %}
+{% block topbar_title %}My Profile{% endblock %}
 
 {% block content %}
 <style>
-  #pg-profile {
-    padding: 20px 22px 90px;
-  }
-
-  .profile-header {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    background: var(--color-background-primary);
-    border: 1px solid #e6ece8;
-    border-radius: 22px;
-    padding: 22px;
-    box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
-    margin-bottom: 18px;
-  }
-
-  .profile-avatar-lg {
-    width: 78px;
-    height: 78px;
-    border-radius: 22px;
-    background: #2e7d42;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 26px;
-    font-weight: 900;
-    flex-shrink: 0;
-  }
-
-  .profile-main {
-    flex: 1;
-  }
-
-  .profile-name {
-    font-size: 22px;
-    font-weight: 900;
-    color: var(--color-text-primary);
-    margin-bottom: 5px;
-  }
-
-  .profile-sub {
-    font-size: 13px;
-    color: #667085;
-    margin-bottom: 9px;
-  }
-
-  .profile-pills {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    padding: 5px 10px;
-    font-size: 11px;
-    font-weight: 900;
-  }
-
-  .pill.green {
-    background: var(--green-light);
-    color: var(--green);
-  }
-
-  .pill.gray {
-    background: var(--color-background-tertiary);
-    color: var(--color-text-secondary);
-  }
-
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
-  }
-
-  .card {
-    background: var(--color-background-primary);
-    border: 1px solid #e6ece8;
-    border-radius: 22px;
-    box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
-    overflow: hidden;
-  }
-
-  .card-hd {
-    padding: 17px 20px;
-    border-bottom: 1px solid #edf2ef;
-    background: var(--color-background-tertiary);
-  }
-
-  .card-title {
-    font-size: 16px;
-    font-weight: 900;
-    color: var(--color-text-primary);
-  }
-
-  .card-body {
-    padding: 18px 20px;
-  }
-
-  .field-wrap {
-    margin-bottom: 14px;
-  }
-
-  .field-label {
-    font-size: 12px;
-    font-weight: 900;
-    color: var(--color-text-primary);
-    margin-bottom: 6px;
-  }
-
-  .field-input {
-    width: 100%;
-    border: 1px solid #d8e2dc;
-    border-radius: 13px;
-    padding: 11px 13px;
-    font-size: 14px;
-    outline: none;
-    background: var(--color-background-primary);
-    font-family: inherit;
-  }
-
-  .field-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px rgba(46, 125, 66, 0.12);
-  }
-
-  .btn-row {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 10px;
-  }
-
-  .btn {
-    border: 0;
-    border-radius: 13px;
-    padding: 10px 15px;
-    font-weight: 900;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  .btn-primary {
-    background: #2e7d42;
-    color: #fff;
-  }
-
-  .btn-outline {
-    background: var(--color-background-tertiary);
-    color: var(--green);
-    border: 1px solid #cfe0d4;
-  }
-
   .profile-msg {
     display: none;
     margin-top: 12px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    font-size: 13px;
-    font-weight: 700;
+    padding: 8px 12px;
+    border-radius: 7px;
+    font-size: 12px;
   }
 
   .profile-msg.ok {
     display: block;
     color: var(--green);
     background: var(--green-light);
-    border: 1px solid #abefc6;
   }
 
   .profile-msg.error {
     display: block;
-    color: #b42318;
+    color: var(--coral);
     background: var(--coral-light);
-    border: 1px solid #fecdca;
   }
 
-  @media (max-width: 850px) {
-    .profile-header {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-
-    .two-col {
-      grid-template-columns: 1fr;
-    }
+  #pg-profile .profile-avatar-lg {
+    color: var(--green);
+    background: var(--green-light);
   }
 </style>
 
-<div class="page page-single on" id="pg-profile">
+<div class="page on" id="pg-profile">
+
   <div class="profile-header">
     <div class="profile-avatar-lg" id="profileAvatar">--</div>
-
-    <div class="profile-main">
-      <div class="profile-name" id="profileName">Loading...</div>
-      <div class="profile-sub" id="profileSubtitle">Coordinator · Computer Science Department</div>
-
-      <div class="profile-pills">
-        <span class="pill green">Active Coordinator</span>
-        <span class="pill gray" id="profileCourse">COMP4200 / COMP4300</span>
+    <div style="flex:1">
+      <div id="profileName" style="font-size:18px;font-weight:600;color:var(--color-text-primary)">
+        Loading profile...
       </div>
-      <form action="{{ url_for('coordinator_bp.switch_to_supervisor') }}" method="post">
-      
+      <div style="font-size:13px;color:var(--color-text-secondary);margin-top:2px">
+        <span id="profileStaffId">--</span> &middot; Coordinator &middot; Department of Computer Science
+      </div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;
+                     background:var(--blue-light);color:var(--blue)">Coordinator</span>
+        <span id="profileSpecializationBadge" style="font-size:11px;padding:3px 10px;border-radius:20px;
+                     background:var(--green-light);color:var(--green)">Computer Science</span>
+      </div>
     </div>
-    <button class="btn btn-outline" type="submit">
+    <form action="{{ url_for('coordinator_bp.switch_to_supervisor') }}" method="post">
+      <button class="btn btn-outline" type="submit">
+        <span class="material-symbols-outlined icon-inline">swap_horiz</span>
         Switch to Supervisor
       </button>
     </form>
   </div>
 
   <div class="two-col">
+
     <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Personal Information</span>
+      <div class="card-hd"><span class="card-title">Personal Information</span></div>
+
+      <div class="field-wrap">
+        <div class="field-label">Full Name</div>
+        <input class="field-input" id="fullName" readonly
+          style="background:var(--color-background-secondary)" />
       </div>
-
-      <div class="card-body">
-        <form id="profileForm">
-          <div class="field-wrap">
-            <div class="field-label">Full Name</div>
-            <input class="field-input" id="fullName" name="full_name" autocomplete="name">
-          </div>
-
-          <div class="field-wrap">
-            <div class="field-label">Email</div>
-            <input class="field-input" id="email" name="email" type="email" autocomplete="email">
-          </div>
-
-          <div class="field-wrap">
-            <div class="field-label">Office Number</div>
-            <input class="field-input" id="officeNumber" name="office_number"
-              placeholder="Example: Science Building — 214">
-          </div>
-
-          <div class="btn-row">
-            <button class="btn btn-primary" type="submit">Save Changes</button>
-          </div>
-
-          <div class="profile-msg" id="profileMsg"></div>
-        </form>
+      <div class="field-wrap">
+        <div class="field-label">Staff ID</div>
+        <input class="field-input" id="staffId" readonly
+          style="background:var(--color-background-secondary)" />
       </div>
+      <div class="field-wrap">
+        <div class="field-label">Email</div>
+        <input class="field-input" id="email" readonly
+          style="background:var(--color-background-secondary)" />
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Office</div>
+        <input class="field-input" id="officeNumber" readonly
+          style="background:var(--color-background-secondary)" />
+      </div>
+      <div class="profile-msg" id="profileMsg"></div>
     </div>
 
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Change Password</span>
-      </div>
+    <div>
 
-      <div class="card-body">
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Change Password</span></div>
+
         <form id="passwordForm">
           <div class="field-wrap">
             <div class="field-label">Current Password</div>
-            <input class="field-input" id="currentPassword" type="password" autocomplete="current-password">
+            <div style="position:relative">
+              <input class="field-input" id="currentPassword" type="password"
+                autocomplete="current-password" placeholder="********"
+                style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;line-height:1">
+                <span class="material-symbols-outlined" style="font-size:15px">visibility</span>
+              </button>
+            </div>
           </div>
-
           <div class="field-wrap">
             <div class="field-label">New Password</div>
-            <input class="field-input" id="newPassword" type="password" autocomplete="new-password">
+            <div style="position:relative">
+              <input class="field-input" id="newPassword" type="password"
+                autocomplete="new-password" placeholder="At least 8 characters"
+                style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;line-height:1">
+                <span class="material-symbols-outlined" style="font-size:15px">visibility</span>
+              </button>
+            </div>
           </div>
-
           <div class="field-wrap">
-            <div class="field-label">Confirm New Password</div>
-            <input class="field-input" id="confirmPassword" type="password" autocomplete="new-password">
+            <div class="field-label">Confirm Password</div>
+            <div style="position:relative">
+              <input class="field-input" id="confirmPassword" type="password"
+                autocomplete="new-password" placeholder="Re-enter new password"
+                style="padding-right:38px;margin-bottom:0" />
+              <button type="button" onclick="togglePwd(this)"
+                style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:#888;line-height:1">
+                <span class="material-symbols-outlined" style="font-size:15px">visibility</span>
+              </button>
+            </div>
           </div>
-
           <div class="btn-row">
-            <button class="btn btn-primary" type="submit">Update Password</button>
+            <button type="submit" class="btn btn-primary">Update Password</button>
           </div>
-
           <div class="profile-msg" id="passwordMsg"></div>
         </form>
       </div>
+
+      <div class="card">
+        <div class="card-hd"><span class="card-title">Academic Information</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Role</span>
+            <span>Coordinator</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Department</span>
+            <span>Computer Science</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;
+                      border-bottom:1px solid var(--color-border-tertiary)">
+            <span style="color:var(--color-text-secondary)">Specialization</span>
+            <span id="specialization">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0">
+            <span style="color:var(--color-text-secondary)">Years of Experience</span>
+            <span id="yearsExperience">--</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
+
 </div>
 
 <script>
@@ -305,66 +189,52 @@
         .slice(0, 2) || '--';
     }
 
+    function readable(value) {
+      return String(value || '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase()) || '--';
+    }
+
     async function apiFetch(url, options = {}) {
-      const res = await fetch(url, {
+      const response = await fetch(url, {
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
           ...(options.headers || {})
         },
         ...options
       });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Request failed');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.error || data.ok === false) {
+        throw new Error(data.error || 'Request failed.');
       }
-
       return data;
     }
 
     async function loadProfile() {
       try {
         const data = await apiFetch('/api/coordinator/profile');
-        const user = data.profile || {};
+        const profile = data.profile || {};
+        const specialization = readable(profile.specialization);
 
-        $('fullName').value = user.full_name || '';
-        $('email').value = user.email || '';
-        $('officeNumber').value = user.office_number || '';
-
-        $('profileName').textContent = user.full_name || 'Coordinator';
-        $('profileAvatar').textContent = user.avatar_initials || initials(user.full_name);
-        $('profileSubtitle').textContent = `${user.title || 'Coordinator'} · Computer Science Department`;
-        $('profileCourse').textContent = user.course_label || 'COMP4200 / COMP4300';
-      } catch (err) {
-        $('profileName').textContent = 'Profile';
-        showMsg('profileMsg', err.message, 'error');
+        $('fullName').value = profile.full_name || '';
+        $('staffId').value = profile.university_id || '';
+        $('email').value = profile.email || '';
+        $('officeNumber').value = profile.office_number || '--';
+        $('profileName').textContent = profile.full_name || 'Coordinator';
+        $('profileAvatar').textContent = profile.avatar_initials || initials(profile.full_name);
+        $('profileStaffId').textContent = profile.university_id || '--';
+        $('profileSpecializationBadge').textContent = specialization;
+        $('specialization').textContent = specialization;
+        $('yearsExperience').textContent = profile.years_experience ?? '--';
+      } catch (error) {
+        $('profileName').textContent = 'Coordinator Profile';
+        showMsg('profileMsg', error.message, 'error');
       }
     }
 
-    $('profileForm').addEventListener('submit', async event => {
-      event.preventDefault();
-
-      try {
-        const data = await apiFetch('/api/coordinator/profile', {
-          method: 'POST',
-          body: JSON.stringify({
-            full_name: $('fullName').value.trim(),
-            email: $('email').value.trim(),
-            office_number: $('officeNumber').value.trim()
-          })
-        });
-
-        showMsg('profileMsg', data.message || 'Profile updated successfully.', 'ok');
-        loadProfile();
-      } catch (err) {
-        showMsg('profileMsg', err.message, 'error');
-      }
-    });
-
     $('passwordForm').addEventListener('submit', async event => {
       event.preventDefault();
-
       const currentPassword = $('currentPassword').value;
       const newPassword = $('newPassword').value;
       const confirmPassword = $('confirmPassword').value;
@@ -373,12 +243,10 @@
         showMsg('passwordMsg', 'Please fill in all password fields.', 'error');
         return;
       }
-
       if (newPassword.length < 8) {
         showMsg('passwordMsg', 'New password must be at least 8 characters.', 'error');
         return;
       }
-
       if (newPassword !== confirmPassword) {
         showMsg('passwordMsg', 'New passwords do not match.', 'error');
         return;
@@ -393,15 +261,22 @@
             confirm_password: confirmPassword
           })
         });
-
         $('passwordForm').reset();
         showMsg('passwordMsg', data.message || 'Password updated successfully.', 'ok');
-      } catch (err) {
-        showMsg('passwordMsg', err.message, 'error');
+      } catch (error) {
+        showMsg('passwordMsg', error.message, 'error');
       }
     });
 
     loadProfile();
   })();
+
+  function togglePwd(button) {
+    const input = button.previousElementSibling;
+    const icon = button.querySelector('.material-symbols-outlined');
+    const hidden = input.type === 'password';
+    input.type = hidden ? 'text' : 'password';
+    icon.textContent = hidden ? 'visibility_off' : 'visibility';
+  }
 </script>
 {% endblock %}

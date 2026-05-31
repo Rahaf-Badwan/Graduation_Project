@@ -11,7 +11,7 @@
     <div class="profile-avatar-lg">{{ user.avatar_initials if user else '?' }}</div>
     <div style="flex:1">
       <div style="font-size:18px;font-weight:600;color:var(--color-text-primary)">
-        {{ user.title if user and user.title else 'Dr.' }} {{ user.full_name if user else '—' }}
+        {{ user.display_name if user else '—' }}
       </div>
       <div style="font-size:13px;color:var(--color-text-secondary);margin-top:2px">
         {{ user.university_id if user else '—' }} · Supervisor · Department of Computer Science
@@ -36,7 +36,7 @@
       <div class="field-wrap">
         <div class="field-label">Full Name</div>
         <input class="field-input" readonly style="background:var(--color-background-secondary)"
-          value="{{ (user.title ~ ' ' ~ user.full_name) if user and user.title else (user.full_name if user else '') }}" />
+          value="{{ user.display_name if user else '' }}" />
       </div>
       <div class="field-wrap">
         <div class="field-label">Staff ID</div>

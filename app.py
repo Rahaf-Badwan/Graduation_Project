@@ -827,29 +827,20 @@ def supervisor_subpage(page):
 @app.route("/api/supervisor/my-projects", methods=["GET"])
 @login_required(role="supervisor")
 def api_supervisor_my_projects():
-    user_id = session["user_id"]
     db = get_db()
     cursor = db.cursor(dictionary=True)
-    cursor.execute(
-        """
-        SELECT p.project_id, p.title,
-               GROUP_CONCAT(u2.full_name ORDER BY pm.project_id SEPARATOR ', ') AS members
-        FROM   faculty f
-        JOIN   supervisor_assignments sa ON sa.faculty_id  = f.faculty_id
-        JOIN   projects p               ON p.project_id   = sa.project_id
-        LEFT   JOIN project_members pm  ON pm.project_id  = p.project_id
-        LEFT   JOIN students st         ON st.student_id  = pm.student_id
-        LEFT   JOIN users u2            ON u2.user_id     = st.user_id
-        WHERE  f.user_id = %s
-        GROUP  BY p.project_id, p.title
-        ORDER  BY p.project_id DESC
-    """,
-        (user_id,),
-    )
-    projects = cursor.fetchall()
-    cursor.close()
-    db.close()
-    return jsonify({"projects": projects})
+    try:
+        from routes.supervisor_progress_api import (
+            _current_supervisor_faculty_id,
+            _fetch_supervisor_projects,
+        )
+
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        projects = _fetch_supervisor_projects(cursor, faculty_id)
+        return jsonify({"projects": projects})
+    finally:
+        cursor.close()
+        db.close()
 
 
 @app.route("/api/supervisor/submit-feedback", methods=["POST"])
@@ -861,44 +852,35 @@ def api_supervisor_submit_feedback():
     project_id = data.get("project_id")
     feedback_type = data.get("feedback_type", "general_performance")
     feedback_text = (data.get("feedback_text") or "").strip()
-    score = data.get("score")
     priority = data.get("priority", "normal")
     is_draft = bool(data.get("is_draft", False))
     points = data.get("improvement_points", [])
 
     if not project_id or not feedback_text:
         return jsonify({"error": "project_id and feedback_text are required"}), 400
-
-    try:
-        score = float(score) if score not in (None, "", "null") else None
-        if score is not None and not (0 <= score <= 100):
-            return jsonify({"error": "Score must be between 0 and 100"}), 400
-    except (ValueError, TypeError):
-        score = None
+    if priority not in {"normal", "important", "urgent"}:
+        return jsonify({"error": "Invalid feedback priority"}), 400
 
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute(
-        """
-        SELECT sa.sa_id FROM supervisor_assignments sa
-        JOIN   faculty f ON f.faculty_id = sa.faculty_id
-        WHERE  f.user_id = %s AND sa.project_id = %s
-        LIMIT  1
-    """,
-        (user_id, project_id),
+    from routes.supervisor_progress_api import (
+        _current_supervisor_faculty_id,
+        _get_project_for_supervisor,
     )
-    if not cursor.fetchone():
+
+    faculty_id = _current_supervisor_faculty_id(cursor)
+    if not faculty_id or not _get_project_for_supervisor(cursor, project_id, faculty_id):
         cursor.close()
         db.close()
         return jsonify({"error": "You are not assigned to this project"}), 403
 
     cursor.execute(
         """
-        INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, score, priority, is_draft)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, priority, is_draft)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """,
-        (project_id, user_id, feedback_type, feedback_text, score, priority, is_draft),
+        (project_id, user_id, feedback_type, feedback_text, priority, is_draft),
     )
     feedback_id = cursor.lastrowid
 
@@ -947,7 +929,7 @@ def api_supervisor_my_feedback():
 
     sql = """
         SELECT f.feedback_id, f.project_id, p.title AS project_title,
-               f.feedback_type, f.feedback_text, f.score, f.priority,
+               f.feedback_type, f.feedback_text, f.priority,
                f.is_draft, f.created_at
         FROM   feedback f
         JOIN   projects p ON p.project_id = f.project_id
@@ -965,8 +947,6 @@ def api_supervisor_my_feedback():
         r["created_at"] = (
             r["created_at"].strftime("%b %d, %Y") if r["created_at"] else ""
         )
-        if r["score"] is not None:
-            r["score"] = float(r["score"])
         r["is_draft"] = bool(r["is_draft"])
 
     cursor.close()

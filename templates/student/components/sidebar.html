@@ -5,7 +5,7 @@
     </button>
   </div>
 
-  <div class="sb-profile" onclick="window.location.href='/student/profile'" title="My Profile">
+  <div class="sb-profile"{% if not student_nav.registration_only %} data-student-href="/student/profile" role="link" tabindex="0" title="My Profile"{% endif %}>
     <div class="sb-avatar">{{ session.avatar_initials }}</div>
     <div class="sb-name">{{ session.full_name }}</div>
     <div class="sb-id">{{ session.university_id }}</div>
@@ -13,63 +13,59 @@
   </div>
 
   <div class="sb-nav">
-    <a class="sb-item {% if request.path == '/student/' %}on{% endif %}" data-page="dashboard" href="/student/">
+    {% if not student_nav.registration_only %}
+    <a class="sb-item" data-page="dashboard" data-student-nav href="/student/">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
       <span class="sb-label">Dashboard</span>
     </a>
+    {% endif %}
     {% if student_nav.show_registration %}
-    <a class="sb-item {% if request.path == '/student/registration' %}on{% endif %}"
-      data-page="registration" href="/student/registration">
+    <a class="sb-item" data-page="registration" data-student-nav href="/student/registration">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">app_registration</span></span>
       <span class="sb-label">Registration</span>
     </a>
     {% endif %}
+    {% if not student_nav.registration_only %}
     {% if student_nav.show_submit %}
     <a
-      class="sb-item {% if request.path == '/student/submit' %}on{% endif %}"
-      data-page="submit" href="{{ student_nav.submit_url }}">
+      class="sb-item" data-page="submit" data-student-nav href="{{ student_nav.submit_url }}">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">upload_file</span></span>
       <span class="sb-label">Submit Project</span>
     </a>
     {% endif %}
     {% if student_nav.is_registered %}
-    <a class="sb-item {% if request.path == '/student/timeline' %}on{% endif %}" data-page="timeline"
-      href="/student/timeline">
+    <a class="sb-item" data-page="timeline" data-student-nav href="/student/timeline">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">timeline</span></span>
       <span class="sb-label">Student Timeline</span>
     </a>
-    <a class="sb-item {% if request.path == '/student/feedback' %}on{% endif %}" data-page="feedback"
-      href="/student/feedback">
+    <a class="sb-item" data-page="feedback" data-student-nav href="/student/feedback">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">reviews</span></span>
       <span class="sb-label">Feedback</span>
     </a>
    
-    <a class="sb-item {% if request.path == '/student/challenges' %}on{% endif %}" data-page="challenges"
-      href="/student/challenges">
+    <a class="sb-item" data-page="challenges" data-student-nav href="/student/challenges">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">flag</span></span>
       <span class="sb-label">Challenges &amp; Reflections</span>
     </a>
     {% endif %}
-     <a class="sb-item {% if request.path == '/student/result' %}on{% endif %}" data-page="result"
-      href="/student/result">
+     <a class="sb-item" data-page="result" data-student-nav href="/student/result">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">workspace_premium</span></span>
       <span class="sb-label">Course Result</span>
     </a>
-    <a class="sb-item {% if request.path == '/student/search' %}on{% endif %}" data-page="search"
-      href="/student/search">
+    <a class="sb-item" data-page="search" data-student-nav href="/student/search">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
       <span class="sb-label">Archived Projects</span>
     </a>
-    <a class="sb-item {% if request.path == '/student/notifs' %}on{% endif %}" data-page="notifs"
-      href="/student/notifs">
+    <a class="sb-item" data-page="notifs" data-student-nav href="/student/notifs">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
       <span class="sb-label">Notifications</span>
       <span class="sb-badge" id="sbNotifBadge" style="display:none"></span>
     </a>
-    <a class="sb-item {% if request.path == '/student/ai' %}on{% endif %}" data-page="ai" href="/student/ai">
+    <a class="sb-item" data-page="ai" data-student-nav href="/student/ai">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
       <span class="sb-label">AI Assistant</span>
     </a>
+    {% endif %}
   </div>
 
   <div class="sb-footer">
@@ -79,22 +75,3 @@
     </a>
   </div>
 </div>
-<script>
-  // Dynamic notification badge
-  (function () {
-    function updateBadge() {
-      fetch('/student/api/notifications/unread-count')
-        .then(r => r.json())
-        .then(data => {
-          var badge = document.getElementById('sbNotifBadge');
-          if (!badge) return;
-          var count = data.unread || 0;
-          badge.textContent = count > 99 ? '99+' : count;
-          badge.style.display = count > 0 ? '' : 'none';
-        })
-        .catch(() => { });
-    }
-    updateBadge();
-    setInterval(updateBadge, 60000);
-  })();
-</script>

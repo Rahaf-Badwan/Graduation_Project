@@ -18,7 +18,6 @@ from routes.add_student import add_student_bp
 from routes.assign_rols import assign_rols_bp
 from routes.promote import promote_bp
 from routes.dashboard import dashboard_bp
-from routes.profile import profile_bp
 from routes.supervisors import head_supervisors_bp
 
 head_bp = Blueprint("head", __name__, url_prefix="/head")
@@ -26,7 +25,6 @@ head_bp.register_blueprint(add_student_bp)
 head_bp.register_blueprint(assign_rols_bp)
 head_bp.register_blueprint(promote_bp)
 head_bp.register_blueprint(dashboard_bp)
-head_bp.register_blueprint(profile_bp)
 head_bp.register_blueprint(head_supervisors_bp)
 # ─── Dashboard ──────────────────────────────────────────────
 @head_bp.route("/")
@@ -171,20 +169,53 @@ def ai():
 
 
 # ─── Profile ────────────────────────────────────────────────
-@head_bp.route("/profile")
-@login_required(role="head_of_department")
-def profile():
-    user_id = session["user_id"]
+def _load_head_profile_user(include_password=False):
+    """Load one complete head profile from users and faculty."""
+    db = None
+    cursor = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        password_field = ", u.password_hash" if include_password else ""
         cursor.execute(
-            "SELECT user_id, university_id, full_name, email, avatar_initials FROM users WHERE user_id = %s",
-            (user_id,),
+            f"""
+            SELECT u.user_id, u.university_id, u.full_name, u.email,
+                   u.avatar_initials, f.specialization, f.years_experience,
+                   f.title, f.office_number
+                   {password_field}
+            FROM users u
+            LEFT JOIN faculty f ON f.user_id = u.user_id
+            WHERE u.user_id = %s
+            LIMIT 1
+            """,
+            (session.get("user_id"),),
         )
         user = cursor.fetchone()
-        cursor.close()
-        db.close()
+        if not user:
+            return None
+
+        title = (user.get("title") or "Dr.").strip()
+        full_name = (user.get("full_name") or "").strip()
+        if full_name.lower().startswith(f"{title.lower()} "):
+            user["display_name"] = full_name
+        else:
+            user["display_name"] = f"{title} {full_name}".strip()
+        if not user.get("avatar_initials"):
+            parts = [part for part in full_name.replace("Dr.", "").split() if part]
+            user["avatar_initials"] = "".join(part[0].upper() for part in parts[:2])
+        return user
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
+@head_bp.route("/profile")
+@login_required(role="head_of_department")
+def profile():
+    try:
+        user = _load_head_profile_user()
     except Exception:
         user = None
     return render_template(
@@ -196,27 +227,14 @@ def profile():
 @head_bp.route("/profile/change-password", methods=["POST"])
 @login_required(role="head_of_department")
 def change_password():
-    user_id = session["user_id"]
     current_pwd = request.form.get("current_password", "").strip()
     new_pwd = request.form.get("new_password", "").strip()
     confirm_pwd = request.form.get("confirm_password", "").strip()
 
-    def get_user():
-        try:
-            db = get_db()
-            cursor = db.cursor(dictionary=True)
-            cursor.execute(
-                "SELECT user_id, university_id, full_name, email, avatar_initials, password_hash FROM users WHERE user_id = %s",
-                (user_id,),
-            )
-            u = cursor.fetchone()
-            cursor.close()
-            db.close()
-            return u
-        except Exception:
-            return None
-
-    user = get_user()
+    try:
+        user = _load_head_profile_user(include_password=True)
+    except Exception:
+        user = None
 
     if not current_pwd or not new_pwd or not confirm_pwd:
         return render_template(
@@ -254,7 +272,7 @@ def change_password():
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            "UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed, user_id)
+            "UPDATE users SET password_hash = %s WHERE user_id = %s", (hashed, user["user_id"])
         )
         db.commit()
         cursor.close()
