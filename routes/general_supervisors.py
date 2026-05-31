@@ -7,28 +7,25 @@ from flask import (
     request,
     session,
     Response,
+    redirect,
+    url_for,
 )
 import bcrypt
 from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
-from routes.supervisor_progress_submitted_api import supervisor_progress_api_bp
+from routes.supervisor_evaluation import supervisor_evaluation_bp
 general_supervisors_bp = Blueprint(
     "general_supervisors",
     __name__,
     url_prefix="/supervisor"
 )
 
-general_supervisors_bp.register_blueprint(supervisor_progress_api_bp)
 
-# Alias route for submitted files.
-# This guarantees the endpoint is available under:
-# /supervisor/api/supervisor/progress/submissions
-@general_supervisors_bp.route("/api/supervisor/progress/submissions", methods=["GET"])
-@login_required(role="supervisor")
-def supervisor_submissions_alias():
-    from routes.supervisor_progress_submitted_api import api_supervisor_submitted_files
-    return api_supervisor_submitted_files()
+# Routes that must stay without the /supervisor prefix.
+supervisor_api_bp = Blueprint("supervisor_api", __name__)
+supervisor_api_bp.register_blueprint(supervisor_evaluation_bp)
+
 
 
 # ─── Dashboard ──────────────────────────────────────────────
@@ -37,6 +34,29 @@ def supervisor_submissions_alias():
 @login_required(role="supervisor")
 def dashboard():
     return render_template("supervisor/index.html")
+
+
+SUPERVISOR_PAGES = {
+    "dashboard": "supervisor/index.html",
+    "mystudents": "supervisor/mystudents.html",
+    "feedback": "supervisor/feedback.html",
+    "evaluation": "supervisor/evaluation.html",
+    "search": "shared/archive_search.html",
+    "notifs": "supervisor/notifs.html",
+    "ai": "shared/ai.html",
+    "profile": "supervisor/profile.html",
+}
+
+
+@general_supervisors_bp.route("/<page>")
+@login_required(role="supervisor")
+def supervisor_subpage(page):
+    template = SUPERVISOR_PAGES.get(page)
+    if not template:
+        return redirect(url_for("general_supervisors.dashboard"))
+    if page in {"search", "ai"}:
+        return render_template(template, base_template="supervisor/base.html")
+    return render_template(template)
 
 
 # ─── Search ─────────────────────────────────────────────────
@@ -51,13 +71,6 @@ def search():
 @login_required(role="supervisor")
 def notifs():
     return render_template("supervisor/notifs.html")
-
-
-# ─── Progress Page ──────────────────────────────────────────
-@general_supervisors_bp.route("/progress")
-@login_required(role="supervisor")
-def progress():
-    return render_template("supervisor/progress.html")
 
 
 # ─── AI Assistant ───────────────────────────────────────────
@@ -905,3 +918,261 @@ def unread_count():
         return jsonify({"unread": 0})
 
 
+
+
+# ============================================================
+# Supervisor feedback helpers (independent from progress files)
+# ============================================================
+
+def _current_supervisor_faculty_id(cursor):
+    """Return the faculty_id for the currently logged-in supervisor."""
+    faculty_id = session.get("faculty_id")
+    if faculty_id:
+        return faculty_id
+
+    cursor.execute(
+        """
+        SELECT f.faculty_id
+        FROM faculty f
+        WHERE f.user_id = %s
+        LIMIT 1
+        """,
+        (session.get("user_id"),),
+    )
+    row = cursor.fetchone()
+    return row["faculty_id"] if row else None
+
+
+def _json_safe(value):
+    """Convert MySQL/date/set values to JSON-safe values."""
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, set):
+        return ", ".join(str(v) for v in sorted(value))
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    return value
+
+
+def _fetch_supervisor_projects(cursor, faculty_id):
+    """Load active projects assigned to this supervisor for the feedback page.
+
+    This version is independent from progress files and avoids columns/values
+    that can break JSON serialization.
+    """
+    if not faculty_id:
+        return []
+
+    project_type_expr = "p.project_type" if _supervisor_db_column_exists(cursor, "projects", "project_type") else "NULL"
+    updated_order = "COALESCE(p.updated_at, p.submission_date) DESC," if _supervisor_db_column_exists(cursor, "projects", "updated_at") else ""
+    submission_select = "p.submission_date," if _supervisor_db_column_exists(cursor, "projects", "submission_date") else "NULL AS submission_date,"
+
+    cursor.execute(
+        f"""
+        SELECT
+            p.project_id,
+            COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS title,
+            {project_type_expr} AS project_type,
+            p.status,
+            {submission_select}
+            sem.academic_year,
+            sem.course_code,
+            COALESCE(
+                GROUP_CONCAT(
+                    DISTINCT u_st.full_name
+                    ORDER BY pm.is_primary_contact DESC, u_st.full_name
+                    SEPARATOR ', '
+                ),
+                ''
+            ) AS team_members
+        FROM projects p
+        LEFT JOIN semesters sem ON sem.semester_id = p.semester_id
+        LEFT JOIN project_members pm ON pm.project_id = p.project_id
+        LEFT JOIN students st ON st.student_id = pm.student_id
+        LEFT JOIN users u_st ON u_st.user_id = st.user_id
+        WHERE p.supervisor_id = %s
+          AND p.semester_id IS NOT NULL
+          AND LOWER(COALESCE(p.status, '')) NOT IN (
+              'draft',
+              'archived',
+              'archive',
+              'search',
+              'search_only',
+              'imported_archive',
+              'rejected',
+              'cancelled'
+          )
+        GROUP BY
+            p.project_id,
+            p.title,
+            project_type,
+            p.status,
+            submission_date,
+            sem.academic_year,
+            sem.course_code
+        HAVING COUNT(DISTINCT st.student_id) > 0
+        ORDER BY {updated_order} p.project_id DESC
+        """,
+        (faculty_id,),
+    )
+
+    projects = []
+    for row in cursor.fetchall():
+        item = dict(row)
+        # The feedback page uses title/team_members; keep both common keys.
+        item["members"] = item.get("team_members") or ""
+        projects.append(_json_safe(item))
+    return projects
+
+
+def _get_project_for_supervisor(cursor, project_id, faculty_id):
+    """Check that a project belongs to the logged-in supervisor."""
+    if not project_id or not faculty_id:
+        return None
+
+    cursor.execute(
+        """
+        SELECT p.project_id
+        FROM projects p
+        LEFT JOIN project_members pm ON pm.project_id = p.project_id
+        LEFT JOIN students st ON st.student_id = pm.student_id
+        LEFT JOIN users u_st ON u_st.user_id = st.user_id
+        WHERE p.project_id = %s
+          AND p.supervisor_id = %s
+          AND p.semester_id IS NOT NULL
+          AND LOWER(COALESCE(p.status, '')) NOT IN (
+              'draft',
+              'archived',
+              'archive',
+              'search',
+              'search_only',
+              'imported_archive',
+              'rejected',
+              'cancelled'
+          )
+        GROUP BY p.project_id
+        HAVING COUNT(DISTINCT st.student_id) > 0
+        LIMIT 1
+        """,
+        (project_id, faculty_id),
+    )
+    return cursor.fetchone()
+
+
+# ============================================================
+# Supervisor feedback APIs moved from app.py
+# ============================================================
+
+@supervisor_api_bp.route("/api/supervisor/my-projects", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_my_projects():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        projects = _fetch_supervisor_projects(cursor, faculty_id)
+        return jsonify({"projects": _json_safe(projects)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@supervisor_api_bp.route("/api/supervisor/submit-feedback", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_submit_feedback():
+    user_id = session["user_id"]
+    data = request.get_json(force=True)
+    project_id = data.get("project_id")
+    feedback_type = data.get("feedback_type", "general_performance")
+    feedback_text = (data.get("feedback_text") or "").strip()
+    priority = data.get("priority", "normal")
+    is_draft = bool(data.get("is_draft", False))
+    points = data.get("improvement_points", [])
+    if not project_id or not feedback_text:
+        return jsonify({"error": "project_id and feedback_text are required"}), 400
+    if priority not in {"normal", "important", "urgent"}:
+        return jsonify({"error": "Invalid feedback priority"}), 400
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id or not _get_project_for_supervisor(cursor, project_id, faculty_id):
+            return jsonify({"error": "You are not assigned to this project"}), 403
+        cursor.execute(
+            """
+            INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, priority, is_draft)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (project_id, user_id, feedback_type, feedback_text, priority, is_draft),
+        )
+        feedback_id = cursor.lastrowid
+        for pt in points:
+            pt = str(pt).strip()
+            if pt:
+                cursor.execute(
+                    "INSERT INTO feedback_improvement_points (feedback_id, point_text) VALUES (%s, %s)",
+                    (feedback_id, pt),
+                )
+        db.commit()
+        return jsonify({"success": True, "feedback_id": feedback_id})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@supervisor_api_bp.route("/api/supervisor/my-feedback", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_my_feedback():
+    user_id = session["user_id"]
+    project_id = request.args.get("project_id")
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        sql = """
+            SELECT f.feedback_id, f.project_id, p.title AS project_title,
+                   f.feedback_type, f.feedback_text, f.priority,
+                   f.is_draft, f.created_at
+            FROM   feedback f
+            JOIN   projects p ON p.project_id = f.project_id
+            WHERE  f.reviewer_id = %s
+        """
+        params = [user_id]
+        if project_id:
+            sql += " AND f.project_id = %s"
+            params.append(project_id)
+        sql += " ORDER BY f.created_at DESC LIMIT 20"
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        for r in rows:
+            r["created_at"] = r["created_at"].strftime("%b %d, %Y") if r["created_at"] else ""
+            r["is_draft"] = bool(r["is_draft"])
+        return jsonify({"feedback": _json_safe(rows)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@supervisor_api_bp.route("/switch-back-to-coordinator", methods=["POST", "GET"])
+@login_required(role="supervisor")
+def switch_back_to_coordinator():
+    if not session.get("is_switched_to_supervisor"):
+        return redirect(url_for("general_supervisors.dashboard"))
+    session["role"] = session.get("original_role", "coordinator")
+    session["user_id"] = session.get("original_user_id", session.get("user_id"))
+    session["full_name"] = session.get("original_full_name", session.get("full_name"))
+    session.pop("original_role", None)
+    session.pop("original_user_id", None)
+    session.pop("original_full_name", None)
+    session.pop("is_switched_to_supervisor", None)
+    return redirect(url_for("coordinator_bp.coordinator_dashboard"))
