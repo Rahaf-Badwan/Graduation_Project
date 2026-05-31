@@ -656,18 +656,22 @@
 
   .sn-toast {
     position: fixed;
-    right: 22px;
-    bottom: 98px;
-    z-index: 999;
+    top: 88px;
+    left: 50%;
+    z-index: 10000;
+    width: min(620px, calc(100vw - 32px));
+    transform: translateX(-50%);
     background: #111827;
     color: #fff;
-    padding: 12px 16px;
-    border-radius: 14px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
+    padding: 16px 20px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 16px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .24);
     display: none;
-    max-width: 360px;
-    font-size: 14px;
-    font-weight: 700
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.5;
+    text-align: center
   }
 
   .sn-specific-wrap {
@@ -914,9 +918,9 @@
     // ── Toast ────────────────────────────────────────────────────
     function showToast(msg, isErr = false) {
       toast.textContent = msg;
-      toast.style.background = isErr ? '#991b1b' : '#111827';
+      toast.style.background = isErr ? '#991b1b' : '#166534';
       toast.style.display = 'block';
-      setTimeout(() => (toast.style.display = 'none'), 3400);
+      setTimeout(() => (toast.style.display = 'none'), isErr ? 5000 : 3600);
     }
 
     // ── Fetch helpers ────────────────────────────────────────────

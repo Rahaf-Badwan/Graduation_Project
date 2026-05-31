@@ -104,25 +104,48 @@ def api_active_students():
         db = get_db()
         cursor = db.cursor(dictionary=True)
 
-        # filter the course base on semesters
-        cursor.execute(
-            """
-                    SELECT DISTINCT
-           u.user_id,
-           u.university_id,
-           u.full_name,
-           u.email,
-           u.avatar_initials
-    FROM users u
-    JOIN students st ON st.user_id = u.user_id
-    JOIN student_course_results scr ON scr.student_id = st.student_id
-    JOIN semesters s ON s.semester_id = scr.semester_id
-    WHERE u.role = 'student'
-        AND u.is_active = TRUE
-        AND s.course_code = %s
-    ORDER BY u.full_name""",
-            (course,),
-        )
+        if course == "COMP4200":
+            cursor.execute(
+                """
+                SELECT DISTINCT
+                       u.user_id,
+                       u.university_id,
+                       u.full_name,
+                       u.email,
+                       u.avatar_initials
+                FROM users u
+                JOIN students st ON st.user_id = u.user_id
+                JOIN student_course_results scr ON scr.student_id = st.student_id
+                JOIN semesters s ON s.semester_id = scr.semester_id
+                WHERE u.role = 'student'
+                  AND u.is_active = TRUE
+                  AND s.course_code = 'COMP4200'
+                  AND scr.promoted_at IS NULL
+                  AND scr.promoted_to_semester_id IS NULL
+                ORDER BY u.full_name
+                """
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT DISTINCT
+                       u.user_id,
+                       u.university_id,
+                       u.full_name,
+                       u.email,
+                       u.avatar_initials
+                FROM users u
+                JOIN students st ON st.user_id = u.user_id
+                JOIN student_course_results scr ON scr.student_id = st.student_id
+                JOIN semesters promoted_sem
+                  ON promoted_sem.semester_id = scr.promoted_to_semester_id
+                WHERE u.role = 'student'
+                  AND u.is_active = TRUE
+                  AND promoted_sem.course_code = 'COMP4300'
+                  AND scr.promoted_at IS NOT NULL
+                ORDER BY u.full_name
+                """
+            )
         students = cursor.fetchall()
         cursor.close()
         db.close()

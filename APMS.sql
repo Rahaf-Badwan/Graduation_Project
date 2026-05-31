@@ -1089,52 +1089,8 @@ WHERE s.course_code    = 'COMP4300'
   )
 LIMIT 1;
 
--- ── 3. Sample Projects for COMP4300 (doctors overview panel) ─────────────
-
--- Dr. Radi Jarrar (faculty_id = 4)
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT
-    'Advanced AI Decision System', 'ai', s.semester_id, 4, 'submitted', CURDATE()
-FROM semesters s
-WHERE s.course_code   = 'COMP4300'
-  AND s.academic_year = '2025/2026'
-  AND NOT EXISTS (
-      SELECT 1 FROM projects p
-      WHERE p.supervisor_id = 4
-        AND p.semester_id   = s.semester_id
-        AND p.title         = 'Advanced AI Decision System'
-  )
-LIMIT 1;
-
--- Dr. Abdullah Krakeh (faculty_id = 5)
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT
-    'Enterprise Web Platform', 'web', s.semester_id, 5, 'submitted', CURDATE()
-FROM semesters s
-WHERE s.course_code   = 'COMP4300'
-  AND s.academic_year = '2025/2026'
-  AND NOT EXISTS (
-      SELECT 1 FROM projects p
-      WHERE p.supervisor_id = 5
-        AND p.semester_id   = s.semester_id
-        AND p.title         = 'Enterprise Web Platform'
-  )
-LIMIT 1;
-
--- Dr. Hafez Barghouthi (faculty_id = 7)
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT
-    'Cyber Security Audit Platform', 'security', s.semester_id, 7, 'submitted', CURDATE()
-FROM semesters s
-WHERE s.course_code   = 'COMP4300'
-  AND s.academic_year = '2025/2026'
-  AND NOT EXISTS (
-      SELECT 1 FROM projects p
-      WHERE p.supervisor_id = 7
-        AND p.semester_id   = s.semester_id
-        AND p.title         = 'Cyber Security Audit Platform'
-  )
-LIMIT 1;
+-- ── 3. Sample Projects for COMP4300 removed
+-- Removed fake Assign Roles sample projects so they are not recreated on import.
 
 
 -- ============================================================
@@ -1959,304 +1915,9 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================
--- 3) Add at least 8 more projects to the latest active semester
+-- Fake active project seed removed
+-- Removed 8 generated active projects and their optional test members.
 -- ============================================================
-
-SET @target_semester_id := (
-    SELECT semester_id
-    FROM semesters
-    WHERE is_active = TRUE
-    ORDER BY semester_id DESC
-    LIMIT 1
-);
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Smart Clinic Management Platform', 'web', @target_semester_id, 5, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Smart Clinic Management Platform'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'AI Resume Screening System', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'AI Resume Screening System'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Secure Campus Access Control', 'security', @target_semester_id, 7, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Secure Campus Access Control'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Mobile Pharmacy Assistant', 'mobile', @target_semester_id, 5, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Mobile Pharmacy Assistant'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Intelligent Library Recommender', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Intelligent Library Recommender'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Cloud Attendance Tracker', 'web', @target_semester_id, 3, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Cloud Attendance Tracker'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Database Performance Analyzer', 'databases', @target_semester_id, 6, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Database Performance Analyzer'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Smart Graduation Project Marketplace', 'web', @target_semester_id, 3, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Smart Graduation Project Marketplace'
-  );
-
--- ============================================================
--- 4) Optional team members for the new 8 projects
---    Safe re-run. Uses the extra students you added before.
--- ============================================================
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221001'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Clinic Management Platform'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221002'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Clinic Management Platform'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221003'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'AI Resume Screening System'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221004'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'AI Resume Screening System'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221005'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Secure Campus Access Control'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221006'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Secure Campus Access Control'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221007'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Mobile Pharmacy Assistant'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221008'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Mobile Pharmacy Assistant'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221009'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Intelligent Library Recommender'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221010'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Intelligent Library Recommender'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221011'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Cloud Attendance Tracker'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221012'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Cloud Attendance Tracker'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221013'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Database Performance Analyzer'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221014'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Database Performance Analyzer'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221015'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Graduation Project Marketplace'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221016'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Graduation Project Marketplace'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
--- ============================================================
--- 5) Verification
--- ============================================================
-
-SELECT p.project_id, p.title, p.status, p.project_type
-FROM projects p
-WHERE p.semester_id = @target_semester_id
-  AND p.title IN (
-      'Smart Clinic Management Platform',
-      'AI Resume Screening System',
-      'Secure Campus Access Control',
-      'Mobile Pharmacy Assistant',
-      'Intelligent Library Recommender',
-      'Cloud Attendance Tracker',
-      'Database Performance Analyzer',
-      'Smart Graduation Project Marketplace'
-  )
-ORDER BY p.project_id;
 
 -- ============================================================
 --  RANDOM COMMITTEE DISTRIBUTION APPENDIX
@@ -2336,313 +1997,9 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================
--- 3) Add at least 8 more projects to the latest active semester
+-- Fake active project seed removed
+-- Removed duplicated 8 generated active projects and their optional test members.
 -- ============================================================
-
-SET @target_semester_id := (
-    SELECT semester_id
-    FROM semesters
-    WHERE is_active = TRUE
-    ORDER BY semester_id DESC
-    LIMIT 1
-);
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Smart Clinic Management Platform', 'web', @target_semester_id, 5, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Smart Clinic Management Platform'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'AI Resume Screening System', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'AI Resume Screening System'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Secure Campus Access Control', 'security', @target_semester_id, 7, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Secure Campus Access Control'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Mobile Pharmacy Assistant', 'mobile', @target_semester_id, 5, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Mobile Pharmacy Assistant'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Intelligent Library Recommender', 'ai', @target_semester_id, 4, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Intelligent Library Recommender'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Cloud Attendance Tracker', 'web', @target_semester_id, 3, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Cloud Attendance Tracker'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Database Performance Analyzer', 'databases', @target_semester_id, 6, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Database Performance Analyzer'
-  );
-
-INSERT IGNORE INTO projects (title, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT 'Smart Graduation Project Marketplace', 'web', @target_semester_id, 3, 'submitted', CURDATE()
-WHERE @target_semester_id IS NOT NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM projects
-      WHERE semester_id = @target_semester_id
-        AND title = 'Smart Graduation Project Marketplace'
-  );
-
--- ============================================================
--- 4) Optional team members for the new 8 projects
---    Safe re-run. Uses the extra students you added before.
--- ============================================================
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221001'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Clinic Management Platform'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221002'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Clinic Management Platform'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221003'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'AI Resume Screening System'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221004'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'AI Resume Screening System'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221005'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Secure Campus Access Control'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221006'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Secure Campus Access Control'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221007'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Mobile Pharmacy Assistant'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221008'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Mobile Pharmacy Assistant'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221009'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Intelligent Library Recommender'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221010'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Intelligent Library Recommender'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221011'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Cloud Attendance Tracker'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221012'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Cloud Attendance Tracker'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221013'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Database Performance Analyzer'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221014'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Database Performance Analyzer'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 1
-FROM projects p
-JOIN users u ON u.university_id = '1221015'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Graduation Project Marketplace'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT p.project_id, s.student_id, 0
-FROM projects p
-JOIN users u ON u.university_id = '1221016'
-JOIN students s ON s.user_id = u.user_id
-WHERE p.semester_id = @target_semester_id
-  AND p.title = 'Smart Graduation Project Marketplace'
-  AND NOT EXISTS (
-      SELECT 1 FROM project_members pm
-      WHERE pm.project_id = p.project_id AND pm.student_id = s.student_id
-  );
-
--- ============================================================
--- 5) Verification
--- ============================================================
-
-SELECT p.project_id, p.title, p.status, p.project_type
-FROM projects p
-WHERE p.semester_id = @target_semester_id
-  AND p.title IN (
-      'Smart Clinic Management Platform',
-      'AI Resume Screening System',
-      'Secure Campus Access Control',
-      'Mobile Pharmacy Assistant',
-      'Intelligent Library Recommender',
-      'Cloud Attendance Tracker',
-      'Database Performance Analyzer',
-      'Smart Graduation Project Marketplace'
-  )
-ORDER BY p.project_id;
-
--- ============================================================
---  COMMITTEE RANDOM DISTRIBUTION REPAIR APPENDIX
---  Safe fixes for older databases / partial runs
--- ============================================================
-
-USE apms_db;
-SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
 
 -- ============================================================
 -- A) discussion_rooms safe repair
@@ -3679,6 +3036,24 @@ CREATE TABLE IF NOT EXISTS section_completion_status (
     FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Links each succeeded COMP4200 group to its COMP4300 continuation.
+-- The source stays in the database for audit history, while the coordinator UI
+-- shows only the promoted COMP4300 copy after the Head performs the transfer.
+CREATE TABLE IF NOT EXISTS project_course_promotions (
+    promotion_id             INT PRIMARY KEY AUTO_INCREMENT,
+    source_project_id        INT NOT NULL,
+    promoted_project_id      INT NOT NULL,
+    promoted_to_semester_id  INT NOT NULL,
+    promoted_by              INT NULL,
+    promoted_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_project_course_promotion_source (source_project_id),
+    UNIQUE KEY uq_project_course_promotion_target (promoted_project_id),
+    FOREIGN KEY (source_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (promoted_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (promoted_to_semester_id) REFERENCES semesters(semester_id) ON DELETE RESTRICT,
+    FOREIGN KEY (promoted_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 
 
@@ -4635,18 +4010,17 @@ LEFT JOIN users marker ON marker.user_id = scs.marked_by;
 
 -- ============================================================
 -- 6) Project Introduction section results view
---    This is the part that fixes the broken Introduction tab.
---    It reads from student_distribution_sections, NOT projects.
+--    COMP4200 groups are stored in projects + project_members.
 -- ============================================================
 
 CREATE OR REPLACE VIEW vw_introduction_section_results AS
 SELECT
     'introduction' AS course_scope,
-    sds.section_id AS reference_id,
-    sds.section_name,
-    sds.supervisor_id,
-    u_sup.full_name AS supervisor_name,
-    COUNT(DISTINCT ss.student_id) AS student_count,
+    p.project_id AS reference_id,
+    COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id)) AS section_name,
+    p.supervisor_id,
+    COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+    COUNT(DISTINCT pm.student_id) AS student_count,
     COALESCE(
         GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '),
         ''
@@ -4655,20 +4029,24 @@ SELECT
     scs.notes,
     scs.marked_at,
     marker.full_name AS marked_by_name
-FROM student_distribution_sections sds
-JOIN faculty f_sup ON f_sup.faculty_id = sds.supervisor_id
-JOIN users u_sup ON u_sup.user_id = f_sup.user_id
-LEFT JOIN section_students ss ON ss.section_id = sds.section_id
-LEFT JOIN students st ON st.student_id = ss.student_id
-LEFT JOIN users u_st ON u_st.user_id = st.user_id
+FROM projects p
+JOIN semesters sem ON sem.semester_id = p.semester_id
+JOIN project_members pm ON pm.project_id = p.project_id
+JOIN students st ON st.student_id = pm.student_id
+JOIN users u_st ON u_st.user_id = st.user_id
+LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
 LEFT JOIN section_completion_status scs
        ON scs.course_scope = 'introduction'
-      AND scs.reference_id = sds.section_id
+      AND scs.reference_id = p.project_id
 LEFT JOIN users marker ON marker.user_id = scs.marked_by
+WHERE sem.course_code = 'COMP4200'
+  AND p.title NOT LIKE 'Committee Demo%'
+  AND p.title NOT LIKE 'COMP4300 Graduation Project%'
 GROUP BY
-    sds.section_id,
-    sds.section_name,
-    sds.supervisor_id,
+    p.project_id,
+    p.group_name,
+    p.supervisor_id,
     u_sup.full_name,
     scs.status,
     scs.notes,
@@ -5410,285 +4788,10 @@ SET SQL_SAFE_UPDATES = 1;
 
 
 -- ============================================================
--- APMS Seed Data: 10 COMP4200 sections + 10 COMP4300 project groups
--- Password for all NEW students and used doctors after this script: 123456
--- Safe re-run: uses INSERT IGNORE / NOT EXISTS guards
+-- Removed APMS fake seed data block
+-- This used to generate 60 test students, 10 COMP4200 sections,
+-- and 10 COMP4300 fake graduation project groups.
 -- ============================================================
-
-USE apms_db;
-
-SET SQL_SAFE_UPDATES = 0;
-SET FOREIGN_KEY_CHECKS = 0;
-SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
-SET collation_connection = 'utf8mb4_unicode_ci';
-
-SET @pwd_123456 := '$2b$05$D5fa/ZMO0l17xOixnQUsRuSI8bonQna5cdlPIvHt89jtwWb8zUd9S';
-
--- ------------------------------------------------------------
--- 0) Make sure both active semesters exist
--- ------------------------------------------------------------
-INSERT IGNORE INTO semesters (academic_year, semester_number, course_code, start_date, end_date, is_active)
-VALUES
-('2025/2026', 1, 'COMP4200', '2025-09-01', '2026-02-28', TRUE),
-('2025/2026', 2, 'COMP4300', '2026-03-01', '2026-07-01', TRUE);
-
-SELECT @sem4200 := semester_id
-FROM semesters
-WHERE course_code = 'COMP4200'
-  AND academic_year = '2025/2026'
-ORDER BY semester_id DESC
-LIMIT 1;
-
-SELECT @sem4300 := semester_id
-FROM semesters
-WHERE course_code = 'COMP4300'
-  AND academic_year = '2025/2026'
-ORDER BY semester_id DESC
-LIMIT 1;
-
-SELECT @coordinator_user_id := user_id
-FROM users
-WHERE role = 'coordinator'
-ORDER BY user_id ASC
-LIMIT 1;
-
--- ------------------------------------------------------------
--- 1) Existing doctors to use
---    The script does NOT create new doctors. It uses these if they exist.
---    It also resets ONLY these used doctor accounts to password 123456 for testing.
--- ------------------------------------------------------------
-DROP TEMPORARY TABLE IF EXISTS tmp_used_doctors;
-CREATE TEMPORARY TABLE tmp_used_doctors (
-    seq INT PRIMARY KEY,
-    full_name VARCHAR(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
-);
-
-INSERT INTO tmp_used_doctors (seq, full_name) VALUES
-(1, 'Dr. Sobhi Ahmad'),
-(2, 'Dr. Radi Jarrar'),
-(3, 'Dr. Abdullah Krakeh'),
-(4, 'Dr. Mamoun Nawahdah'),
-(5, 'Dr. Hafez Barghouthi'),
-(6, 'Dr. Murad Njoum'),
-(7, 'Dr. Adel Taweel'),
-(8, 'Dr. Yousef Hassouneh'),
-(9, 'Dr. Bassem Alserafi'),
-(10, 'Dr. Samer Zein');
-
-DROP TEMPORARY TABLE IF EXISTS tmp_doctor_faculty;
-CREATE TEMPORARY TABLE tmp_doctor_faculty AS
-SELECT
-    d.seq,
-    d.full_name,
-    MIN(f.faculty_id) AS faculty_id,
-    MIN(u.user_id) AS user_id,
-    MIN(u.email) AS email
-FROM tmp_used_doctors d
-JOIN users u
-  ON u.full_name COLLATE utf8mb4_unicode_ci = d.full_name COLLATE utf8mb4_unicode_ci
- AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
- AND u.is_active = TRUE
-JOIN faculty f
-  ON f.user_id = u.user_id
-GROUP BY d.seq, d.full_name;
-
--- Reset password for the doctors used in this seed so you know their login password.
-UPDATE users u
-JOIN tmp_doctor_faculty df ON df.user_id = u.user_id
-SET u.password_hash = @pwd_123456;
-
--- Stop clearly if not enough existing doctors are available.
--- MySQL has no simple SIGNAL outside procedure in all environments, so show a warning result.
-SELECT
-    CASE
-        WHEN COUNT(*) < 10 THEN 'WARNING: Less than 10 of the listed doctors were found. Add missing doctors first or change tmp_used_doctors names.'
-        ELSE 'OK: 10 doctors found and will be used.'
-    END AS doctor_check,
-    COUNT(*) AS found_doctors
-FROM tmp_doctor_faculty;
-
-
-INSERT IGNORE INTO users
-    (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
-SELECT
-    university_id, full_name, email, @pwd_123456, 'student', initials, TRUE
-FROM tmp_seed_students;
-
--- If the student already existed, reset its password too for testing.
-UPDATE users u
-JOIN tmp_seed_students ts ON ts.university_id COLLATE utf8mb4_unicode_ci = u.university_id COLLATE utf8mb4_unicode_ci
-SET u.password_hash = @pwd_123456,
-    u.role = 'student',
-    u.is_active = TRUE;
-
-INSERT IGNORE INTO students (user_id, enrollment_year)
-SELECT u.user_id, 2022
-FROM tmp_seed_students ts
-JOIN users u ON u.university_id COLLATE utf8mb4_unicode_ci = ts.university_id COLLATE utf8mb4_unicode_ci;
-
--- ------------------------------------------------------------
--- 3) COMP4200: create 10 sections with 3 unique students each
--- ------------------------------------------------------------
-DROP TEMPORARY TABLE IF EXISTS tmp_4200_sections;
-CREATE TEMPORARY TABLE tmp_4200_sections (
-    section_no INT PRIMARY KEY,
-    section_name VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    doctor_seq INT NOT NULL,
-    student_seq_1 INT NOT NULL,
-    student_seq_2 INT NOT NULL,
-    student_seq_3 INT NOT NULL
-);
-
-
-INSERT INTO student_distribution_sections (section_name, supervisor_id, entered_by)
-SELECT s.section_name, df.faculty_id, @coordinator_user_id
-FROM tmp_4200_sections s
-JOIN tmp_doctor_faculty df ON df.seq = s.doctor_seq
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM student_distribution_sections existing
-    WHERE existing.section_name COLLATE utf8mb4_unicode_ci = s.section_name COLLATE utf8mb4_unicode_ci
-);
-
--- Insert section students. Works even if uq_section_student_once(student_id) exists,
--- because each created student appears in one section only.
-INSERT IGNORE INTO section_students (section_id, student_id)
-SELECT sec.section_id, st.student_id
-FROM tmp_4200_sections s
-JOIN student_distribution_sections sec ON sec.section_name COLLATE utf8mb4_unicode_ci = s.section_name COLLATE utf8mb4_unicode_ci
-JOIN tmp_seed_students ts ON ts.seq IN (s.student_seq_1, s.student_seq_2, s.student_seq_3)
-JOIN users u ON u.university_id COLLATE utf8mb4_unicode_ci = ts.university_id COLLATE utf8mb4_unicode_ci
-JOIN students st ON st.user_id = u.user_id;
-
--- ------------------------------------------------------------
--- 4) COMP4300: create 10 graduation project groups with 3 students each
---    In your system COMP4300 appears through projects, not section_students.
--- ------------------------------------------------------------
-DROP TEMPORARY TABLE IF EXISTS tmp_4300_projects;
-CREATE TEMPORARY TABLE tmp_4300_projects (
-    project_no INT PRIMARY KEY,
-    title VARCHAR(300) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    project_type VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    doctor_seq INT NOT NULL,
-    student_seq_1 INT NOT NULL,
-    student_seq_2 INT NOT NULL,
-    student_seq_3 INT NOT NULL
-);
-
-INSERT INTO tmp_4300_projects VALUES
-(1,  'COMP4300 Graduation Project 01 - Web Archive System',          'web',                  1, 31, 32, 33),
-(2,  'COMP4300 Graduation Project 02 - AI Advising Assistant',       'ai',                   2, 34, 35, 36),
-(3,  'COMP4300 Graduation Project 03 - Mobile Campus App',           'mobile',                3, 37, 38, 39),
-(4,  'COMP4300 Graduation Project 04 - Secure File Portal',          'security',              4, 40, 41, 42),
-(5,  'COMP4300 Graduation Project 05 - Database Reporting System',   'databases',             5, 43, 44, 45),
-(6,  'COMP4300 Graduation Project 06 - Software QA Platform',        'software_engineering',  6, 46, 47, 48),
-(7,  'COMP4300 Graduation Project 07 - Smart Attendance System',     'web',                  7, 49, 50, 51),
-(8,  'COMP4300 Graduation Project 08 - IoT Monitoring Dashboard',    'software_engineering',  8, 52, 53, 54),
-(9,  'COMP4300 Graduation Project 09 - Cyber Risk Analyzer',         'security',              9, 55, 56, 57),
-(10, 'COMP4300 Graduation Project 10 - Academic Chatbot System',     'ai',                  10, 58, 59, 60);
-
-INSERT INTO projects
-    (title, title_en, abstract, keywords, project_type, semester_id, supervisor_id, status, submission_date)
-SELECT
-    p.title,
-    p.title,
-    CONCAT('Seed graduation project group for ', p.title),
-    'COMP4300, graduation project, seed data',
-    p.project_type,
-    @sem4300,
-    df.faculty_id,
-    'submitted',
-    CURDATE()
-FROM tmp_4300_projects p
-JOIN tmp_doctor_faculty df ON df.seq = p.doctor_seq
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM projects existing
-    WHERE existing.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci
-      AND existing.semester_id = @sem4300
-);
-
-INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact)
-SELECT pr.project_id, st.student_id,
-       CASE WHEN ts.seq = p.student_seq_1 THEN TRUE ELSE FALSE END AS is_primary_contact
-FROM tmp_4300_projects p
-JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300
-JOIN tmp_seed_students ts ON ts.seq IN (p.student_seq_1, p.student_seq_2, p.student_seq_3)
-JOIN users u ON u.university_id COLLATE utf8mb4_unicode_ci = ts.university_id COLLATE utf8mb4_unicode_ci
-JOIN students st ON st.user_id = u.user_id;
-
--- Optional: create lifecycle rows for COMP4300 groups so they appear as ready/submitted in pages using lifecycle.
-INSERT IGNORE INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes)
-SELECT pr.project_id, 'registration', 'completed', CURDATE(), CURDATE(), 'Seed registration completed'
-FROM tmp_4300_projects p
-JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300;
-
-INSERT IGNORE INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes)
-SELECT pr.project_id, 'file_submission', 'completed', CURDATE(), CURDATE(), 'Seed file submission completed'
-FROM tmp_4300_projects p
-JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300;
-
-INSERT IGNORE INTO project_lifecycle (project_id, stage, status, scheduled_date, completed_date, notes)
-SELECT pr.project_id, 'committee_evaluation', 'pending', CURDATE(), NULL, 'Ready for committee generation'
-FROM tmp_4300_projects p
-JOIN projects pr ON pr.title COLLATE utf8mb4_unicode_ci = p.title COLLATE utf8mb4_unicode_ci AND pr.semester_id = @sem4300;
-
--- ------------------------------------------------------------
--- 5) Result checks + account list
--- ------------------------------------------------------------
-SELECT
-    'COMP4200 sections created' AS item,
-    COUNT(*) AS count_value
-FROM student_distribution_sections
-WHERE section_name LIKE 'COMP4200 Section %';
-
-SELECT
-    'COMP4200 students in sections' AS item,
-    COUNT(DISTINCT ss.student_id) AS count_value
-FROM section_students ss
-JOIN student_distribution_sections sec ON sec.section_id = ss.section_id
-WHERE sec.section_name LIKE 'COMP4200 Section %';
-
-SELECT
-    'COMP4300 projects created' AS item,
-    COUNT(*) AS count_value
-FROM projects p
-JOIN semesters s ON s.semester_id = p.semester_id
-WHERE s.course_code = 'COMP4300'
-  AND p.title LIKE 'COMP4300 Graduation Project %';
-
-SELECT
-    'COMP4300 project students' AS item,
-    COUNT(DISTINCT pm.student_id) AS count_value
-FROM project_members pm
-JOIN projects p ON p.project_id = pm.project_id
-JOIN semesters s ON s.semester_id = p.semester_id
-WHERE s.course_code = 'COMP4300'
-  AND p.title LIKE 'COMP4300 Graduation Project %';
-
--- Account list: all generated students + the doctors used by the seed.
-SELECT
-    u.university_id,
-    u.full_name,
-    u.email,
-    u.role,
-    '123456' AS login_password
-FROM users u
-WHERE u.university_id BETWEEN '4200001' AND '4200030'
-   OR u.university_id BETWEEN '4300001' AND '4300030'
-   OR u.user_id IN (SELECT user_id FROM tmp_doctor_faculty)
-ORDER BY u.role, u.university_id;
-
-SET FOREIGN_KEY_CHECKS = 1;
-SET SQL_SAFE_UPDATES = 1;
-
-
-
-
-
-
-
-
 
 SELECT
     p.project_id,
@@ -5952,15 +5055,17 @@ HAVING COUNT(DISTINCT ss.student_id) > 0
 ORDER BY sec.section_id;
 
 
-UPDATE users u
-JOIN faculty f ON f.user_id = u.user_id
-SET u.role = 'supervisor'
-WHERE u.university_id = 1003;
+SET SQL_SAFE_UPDATES = 0;
 
-UPDATE users u
-JOIN faculty f ON f.user_id = u.user_id
-SET u.role = 'coordinator'
-WHERE u.university_id = 1002;
+UPDATE users
+SET role = 'supervisor'
+WHERE university_id = '1003';
+
+UPDATE users
+SET role = 'coordinator'
+WHERE university_id = '1002';
+
+SET SQL_SAFE_UPDATES = 1;
 
 select * from users;
 select * from faculty;
@@ -5999,11 +5104,11 @@ INSERT INTO projects (semester_id, supervisor_id, title, project_type, status, f
                 ON gp.supervisor_id = f.faculty_id
                      AND gp.status NOT IN ('cancelled', 'rejected', 'archived', 'draft')
             WHERE u.role = 'supervisor'
-				AND project_count != 0
             GROUP BY 
                 u.user_id, u.full_name, u.university_id,
                 u.email,   u.is_active,
                 f.specialization
+            HAVING COUNT(gp.project_id) != 0
             ORDER BY u.full_name;
 
 

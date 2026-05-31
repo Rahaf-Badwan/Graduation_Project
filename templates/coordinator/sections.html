@@ -468,7 +468,7 @@
   function cardTemplate(row) {
     const scopeLabel = row.course_scope === 'introduction'
       ? 'COMP4200 · Project Introduction'
-      : 'COMP4201 · Graduation Project';
+      : 'COMP4300 · Graduation Project';
 
     const status = row.result_status || 'pending';
 
@@ -481,6 +481,7 @@
           </div>
 
           <div class="section-meta"><b>${scopeLabel}</b></div>
+          <div class="section-meta">Project: <b>${escapeHtml(row.project_title || 'Untitled project')}</b></div>
           <div class="section-meta">Supervisor: <b>${escapeHtml(row.supervisor_name || '—')}</b></div>
           <div class="section-meta">Students (${escapeHtml(row.student_count || 0)}): ${escapeHtml(row.students || 'No students')}</div>
 
@@ -534,13 +535,18 @@
 
       const intro = data.introduction_sections || [];
       const grad = data.graduation_sections || [];
+      const stats = data.stats || {};
 
-      document.getElementById('introTotal').textContent = intro.length;
+      document.getElementById('introTotal').textContent =
+        stats.introduction_total ?? intro.length;
       document.getElementById('introDone').textContent =
+        stats.introduction_succeeded ??
         intro.filter(item => item.result_status === 'succeeded').length;
 
-      document.getElementById('gradTotal').textContent = grad.length;
+      document.getElementById('gradTotal').textContent =
+        stats.graduation_total ?? grad.length;
       document.getElementById('gradDone').textContent =
+        stats.graduation_succeeded ??
         grad.filter(item => item.result_status === 'succeeded').length;
 
       renderList('introBox', intro);

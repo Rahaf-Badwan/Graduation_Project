@@ -66,6 +66,22 @@ def _ensure_section_results_schema(cursor):
             FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS project_course_promotions (
+            promotion_id INT PRIMARY KEY AUTO_INCREMENT,
+            source_project_id INT NOT NULL,
+            promoted_project_id INT NOT NULL,
+            promoted_to_semester_id INT NOT NULL,
+            promoted_by INT NULL,
+            promoted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_project_course_promotion_source (source_project_id),
+            UNIQUE KEY uq_project_course_promotion_target (promoted_project_id),
+            FOREIGN KEY (source_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+            FOREIGN KEY (promoted_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+            FOREIGN KEY (promoted_to_semester_id) REFERENCES semesters(semester_id) ON DELETE RESTRICT,
+            FOREIGN KEY (promoted_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
 
 
 @head_bp.route("/section-results")
@@ -83,34 +99,45 @@ def api_head_section_results():
         _ensure_section_results_schema(cursor)
 
         cursor.execute("""
-            SELECT sec.section_id AS reference_id,
-                   sec.section_name,
+            SELECT p.project_id AS reference_id,
+                   COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id)) AS section_name,
                    'introduction' AS course_scope,
-                   u_sup.full_name AS supervisor_name,
-                   COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '), '') AS students,
+                   COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+                   COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
                    COUNT(DISTINCT st.student_id) AS student_count,
                    scs.notes,
                    scs.marked_at,
                    u_mark.full_name AS marked_by_name
             FROM section_completion_status scs
-            JOIN student_distribution_sections sec
-              ON scs.course_scope = 'introduction' AND scs.reference_id = sec.section_id
-            JOIN faculty f ON f.faculty_id = sec.supervisor_id
-            JOIN users u_sup ON u_sup.user_id = f.user_id
-            LEFT JOIN section_students ss ON ss.section_id = sec.section_id
-            LEFT JOIN students st ON st.student_id = ss.student_id
+            JOIN projects p
+              ON scs.course_scope = 'introduction' AND scs.reference_id = p.project_id
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
+            LEFT JOIN project_members pm ON pm.project_id = p.project_id
+            LEFT JOIN students st ON st.student_id = pm.student_id
             LEFT JOIN users u_st ON u_st.user_id = st.user_id
             LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
             WHERE scs.status = 'succeeded'
-            GROUP BY sec.section_id, sec.section_name, u_sup.full_name,
+              AND sem.course_code = 'COMP4200'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM project_course_promotions pcp
+                  WHERE pcp.source_project_id = p.project_id
+              )
+              AND p.title NOT LIKE 'Committee Demo%'
+              AND p.title NOT LIKE 'COMP4300 Graduation Project%'
+            GROUP BY p.project_id, p.group_name, u_sup.full_name,
                      scs.notes, scs.marked_at, u_mark.full_name
-            ORDER BY scs.marked_at DESC, sec.section_id DESC
+            HAVING student_count > 0
+            ORDER BY scs.marked_at DESC, p.project_id DESC
             """)
         introduction_sections = cursor.fetchall()
 
         cursor.execute("""
             SELECT p.project_id AS reference_id,
-                   COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS section_name,
+                   COALESCE(NULLIF(p.group_name, ''), NULLIF(p.title, ''),
+                            CONCAT('Project ', p.project_id)) AS section_name,
                    'graduation_project' AS course_scope,
                    COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
                    COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
@@ -122,6 +149,7 @@ def api_head_section_results():
             FROM section_completion_status scs
             JOIN projects p
               ON scs.course_scope = 'graduation_project' AND scs.reference_id = p.project_id
+            JOIN semesters sem ON sem.semester_id = p.semester_id
             LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
             LEFT JOIN project_members pm ON pm.project_id = p.project_id
@@ -129,8 +157,11 @@ def api_head_section_results():
             LEFT JOIN users u_st ON u_st.user_id = st.user_id
             LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
             WHERE scs.status = 'succeeded'
-            GROUP BY p.project_id, p.title, p.status, u_sup.full_name,
+              AND sem.course_code = 'COMP4300'
+              AND p.title NOT LIKE 'Committee Demo%'
+            GROUP BY p.project_id, p.group_name, p.title, p.status, u_sup.full_name,
                      scs.notes, scs.marked_at, u_mark.full_name
+            HAVING student_count > 0
             ORDER BY scs.marked_at DESC, p.project_id DESC
             """)
         graduation_sections = cursor.fetchall()

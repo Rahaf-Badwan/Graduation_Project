@@ -208,23 +208,20 @@ async function loadPassedStudents(){
   try{
     var res = await fetch('/head/api/students/passes');
     var data = await res.json();
-    var students = data.students || [];
+    var groups = data.groups || [];
 
-    if(!students.length){
-      list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">No passed COMP4200 students waiting for promotion.</div>';
+    if(!groups.length){
+      list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">No succeeded COMP4200 groups waiting for promotion.</div>';
       return;
     }
 
-    list.innerHTML = students.map(function(s){
+    list.innerHTML = groups.map(function(group){
       return '<div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">' +
-      '<div style="width:28px; height:28px; border-radius:50%; background:var(--color-background-info); display:grid; place-items:center; font-size:11px; font-weight:600; color:var(--color-text-info); flex-shrink:0;">' +
-        (s.avatar_initials || s.full_name.substring(0,2).toUpperCase()) +
-        '</div>' +
         '<div style="flex:1; min-width:0;">' +
-          '<div style="font-size:13px; font-weight:500;">' + s.full_name + '</div>' +
-          '<div style="font-size:11px; color:var(--color-text-secondary);">' + s.university_id + '</div>' +
+          '<div style="font-size:13px; font-weight:500;">' + group.group_name + '</div>' +
+          '<div style="font-size:11px; color:var(--color-text-secondary);">' + group.students + '</div>' +
         '</div>' +
-        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-success); color:var(--color-text-success); border: 0.5px solid var(--color-border-tertiary);">Passed COMP4200</span>' +
+        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-success); color:var(--color-text-success); border: 0.5px solid var(--color-border-tertiary);">Succeeded COMP4200</span>' +
       '</div>';
     }).join('');
   }catch(e){
@@ -239,23 +236,20 @@ async function loadComp4300Students(){
   try{
     var res = await fetch('/head/api/students/comp4300');
     var data = await res.json();
-    var students = data.students || [];
+    var projects = data.projects || [];
 
-    if(!students.length){
-      list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">No active COMP4300 projects found.</div>';
+    if(!projects.length){
+      list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">No succeeded COMP4300 projects waiting for archive.</div>';
       return;
     }
 
-    list.innerHTML = students.map(function(s){
+    list.innerHTML = projects.map(function(project){
       return '<div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">' +
-        '<div style="width:28px; height:28px; border-radius:50%; background:var(--color-background-info); display:grid; place-items:center; font-size:11px; font-weight:600; color:var(--color-text-info); flex-shrink:0;">' +
-          (s.avatar_initials || s.full_name.substring(0,2).toUpperCase()) +
-        '</div>' +
         '<div style="flex:1; min-width:0;">' +
-          '<div style="font-size:13px; font-weight:500;">' + s.full_name + '</div>' +
-          '<div style="font-size:11px; color:var(--color-text-secondary);">' + s.university_id + '</div>' +
+          '<div style="font-size:13px; font-weight:500;">' + project.group_name + '</div>' +
+          '<div style="font-size:11px; color:var(--color-text-secondary);">' + project.students + '</div>' +
         '</div>' +
-        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-info); color:var(--color-text-info); border: 0.5px solid var(--color-border-tertiary);">COMP4300</span>' +
+        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-info); color:var(--color-text-info); border: 0.5px solid var(--color-border-tertiary);">Succeeded COMP4300</span>' +
       '</div>';
     }).join('');
   }catch(e){

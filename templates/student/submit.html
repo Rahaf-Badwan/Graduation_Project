@@ -142,7 +142,7 @@
           <span class="material-symbols-outlined icon-inline">code</span>
         </div>
         <div class="upload-text">Source Code</div>
-        <div class="upload-hint">ZIP / RAR</div>
+        <div class="upload-hint">ZIP / RAR / 7Z · Max 50MB</div>
         <div id="status-code" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
           ↑ Click to upload
         </div>
@@ -157,7 +157,7 @@
           <span class="material-symbols-outlined icon-inline">slideshow</span>
         </div>
         <div class="upload-text">Presentation Slides</div>
-        <div class="upload-hint">PPTX / PDF</div>
+        <div class="upload-hint">PPTX / PDF · Max 50MB</div>
         <div id="status-slides" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
           ↑ Click to upload
         </div>
@@ -223,23 +223,167 @@
 
 </div>
 
+<style>
+  .student-toast-stack {
+    position: fixed;
+    top: 88px;
+    left: 50%;
+    z-index: 10000;
+    width: min(680px, calc(100vw - 32px));
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .student-toast {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    padding: 17px 20px;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, .18);
+    opacity: 0;
+    transform: translateY(-14px) scale(.98);
+    transition: opacity .24s ease, transform .24s ease;
+  }
+
+  .student-toast.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .student-toast.success {
+    color: #166534;
+    background: #f0fdf4;
+    border-color: #86efac;
+  }
+
+  .student-toast.error {
+    color: #991b1b;
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+
+  .student-toast.warning {
+    color: #92400e;
+    background: #fffbeb;
+    border-color: #fcd34d;
+  }
+
+  .student-toast-icon {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .72);
+  }
+
+  .student-toast-icon .material-symbols-outlined {
+    font-size: 27px;
+  }
+
+  .student-toast-title {
+    margin-bottom: 3px;
+    font-size: 15px;
+    font-weight: 900;
+  }
+
+  .student-toast-message {
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.55;
+  }
+
+  html[data-theme="dark"] .student-toast.success {
+    color: #86efac;
+    background: #163322;
+    border-color: #166534;
+  }
+
+  html[data-theme="dark"] .student-toast.error {
+    color: #fecaca;
+    background: #451a1a;
+    border-color: #991b1b;
+  }
+
+  html[data-theme="dark"] .student-toast.warning {
+    color: #fde68a;
+    background: #422006;
+    border-color: #a16207;
+  }
+</style>
+
+<div class="student-toast-stack" id="student-toast-stack" aria-live="polite"></div>
+
 <script>
   // ── توست للإشعارات ────────────────────────────────────────────
-  function showToast(msg, isError) {
-    var t = document.createElement('div');
-    t.textContent = msg;
-    t.style.cssText = [
-      'position:fixed', 'bottom:24px', 'right:24px', 'z-index:9999',
-      'padding:12px 20px', 'border-radius:8px', 'font-size:13px',
-      'font-weight:600', 'color:#fff', 'box-shadow:0 4px 16px rgba(0,0,0,.18)',
-      'background:' + (isError ? '#ef4444' : '#22c55e'),
-      'transition:opacity .4s'
-    ].join(';');
-    document.body.appendChild(t);
-    setTimeout(function () { t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 400); }, 3500);
+  var toastTimer = null;
+
+  function toastTypeForMessage(msg, requestedType) {
+    if (requestedType === true) requestedType = 'error';
+    if (requestedType === false || !requestedType) requestedType = 'success';
+    if (
+      requestedType === 'error' &&
+      /deadline|submission window|closed|not opened yet/i.test(String(msg || ''))
+    ) {
+      return 'warning';
+    }
+    return requestedType;
+  }
+
+  function showToast(msg, requestedType, customTitle) {
+    var type = toastTypeForMessage(msg, requestedType);
+    var config = {
+      success: { icon: 'task_alt', title: 'Saved successfully' },
+      error: { icon: 'error', title: 'Could not complete the request' },
+      warning: { icon: 'schedule', title: 'Submission window is closed' }
+    }[type] || { icon: 'info', title: 'Notice' };
+
+    var stack = document.getElementById('student-toast-stack');
+    if (!stack) return;
+    stack.innerHTML = '';
+
+    var toast = document.createElement('div');
+    toast.className = 'student-toast ' + type;
+
+    var iconWrap = document.createElement('div');
+    iconWrap.className = 'student-toast-icon';
+    var icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined';
+    icon.textContent = config.icon;
+    iconWrap.appendChild(icon);
+
+    var body = document.createElement('div');
+    var title = document.createElement('div');
+    title.className = 'student-toast-title';
+    title.textContent = customTitle || config.title;
+    var message = document.createElement('div');
+    message.className = 'student-toast-message';
+    message.textContent = msg;
+    body.appendChild(title);
+    body.appendChild(message);
+
+    toast.appendChild(iconWrap);
+    toast.appendChild(body);
+    stack.appendChild(toast);
+    requestAnimationFrame(function () { toast.classList.add('show'); });
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      toast.classList.remove('show');
+      setTimeout(function () { toast.remove(); }, 260);
+    }, type === 'success' ? 3600 : 5200);
   }
 
   var TIMELINE_ITEM_ID = "{{ timeline_item_id or '' }}";
+  var MAX_UPLOAD_MB = 50;
+  var FILE_RULES = {
+    final_report: { label: 'Final Report', extensions: ['pdf'] },
+    source_code: { label: 'Source Code', extensions: ['zip', 'rar', 'tar', 'gz', '7z'] },
+    presentation: { label: 'Presentation Slides', extensions: ['pdf', 'pptx', 'ppt'] }
+  };
 
   // ── تحميل الملفات المرفوعة مسبقاً عند فتح الصفحة ─────────────
   var FILE_ZONE_MAP = {
@@ -275,6 +419,20 @@
     var zone = document.getElementById(zoneId);
     if (input.files && input.files[0]) {
       var f = input.files[0];
+      var fileType = input.id === 'file-report'
+        ? 'final_report'
+        : input.id === 'file-code'
+          ? 'source_code'
+          : 'presentation';
+      var validationError = validateSelectedFile(input, fileType);
+      if (validationError) {
+        input.value = '';
+        status.textContent = validationError;
+        status.style.color = '#ef4444';
+        zone.style.borderColor = '#ef4444';
+        showToast(validationError, 'error', 'File not accepted');
+        return;
+      }
       var mb = (f.size / 1024 / 1024).toFixed(1);
       status.textContent = '✓ ' + f.name + ' (' + mb + ' MB)';
       status.style.color = 'var(--green, #22c55e)';
@@ -283,8 +441,62 @@
   }
 
   // ── رفع ملف واحد إلى الـ API ──────────────────────────────────
+  function validateSelectedFile(fileInput, fileType) {
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) return '';
+    var file = fileInput.files[0];
+    var rule = FILE_RULES[fileType];
+    if (!rule) return 'Unsupported upload field.';
+
+    var dot = file.name.lastIndexOf('.');
+    var extension = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : '';
+    if (!rule.extensions.includes(extension)) {
+      return rule.label + ' must use one of these formats: ' + rule.extensions.join(', ').toUpperCase() + '.';
+    }
+    if (!file.size) {
+      return rule.label + ' cannot be empty.';
+    }
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      return rule.label + ' exceeds the ' + MAX_UPLOAD_MB + ' MB upload limit.';
+    }
+    return '';
+  }
+
+  function validateFilesBeforeSubmit() {
+    var uploads = [
+      { input: document.getElementById('file-report'), type: 'final_report', zone: 'zone-report' },
+      { input: document.getElementById('file-code'), type: 'source_code', zone: 'zone-code' },
+      { input: document.getElementById('file-slides'), type: 'presentation', zone: 'zone-slides' }
+    ];
+    for (var i = 0; i < uploads.length; i += 1) {
+      var error = validateSelectedFile(uploads[i].input, uploads[i].type);
+      if (error) {
+        document.getElementById(uploads[i].zone).style.borderColor = '#ef4444';
+        showToast(error, 'error', 'File not accepted');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function readApiResponse(response) {
+    return response.text().then(function (text) {
+      var data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (err) {
+        throw new Error('The server returned an unexpected response (' + response.status + ').');
+      }
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Request failed (' + response.status + ').');
+      }
+      return data;
+    });
+  }
+
   function uploadFile(fileInput, fileType) {
     if (!fileInput || !fileInput.files || !fileInput.files[0]) return Promise.resolve(null);
+    var validationError = validateSelectedFile(fileInput, fileType);
+    if (validationError) return Promise.reject(new Error(validationError));
     var fd = new FormData();
     fd.append('file_type', fileType);
     fd.append('file', fileInput.files[0]);
@@ -292,11 +504,7 @@
       fd.append('timeline_item_id', TIMELINE_ITEM_ID);
     }
     return fetch('/student/api/upload-file', { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d.error) throw new Error(d.error);
-        return d;
-      });
+      .then(readApiResponse);
   }
 
   // ── Submit / Update Project ────────────────────────────────────
@@ -321,6 +529,7 @@
       document.getElementById('proj-abstract').focus();
       return;
     }
+    if (!validateFilesBeforeSubmit()) return;
 
     // تحقق من الـ Final Report (مطلوب)
     var reportFile = document.getElementById('file-report');
@@ -344,9 +553,8 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: title, abstract: abstract, keywords: keywords, project_type: projType, timeline_item_id: TIMELINE_ITEM_ID })
     })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d.error) throw new Error(d.error);
+      .then(readApiResponse)
+      .then(function () {
         // 2) رفع الملفات الجديدة إن وجدت
         return Promise.all([
           uploadFile(document.getElementById('file-report'), 'final_report'),
@@ -356,7 +564,7 @@
       })
       .then(function () {
         var isUpdate = document.querySelector('[data-my-submission]') !== null;
-        showToast(isUpdate ? 'Submission updated successfully! ✓' : 'Project submitted successfully! ✓', false);
+        showToast(isUpdate ? 'Submission updated successfully.' : 'Project submitted successfully.', 'success');
         // نعيد تفعيل الزر بعد ثانيتين عشان يقدر يعمل update مرة ثانية
         setTimeout(function () {
           btn.disabled = false;

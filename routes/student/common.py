@@ -840,7 +840,8 @@ def _is_submission_open(cursor, semester_id, project_id):
                   AND (LOWER(ti.title) LIKE '%final report%'
                     OR LOWER(ti.title) LIKE '%final submission%')
             """)
-            for item in cursor.fetchall():
+            final_milestones = cursor.fetchall()
+            for item in final_milestones:
                 # Build start datetime
                 s_d = item.get("start_date")
                 s_t = (item.get("start_time") or "").strip()
@@ -871,6 +872,8 @@ def _is_submission_open(cursor, semester_id, project_id):
                 if due_dt and now > due_dt:
                     continue
                 return True  # active final milestone → allow upload
+            if final_milestones:
+                return False
     except Exception:
         pass
 

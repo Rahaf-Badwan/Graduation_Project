@@ -62,6 +62,13 @@
     text-decoration: none;
   }
 
+  #pg-dashboard .work-actions .btn.is-disabled {
+    opacity: .58;
+    cursor: not-allowed;
+    pointer-events: none;
+    filter: grayscale(.2);
+  }
+
   #pg-dashboard .work-chip {
     display: inline-flex;
     align-items: center;
@@ -471,10 +478,19 @@
     }[ch]));
   }
 
-  function setActionLink(id, href, label) {
+  function setActionLink(id, href, label, options = {}) {
     const el = document.getElementById(id);
-    el.href = href;
+    const disabled = Boolean(options.disabled);
+    el.style.display = options.hidden ? 'none' : '';
     el.textContent = label;
+    el.classList.toggle('is-disabled', disabled);
+    el.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    el.tabIndex = disabled ? -1 : 0;
+    if (disabled) {
+      el.removeAttribute('href');
+    } else {
+      el.href = href;
+    }
   }
 
   function fileUploaded(files, key) {
@@ -604,6 +620,11 @@
     const comp4300Window = d.comp4300_submission_window || {};
     const comp4300Published = Boolean(comp4300Window.deliverable_id);
     const comp4300WindowOpen = Boolean(comp4300Window.is_active);
+    const finalSubmissionWindow = d.final_submission_window || {};
+    const projectFilesWindowOpen = isComp4300
+      ? comp4300WindowOpen
+      : Boolean(finalSubmissionWindow.is_active);
+    const projectFilesUrl = finalSubmissionWindow.submit_url || '/student/submit';
     const deadlines = d.deadlines || [];
     const readiness = Number(milestone.overall ?? overall ?? 0);
     const milestonesWorkChip = document.getElementById('milestones-work-chip');
@@ -657,13 +678,28 @@
       document.getElementById('next-action-copy').textContent = isComp4300
         ? 'Your COMP4300 workspace uses the promoted COMP4200 team data.'
         : 'Start by registering your group and supervisor preference so your dashboard can track the real work.';
-      setActionLink('next-action-primary', isComp4300 ? '/student/submit' : '/student/registration', isComp4300 ? 'Project Files' : 'Register Project');
-      setActionLink('next-action-secondary', isComp4300 ? '/student/submit' : '/student/timeline', isComp4300 ? 'Project Files' : 'View Timeline');
+      setActionLink(
+        'next-action-primary',
+        isComp4300 ? '/student/submit' : '/student/registration',
+        isComp4300 ? 'Project Files' : 'Register Project',
+        { disabled: isComp4300 && !comp4300WindowOpen }
+      );
+      setActionLink('next-action-secondary', '/student/timeline', 'View Timeline', { hidden: true });
     } else if (finalUploaded) {
       document.getElementById('next-action-title').textContent = 'Final submission complete';
       document.getElementById('next-action-copy').textContent = 'The final report is submitted, so semester progress is complete. Keep your files organized for archive and review.';
-      setActionLink('next-action-primary', isComp4300 ? '/student/submit' : '/student/timeline', isComp4300 ? 'Project Files' : 'View Timeline');
-      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+      setActionLink(
+        'next-action-primary',
+        isComp4300 ? '/student/submit' : '/student/timeline',
+        isComp4300 ? 'Project Files' : 'View Timeline',
+        { disabled: isComp4300 && !comp4300WindowOpen }
+      );
+      setActionLink(
+        'next-action-secondary',
+        projectFilesUrl,
+        'Project Files',
+        { hidden: isComp4300, disabled: !isComp4300 && !projectFilesWindowOpen }
+      );
     } else if (isComp4300) {
       document.getElementById('next-action-title').textContent = comp4300WindowOpen
         ? 'Submit your final project'
@@ -675,18 +711,18 @@
         : comp4300Published
           ? 'The COMP4300 final submission deadline has passed. The published milestone remains visible in your timeline.'
           : 'The coordinator has not published the COMP4300 final submission window yet. Keep your project files ready.';
-      setActionLink('next-action-primary', comp4300WindowOpen ? '/student/submit' : '/student/timeline', comp4300WindowOpen ? 'Submit Project' : 'View Timeline');
-      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+      setActionLink('next-action-primary', '/student/submit', 'Project Files', { disabled: !comp4300WindowOpen });
+      setActionLink('next-action-secondary', '/student/submit', 'Project Files', { hidden: true });
     } else if (milestoneTotal) {
       document.getElementById('next-action-title').textContent = 'Continue milestone submissions';
       document.getElementById('next-action-copy').textContent = `${project.workspace_type === 'section' ? 'Your section submitted' : 'You submitted'} ${milestoneSubmitted} of ${milestoneTotal} timeline milestones. Each submitted milestone increases this progress until the final report closes it at 100%.`;
       setActionLink('next-action-primary', '/student/timeline', 'Open Timeline');
-      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+      setActionLink('next-action-secondary', projectFilesUrl, 'Project Files', { disabled: !projectFilesWindowOpen });
     } else {
       document.getElementById('next-action-title').textContent = 'Timeline will guide the semester';
       document.getElementById('next-action-copy').textContent = 'Once the coordinator publishes milestones, this progress will grow with each submission instead of waiting for the final report.';
       setActionLink('next-action-primary', '/student/timeline', 'View Timeline');
-      setActionLink('next-action-secondary', '/student/submit', 'Project Files');
+      setActionLink('next-action-secondary', projectFilesUrl, 'Project Files', { disabled: !projectFilesWindowOpen });
     }
 
     const checklist = [
@@ -795,6 +831,10 @@
               <span class="material-symbols-outlined" style="font-size:13px;line-height:1">open_in_new</span>
               Submit
             </a>`
+          : isTimeline && dl.submission_closed
+            ? `<span style="font-size:10px;font-weight:700;color:var(--color-text-secondary);
+                           background:var(--color-background-tertiary);border-radius:8px;
+                           padding:5px 10px;white-space:nowrap;flex-shrink:0">Closed</span>`
           : '';
         const cardId = 'dl-card-' + Math.random().toString(36).slice(2);
         return `<div id="${cardId}"

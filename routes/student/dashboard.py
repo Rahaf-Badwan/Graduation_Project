@@ -36,11 +36,11 @@ def _comp4300_dashboard_milestone_progress(cursor, semester_id, final_report_upl
 
 
 def _comp4300_dashboard_deadlines(cursor, semester_id):
-    from datetime import date
+    from datetime import datetime, timedelta
 
     window = _comp4300_final_submission_window(cursor, semester_id)
     due_at = (window or {}).get("due_at")
-    if not due_at or due_at.date() < date.today():
+    if not due_at or due_at + timedelta(days=2) < datetime.now():
         return []
     return [
         {
@@ -48,10 +48,57 @@ def _comp4300_dashboard_deadlines(cursor, semester_id):
             "date_str": _fmt_short(due_at),
             "deadline_type": "timeline",
             "submission_open": bool(window.get("is_active")),
+            "submission_closed": not bool(window.get("is_active")),
             "submit_url": "/student/submit",
-            "_sort": _as_date(due_at),
         }
     ]
+
+
+def _student_dashboard_notifications(
+    cursor, user_id, intro_section=None, is_section_workspace=False
+):
+    notification_scope = ""
+    notification_params = [user_id]
+    if (
+        is_section_workspace
+        and intro_section
+        and intro_section.get("joined_at")
+    ):
+        notification_scope = """
+          AND (
+                (
+                    n.title NOT LIKE 'Timeline milestone %'
+                    AND n.title NOT LIKE 'Timeline Submission:%'
+                )
+             OR n.created_at >= %s
+          )
+        """
+        notification_params.append(intro_section["joined_at"])
+    cursor.execute(
+        f"""
+        SELECT n.title, n.message, n.notification_type, n.created_at, n.is_read,
+               sender.full_name AS sender_name
+        FROM   notifications n
+        LEFT JOIN users sender ON sender.user_id = n.sender_id
+        WHERE  n.recipient_id = %s
+        {notification_scope}
+        ORDER  BY n.created_at DESC LIMIT 5
+        """,
+        tuple(notification_params),
+    )
+    notifications = cursor.fetchall()
+    return (
+        [
+            {
+                "title": notification["title"],
+                "notification_type": notification["notification_type"],
+                "is_read": bool(notification["is_read"]),
+                "sender_name": notification["sender_name"] or "System",
+            }
+            for notification in notifications
+        ],
+        sum(1 for notification in notifications if not notification["is_read"]),
+    )
 
 
 @student_bp.route("/api/dashboard-data", methods=["GET"])
@@ -82,6 +129,7 @@ def api_dashboard_data():
         "unread_notifs": 0,
         "team_members": [],
         "project_type_distribution": [],
+        "final_submission_window": None,
         "comp4300_submission_window": None,
         "milestone_progress": {
             "submitted": 0,
@@ -146,6 +194,10 @@ def api_dashboard_data():
             else "COMP4200"
         )
         result["target_course"] = target_course
+        if target_course == "COMP4200":
+            result["final_submission_window"] = _student_final_submission_window(
+                cursor, student_id
+            )
         if target_course == "COMP4300":
             _cleanup_comp4200_state_for_promoted_student(
                 cursor, student_id, promoted_at=(r or {}).get("promoted_at")
@@ -323,6 +375,15 @@ def api_dashboard_data():
                 result["deadlines"] = _comp4300_dashboard_deadlines(
                     cursor, semester_id
                 )
+            (
+                result["notifications"],
+                result["unread_notifs"],
+            ) = _student_dashboard_notifications(
+                cursor,
+                user_id,
+                intro_section=intro_section,
+                is_section_workspace=is_section_workspace,
+            )
             return jsonify(_json_safe(result))
 
         project_id = project["project_id"]
@@ -504,6 +565,7 @@ def api_dashboard_data():
                         "date_str": _fmt_short(dd),
                         "deadline_type": "timeline",
                         "submission_open": bool(ti.get("submission_open")),
+                        "submission_closed": not bool(ti.get("submission_open")),
                         "_sort": _as_date(dd),
                     }
                 )
@@ -565,42 +627,15 @@ def api_dashboard_data():
                 result["days_to_deadline"] = max((nearest_d - date.today()).days, 0)
 
         # 8. آخر 5 إشعارات
-        notification_scope = ""
-        notification_params = [user_id]
-        if is_section_workspace and intro_section.get("joined_at"):
-            notification_scope = """
-              AND (
-                    (
-                        n.title NOT LIKE 'Timeline milestone %'
-                        AND n.title NOT LIKE 'Timeline Submission:%'
-                    )
-                 OR n.created_at >= %s
-              )
-            """
-            notification_params.append(intro_section["joined_at"])
-        cursor.execute(
-            f"""
-            SELECT n.title, n.message, n.notification_type, n.created_at, n.is_read,
-                   sender.full_name AS sender_name
-            FROM   notifications n
-            LEFT JOIN users sender ON sender.user_id = n.sender_id
-            WHERE  n.recipient_id = %s
-            {notification_scope}
-            ORDER  BY n.created_at DESC LIMIT 5
-            """,
-            tuple(notification_params),
+        (
+            result["notifications"],
+            result["unread_notifs"],
+        ) = _student_dashboard_notifications(
+            cursor,
+            user_id,
+            intro_section=intro_section,
+            is_section_workspace=is_section_workspace,
         )
-        notifs = cursor.fetchall()
-        result["notifications"] = [
-            {
-                "title": n["title"],
-                "notification_type": n["notification_type"],
-                "is_read": bool(n["is_read"]),
-                "sender_name": n["sender_name"] or "System",
-            }
-            for n in notifs
-        ]
-        result["unread_notifs"] = sum(1 for n in notifs if not n["is_read"])
 
         # 9. أعضاء الفريق
         if is_section_workspace:

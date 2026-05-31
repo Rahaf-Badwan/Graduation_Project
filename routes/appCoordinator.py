@@ -4037,6 +4037,54 @@ def _ensure_section_results_schema(cursor):
             FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS project_course_promotions (
+            promotion_id INT PRIMARY KEY AUTO_INCREMENT,
+            source_project_id INT NOT NULL,
+            promoted_project_id INT NOT NULL,
+            promoted_to_semester_id INT NOT NULL,
+            promoted_by INT NULL,
+            promoted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_project_course_promotion_source (source_project_id),
+            UNIQUE KEY uq_project_course_promotion_target (promoted_project_id),
+            FOREIGN KEY (source_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+            FOREIGN KEY (promoted_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+            FOREIGN KEY (promoted_to_semester_id) REFERENCES semesters(semester_id) ON DELETE RESTRICT,
+            FOREIGN KEY (promoted_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+
+def _sync_comp4200_group_student_results(cursor, project_id, status, notes, updated_by):
+    """Keep each COMP4200 member result aligned with the coordinator's group result."""
+    if not _table_exists(cursor, "student_course_results"):
+        return 0
+
+    student_status = {
+        "pending": "pending",
+        "succeeded": "passed",
+        "not_succeeded": "failed",
+    }[status]
+
+    cursor.execute(
+        """
+        INSERT INTO student_course_results
+            (student_id, semester_id, status, updated_by, notes)
+        SELECT DISTINCT pm.student_id, p.semester_id, %s, %s, %s
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        JOIN project_members pm ON pm.project_id = p.project_id
+        WHERE p.project_id = %s
+          AND sem.course_code = 'COMP4200'
+        ON DUPLICATE KEY UPDATE
+            status = IF(student_course_results.promoted_at IS NULL, VALUES(status), student_course_results.status),
+            updated_by = IF(student_course_results.promoted_at IS NULL, VALUES(updated_by), student_course_results.updated_by),
+            notes = IF(student_course_results.promoted_at IS NULL, VALUES(notes), student_course_results.notes),
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (student_status, updated_by, notes, project_id),
+    )
+    return cursor.rowcount
 
 
 @coordinator_bp.route("/api/coordinator/section-results", methods=["GET"])
@@ -4047,67 +4095,77 @@ def api_coordinator_section_results():
         cursor = db.cursor(dictionary=True)
         _ensure_section_results_schema(cursor)
 
-        semester = _get_active_semester(cursor)
-        semester_id = semester["semester_id"] if semester else None
-
-        introduction_sections = []
-        if _table_exists(cursor, "student_distribution_sections") and _table_exists(
-            cursor, "section_students"
-        ):
-            cursor.execute("""
-                SELECT sec.section_id AS reference_id,
-                       sec.section_name,
-                       'introduction' AS course_scope,
-                       u_sup.full_name AS supervisor_name,
-                       COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY u_st.full_name SEPARATOR ', '), '') AS students,
-                       COUNT(DISTINCT st.student_id) AS student_count,
-                       COALESCE(scs.status, 'pending') AS result_status,
-                       scs.notes,
-                       scs.marked_at,
-                       u_mark.full_name AS marked_by_name
-                FROM student_distribution_sections sec
-                JOIN faculty f ON f.faculty_id = sec.supervisor_id
-                JOIN users u_sup ON u_sup.user_id = f.user_id
-                LEFT JOIN section_students ss ON ss.section_id = sec.section_id
-                LEFT JOIN students st ON st.student_id = ss.student_id
-                LEFT JOIN users u_st ON u_st.user_id = st.user_id
-                LEFT JOIN section_completion_status scs
-                  ON scs.course_scope = 'introduction' AND scs.reference_id = sec.section_id
-                LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
-                GROUP BY sec.section_id, sec.section_name, u_sup.full_name,
-                         scs.status, scs.notes, scs.marked_at, u_mark.full_name
-                ORDER BY sec.section_id DESC
-                """)
-            introduction_sections = cursor.fetchall()
-
-        # Graduation Project groups must come from REAL registered projects only.
-        # Do NOT read every row from projects, because the database contains demo/seed projects
-        # such as "Committee Demo ..." with no students, which makes this page look wrong.
-        grad_where_parts = []
-        grad_params_list = []
-        if semester_id:
-            grad_where_parts.append("p.semester_id = %s")
-            grad_params_list.append(semester_id)
-
-        # A real graduation group must have at least one student in project_members.
-        grad_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
-
-        # Hide generated demo projects if they still exist in the database.
-        grad_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
-
-        grad_where = "WHERE " + " AND ".join(grad_where_parts)
-        grad_params = tuple(grad_params_list)
+        intro_semester = _get_active_semester_by_course(cursor, "COMP4200")
+        grad_semester = _get_active_semester_by_course(cursor, "COMP4300")
 
         group_name_select = (
-            "COALESCE(NULLIF(p.group_name, ''), NULLIF(p.title, ''), CONCAT('Project ', p.project_id))"
+            "COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id))"
             if _db_column_exists(cursor, "projects", "group_name")
-            else "COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id))"
+            else "CONCAT('Group ', p.project_id)"
         )
+
+        # Project Introduction groups are saved from the COMP4200 registration page
+        # in projects + project_members, not in student_distribution_sections.
+        intro_where_parts = ["sem.course_code = 'COMP4200'"]
+        intro_params_list = []
+        if intro_semester:
+            intro_where_parts.append("p.semester_id = %s")
+            intro_params_list.append(intro_semester["semester_id"])
+        intro_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
+        intro_where_parts.append("NOT EXISTS (SELECT 1 FROM project_course_promotions pcp WHERE pcp.source_project_id = p.project_id)")
+        intro_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
+        intro_where_parts.append("p.title NOT LIKE 'COMP4300 Graduation Project%'")
+        intro_where = "WHERE " + " AND ".join(intro_where_parts)
 
         cursor.execute(
             f"""
             SELECT p.project_id AS reference_id,
                    {group_name_select} AS section_name,
+                   p.title AS project_title,
+                   'introduction' AS course_scope,
+                   COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+                   COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
+                   COUNT(DISTINCT pm.student_id) AS student_count,
+                   p.status AS project_status,
+                   COALESCE(scs.status, 'pending') AS result_status,
+                   scs.notes,
+                   scs.marked_at,
+                   u_mark.full_name AS marked_by_name
+            FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            JOIN project_members pm ON pm.project_id = p.project_id
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users u_st ON u_st.user_id = st.user_id
+            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
+            LEFT JOIN section_completion_status scs
+              ON scs.course_scope = 'introduction' AND scs.reference_id = p.project_id
+            LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
+            {intro_where}
+            GROUP BY p.project_id, p.title, p.status, u_sup.full_name,
+                     scs.status, scs.notes, scs.marked_at, u_mark.full_name
+            HAVING student_count > 0
+            ORDER BY p.project_id DESC
+            """,
+            tuple(intro_params_list),
+        )
+        introduction_sections = cursor.fetchall()
+
+        # Graduation Project groups come from real COMP4300 projects only.
+        grad_where_parts = ["sem.course_code = 'COMP4300'"]
+        grad_params_list = []
+        if grad_semester:
+            grad_where_parts.append("p.semester_id = %s")
+            grad_params_list.append(grad_semester["semester_id"])
+        grad_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
+        grad_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
+        grad_where = "WHERE " + " AND ".join(grad_where_parts)
+
+        cursor.execute(
+            f"""
+            SELECT p.project_id AS reference_id,
+                   {group_name_select} AS section_name,
+                   p.title AS project_title,
                    'graduation_project' AS course_scope,
                    COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
                    COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
@@ -4118,6 +4176,7 @@ def api_coordinator_section_results():
                    scs.marked_at,
                    u_mark.full_name AS marked_by_name
             FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
             JOIN project_members pm ON pm.project_id = p.project_id
             JOIN students st ON st.student_id = pm.student_id
             JOIN users u_st ON u_st.user_id = st.user_id
@@ -4132,18 +4191,79 @@ def api_coordinator_section_results():
             HAVING student_count > 0
             ORDER BY p.project_id DESC
             """,
-            grad_params,
+            tuple(grad_params_list),
         )
         graduation_sections = cursor.fetchall()
+
+        # Keep the summary cumulative even after a succeeded COMP4200 group is
+        # promoted and hidden from the active Introduction list.
+        intro_stats_where_parts = [
+            "sem.course_code = 'COMP4200'",
+            "EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)",
+            "p.title NOT LIKE 'Committee Demo%'",
+            "p.title NOT LIKE 'COMP4300 Graduation Project%'",
+        ]
+        intro_stats_params = []
+        if intro_semester:
+            intro_stats_where_parts.append("p.semester_id = %s")
+            intro_stats_params.append(intro_semester["semester_id"])
+        cursor.execute(
+            f"""
+            SELECT COUNT(DISTINCT p.project_id) AS total,
+                   COUNT(DISTINCT CASE
+                       WHEN scs.status = 'succeeded' THEN p.project_id
+                   END) AS succeeded
+            FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            LEFT JOIN section_completion_status scs
+              ON scs.course_scope = 'introduction'
+             AND scs.reference_id = p.project_id
+            WHERE {" AND ".join(intro_stats_where_parts)}
+            """,
+            tuple(intro_stats_params),
+        )
+        introduction_stats = cursor.fetchone() or {}
+
+        grad_stats_where_parts = [
+            "sem.course_code = 'COMP4300'",
+            "EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)",
+            "p.title NOT LIKE 'Committee Demo%'",
+        ]
+        grad_stats_params = []
+        if grad_semester:
+            grad_stats_where_parts.append("p.semester_id = %s")
+            grad_stats_params.append(grad_semester["semester_id"])
+        cursor.execute(
+            f"""
+            SELECT COUNT(DISTINCT p.project_id) AS total,
+                   COUNT(DISTINCT CASE
+                       WHEN scs.status = 'succeeded' THEN p.project_id
+                   END) AS succeeded
+            FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            LEFT JOIN section_completion_status scs
+              ON scs.course_scope = 'graduation_project'
+             AND scs.reference_id = p.project_id
+            WHERE {" AND ".join(grad_stats_where_parts)}
+            """,
+            tuple(grad_stats_params),
+        )
+        graduation_stats = cursor.fetchone() or {}
 
         cursor.close()
         db.close()
         return jsonify(
             _json_safe_value(
                 {
-                    "semester": semester or {},
+                    "semester": intro_semester or grad_semester or {},
                     "introduction_sections": introduction_sections,
                     "graduation_sections": graduation_sections,
+                    "stats": {
+                        "introduction_total": introduction_stats.get("total", 0),
+                        "introduction_succeeded": introduction_stats.get("succeeded", 0),
+                        "graduation_total": graduation_stats.get("total", 0),
+                        "graduation_succeeded": graduation_stats.get("succeeded", 0),
+                    },
                 }
             )
         )
@@ -4169,7 +4289,7 @@ def api_coordinator_mark_section_result():
         )
     if status not in {"pending", "succeeded", "not_succeeded"}:
         return (
-            jsonify({"error": "status must be pending, succeeded, or not_succeeded."}),
+            jsonify({"error": "status must be pending, succeeded, or not_succeeded"}),
             400,
         )
     if not reference_id:
@@ -4180,15 +4300,19 @@ def api_coordinator_mark_section_result():
         cursor = db.cursor(dictionary=True)
         _ensure_section_results_schema(cursor)
 
-        if course_scope == "introduction":
-            cursor.execute(
-                "SELECT section_id FROM student_distribution_sections WHERE section_id = %s",
-                (reference_id,),
-            )
-        else:
-            cursor.execute(
-                "SELECT project_id FROM projects WHERE project_id = %s", (reference_id,)
-            )
+        expected_course_code = "COMP4200" if course_scope == "introduction" else "COMP4300"
+        cursor.execute(
+            """
+            SELECT p.project_id
+            FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            WHERE p.project_id = %s
+              AND sem.course_code = %s
+              AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.project_id)
+            LIMIT 1
+            """,
+            (reference_id, expected_course_code),
+        )
         if not cursor.fetchone():
             cursor.close()
             db.close()
@@ -4208,6 +4332,14 @@ def api_coordinator_mark_section_result():
             """,
             (course_scope, reference_id, status, notes, session.get("user_id")),
         )
+        if course_scope == "introduction":
+            _sync_comp4200_group_student_results(
+                cursor,
+                reference_id,
+                status,
+                notes,
+                session.get("user_id"),
+            )
         db.commit()
         cursor.close()
         db.close()
@@ -4219,7 +4351,7 @@ def api_coordinator_mark_section_result():
 @coordinator_bp.route("/api/coordinator/section-results/succeed-all", methods=["POST"])
 @login_required(role="coordinator")
 def api_coordinator_succeed_all_section_results():
-    """Mark all visible COMP4200 sections and COMP4300 project groups as succeeded."""
+    """Mark all visible COMP4200 groups and COMP4300 project groups as succeeded."""
     data = request.get_json(silent=True) or {}
     course_scope = (data.get("course_scope") or "all").strip()
 
@@ -4231,37 +4363,48 @@ def api_coordinator_succeed_all_section_results():
         cursor = db.cursor(dictionary=True)
         _ensure_section_results_schema(cursor)
 
-        semester = _get_active_semester(cursor)
-        semester_id = semester["semester_id"] if semester else None
-
         intro_ids = []
         grad_ids = []
 
         if course_scope in {"all", "introduction"}:
-            if _table_exists(cursor, "student_distribution_sections"):
-                cursor.execute("""
-                    SELECT sec.section_id AS reference_id
-                    FROM student_distribution_sections sec
-                    WHERE sec.section_id IS NOT NULL
-                    ORDER BY sec.section_id DESC
-                """)
-                intro_ids = [row["reference_id"] for row in cursor.fetchall()]
+            intro_semester = _get_active_semester_by_course(cursor, "COMP4200")
+            intro_where_parts = ["sem.course_code = 'COMP4200'"]
+            intro_params_list = []
+            if intro_semester:
+                intro_where_parts.append("p.semester_id = %s")
+                intro_params_list.append(intro_semester["semester_id"])
+            intro_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
+            intro_where_parts.append("NOT EXISTS (SELECT 1 FROM project_course_promotions pcp WHERE pcp.source_project_id = p.project_id)")
+            intro_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
+            intro_where_parts.append("p.title NOT LIKE 'COMP4300 Graduation Project%'")
+            intro_where = "WHERE " + " AND ".join(intro_where_parts)
+            cursor.execute(
+                f"""
+                SELECT DISTINCT p.project_id AS reference_id
+                FROM projects p
+                JOIN semesters sem ON sem.semester_id = p.semester_id
+                {intro_where}
+                ORDER BY p.project_id DESC
+                """,
+                tuple(intro_params_list),
+            )
+            intro_ids = [row["reference_id"] for row in cursor.fetchall()]
 
         if course_scope in {"all", "graduation_project"}:
-            grad_where_parts = []
+            grad_semester = _get_active_semester_by_course(cursor, "COMP4300")
+            grad_where_parts = ["sem.course_code = 'COMP4300'"]
             grad_params_list = []
-            if semester_id:
+            if grad_semester:
                 grad_where_parts.append("p.semester_id = %s")
-                grad_params_list.append(semester_id)
-
+                grad_params_list.append(grad_semester["semester_id"])
             grad_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
             grad_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
-
             grad_where = "WHERE " + " AND ".join(grad_where_parts)
             cursor.execute(
                 f"""
                 SELECT DISTINCT p.project_id AS reference_id
                 FROM projects p
+                JOIN semesters sem ON sem.semester_id = p.semester_id
                 {grad_where}
                 ORDER BY p.project_id DESC
                 """,
@@ -4290,6 +4433,14 @@ def api_coordinator_succeed_all_section_results():
                     (scope, reference_id, notes, marked_by),
                 )
                 count += 1
+                if scope == "introduction":
+                    _sync_comp4200_group_student_results(
+                        cursor,
+                        reference_id,
+                        "succeeded",
+                        notes,
+                        marked_by,
+                    )
             return count
 
         intro_count = mark_rows("introduction", intro_ids)
