@@ -12,15 +12,23 @@ import bcrypt
 from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
-from routes.supervisor_progress_api import supervisor_progress_api_bp
-
+from routes.supervisor_progress_submitted_api import supervisor_progress_api_bp
 general_supervisors_bp = Blueprint(
     "general_supervisors",
     __name__,
-    url_prefix="/general-supervisor"
+    url_prefix="/supervisor"
 )
 
 general_supervisors_bp.register_blueprint(supervisor_progress_api_bp)
+
+# Alias route for submitted files.
+# This guarantees the endpoint is available under:
+# /supervisor/api/supervisor/progress/submissions
+@general_supervisors_bp.route("/api/supervisor/progress/submissions", methods=["GET"])
+@login_required(role="supervisor")
+def supervisor_submissions_alias():
+    from routes.supervisor_progress_submitted_api import api_supervisor_submitted_files
+    return api_supervisor_submitted_files()
 
 
 # ─── Dashboard ──────────────────────────────────────────────

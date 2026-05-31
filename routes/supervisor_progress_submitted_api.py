@@ -1,9 +1,13 @@
 from datetime import datetime, time
+import os
+import zipfile
+import io
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, session, Response, redirect, url_for
 
 from auth import login_required
 from db import get_db
+from werkzeug.utils import secure_filename
 
 supervisor_progress_api_bp = Blueprint("supervisor_progress_api_bp", __name__)
 
@@ -718,9 +722,411 @@ def _exam_distribution_timeline(cursor, project, file_counts, feedback_count):
     return timeline, "exam_distribution"
 
 
+
+
+# ─────────────────────────────────────────────────────────────
+# Supervisor Submitted Files helpers
+# ─────────────────────────────────────────────────────────────
+def _course_label_for_code(course_code):
+    if course_code == "COMP4300":
+        return "Graduation Project"
+    if course_code == "COMP4200":
+        return "Project Introduction"
+    return course_code or "Course"
+
+
+def _format_submission_datetime(value):
+    if not value:
+        return ""
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d %H:%M")
+    return str(value)[:16]
+
+
+def _download_static_path(file_path):
+    clean_path = (file_path or "").replace("\\", "/").lstrip("/")
+    if clean_path.startswith("static/"):
+        clean_path = clean_path[len("static/"):]
+    return redirect(url_for("static", filename=clean_path))
+
+
+def _file_download_response(row, fallback_name="submitted-file"):
+    if not row:
+        return jsonify({"error": "File not found."}), 404
+
+    if row.get("file_data"):
+        return Response(
+            bytes(row["file_data"]),
+            mimetype=row.get("file_mime") or "application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{row.get("file_name") or fallback_name}"'
+            },
+        )
+
+    if row.get("file_path"):
+        return _download_static_path(row.get("file_path"))
+
+    return jsonify({"error": "File content not found."}), 404
+
+
+def _sort_and_clean_submission_files(files):
+    files.sort(key=lambda item: item.get("sort_at") or datetime.min, reverse=True)
+    for item in files:
+        item.pop("sort_at", None)
+    return files
+
 # ─────────────────────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────────────────────
+
+
+@supervisor_progress_api_bp.route("/api/supervisor/progress/submissions", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_submitted_files():
+    """Return only submitted files for projects owned by the logged-in supervisor."""
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Supervisor faculty record was not found."}), 404
+
+        files = []
+        access_filter = _project_access_filter(cursor)
+        access_params = _project_access_params(cursor, faculty_id)
+
+        # Return ALL projects for this supervisor, even when they have no submissions.
+        projects = _fetch_supervisor_projects(cursor, faculty_id)
+        for project in projects:
+            project["title"] = project.get("title") or f"Project {project.get('project_id')}"
+            project["course_code"] = project.get("course_code") or ""
+            project["course_label"] = _course_label_for_code(project.get("course_code") or "")
+            project["members"] = project.get("members") or ""
+            project["status"] = project.get("status") or ""
+            project["submission_date"] = _dt(project.get("submission_date"))
+            project["updated_at"] = _dt(project.get("updated_at"))
+
+        # 1) COMP4300 / general project files
+        if _table_exists(cursor, "project_files"):
+            cursor.execute(
+                f"""
+                SELECT
+                    pf.file_id,
+                    pf.project_id,
+                    pf.file_type,
+                    pf.file_name,
+                    pf.file_path,
+                    pf.file_mime,
+                    pf.file_size_mb,
+                    pf.uploaded_at,
+                    pf.file_data IS NOT NULL AS has_file_data,
+                    p.title AS project_title,
+                    p.project_type,
+                    p.status AS project_status,
+                    s.course_code,
+                    COALESCE(u_upload.full_name, primary_user.full_name, 'Unknown student') AS submitted_by,
+                    sup_user.full_name AS supervisor_name,
+                    GROUP_CONCAT(DISTINCT team_user.full_name ORDER BY pm.is_primary_contact DESC, team_user.full_name SEPARATOR ', ') AS team_members
+                FROM project_files pf
+                JOIN projects p ON p.project_id = pf.project_id
+                LEFT JOIN semesters s ON s.semester_id = p.semester_id
+                LEFT JOIN users u_upload ON u_upload.user_id = pf.uploaded_by
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_user ON sup_user.user_id = sup_f.user_id
+                LEFT JOIN project_members pm ON pm.project_id = p.project_id
+                LEFT JOIN students team_st ON team_st.student_id = pm.student_id
+                LEFT JOIN users team_user ON team_user.user_id = team_st.user_id
+                LEFT JOIN project_members primary_pm
+                       ON primary_pm.project_id = p.project_id
+                      AND primary_pm.is_primary_contact = TRUE
+                LEFT JOIN students primary_st ON primary_st.student_id = primary_pm.student_id
+                LEFT JOIN users primary_user ON primary_user.user_id = primary_st.user_id
+                WHERE {access_filter}
+                  AND (
+                        COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+                        OR pf.uploaded_at IS NOT NULL
+                        OR pf.file_data IS NOT NULL
+                        OR COALESCE(pf.file_path, '') <> ''
+                      )
+                GROUP BY
+                    pf.file_id, pf.project_id, pf.file_type, pf.file_name,
+                    pf.file_path, pf.file_mime, pf.file_size_mb, pf.uploaded_at,
+                    p.title, p.project_type, p.status, s.course_code,
+                    u_upload.full_name, primary_user.full_name, sup_user.full_name
+                ORDER BY pf.uploaded_at DESC, pf.file_id DESC
+                """,
+                access_params,
+            )
+            for row in cursor.fetchall():
+                course_code = row.get("course_code") or "COMP4300"
+                uploaded_at = row.get("uploaded_at")
+                files.append(
+                    {
+                        "source": "project",
+                        "source_id": row.get("file_id"),
+                        "project_id": row.get("project_id"),
+                        "file_type": row.get("file_type") or "project_file",
+                        "submission_title": "Project File Submission" if course_code != "COMP4300" else "Graduation Project Final Submission",
+                        "course_scope": course_code,
+                        "course_code": course_code,
+                        "course_label": _course_label_for_code(course_code),
+                        "project_title": row.get("project_title") or "Untitled Project",
+                        "project_type": row.get("project_type") or "",
+                        "project_status": row.get("project_status") or "",
+                        "supervisor_name": row.get("supervisor_name") or "",
+                        "team_members": row.get("team_members") or "",
+                        "submitted_by": row.get("submitted_by") or "Unknown student",
+                        "file_name": row.get("file_name") or "Open file",
+                        "file_path": row.get("file_path") or "",
+                        "file_size_mb": float(row.get("file_size_mb") or 0),
+                        "uploaded_at": _format_submission_datetime(uploaded_at),
+                        "sort_at": uploaded_at,
+                        "download_url": f"/api/supervisor/progress/project-files/{row.get('file_id')}/download",
+                    }
+                )
+
+        # 2) COMP4200 timeline milestone submissions sent to supervisor/both
+        if _table_exists(cursor, "milestone_submissions") and _table_exists(cursor, "comp4200_timeline_items"):
+            cursor.execute(
+                f"""
+                SELECT
+                    ms.submission_id,
+                    ms.project_id,
+                    ms.file_name,
+                    ms.file_mime,
+                    ms.file_size_mb,
+                    ms.submitted_at,
+                    ms.file_data IS NOT NULL AS has_file_data,
+                    ti.title AS milestone_title,
+                    ti.milestone_label,
+                    p.title AS project_title,
+                    p.status AS project_status,
+                    s.course_code,
+                    u_student.full_name AS submitted_by,
+                    sup_user.full_name AS supervisor_name,
+                    GROUP_CONCAT(DISTINCT team_user.full_name ORDER BY pm.is_primary_contact DESC, team_user.full_name SEPARATOR ', ') AS team_members
+                FROM milestone_submissions ms
+                JOIN projects p ON p.project_id = ms.project_id
+                LEFT JOIN semesters s ON s.semester_id = p.semester_id
+                JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                JOIN students st_submit ON st_submit.student_id = ms.student_id
+                JOIN users u_student ON u_student.user_id = st_submit.user_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_user ON sup_user.user_id = sup_f.user_id
+                LEFT JOIN project_members pm ON pm.project_id = p.project_id
+                LEFT JOIN students team_st ON team_st.student_id = pm.student_id
+                LEFT JOIN users team_user ON team_user.user_id = team_st.user_id
+                WHERE {access_filter}
+                  AND ms.submitted_to IN ('supervisor', 'both')
+                GROUP BY
+                    ms.submission_id, ms.project_id, ms.file_name, ms.file_mime,
+                    ms.file_size_mb, ms.submitted_at, ti.title, ti.milestone_label,
+                    p.title, p.status, s.course_code, u_student.full_name, sup_user.full_name
+                ORDER BY ms.submitted_at DESC, ms.submission_id DESC
+                """,
+                access_params,
+            )
+            for row in cursor.fetchall():
+                uploaded_at = row.get("submitted_at")
+                course_code = row.get("course_code") or "COMP4200"
+                files.append(
+                    {
+                        "source": "timeline",
+                        "source_id": row.get("submission_id"),
+                        "project_id": row.get("project_id"),
+                        "file_type": "timeline_submission",
+                        "submission_title": row.get("milestone_label") or row.get("milestone_title") or "Timeline Submission",
+                        "course_scope": course_code,
+                        "course_code": course_code,
+                        "course_label": _course_label_for_code(course_code),
+                        "project_title": row.get("project_title") or "Untitled Project",
+                        "project_status": row.get("project_status") or "",
+                        "supervisor_name": row.get("supervisor_name") or "",
+                        "team_members": row.get("team_members") or "",
+                        "submitted_by": row.get("submitted_by") or "Unknown student",
+                        "file_name": row.get("file_name") or "Open file",
+                        "file_size_mb": float(row.get("file_size_mb") or 0),
+                        "uploaded_at": _format_submission_datetime(uploaded_at),
+                        "sort_at": uploaded_at,
+                        "download_url": f"/api/supervisor/progress/milestone-submissions/{row.get('submission_id')}/download",
+                    }
+                )
+
+        # 3) Coordinator deliverable submissions connected to supervisor projects
+        if _table_exists(cursor, "coordinator_deliverable_submissions") and _table_exists(cursor, "coordinator_deliverables"):
+            cursor.execute(
+                f"""
+                SELECT
+                    cds.submission_id,
+                    cds.project_id,
+                    cds.file_name,
+                    cds.file_path,
+                    cds.file_mime,
+                    cds.file_size_mb,
+                    cds.submitted_at,
+                    cds.file_data IS NOT NULL AS has_file_data,
+                    cd.title AS deliverable_title,
+                    cd.course_scope,
+                    p.title AS project_title,
+                    p.status AS project_status,
+                    s.course_code,
+                    u_student.full_name AS submitted_by,
+                    sup_user.full_name AS supervisor_name,
+                    GROUP_CONCAT(DISTINCT team_user.full_name ORDER BY pm.is_primary_contact DESC, team_user.full_name SEPARATOR ', ') AS team_members
+                FROM coordinator_deliverable_submissions cds
+                JOIN coordinator_deliverables cd ON cd.deliverable_id = cds.deliverable_id
+                JOIN projects p ON p.project_id = cds.project_id
+                LEFT JOIN semesters s ON s.semester_id = p.semester_id
+                JOIN students st_submit ON st_submit.student_id = cds.student_id
+                JOIN users u_student ON u_student.user_id = st_submit.user_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                LEFT JOIN users sup_user ON sup_user.user_id = sup_f.user_id
+                LEFT JOIN project_members pm ON pm.project_id = p.project_id
+                LEFT JOIN students team_st ON team_st.student_id = pm.student_id
+                LEFT JOIN users team_user ON team_user.user_id = team_st.user_id
+                WHERE {access_filter}
+                GROUP BY
+                    cds.submission_id, cds.project_id, cds.file_name, cds.file_path,
+                    cds.file_mime, cds.file_size_mb, cds.submitted_at, cd.title,
+                    cd.course_scope, p.title, p.status, s.course_code,
+                    u_student.full_name, sup_user.full_name
+                ORDER BY cds.submitted_at DESC, cds.submission_id DESC
+                """,
+                access_params,
+            )
+            for row in cursor.fetchall():
+                uploaded_at = row.get("submitted_at")
+                course_code = row.get("course_code") or ("COMP4300" if row.get("course_scope") == "graduation_project" else "COMP4200")
+                files.append(
+                    {
+                        "source": "deliverable",
+                        "source_id": row.get("submission_id"),
+                        "project_id": row.get("project_id"),
+                        "file_type": "deliverable_submission",
+                        "submission_title": row.get("deliverable_title") or "Deliverable Submission",
+                        "course_scope": course_code,
+                        "course_code": course_code,
+                        "course_label": _course_label_for_code(course_code),
+                        "project_title": row.get("project_title") or "Untitled Project",
+                        "project_status": row.get("project_status") or "",
+                        "supervisor_name": row.get("supervisor_name") or "",
+                        "team_members": row.get("team_members") or "",
+                        "submitted_by": row.get("submitted_by") or "Unknown student",
+                        "file_name": row.get("file_name") or "Open file",
+                        "file_path": row.get("file_path") or "",
+                        "file_size_mb": float(row.get("file_size_mb") or 0),
+                        "uploaded_at": _format_submission_datetime(uploaded_at),
+                        "sort_at": uploaded_at,
+                        "download_url": f"/api/supervisor/progress/deliverable-submissions/{row.get('submission_id')}/download",
+                    }
+                )
+
+        cursor.close()
+        db.close()
+        return jsonify({
+            "projects": projects,
+            "files": _sort_and_clean_submission_files(files)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@supervisor_progress_api_bp.route("/api/supervisor/progress/project-files/<int:file_id>/download")
+@login_required(role="supervisor")
+def api_supervisor_download_project_file(file_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        access_filter = _project_access_filter(cursor)
+        params = (file_id,) + _project_access_params(cursor, faculty_id)
+        cursor.execute(
+            f"""
+            SELECT pf.file_name, pf.file_path, pf.file_data, pf.file_mime
+            FROM project_files pf
+            JOIN projects p ON p.project_id = pf.project_id
+            LEFT JOIN semesters s ON s.semester_id = p.semester_id
+            WHERE pf.file_id = %s
+              AND {access_filter}
+              AND (
+                    COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+                    OR pf.uploaded_at IS NOT NULL
+                    OR pf.file_data IS NOT NULL
+                    OR COALESCE(pf.file_path, '') <> ''
+                  )
+            LIMIT 1
+            """,
+            params,
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+        return _file_download_response(row, "project-file")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@supervisor_progress_api_bp.route("/api/supervisor/progress/milestone-submissions/<int:submission_id>/download")
+@login_required(role="supervisor")
+def api_supervisor_download_milestone_submission(submission_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        access_filter = _project_access_filter(cursor)
+        params = (submission_id,) + _project_access_params(cursor, faculty_id)
+        cursor.execute(
+            f"""
+            SELECT ms.file_name, ms.file_data, ms.file_mime
+            FROM milestone_submissions ms
+            JOIN projects p ON p.project_id = ms.project_id
+            LEFT JOIN semesters s ON s.semester_id = p.semester_id
+            WHERE ms.submission_id = %s
+              AND {access_filter}
+              AND ms.submitted_to IN ('supervisor', 'both')
+            LIMIT 1
+            """,
+            params,
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+        return _file_download_response(row, "milestone-submission")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@supervisor_progress_api_bp.route("/api/supervisor/progress/deliverable-submissions/<int:submission_id>/download")
+@login_required(role="supervisor")
+def api_supervisor_download_deliverable_submission(submission_id):
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        access_filter = _project_access_filter(cursor)
+        params = (submission_id,) + _project_access_params(cursor, faculty_id)
+        cursor.execute(
+            f"""
+            SELECT cds.file_name, cds.file_path, cds.file_data, cds.file_mime
+            FROM coordinator_deliverable_submissions cds
+            JOIN projects p ON p.project_id = cds.project_id
+            LEFT JOIN semesters s ON s.semester_id = p.semester_id
+            WHERE cds.submission_id = %s
+              AND {access_filter}
+            LIMIT 1
+            """,
+            params,
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        db.close()
+        return _file_download_response(row, "deliverable-submission")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @supervisor_progress_api_bp.route("/api/supervisor/progress/projects", methods=["GET"])
 @login_required(role="supervisor")
 def api_supervisor_progress_projects():
