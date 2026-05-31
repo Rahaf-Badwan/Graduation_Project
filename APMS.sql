@@ -5289,3 +5289,70 @@ SET SQL_SAFE_UPDATES = 1;
 -- ============================================================
 --  END OF SUPERVISOR NAME OVERRIDE MIGRATION
 -- ============================================================
+START TRANSACTION;
+
+DELETE FROM projects
+WHERE semester_id = 5
+  AND title IN (
+    'Hospital Management System',
+    'Food Delivery Mobile App',
+    'AI Fraud Detection System',
+    'E-Commerce Website',
+    'Task Management App',
+    'Network Security Monitor',
+    'HR Database System',
+    'Smart Campus Navigation',
+    'Online Exam Platform',
+    'Inventory Management System'
+  );
+
+SELECT ROW_COUNT() AS deleted_projects;
+
+COMMIT;
+
+
+SELECT project_id, title, status, semester_id, supervisor_id
+FROM projects
+WHERE semester_id = 5
+  AND title IN (
+    'Hospital Management System',
+    'Food Delivery Mobile App',
+    'AI Fraud Detection System',
+    'E-Commerce Website',
+    'Task Management App',
+    'Network Security Monitor',
+    'HR Database System',
+    'Smart Campus Navigation',
+    'Online Exam Platform',
+    'Inventory Management System'
+  );
+  
+  SELECT
+    p.project_id,
+    p.title,
+    p.status,
+    p.semester_id,
+    s.course_code,
+    p.supervisor_id,
+    u.full_name AS real_supervisor_from_id,
+    p.supervisor_name_override,
+    COUNT(pm.student_id) AS members_count
+FROM projects p
+LEFT JOIN semesters s ON s.semester_id = p.semester_id
+LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+LEFT JOIN users u ON u.user_id = f.user_id
+LEFT JOIN project_members pm ON pm.project_id = p.project_id
+WHERE p.title IN (
+    'Plestia Events Platform',
+    'E-Voting System Using Blockchain',
+    'Flora Palestine Plant Guide',
+    'KhatClarifier AI Writing Tool',
+    'Policy Peek Policy Analyzer',
+    'Palestine Charity Platform',
+    'Prediction of Anti-Cancer Peptide ACP-XG',
+    'Wasselha Delivery System',
+    'Smart Invoice'
+)
+GROUP BY
+    p.project_id, p.title, p.status, p.semester_id, s.course_code,
+    p.supervisor_id, u.full_name, p.supervisor_name_override;
