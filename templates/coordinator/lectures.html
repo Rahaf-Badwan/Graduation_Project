@@ -1,8 +1,8 @@
 {% extends 'coordinator/base.html' %}
 
-{% block page_title %}Lectures &amp; Deliverables{% endblock %}
+{% block page_title %}Lectures &amp; Submission Files{% endblock %}
 {% block page_id %}lectures{% endblock %}
-{% block topbar_title %}Lectures &amp; Deliverables{% endblock %}
+{% block topbar_title %}Lectures &amp; Submission Files{% endblock %}
 
 {% block content %}
 <style>
@@ -84,7 +84,7 @@
 
   #pg-lectures .lecture-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
     align-items: start;
   }
@@ -202,10 +202,9 @@
     margin: 0 18px 18px 18px;
   }
 
-  #pg-lectures .lec-card,
-  #pg-lectures .deliv-row {
+  #pg-lectures .lec-card {
     display: grid;
-    grid-template-columns: 42px 1fr auto;
+    grid-template-columns: 42px 1fr;
     gap: 12px;
     align-items: flex-start;
     border: 1px solid #e7eee9;
@@ -215,8 +214,7 @@
     margin: 0 18px 12px 18px;
   }
 
-  #pg-lectures .lec-num,
-  #pg-lectures .deliv-token {
+  #pg-lectures .lec-num {
     width: 42px;
     height: 42px;
     border-radius: 14px;
@@ -288,15 +286,6 @@
     color: #fff;
   }
 
-  #pg-lectures .submission-file-card {
-    border: 1px solid #e7eee9;
-    background: var(--color-background-primary);
-    border-radius: 16px;
-    padding: 14px 16px;
-    margin-bottom: 12px;
-    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
-  }
-
   #pg-lectures .submission-folder {
     border: 1px solid #dfe9e3;
     background: var(--color-background-primary);
@@ -342,15 +331,6 @@
     border-bottom: 0;
   }
 
-  #pg-lectures .submission-file-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 8px;
-  }
-
   #pg-lectures .submission-file-title {
     font-size: 15px;
     font-weight: 900;
@@ -381,8 +361,6 @@
   }
 
   @media(max-width:900px) {
-
-    #pg-lectures .lecture-grid,
     #pg-lectures .form-grid {
       grid-template-columns: 1fr;
     }
@@ -393,15 +371,15 @@
     }
 
     #pg-lectures .lec-card,
-    #pg-lectures .deliv-row {
-      grid-template-columns: 42px 1fr;
+    #pg-lectures .submission-file-row {
+      grid-template-columns: 1fr;
     }
   }
 </style>
 
 <div class="page page-single on" id="pg-lectures">
 
-  <div class="lecture-tabs" role="tablist" aria-label="Lectures and Deliverables tabs">
+  <div class="lecture-tabs" role="tablist" aria-label="Lectures and submission files tabs">
     <button class="lecture-tab on" type="button" role="tab" aria-selected="true"
       onclick="showLectureSection('introduction', this)">
       Project Introduction — COMP4200
@@ -411,12 +389,12 @@
       onclick="showLectureSection('graduation_project', this)">
       Graduation Projects — COMP4300
     </button>
+
   </div>
 
   <div id="introLectures" class="lecture-section active" data-scope="introduction">
     <div class="course-head">
       <span class="course-badge">◑ Project Introduction — COMP4200</span>
-
     </div>
 
     <div class="lecture-grid">
@@ -427,40 +405,34 @@
         </div>
 
         <div class="lecture-note">
-          Add lecture dates and publish the semester lecture plan.
+          Add lecture dates and publish the semester lecture plan. Deliverables were removed from this page, so this screen now focuses on lectures only.
         </div>
 
         <div id="lectureForm-introduction" class="mini-form"></div>
         <div id="lectureList-introduction"></div>
       </div>
-
-
     </div>
   </div>
 
   <div id="gradLectures" class="lecture-section" data-scope="graduation_project">
     <div class="course-head">
       <span class="course-badge">✦ Graduation Projects — COMP4300</span>
-
     </div>
 
     <div class="lecture-grid">
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Coordinator Lectures</span>
-          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add
-            Lecture</button>
+          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add Lecture</button>
         </div>
 
         <div class="lecture-note">
-          Add lecture dates and publish the semester lecture plan.
+          Add lecture dates and publish the semester lecture plan. Deliverables were removed from this page, so this screen now focuses on lectures only.
         </div>
 
         <div id="lectureForm-graduation_project" class="mini-form"></div>
         <div id="lectureList-graduation_project"></div>
       </div>
-
-
     </div>
   </div>
 
@@ -477,16 +449,13 @@
       </div>
 
       <div class="lecture-note">
-        This tab shows submitted files such as reports and final submissions.
-        Example: <b>Report One — COMP4200</b>, submitted by the student name with the uploaded file.
+        This tab shows submitted project files grouped by course and project. Deliverable submissions are still displayed only if the backend returns old records.
       </div>
 
       <div class="submission-filter-row">
         <button class="submission-filter-btn on" type="button" onclick="filterSubmissionFiles('all', this)">All</button>
-        <button class="submission-filter-btn" type="button"
-          onclick="filterSubmissionFiles('COMP4200', this)">COMP4200</button>
-        <button class="submission-filter-btn" type="button"
-          onclick="filterSubmissionFiles('COMP4300', this)">COMP4300</button>
+        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4200', this)">COMP4200</button>
+        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4300', this)">COMP4300</button>
       </div>
 
       <div id="submissionFilesList" style="padding:0 18px 18px 18px">
@@ -499,17 +468,8 @@
 
 {% block extra_scripts %}
 <script>
-  const scopeLabels = {
-    introduction: 'Project Introduction',
-    graduation_project: 'Graduation Projects'
-  };
-
   let lecturesState = {
     lectures: {
-      introduction: [],
-      graduation_project: []
-    },
-    deliverables: {
       introduction: [],
       graduation_project: []
     }
@@ -536,20 +496,14 @@
 
     let sectionId = 'introLectures';
 
-    if (scope === 'graduation_project') {
-      sectionId = 'gradLectures';
-    }
-
+    if (scope === 'graduation_project') sectionId = 'gradLectures';
     if (scope === 'submission_files') {
       sectionId = 'submissionFilesLectures';
       loadSubmissionFiles();
     }
 
     const selected = document.getElementById(sectionId);
-
-    if (selected) {
-      selected.classList.add('active');
-    }
+    if (selected) selected.classList.add('active');
 
     document.querySelectorAll('#pg-lectures .lecture-tab').forEach(tab => {
       const isActive = tab === btn;
@@ -621,73 +575,17 @@
     `;
   }
 
-  function deliverableFormHtml(scope) {
-    return `
-      <div class="form-grid">
-        <div>
-          <label>Deliverable Title</label>
-          <input id="delTitle-${scope}" placeholder="Example: Final Report + Turnitin">
-        </div>
-
-        <div>
-          <label>Due Date</label>
-          <input id="delDue-${scope}" type="date">
-        </div>
-
-        <div>
-          <label>Mark Points</label>
-          <input id="delMark-${scope}" type="number" min="0" value="5">
-        </div>
-
-        <div>
-          <label>Status</label>
-          <select id="delStatus-${scope}">
-            <option value="not_open">Not Open Yet</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="closed">Closed</option>
-          </select>
-        </div>
-
-        <div style="grid-column:1/-1">
-          <label>Description</label>
-          <textarea id="delDesc-${scope}" rows="2" placeholder="Submission details"></textarea>
-        </div>
-      </div>
-
-      <div class="btn-row" style="margin-top:10px">
-        <button class="btn btn-primary" type="button" onclick="saveDeliverable('${scope}')">Save Deliverable</button>
-        <button class="btn btn-outline" type="button" onclick="toggleDeliverableForm('${scope}')">Cancel</button>
-      </div>
-    `;
-  }
-
   function toggleLectureForm(scope) {
     const box = document.getElementById(`lectureForm-${scope}`);
     if (!box) return;
 
-    if (!box.innerHTML.trim()) {
-      box.innerHTML = lectureFormHtml(scope);
-    }
-
-    box.classList.toggle('on');
-  }
-
-  function toggleDeliverableForm(scope) {
-    const box = document.getElementById(`deliverableForm-${scope}`);
-    if (!box) return;
-
-    if (!box.innerHTML.trim()) {
-      box.innerHTML = deliverableFormHtml(scope);
-    }
-
+    if (!box.innerHTML.trim()) box.innerHTML = lectureFormHtml(scope);
     box.classList.toggle('on');
   }
 
   function renderLectures(scope) {
     const list = document.getElementById(`lectureList-${scope}`);
-    const rows = lecturesState.lectures[scope] || [];
+    const rows = (lecturesState.lectures && lecturesState.lectures[scope]) || [];
 
     if (!list) return;
 
@@ -730,48 +628,8 @@
     `).join('');
   }
 
-  function renderDeliverables(scope) {
-    const list = document.getElementById(`deliverableList-${scope}`);
-    const rows = lecturesState.deliverables[scope] || [];
-
-    if (!list) return;
-
-    if (!rows.length) {
-      list.innerHTML = '<div class="empty-box">No deliverables yet. Click + Add Deliverable to create one.</div>';
-      return;
-    }
-
-    list.innerHTML = rows.map((deliverable, index) => `
-      <div class="deliv-row">
-        <div class="deliv-token">T${index + 1}</div>
-
-        <div>
-          <div class="lecture-item-title">${safe(deliverable.title)}</div>
-
-          <div class="lecture-item-meta">
-            ${deliverable.due_date ? safe(deliverable.due_date) : 'No due date'}
-            · Commitment mark: ${safe(deliverable.mark_points || 0)} pts
-          </div>
-
-          <div class="lecture-item-meta">
-            ${safe(deliverable.description || '')}
-          </div>
-        </div>
-
-        <div>
-          <span class="pill ${pillClass(deliverable.status === 'open' ? 'in_progress' : deliverable.status)}">
-            ${niceStatus(deliverable.status)}
-          </span>
-        </div>
-      </div>
-    `).join('');
-  }
-
   function renderAll() {
-    ['introduction', 'graduation_project'].forEach(scope => {
-      renderLectures(scope);
-      renderDeliverables(scope);
-    });
+    ['introduction', 'graduation_project'].forEach(scope => renderLectures(scope));
   }
 
   async function apiFetch(url, options) {
@@ -798,10 +656,19 @@
 
   async function loadLecturesData() {
     try {
-      lecturesState = await apiFetch('/api/coordinator/lectures-data');
+      const data = await apiFetch('/api/coordinator/lectures-data');
+      lecturesState = {
+        lectures: {
+          introduction: (data.lectures && data.lectures.introduction) || [],
+          graduation_project: (data.lectures && data.lectures.graduation_project) || []
+        }
+      };
       renderAll();
     } catch (err) {
-      alert('Lectures page error: ' + err.message);
+      ['introduction', 'graduation_project'].forEach(scope => {
+        const list = document.getElementById(`lectureList-${scope}`);
+        if (list) list.innerHTML = `<div class="empty-box">Lectures page error: ${safe(err.message)}</div>`;
+      });
     }
   }
 
@@ -825,62 +692,34 @@
       body: JSON.stringify(payload)
     });
 
-    document.getElementById(`lectureForm-${scope}`).classList.remove('on');
-    document.getElementById(`lectureForm-${scope}`).innerHTML = '';
-
-    await loadLecturesData();
-  }
-
-  async function saveDeliverable(scope) {
-    const payload = {
-      course_scope: scope,
-      title: document.getElementById(`delTitle-${scope}`).value.trim(),
-      description: document.getElementById(`delDesc-${scope}`).value.trim(),
-      due_date: document.getElementById(`delDue-${scope}`).value,
-      mark_points: Number(document.getElementById(`delMark-${scope}`).value || 0),
-      status: document.getElementById(`delStatus-${scope}`).value
-    };
-
-    if (!payload.title) {
-      alert('Deliverable title is required.');
-      return;
+    const form = document.getElementById(`lectureForm-${scope}`);
+    if (form) {
+      form.classList.remove('on');
+      form.innerHTML = '';
     }
-
-    await apiFetch('/api/coordinator/deliverables', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    document.getElementById(`deliverableForm-${scope}`).classList.remove('on');
-    document.getElementById(`deliverableForm-${scope}`).innerHTML = '';
 
     await loadLecturesData();
   }
 
   async function updateLectureDate(lectureId) {
     const dateInput = document.getElementById(`lecDateUpdate-${lectureId}`);
+    if (!dateInput) return;
 
     await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, {
       method: 'POST',
-      body: JSON.stringify({
-        lecture_date: dateInput.value
-      })
+      body: JSON.stringify({ lecture_date: dateInput.value })
     });
 
     await loadLecturesData();
   }
 
   function buildSubmissionFileHref(file) {
-    if (file.download_url) {
-      return file.download_url;
-    }
+    if (file.download_url) return file.download_url;
 
     const path = String(file.file_path || '');
-
     if (!path) return '#';
 
     const cleanPath = path.replaceAll('\\', '/');
-
     if (cleanPath.startsWith('/static/')) return cleanPath;
     if (cleanPath.startsWith('static/')) return '/' + cleanPath;
 
@@ -895,16 +734,87 @@
     });
 
     if (btn) btn.classList.add('on');
-
     renderSubmissionFiles();
   }
 
+  function normalizeCourseScope(file) {
+    const raw = String(file.course_scope || file.course_code || file.course || '').toLowerCase();
+    if (raw.includes('4300') || raw.includes('graduation')) return 'COMP4300';
+    if (raw.includes('4200') || raw.includes('introduction')) return 'COMP4200';
+    return file.course_label || file.course_scope || 'Other';
+  }
+
+  function projectTypeLabel(value) {
+    const labels = {
+      web: 'Web',
+      mobile: 'Mobile',
+      ai: 'Artificial Intelligence',
+      software_engineering: 'Software Engineering',
+      security: 'Security',
+      databases: 'Databases',
+      other: 'Other'
+    };
+
+    return String(value || '')
+      .split(',')
+      .map(v => v.trim())
+      .filter(Boolean)
+      .map(v => labels[v.toLowerCase()] || v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
+      .join(', ');
+  }
+
+  function buildProjectCard(g) {
+    const pid = 'proj-' + g.project_id;
+    const typeText = projectTypeLabel(g.project_type);
+    const typeLabel = g.project_type
+      ? `<span style="font-size:11px;background:var(--color-background-tertiary);border:1px solid #d7e3dc;border-radius:6px;padding:2px 8px;color:var(--green)">${safe(typeText)}</span>`
+      : '';
+
+    const filesHtml = g.files.map(f => {
+      const href = buildSubmissionFileHref(f);
+      const sz = Number(f.file_size_mb || 0) > 0 ? ' · ' + Number(f.file_size_mb).toFixed(2) + ' MB' : '';
+      const icon = f.file_type === 'final_report' ? '📄' : f.file_type === 'source_code' ? '💾' : f.file_type === 'presentation' ? '📊' : '📁';
+
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid #eef1ee;flex-wrap:wrap">
+        <div style="font-size:13px;color:var(--color-text-primary)">
+          ${icon} <b>${safe((f.file_type || 'file').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</b>
+          <span style="color:#888;font-size:11px">${sz}</span>
+        </div>
+        <a class="submission-file-link" href="${safe(href)}" target="_blank" style="font-size:12px;padding:4px 10px" onclick="event.stopPropagation()">
+          ${href === '#' ? 'Unavailable' : safe(f.file_name || 'Download')}
+        </a>
+      </div>`;
+    }).join('');
+
+    return `
+      <div style="border:1px solid #e7eee9;border-radius:10px;margin-bottom:8px;overflow:hidden">
+        <div style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--color-background-secondary)"
+             onclick="var b=document.getElementById('${pid}'); b.style.display=b.style.display==='none'?'block':'none'; this.querySelector('.pa').textContent=b.style.display==='none'?'▸':'▾'">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="pa" style="color:var(--green);font-size:13px">▸</span>
+            <span style="font-weight:700;font-size:14px">${safe(g.project_title)}</span>
+            ${typeLabel}
+          </div>
+          <span style="font-size:12px;color:#667085">${g.files.length} file${g.files.length === 1 ? '' : 's'} · ${safe(g.submitted_by || 'Unknown')}</span>
+        </div>
+        <div id="${pid}" style="display:none;padding:0 14px 10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin:8px 0;font-size:12px;color:var(--color-text-primary);background:var(--color-background-tertiary);border-radius:8px;padding:8px 12px">
+            ${g.supervisor_name ? `<div>🎓 <b>Supervisor:</b> ${safe(g.supervisor_name)}</div>` : ''}
+            ${g.team_members ? `<div style="grid-column:1/-1">👥 <b>Team:</b> ${safe(g.team_members)}</div>` : ''}
+            ${g.uploaded_at ? `<div>🕐 <b>Submitted:</b> ${safe(g.uploaded_at)}</div>` : ''}
+          </div>
+          ${filesHtml}
+        </div>
+      </div>`;
+  }
+
   function renderGroupedSubmissionFiles(rows) {
-    // Separate project files vs timeline/deliverable
-    const projectGroups = {};  // keyed by project_id
-    const otherGroups = {};   // keyed by course::title::source
+    const projectGroups = {};
+    const otherGroups = {};
 
     rows.forEach(file => {
+      const course = normalizeCourseScope(file);
+
       if (file.source === 'project' && file.project_id) {
         if (!projectGroups[file.project_id]) {
           projectGroups[file.project_id] = {
@@ -913,8 +823,8 @@
             project_type: file.project_type || '',
             supervisor_name: file.supervisor_name || '',
             team_members: file.team_members || '',
-            course_scope: file.course_scope || '',
-            course_label: file.course_label || file.course_scope || 'Project',
+            course_scope: course,
+            course_label: file.course_label || course,
             submitted_by: file.submitted_by || '',
             uploaded_at: file.uploaded_at || '',
             files: []
@@ -922,117 +832,42 @@
         }
         projectGroups[file.project_id].files.push(file);
       } else {
-        const key = [file.course_scope || 'Course', file.submission_title || 'Submission', file.source || 'submission'].join('::');
-        if (!otherGroups[key]) otherGroups[key] = {
-          title: file.submission_title || 'Submission',
-          course: file.course_scope || 'Course',
-          label: file.course_label || file.course_scope || 'Submission',
-          files: []
-        };
+        const key = [course, file.submission_title || 'Submission', file.source || 'submission'].join('::');
+        if (!otherGroups[key]) {
+          otherGroups[key] = {
+            title: file.submission_title || 'Submission',
+            course: course,
+            label: file.course_label || course,
+            files: []
+          };
+        }
         otherGroups[key].files.push(file);
       }
     });
 
-    // ── Build inner project card (expandable) ─────────────
-    function projectTypeLabel(value) {
-      const labels = {
-        web: 'Web',
-        mobile: 'Mobile',
-        ai: 'Artificial Intelligence',
-        software_engineering: 'Software Engineering',
-        security: 'Security',
-        databases: 'Databases',
-        other: 'Other'
-      };
-      return String(value || '')
-        .split(',')
-        .map(v => v.trim())
-        .filter(Boolean)
-        .map(v => labels[v.toLowerCase()] || v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
-        .join(', ');
-    }
-
-    function buildProjectCard(g) {
-      const pid = 'proj-' + g.project_id;
-      const typeText = projectTypeLabel(g.project_type);
-      const typeLabel = g.project_type
-        ? `<span style="font-size:11px;background:var(--color-background-tertiary);border:1px solid var(--color-border-tertiary);
-                        border-radius:6px;padding:2px 8px;color:var(--green)">
-             ${safe(typeText)}
-           </span>` : '';
-
-      const filesHtml = g.files.map(f => {
-        const href = buildSubmissionFileHref(f);
-        const sz = Number(f.file_size_mb || 0) > 0 ? ' · ' + Number(f.file_size_mb).toFixed(2) + ' MB' : '';
-        const icon = f.file_type === 'final_report' ? '📄' : f.file_type === 'source_code' ? '💾' : f.file_type === 'presentation' ? '📊' : '📁';
-        return `<div style="display:flex;align-items:center;justify-content:space-between;
-                             padding:8px 0;border-top:1px solid #eef1ee">
-          <div style="font-size:13px;color:var(--color-text-primary)">
-            ${icon} <b>${safe((f.file_type || 'file').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</b>
-            <span style="color:#888;font-size:11px">${sz}</span>
-          </div>
-          <a class="submission-file-link" href="${safe(href)}" target="_blank"
-             style="font-size:12px;padding:4px 10px" onclick="event.stopPropagation()">
-            ${href === '#' ? 'Unavailable' : safe(f.file_name || 'Download')}
-          </a>
-        </div>`;
-      }).join('');
-
-      return `
-        <div style="border:1px solid #e7eee9;border-radius:10px;margin-bottom:8px;overflow:hidden">
-          <div style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
-                      background:var(--color-background-secondary)"
-               onclick="var b=document.getElementById('${pid}');
-                        b.style.display=b.style.display==='none'?'block':'none';
-                        this.querySelector('.pa').textContent=b.style.display==='none'?'▸':'▾'">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="pa" style="color:var(--green);font-size:13px">▸</span>
-              <span style="font-weight:700;font-size:14px">${safe(g.project_title)}</span>
-              ${typeLabel}
-            </div>
-            <span style="font-size:12px;color:#667085">${g.files.length} file${g.files.length === 1 ? '' : 's'} · ${safe(g.submitted_by)}</span>
-          </div>
-          <div id="${pid}" style="display:none;padding:0 14px 10px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;
-                        margin:8px 0;font-size:12px;color:var(--color-text-primary);
-                        background:var(--color-background-tertiary);border-radius:8px;padding:8px 12px">
-              ${g.supervisor_name ? `<div>🎓 <b>Supervisor:</b> ${safe(g.supervisor_name)}</div>` : ''}
-              ${g.team_members ? `<div style="grid-column:1/-1">👥 <b>Team:</b> ${safe(g.team_members)}</div>` : ''}
-              ${g.uploaded_at ? `<div>🕐 <b>Submitted:</b> ${safe(g.uploaded_at)}</div>` : ''}
-            </div>
-            ${filesHtml}
-          </div>
-        </div>`;
-    }
-
-    // ── Group projects by course → one big outer folder per course ──
     const byCourseFolders = {};
     Object.values(projectGroups).forEach(g => {
       const course = g.course_scope || 'Other';
-      if (!byCourseFolders[course]) byCourseFolders[course] = {
-        label: g.course_label || course,
-        projects: []
-      };
+      if (!byCourseFolders[course]) {
+        byCourseFolders[course] = { label: g.course_label || course, projects: [] };
+      }
       byCourseFolders[course].projects.push(g);
     });
 
     const outerFolders = Object.entries(byCourseFolders).map(([course, cg]) => {
       const uid = 'cf-' + course.replace(/\W/g, '');
-      const total = cg.projects.length;
       const inner = cg.projects.map(buildProjectCard).join('');
 
       return `
-        <section class="submission-folder" style="cursor:default">
+        <section class="submission-folder">
           <div class="submission-folder-head" style="cursor:pointer;user-select:none"
-               onclick="var b=document.getElementById('${uid}');
-                        b.style.display=b.style.display==='none'?'block':'none';
-                        this.querySelector('.ca').textContent=b.style.display==='none'?'▸':'▾'">
+               onclick="var b=document.getElementById('${uid}'); b.style.display=b.style.display==='none'?'block':'none'; this.querySelector('.ca').textContent=b.style.display==='none'?'▸':'▾'">
             <div>
               <div class="submission-folder-title" style="display:flex;align-items:center;gap:8px">
                 <span class="ca" style="color:var(--green);font-size:16px">▾</span>
                 Final Submissions — ${safe(course)}
               </div>
-              <div class="submission-folder-meta">${total} project${total === 1 ? '' : 's'} submitted</div>
+              <div class="submission-folder-meta">${cg.projects.length} project${cg.projects.length === 1 ? '' : 's'} submitted</div>
             </div>
             <span class="pill p-review">${safe(cg.label)}</span>
           </div>
@@ -1040,7 +875,6 @@
         </section>`;
     }).join('');
 
-    // ── Timeline / deliverable groups (unchanged style) ──
     const otherCards = Object.values(otherGroups).map(group => `
       <section class="submission-folder">
         <div class="submission-folder-head">
@@ -1051,9 +885,9 @@
           <span class="pill p-review">${safe(group.label)}</span>
         </div>
         ${group.files.map(file => {
-      const href = buildSubmissionFileHref(file);
-      const sz = Number(file.file_size_mb || 0) > 0 ? ` - ${Number(file.file_size_mb).toFixed(2)} MB` : '';
-      return `<div class="submission-file-row">
+          const href = buildSubmissionFileHref(file);
+          const sz = Number(file.file_size_mb || 0) > 0 ? ` - ${Number(file.file_size_mb).toFixed(2)} MB` : '';
+          return `<div class="submission-file-row">
             <div>
               <div class="submission-file-title">${safe(file.project_title || 'Untitled Project')}</div>
               <div class="submission-file-meta">Submitted by: <b>${safe(file.submitted_by || 'Unknown')}</b></div>
@@ -1063,21 +897,19 @@
               ${href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file')}
             </a>
           </div>`;
-    }).join('')}
+        }).join('')}
       </section>`).join('');
 
     return outerFolders + otherCards;
   }
 
-
   function renderSubmissionFiles() {
     const box = document.getElementById('submissionFilesList');
-
     if (!box) return;
 
     const rows = currentSubmissionFilter === 'all'
       ? submissionFilesState
-      : submissionFilesState.filter(file => file.course_scope === currentSubmissionFilter);
+      : submissionFilesState.filter(file => normalizeCourseScope(file) === currentSubmissionFilter);
 
     if (!rows.length) {
       box.innerHTML = '<div class="empty-box">No submitted files found.</div>';
@@ -1085,81 +917,23 @@
     }
 
     box.innerHTML = renderGroupedSubmissionFiles(rows);
-    return;
-
-    box.innerHTML = rows.map(file => {
-      const href = buildSubmissionFileHref(file);
-      const sourceLabel = file.source === 'timeline'
-        ? 'Timeline submission'
-        : file.source === 'deliverable'
-          ? 'Deliverable submission'
-          : 'Project submitted';
-      const targetLabel = file.submitted_to
-        ? ` - ${safe(niceStatus(file.submitted_to))}`
-        : '';
-      const sizeLabel = Number(file.file_size_mb || 0) > 0
-        ? ` Â· ${safe(Number(file.file_size_mb).toFixed(2))} MB`
-        : '';
-      const linkText = href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file');
-      const title = `${safe(file.submission_title || 'Submission')} — ${safe(file.course_scope || 'Course')}`;
-
-      return `
-        <div class="submission-file-card">
-          <div class="submission-file-head">
-            <div>
-              <div class="submission-file-title">${title}</div>
-
-              <div class="submission-file-meta">
-                Project: <b>${safe(file.project_title || 'Untitled Project')}</b>
-              </div>
-
-              <div class="submission-file-meta">
-                Submitted by: <b>${safe(file.submitted_by || 'Unknown student')}</b>
-              </div>
-
-              <div class="submission-file-meta">
-                Uploaded at: ${safe(file.uploaded_at || '—')}
-              </div>
-
-              <div class="submission-file-meta">
-                Details: <b>${safe(sourceLabel)}</b>${targetLabel}${sizeLabel}
-              </div>
-            </div>
-
-            <span class="pill p-review">${safe(file.course_label || file.course_scope || 'Submission')}</span>
-          </div>
-
-          <a class="submission-file-link" href="${safe(href)}" target="_blank">
-            ${linkText}
-          </a>
-        </div>
-      `;
-    }).join('');
   }
-
-
 
   async function loadSubmissionFiles() {
     const box = document.getElementById('submissionFilesList');
-
-    if (box) {
-      box.innerHTML = '<div class="empty-box">Loading submitted files...</div>';
-    }
+    if (box) box.innerHTML = '<div class="empty-box">Loading submitted files...</div>';
 
     try {
       const data = await apiFetch('/api/coordinator/submission-files');
       submissionFilesState = data.files || [];
       renderSubmissionFiles();
     } catch (err) {
-      if (box) {
-        box.innerHTML = `<div class="empty-box">Submission files error: ${safe(err.message)}</div>`;
-      }
+      if (box) box.innerHTML = `<div class="empty-box">Submission files error: ${safe(err.message)}</div>`;
     }
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     loadLecturesData();
-    loadSubmissionFiles();
 
     const firstTab = document.querySelector('#pg-lectures .lecture-tab');
     showLectureSection('introduction', firstTab);
