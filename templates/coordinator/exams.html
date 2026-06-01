@@ -405,12 +405,12 @@
   <div class="exam-tabs" role="tablist" aria-label="Exam timeline tabs">
     <button class="exam-tab on" type="button" role="tab" aria-selected="true"
       onclick="showExamSection('introTimeline', this)">
-      COMP4200 Timeline
+      Project Introduction — COMP4200 Timeline
     </button>
 
     <button class="exam-tab" type="button" role="tab" aria-selected="false"
       onclick="showExamSection('gradTimeline', this)">
-      COMP4300 Timeline
+      Graduation Project — COMP4300 Timeline
     </button>
 
     <button class="exam-tab" type="button" role="tab" aria-selected="false"
@@ -426,7 +426,7 @@
     <div class="card">
       <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div>
-          <span class="card-title">Project Introduction Timeline Builder</span>
+          <span class="card-title">Project Introduction — COMP4200 Timeline Builder</span>
           <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
             Design the COMP4200 student timeline here. After publishing, students will see it in their Student Timeline
             page and receive a notification.
@@ -497,7 +497,7 @@
     <div class="card">
       <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div>
-          <span class="card-title">Graduation Project Final Submission</span>
+          <span class="card-title">Graduation Project  — COMP4300 Final Submission</span>
           <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
             Set the opening time and final deadline for COMP4300 final project submission.
           </div>
@@ -590,8 +590,8 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <select id="submissionCourseFilter" onchange="renderSubmissionFiles()">
             <option value="all">All Courses</option>
-            <option value="COMP4200">COMP4200</option>
-            <option value="COMP4300">COMP4300</option>
+            <option value="COMP4200">Project Introduction — COMP4200</option>
+            <option value="COMP4300">Graduation Project — COMP4300</option>
           </select>
 
           <input id="submissionSearch" type="search" placeholder="Search student, project, file..."

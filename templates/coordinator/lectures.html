@@ -381,6 +381,7 @@
   }
 
   @media(max-width:900px) {
+
     #pg-lectures .lecture-grid,
     #pg-lectures .form-grid {
       grid-template-columns: 1fr;
@@ -401,19 +402,21 @@
 <div class="page page-single on" id="pg-lectures">
 
   <div class="lecture-tabs" role="tablist" aria-label="Lectures and Deliverables tabs">
-    <button class="lecture-tab on" type="button" role="tab" aria-selected="true" onclick="showLectureSection('introduction', this)">
-      Project Introduction
+    <button class="lecture-tab on" type="button" role="tab" aria-selected="true"
+      onclick="showLectureSection('introduction', this)">
+      Project Introduction — COMP4200
     </button>
 
-    <button class="lecture-tab" type="button" role="tab" aria-selected="false" onclick="showLectureSection('graduation_project', this)">
-      Graduation Projects
+    <button class="lecture-tab" type="button" role="tab" aria-selected="false"
+      onclick="showLectureSection('graduation_project', this)">
+      Graduation Projects — COMP4300
     </button>
   </div>
 
   <div id="introLectures" class="lecture-section active" data-scope="introduction">
     <div class="course-head">
       <span class="course-badge">◑ Project Introduction — COMP4200</span>
-      
+
     </div>
 
     <div class="lecture-grid">
@@ -431,33 +434,22 @@
         <div id="lectureList-introduction"></div>
       </div>
 
-      <div class="card">
-        <div class="card-hd">
-          <span class="card-title">Deliverables — Project Introduction</span>
-          <button class="card-action" type="button" onclick="toggleDeliverableForm('introduction')">+ Add Deliverable</button>
-        </div>
 
-        <div class="lecture-note">
-          On-time submission carries marks — monitored by the coordinator.
-        </div>
-
-        <div id="deliverableForm-introduction" class="mini-form"></div>
-        <div id="deliverableList-introduction"></div>
-      </div>
     </div>
   </div>
 
   <div id="gradLectures" class="lecture-section" data-scope="graduation_project">
     <div class="course-head">
       <span class="course-badge">✦ Graduation Projects — COMP4300</span>
-     
+
     </div>
 
     <div class="lecture-grid">
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Coordinator Lectures</span>
-          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add Lecture</button>
+          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add
+            Lecture</button>
         </div>
 
         <div class="lecture-note">
@@ -468,19 +460,7 @@
         <div id="lectureList-graduation_project"></div>
       </div>
 
-      <div class="card">
-        <div class="card-hd">
-          <span class="card-title">Deliverables — Graduation Projects</span>
-          <button class="card-action" type="button" onclick="toggleDeliverableForm('graduation_project')">+ Add Deliverable</button>
-        </div>
 
-        <div class="lecture-note">
-          On-time submission carries marks — monitored by the coordinator.
-        </div>
-
-        <div id="deliverableForm-graduation_project" class="mini-form"></div>
-        <div id="deliverableList-graduation_project"></div>
-      </div>
     </div>
   </div>
 
@@ -503,8 +483,10 @@
 
       <div class="submission-filter-row">
         <button class="submission-filter-btn on" type="button" onclick="filterSubmissionFiles('all', this)">All</button>
-        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4200', this)">COMP4200</button>
-        <button class="submission-filter-btn" type="button" onclick="filterSubmissionFiles('COMP4300', this)">COMP4300</button>
+        <button class="submission-filter-btn" type="button"
+          onclick="filterSubmissionFiles('COMP4200', this)">COMP4200</button>
+        <button class="submission-filter-btn" type="button"
+          onclick="filterSubmissionFiles('COMP4300', this)">COMP4300</button>
       </div>
 
       <div id="submissionFilesList" style="padding:0 18px 18px 18px">
@@ -920,31 +902,31 @@
   function renderGroupedSubmissionFiles(rows) {
     // Separate project files vs timeline/deliverable
     const projectGroups = {};  // keyed by project_id
-    const otherGroups  = {};   // keyed by course::title::source
+    const otherGroups = {};   // keyed by course::title::source
 
     rows.forEach(file => {
       if (file.source === 'project' && file.project_id) {
         if (!projectGroups[file.project_id]) {
           projectGroups[file.project_id] = {
-            project_id:     file.project_id,
-            project_title:  file.project_title  || 'Untitled Project',
-            project_type:   file.project_type   || '',
-            supervisor_name:file.supervisor_name || '',
-            team_members:   file.team_members    || '',
-            course_scope:   file.course_scope    || '',
-            course_label:   file.course_label    || file.course_scope || 'Project',
-            submitted_by:   file.submitted_by    || '',
-            uploaded_at:    file.uploaded_at     || '',
+            project_id: file.project_id,
+            project_title: file.project_title || 'Untitled Project',
+            project_type: file.project_type || '',
+            supervisor_name: file.supervisor_name || '',
+            team_members: file.team_members || '',
+            course_scope: file.course_scope || '',
+            course_label: file.course_label || file.course_scope || 'Project',
+            submitted_by: file.submitted_by || '',
+            uploaded_at: file.uploaded_at || '',
             files: []
           };
         }
         projectGroups[file.project_id].files.push(file);
       } else {
-        const key = [file.course_scope||'Course', file.submission_title||'Submission', file.source||'submission'].join('::');
+        const key = [file.course_scope || 'Course', file.submission_title || 'Submission', file.source || 'submission'].join('::');
         if (!otherGroups[key]) otherGroups[key] = {
           title: file.submission_title || 'Submission',
           course: file.course_scope || 'Course',
-          label: file.course_label  || file.course_scope || 'Submission',
+          label: file.course_label || file.course_scope || 'Submission',
           files: []
         };
         otherGroups[key].files.push(file);
@@ -981,17 +963,17 @@
 
       const filesHtml = g.files.map(f => {
         const href = buildSubmissionFileHref(f);
-        const sz   = Number(f.file_size_mb||0) > 0 ? ' · ' + Number(f.file_size_mb).toFixed(2) + ' MB' : '';
-        const icon = f.file_type==='final_report'?'📄':f.file_type==='source_code'?'💾':f.file_type==='presentation'?'📊':'📁';
+        const sz = Number(f.file_size_mb || 0) > 0 ? ' · ' + Number(f.file_size_mb).toFixed(2) + ' MB' : '';
+        const icon = f.file_type === 'final_report' ? '📄' : f.file_type === 'source_code' ? '💾' : f.file_type === 'presentation' ? '📊' : '📁';
         return `<div style="display:flex;align-items:center;justify-content:space-between;
                              padding:8px 0;border-top:1px solid #eef1ee">
           <div style="font-size:13px;color:var(--color-text-primary)">
-            ${icon} <b>${safe((f.file_type||'file').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}</b>
+            ${icon} <b>${safe((f.file_type || 'file').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</b>
             <span style="color:#888;font-size:11px">${sz}</span>
           </div>
           <a class="submission-file-link" href="${safe(href)}" target="_blank"
              style="font-size:12px;padding:4px 10px" onclick="event.stopPropagation()">
-            ${href==='#'?'Unavailable':safe(f.file_name||'Download')}
+            ${href === '#' ? 'Unavailable' : safe(f.file_name || 'Download')}
           </a>
         </div>`;
       }).join('');
@@ -1008,15 +990,15 @@
               <span style="font-weight:700;font-size:14px">${safe(g.project_title)}</span>
               ${typeLabel}
             </div>
-            <span style="font-size:12px;color:#667085">${g.files.length} file${g.files.length===1?'':'s'} · ${safe(g.submitted_by)}</span>
+            <span style="font-size:12px;color:#667085">${g.files.length} file${g.files.length === 1 ? '' : 's'} · ${safe(g.submitted_by)}</span>
           </div>
           <div id="${pid}" style="display:none;padding:0 14px 10px">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;
                         margin:8px 0;font-size:12px;color:var(--color-text-primary);
                         background:var(--color-background-tertiary);border-radius:8px;padding:8px 12px">
               ${g.supervisor_name ? `<div>🎓 <b>Supervisor:</b> ${safe(g.supervisor_name)}</div>` : ''}
-              ${g.team_members    ? `<div style="grid-column:1/-1">👥 <b>Team:</b> ${safe(g.team_members)}</div>` : ''}
-              ${g.uploaded_at     ? `<div>🕐 <b>Submitted:</b> ${safe(g.uploaded_at)}</div>` : ''}
+              ${g.team_members ? `<div style="grid-column:1/-1">👥 <b>Team:</b> ${safe(g.team_members)}</div>` : ''}
+              ${g.uploaded_at ? `<div>🕐 <b>Submitted:</b> ${safe(g.uploaded_at)}</div>` : ''}
             </div>
             ${filesHtml}
           </div>
@@ -1035,7 +1017,7 @@
     });
 
     const outerFolders = Object.entries(byCourseFolders).map(([course, cg]) => {
-      const uid   = 'cf-' + course.replace(/\W/g,'');
+      const uid = 'cf-' + course.replace(/\W/g, '');
       const total = cg.projects.length;
       const inner = cg.projects.map(buildProjectCard).join('');
 
@@ -1050,7 +1032,7 @@
                 <span class="ca" style="color:var(--green);font-size:16px">▾</span>
                 Final Submissions — ${safe(course)}
               </div>
-              <div class="submission-folder-meta">${total} project${total===1?'':'s'} submitted</div>
+              <div class="submission-folder-meta">${total} project${total === 1 ? '' : 's'} submitted</div>
             </div>
             <span class="pill p-review">${safe(cg.label)}</span>
           </div>
@@ -1064,24 +1046,24 @@
         <div class="submission-folder-head">
           <div>
             <div class="submission-folder-title">${safe(group.title)} — ${safe(group.course)}</div>
-            <div class="submission-folder-meta">${group.files.length} submitted file${group.files.length===1?'':'s'}</div>
+            <div class="submission-folder-meta">${group.files.length} submitted file${group.files.length === 1 ? '' : 's'}</div>
           </div>
           <span class="pill p-review">${safe(group.label)}</span>
         </div>
         ${group.files.map(file => {
-          const href = buildSubmissionFileHref(file);
-          const sz   = Number(file.file_size_mb||0)>0 ? ` - ${Number(file.file_size_mb).toFixed(2)} MB` : '';
-          return `<div class="submission-file-row">
+      const href = buildSubmissionFileHref(file);
+      const sz = Number(file.file_size_mb || 0) > 0 ? ` - ${Number(file.file_size_mb).toFixed(2)} MB` : '';
+      return `<div class="submission-file-row">
             <div>
-              <div class="submission-file-title">${safe(file.project_title||'Untitled Project')}</div>
-              <div class="submission-file-meta">Submitted by: <b>${safe(file.submitted_by||'Unknown')}</b></div>
-              <div class="submission-file-meta">Uploaded at: ${safe(file.uploaded_at||'-')}${sz}</div>
+              <div class="submission-file-title">${safe(file.project_title || 'Untitled Project')}</div>
+              <div class="submission-file-meta">Submitted by: <b>${safe(file.submitted_by || 'Unknown')}</b></div>
+              <div class="submission-file-meta">Uploaded at: ${safe(file.uploaded_at || '-')}${sz}</div>
             </div>
             <a class="submission-file-link" href="${safe(href)}" target="_blank">
-              ${href==='#'?'File unavailable':safe(file.file_name||'Open file')}
+              ${href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file')}
             </a>
           </div>`;
-        }).join('')}
+    }).join('')}
       </section>`).join('');
 
     return outerFolders + otherCards;
@@ -1155,7 +1137,7 @@
     }).join('');
   }
 
-  
+
 
   async function loadSubmissionFiles() {
     const box = document.getElementById('submissionFilesList');
