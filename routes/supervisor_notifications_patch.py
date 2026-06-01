@@ -46,7 +46,11 @@ def _ensure_supervisor_notification_schema(cursor):
             )
         if not _sup_db_column_exists(cursor, "notifications", "can_reply"):
             cursor.execute(
-                "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read"
+                "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 0 AFTER is_read"
+            )
+        if not _sup_db_column_exists(cursor, "notifications", "message_origin"):
+            cursor.execute(
+                "ALTER TABLE notifications ADD COLUMN message_origin ENUM('dynamic','manual','reply') NOT NULL DEFAULT 'dynamic' AFTER can_reply"
             )
         if not _sup_db_column_exists(cursor, "notifications", "attachment_name"):
             cursor.execute("ALTER TABLE notifications ADD COLUMN attachment_name VARCHAR(255) NULL")
@@ -63,9 +67,9 @@ def _sup_notification_select_fields(cursor):
         else "NULL AS attachment_name, NULL AS attachment_mime, 0 AS has_attachment"
     )
     can_reply_field = (
-        "COALESCE(n.can_reply, 1) AS can_reply"
+        "CASE WHEN n.message_origin IN ('manual', 'reply') THEN COALESCE(n.can_reply, 0) ELSE 0 END AS can_reply"
         if _sup_db_column_exists(cursor, "notifications", "can_reply")
-        else "1 AS can_reply"
+        else "0 AS can_reply"
     )
     return attachment_fields, can_reply_field
 
@@ -77,7 +81,7 @@ def _sup_notification_row_to_json(row):
     clean["is_read"] = bool(clean.get("is_read"))
     clean["course_scope"] = clean.get("course_scope") or "both"
     clean["has_attachment"] = bool(clean.get("has_attachment"))
-    clean["can_reply"] = bool(clean.get("can_reply", True))
+    clean["can_reply"] = bool(clean.get("can_reply", False))
     clean.pop("attachment_data", None)
     if not clean["has_attachment"]:
         clean["attachment_name"] = None
@@ -88,7 +92,7 @@ def _sup_notification_row_to_json(row):
 def _supervisor_reply_allowed(cursor, original_notification_id, current_user_id, target_user_id):
     if not original_notification_id:
         return False
-    can_reply_expr = "COALESCE(can_reply, 1)" if _sup_db_column_exists(cursor, "notifications", "can_reply") else "1"
+    can_reply_expr = "COALESCE(can_reply, 0)" if _sup_db_column_exists(cursor, "notifications", "can_reply") else "0"
     cursor.execute(
         f"""
         SELECT notification_id
@@ -96,6 +100,7 @@ def _supervisor_reply_allowed(cursor, original_notification_id, current_user_id,
         WHERE notification_id = %s
           AND recipient_id = %s
           AND sender_id = %s
+          AND message_origin IN ('manual', 'reply')
           AND {can_reply_expr} = 1
         LIMIT 1
         """,
@@ -268,12 +273,13 @@ def api_supervisor_notifications_send():
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
                      course_scope, related_project_id, is_read, can_reply,
-                     attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s)
+                     message_origin, attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s, %s)
                 """,
                 (
                     recipient_id, sender_id, notification_type, title, message,
                     course_scope, 1 if can_reply else 0,
+                    "reply" if scope == "reply" else "manual",
                     attachment_name, attachment_mime, attachment_data,
                 ),
             )

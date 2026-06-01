@@ -623,6 +623,82 @@
     border: 1px solid #e6ece8
   }
 
+  .sn-lecture-message {
+    display: grid;
+    gap: 11px;
+    white-space: normal
+  }
+
+  .sn-lecture-hero,
+  .sn-lecture-detail,
+  .sn-lecture-notes {
+    background: var(--color-background-primary);
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 11px
+  }
+
+  .sn-lecture-hero {
+    padding: 12px 13px
+  }
+
+  .sn-lecture-kicker,
+  .sn-lecture-label {
+    color: var(--color-text-secondary);
+    display: block;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .08em;
+    margin-bottom: 3px;
+    text-transform: uppercase
+  }
+
+  .sn-lecture-name {
+    color: var(--color-text-primary);
+    font-size: 15px;
+    font-weight: 900
+  }
+
+  .sn-lecture-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr))
+  }
+
+  .sn-lecture-detail {
+    min-width: 0;
+    padding: 9px 10px
+  }
+
+  .sn-lecture-value {
+    color: var(--color-text-primary);
+    font-size: 12px;
+    font-weight: 800
+  }
+
+  .sn-lecture-notes {
+    color: var(--color-text-primary);
+    font-size: 12px;
+    line-height: 1.65;
+    padding: 10px 11px
+  }
+
+  .sn-lecture-link {
+    color: var(--sn-green);
+    font-weight: 900;
+    overflow-wrap: anywhere;
+    text-decoration: none
+  }
+
+  .sn-lecture-link:hover {
+    text-decoration: underline
+  }
+
+  @media (max-width: 560px) {
+    .sn-lecture-grid {
+      grid-template-columns: 1fr
+    }
+  }
+
   .sn-modal-att-link {
     display: inline-flex;
     align-items: center;
@@ -950,6 +1026,76 @@
       return ({ head_of_department: 'Head of Department', supervisor: 'Supervisor', coordinator: 'Coordinator', student: 'Student' }[role] || role || 'System');
     }
 
+    function linkify(value) {
+      return esc(value).replace(
+        /(https?:\/\/[^\s<]+)/g,
+        '<a class="sn-lecture-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+      );
+    }
+
+    function parseLectureMessage(msgData) {
+      const titleMatch = String(msgData.title || '').match(/^(New Lecture|Lecture Date Confirmed|Lecture Updated):\s*(.+)$/i);
+      if (!titleMatch) return null;
+
+      const raw = String(msgData.message || '').trim();
+      const fields = {};
+      raw.split(/\r?\n/).forEach(line => {
+        const match = line.match(/^([A-Za-z ]+):\s*(.*)$/);
+        if (match) fields[match[1].trim().toLowerCase()] = match[2].trim();
+      });
+
+      const courseMatch = raw.match(/\b(?:for|in)\s+(Project Introduction|Graduation Project)\b/i);
+      const dateMatch = raw.match(/\bDate:\s*([^.]+)/i) || raw.match(/\bconfirmed for\s+([^.]+)/i);
+      const weekMatch = raw.match(/\bWeek\s*:?\s*([^.]+)/i);
+      const statusMatch = raw.match(/\bStatus:\s*([^.]+)/i);
+      const detailsMatch = raw.match(/\bDetails:\s*(.*?)(?=\s+Open from your student timeline:|$)/i);
+
+      return {
+        action: titleMatch[1],
+        lecture: fields.lecture || titleMatch[2],
+        course: fields.course || (courseMatch ? courseMatch[1] : ''),
+        date: fields.date || (dateMatch ? dateMatch[1].trim() : ''),
+        week: fields.week || (weekMatch ? weekMatch[1].trim() : ''),
+        status: fields.status || (statusMatch ? statusMatch[1].trim() : ''),
+        details: fields.details || (detailsMatch ? detailsMatch[1].trim() : '')
+      };
+    }
+
+    function lecturePreview(msgData) {
+      const lecture = parseLectureMessage(msgData);
+      if (!lecture) return msgData.message || '';
+      return [lecture.course, lecture.date, lecture.week, lecture.status].filter(Boolean).join(' \u00b7 ');
+    }
+
+    function lectureDetail(label, value) {
+      return '<div class="sn-lecture-detail">' +
+        '<span class="sn-lecture-label">' + esc(label) + '</span>' +
+        '<div class="sn-lecture-value">' + esc(value || 'Not set') + '</div>' +
+        '</div>';
+    }
+
+    function renderLectureMessage(msgData) {
+      const lecture = parseLectureMessage(msgData);
+      if (!lecture) return '';
+
+      return '<div class="sn-lecture-message">' +
+        '<div class="sn-lecture-hero">' +
+        '<span class="sn-lecture-kicker">' + esc(lecture.action) + '</span>' +
+        '<div class="sn-lecture-name">' + esc(lecture.lecture) + '</div>' +
+        '</div>' +
+        '<div class="sn-lecture-grid">' +
+        lectureDetail('Course', lecture.course) +
+        lectureDetail('Date', lecture.date) +
+        lectureDetail('Week', lecture.week) +
+        lectureDetail('Status', lecture.status) +
+        '</div>' +
+        '<div class="sn-lecture-notes">' +
+        '<span class="sn-lecture-label">Details</span>' +
+        linkify(lecture.details || 'No additional details.') +
+        '</div>' +
+        '</div>';
+    }
+
     // ── File zone wiring ─────────────────────────────────────────
     function wireFileZone(zoneId, inputId, chosenId, nameId, removeId) {
       const zone = $(zoneId);
@@ -1042,7 +1188,7 @@
         '<span class="sn-pill ' + (r.is_read ? 'read' : 'unread-pill') + '">' + (r.is_read ? 'Read' : 'New') + '</span>' +
         '</div>' +
         '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
-        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '<div class="sn-msg-preview">' + esc(lecturePreview(r)) + '</div>' +
         (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
         (r.can_reply === false ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
         '</div>' +
@@ -1062,7 +1208,7 @@
         '<span class="sn-pill sent-pill">Sent</span>' +
         '</div>' +
         '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
-        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '<div class="sn-msg-preview">' + esc(lecturePreview(r)) + '</div>' +
         (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
         (r.can_reply === false ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
         '</div>' +
@@ -1099,7 +1245,9 @@
         ? 'From: ' + (msgData.sender_name || 'System') + ' · ' + roleLabel(msgData.sender_role) + ' · ' + (msgData.created_at || '')
         : 'To: ' + (msgData.recipient_name || '') + ' · ' + roleLabel(msgData.recipient_role) + ' · ' + (msgData.created_at || '');
       $('modalMeta').textContent = from;
-      $('modalBody').textContent = msgData.message;
+      const lectureHtml = renderLectureMessage(msgData);
+      if (lectureHtml) $('modalBody').innerHTML = lectureHtml;
+      else $('modalBody').textContent = msgData.message;
 
       // Attachment link
       const attLink = $('modalAttLink');

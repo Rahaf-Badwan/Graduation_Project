@@ -72,6 +72,12 @@ def _dt(value, include_time=False):
     return text[:16] if include_time else text[:10]
 
 
+def _text_value(value):
+    if isinstance(value, (set, list, tuple)):
+        return ", ".join(sorted(str(item) for item in value))
+    return str(value or "")
+
+
 def _parse_time(value, fallback):
     value = (value or "").strip()
     if not value:
@@ -223,6 +229,42 @@ def _project_access_filter(cursor):
 
 def _project_access_params(cursor, faculty_id):
     return (faculty_id,)
+
+
+def _submission_access_filter(cursor):
+    """Allow assigned live-semester submissions, including archived final work."""
+    filters = [
+        "p.supervisor_id = %s",
+        "p.semester_id IS NOT NULL",
+    ]
+
+    if _table_exists(cursor, "semesters") and _column_exists(cursor, "semesters", "is_active"):
+        filters.append("COALESCE(s.is_active, 0) = TRUE")
+
+    if _table_exists(cursor, "project_members"):
+        filters.append(
+            """
+            EXISTS (
+                SELECT 1
+                FROM project_members pm_real
+                JOIN students st_real ON st_real.student_id = pm_real.student_id
+                JOIN users u_real ON u_real.user_id = st_real.user_id
+                WHERE pm_real.project_id = p.project_id
+                  AND u_real.role = 'student'
+                  AND u_real.is_active = TRUE
+            )
+            """
+        )
+
+    for col in ("is_archive", "is_search_only", "search_only", "archive_only", "is_imported", "is_demo"):
+        if _column_exists(cursor, "projects", col):
+            filters.append(f"COALESCE(p.{col}, 0) = 0")
+
+    for col in ("archive_source", "search_source", "import_source"):
+        if _column_exists(cursor, "projects", col):
+            filters.append(f"(p.{col} IS NULL OR p.{col} = '')")
+
+    return " AND ".join(filters)
 
 
 def _fetch_supervisor_projects(cursor, faculty_id):
@@ -795,7 +837,7 @@ def api_supervisor_submitted_files():
             return jsonify({"error": "Supervisor faculty record was not found."}), 404
 
         files = []
-        access_filter = _project_access_filter(cursor)
+        access_filter = _submission_access_filter(cursor)
         access_params = _project_access_params(cursor, faculty_id)
 
         # Return ALL projects for this supervisor, even when they have no submissions.
@@ -845,6 +887,7 @@ def api_supervisor_submitted_files():
                 LEFT JOIN students primary_st ON primary_st.student_id = primary_pm.student_id
                 LEFT JOIN users primary_user ON primary_user.user_id = primary_st.user_id
                 WHERE {access_filter}
+                  AND s.course_code = 'COMP4300'
                   AND (
                         COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
                         OR pf.uploaded_at IS NOT NULL
@@ -874,7 +917,7 @@ def api_supervisor_submitted_files():
                         "course_code": course_code,
                         "course_label": _course_label_for_code(course_code),
                         "project_title": row.get("project_title") or "Untitled Project",
-                        "project_type": row.get("project_type") or "",
+                        "project_type": _text_value(row.get("project_type")),
                         "project_status": row.get("project_status") or "",
                         "supervisor_name": row.get("supervisor_name") or "",
                         "team_members": row.get("team_members") or "",
@@ -889,7 +932,11 @@ def api_supervisor_submitted_files():
                 )
 
         # 2) COMP4200 timeline milestone submissions sent to supervisor/both
-        if _table_exists(cursor, "milestone_submissions") and _table_exists(cursor, "comp4200_timeline_items"):
+        if (
+            _table_exists(cursor, "milestone_submissions")
+            and _table_exists(cursor, "comp4200_timeline_items")
+            and _table_exists(cursor, "comp4200_timelines")
+        ):
             cursor.execute(
                 f"""
                 SELECT
@@ -912,6 +959,7 @@ def api_supervisor_submitted_files():
                 JOIN projects p ON p.project_id = ms.project_id
                 LEFT JOIN semesters s ON s.semester_id = p.semester_id
                 JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+                JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
                 JOIN students st_submit ON st_submit.student_id = ms.student_id
                 JOIN users u_student ON u_student.user_id = st_submit.user_id
                 LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
@@ -920,6 +968,7 @@ def api_supervisor_submitted_files():
                 LEFT JOIN students team_st ON team_st.student_id = pm.student_id
                 LEFT JOIN users team_user ON team_user.user_id = team_st.user_id
                 WHERE {access_filter}
+                  AND tl.is_published = TRUE
                   AND ms.submitted_to IN ('supervisor', 'both')
                 GROUP BY
                     ms.submission_id, ms.project_id, ms.file_name, ms.file_mime,
@@ -955,75 +1004,6 @@ def api_supervisor_submitted_files():
                     }
                 )
 
-        # 3) Coordinator deliverable submissions connected to supervisor projects
-        if _table_exists(cursor, "coordinator_deliverable_submissions") and _table_exists(cursor, "coordinator_deliverables"):
-            cursor.execute(
-                f"""
-                SELECT
-                    cds.submission_id,
-                    cds.project_id,
-                    cds.file_name,
-                    cds.file_path,
-                    cds.file_mime,
-                    cds.file_size_mb,
-                    cds.submitted_at,
-                    cds.file_data IS NOT NULL AS has_file_data,
-                    cd.title AS deliverable_title,
-                    cd.course_scope,
-                    p.title AS project_title,
-                    p.status AS project_status,
-                    s.course_code,
-                    u_student.full_name AS submitted_by,
-                    sup_user.full_name AS supervisor_name,
-                    GROUP_CONCAT(DISTINCT team_user.full_name ORDER BY pm.is_primary_contact DESC, team_user.full_name SEPARATOR ', ') AS team_members
-                FROM coordinator_deliverable_submissions cds
-                JOIN coordinator_deliverables cd ON cd.deliverable_id = cds.deliverable_id
-                JOIN projects p ON p.project_id = cds.project_id
-                LEFT JOIN semesters s ON s.semester_id = p.semester_id
-                JOIN students st_submit ON st_submit.student_id = cds.student_id
-                JOIN users u_student ON u_student.user_id = st_submit.user_id
-                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
-                LEFT JOIN users sup_user ON sup_user.user_id = sup_f.user_id
-                LEFT JOIN project_members pm ON pm.project_id = p.project_id
-                LEFT JOIN students team_st ON team_st.student_id = pm.student_id
-                LEFT JOIN users team_user ON team_user.user_id = team_st.user_id
-                WHERE {access_filter}
-                GROUP BY
-                    cds.submission_id, cds.project_id, cds.file_name, cds.file_path,
-                    cds.file_mime, cds.file_size_mb, cds.submitted_at, cd.title,
-                    cd.course_scope, p.title, p.status, s.course_code,
-                    u_student.full_name, sup_user.full_name
-                ORDER BY cds.submitted_at DESC, cds.submission_id DESC
-                """,
-                access_params,
-            )
-            for row in cursor.fetchall():
-                uploaded_at = row.get("submitted_at")
-                course_code = row.get("course_code") or ("COMP4300" if row.get("course_scope") == "graduation_project" else "COMP4200")
-                files.append(
-                    {
-                        "source": "deliverable",
-                        "source_id": row.get("submission_id"),
-                        "project_id": row.get("project_id"),
-                        "file_type": "deliverable_submission",
-                        "submission_title": row.get("deliverable_title") or "Deliverable Submission",
-                        "course_scope": course_code,
-                        "course_code": course_code,
-                        "course_label": _course_label_for_code(course_code),
-                        "project_title": row.get("project_title") or "Untitled Project",
-                        "project_status": row.get("project_status") or "",
-                        "supervisor_name": row.get("supervisor_name") or "",
-                        "team_members": row.get("team_members") or "",
-                        "submitted_by": row.get("submitted_by") or "Unknown student",
-                        "file_name": row.get("file_name") or "Open file",
-                        "file_path": row.get("file_path") or "",
-                        "file_size_mb": float(row.get("file_size_mb") or 0),
-                        "uploaded_at": _format_submission_datetime(uploaded_at),
-                        "sort_at": uploaded_at,
-                        "download_url": f"/api/supervisor/progress/deliverable-submissions/{row.get('submission_id')}/download",
-                    }
-                )
-
         cursor.close()
         db.close()
         return jsonify({
@@ -1041,7 +1021,7 @@ def api_supervisor_download_project_file(file_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
         faculty_id = _current_supervisor_faculty_id(cursor)
-        access_filter = _project_access_filter(cursor)
+        access_filter = _submission_access_filter(cursor)
         params = (file_id,) + _project_access_params(cursor, faculty_id)
         cursor.execute(
             f"""
@@ -1051,6 +1031,7 @@ def api_supervisor_download_project_file(file_id):
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.file_id = %s
               AND {access_filter}
+              AND s.course_code = 'COMP4300'
               AND (
                     COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
                     OR pf.uploaded_at IS NOT NULL
@@ -1076,7 +1057,7 @@ def api_supervisor_download_milestone_submission(submission_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
         faculty_id = _current_supervisor_faculty_id(cursor)
-        access_filter = _project_access_filter(cursor)
+        access_filter = _submission_access_filter(cursor)
         params = (submission_id,) + _project_access_params(cursor, faculty_id)
         cursor.execute(
             f"""
@@ -1084,8 +1065,11 @@ def api_supervisor_download_milestone_submission(submission_id):
             FROM milestone_submissions ms
             JOIN projects p ON p.project_id = ms.project_id
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
+            JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
+            JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
             WHERE ms.submission_id = %s
               AND {access_filter}
+              AND tl.is_published = TRUE
               AND ms.submitted_to IN ('supervisor', 'both')
             LIMIT 1
             """,
@@ -1098,34 +1082,6 @@ def api_supervisor_download_milestone_submission(submission_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-@supervisor_progress_api_bp.route("/api/supervisor/progress/deliverable-submissions/<int:submission_id>/download")
-@login_required(role="supervisor")
-def api_supervisor_download_deliverable_submission(submission_id):
-    try:
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        faculty_id = _current_supervisor_faculty_id(cursor)
-        access_filter = _project_access_filter(cursor)
-        params = (submission_id,) + _project_access_params(cursor, faculty_id)
-        cursor.execute(
-            f"""
-            SELECT cds.file_name, cds.file_path, cds.file_data, cds.file_mime
-            FROM coordinator_deliverable_submissions cds
-            JOIN projects p ON p.project_id = cds.project_id
-            LEFT JOIN semesters s ON s.semester_id = p.semester_id
-            WHERE cds.submission_id = %s
-              AND {access_filter}
-            LIMIT 1
-            """,
-            params,
-        )
-        row = cursor.fetchone()
-        cursor.close()
-        db.close()
-        return _file_download_response(row, "deliverable-submission")
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @supervisor_progress_api_bp.route("/api/supervisor/progress/projects", methods=["GET"])
 @login_required(role="supervisor")

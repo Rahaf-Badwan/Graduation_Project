@@ -32,6 +32,7 @@ from ai_engine import ask_apms_ai, get_ai_health, get_archived_projects
 from activate_student import activate_bp
 from announcements import announcements_bp
 from routes.general_supervisors import general_supervisors_bp, supervisor_api_bp
+from routes.supervisor_progress_submitted_api import supervisor_progress_api_bp
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
@@ -66,6 +67,7 @@ app.register_blueprint(activate_bp)
 app.register_blueprint(announcements_bp, url_prefix='/head')
 app.register_blueprint(general_supervisors_bp)
 app.register_blueprint(supervisor_api_bp)
+app.register_blueprint(supervisor_progress_api_bp)
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def _get_active_semester(cursor):
     cursor.execute("""

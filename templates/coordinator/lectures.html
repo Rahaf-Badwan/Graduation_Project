@@ -262,6 +262,26 @@
     white-space: nowrap;
   }
 
+  .lecture-toast {
+    position: fixed;
+    top: 88px;
+    left: 50%;
+    z-index: 10000;
+    width: min(620px, calc(100vw - 32px));
+    transform: translateX(-50%);
+    background: #166534;
+    color: #fff;
+    padding: 16px 20px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 16px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .24);
+    display: none;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.5;
+    text-align: center;
+  }
+
   #pg-lectures .submission-filter-row {
     display: flex;
     gap: 8px;
@@ -464,6 +484,8 @@
     </div>
   </div>
 </div>
+
+<div class="lecture-toast" id="lectureToast" role="status" aria-live="polite"></div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -477,6 +499,20 @@
 
   let submissionFilesState = [];
   let currentSubmissionFilter = 'all';
+  let lectureToastTimer = null;
+
+  function showLectureToast(message, isError = false) {
+    const toast = document.getElementById('lectureToast');
+    if (!toast) return;
+
+    window.clearTimeout(lectureToastTimer);
+    toast.textContent = message;
+    toast.style.background = isError ? '#991b1b' : '#166534';
+    toast.style.display = 'block';
+    lectureToastTimer = window.setTimeout(() => {
+      toast.style.display = 'none';
+    }, isError ? 5000 : 3600);
+  }
 
   function resetLectureScroll() {
     window.scrollTo(0, 0);
@@ -583,6 +619,62 @@
     box.classList.toggle('on');
   }
 
+  function lectureEditFormHtml(lecture) {
+    const statusOption = value =>
+      `<option value="${value}" ${lecture.status === value ? 'selected' : ''}>${niceStatus(value)}</option>`;
+
+    return `
+      <div class="form-grid">
+        <div>
+          <label>Lecture Title</label>
+          <input id="lecEditTitle-${lecture.lecture_id}" value="${safe(lecture.title)}">
+        </div>
+
+        <div>
+          <label>Lecture Date</label>
+          <input id="lecEditDate-${lecture.lecture_id}" type="date" value="${safe(lecture.lecture_date || '')}">
+        </div>
+
+        <div>
+          <label>Week Label</label>
+          <input id="lecEditWeek-${lecture.lecture_id}" value="${safe(lecture.week_label || '')}" placeholder="Example: Week 3">
+        </div>
+
+        <div>
+          <label>Status</label>
+          <select id="lecEditStatus-${lecture.lecture_id}">
+            ${statusOption('scheduled')}
+            ${statusOption('completed')}
+            ${statusOption('cancelled')}
+          </select>
+        </div>
+
+        <div style="grid-column:1/-1">
+          <label>Description</label>
+          <textarea id="lecEditDesc-${lecture.lecture_id}" rows="2">${safe(lecture.description || '')}</textarea>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" type="button" onclick="saveLectureEdit(${lecture.lecture_id})">Save Changes</button>
+        <button class="btn btn-outline" type="button" onclick="toggleLectureEdit(${lecture.lecture_id})">Cancel</button>
+      </div>
+    `;
+  }
+
+  function toggleLectureEdit(lectureId) {
+    const box = document.getElementById(`lectureEdit-${lectureId}`);
+    if (!box) return;
+
+    const lecture = Object.values(lecturesState.lectures || {})
+      .flat()
+      .find(row => Number(row.lecture_id) === Number(lectureId));
+    if (!lecture) return;
+
+    if (!box.innerHTML.trim()) box.innerHTML = lectureEditFormHtml(lecture);
+    box.classList.toggle('on');
+  }
+
   function renderLectures(scope) {
     const list = document.getElementById(`lectureList-${scope}`);
     const rows = (lecturesState.lectures && lecturesState.lectures[scope]) || [];
@@ -622,7 +714,16 @@
               onclick="updateLectureDate(${lecture.lecture_id})">
               Confirm Date
             </button>
+
+            <button
+              class="btn btn-outline lecture-small-btn"
+              type="button"
+              onclick="toggleLectureEdit(${lecture.lecture_id})">
+              Edit Lecture
+            </button>
           </div>
+
+          <div id="lectureEdit-${lecture.lecture_id}" class="mini-form" style="margin-top:12px"></div>
         </div>
       </div>
     `).join('');
@@ -683,34 +784,71 @@
     };
 
     if (!payload.title) {
-      alert('Lecture title is required.');
+      showLectureToast('Lecture title is required.', true);
       return;
     }
 
-    await apiFetch('/api/coordinator/lectures', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
+    try {
+      const result = await apiFetch('/api/coordinator/lectures', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
 
-    const form = document.getElementById(`lectureForm-${scope}`);
-    if (form) {
-      form.classList.remove('on');
-      form.innerHTML = '';
+      const form = document.getElementById(`lectureForm-${scope}`);
+      if (form) {
+        form.classList.remove('on');
+        form.innerHTML = '';
+      }
+
+      await loadLecturesData();
+      showLectureToast(result.message);
+    } catch (err) {
+      showLectureToast(err.message || 'Could not save the lecture.', true);
     }
-
-    await loadLecturesData();
   }
 
   async function updateLectureDate(lectureId) {
     const dateInput = document.getElementById(`lecDateUpdate-${lectureId}`);
     if (!dateInput) return;
 
-    await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, {
-      method: 'POST',
-      body: JSON.stringify({ lecture_date: dateInput.value })
-    });
+    try {
+      const result = await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, {
+        method: 'POST',
+        body: JSON.stringify({ lecture_date: dateInput.value })
+      });
 
-    await loadLecturesData();
+      await loadLecturesData();
+      showLectureToast(result.message);
+    } catch (err) {
+      showLectureToast(err.message || 'Could not update the lecture date.', true);
+    }
+  }
+
+  async function saveLectureEdit(lectureId) {
+    const payload = {
+      title: document.getElementById(`lecEditTitle-${lectureId}`).value.trim(),
+      description: document.getElementById(`lecEditDesc-${lectureId}`).value.trim(),
+      lecture_date: document.getElementById(`lecEditDate-${lectureId}`).value,
+      week_label: document.getElementById(`lecEditWeek-${lectureId}`).value.trim(),
+      status: document.getElementById(`lecEditStatus-${lectureId}`).value
+    };
+
+    if (!payload.title) {
+      showLectureToast('Lecture title is required.', true);
+      return;
+    }
+
+    try {
+      const result = await apiFetch(`/api/coordinator/lectures/${lectureId}`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      await loadLecturesData();
+      showLectureToast(result.message);
+    } catch (err) {
+      showLectureToast(err.message || 'Could not update the lecture.', true);
+    }
   }
 
   function buildSubmissionFileHref(file) {

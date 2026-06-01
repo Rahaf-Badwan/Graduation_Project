@@ -48,7 +48,18 @@ def _ensure_notif_attachment_columns(cursor):
         """)
     if not (cursor.fetchone() or {}).get("cnt"):
         cursor.execute(
-            "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read"
+            "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 0 AFTER is_read"
+        )
+
+    cursor.execute("""
+        SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = 'notifications'
+          AND COLUMN_NAME  = 'message_origin'
+        """)
+    if not (cursor.fetchone() or {}).get("cnt"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN message_origin ENUM('dynamic','manual','reply') NOT NULL DEFAULT 'dynamic' AFTER can_reply"
         )
 
 
@@ -60,7 +71,7 @@ def _student_notif_row_to_json(row):
     if clean.get("created_at") is not None:
         clean["created_at"] = str(clean["created_at"])
     clean["is_read"] = bool(clean.get("is_read"))
-    clean["can_reply"] = bool(clean.get("can_reply", 1))
+    clean["can_reply"] = bool(clean.get("can_reply", 0))
     clean["course_scope"] = clean.get("course_scope") or "both"
     clean["has_attachment"] = bool(clean.get("attachment_name"))
     clean.pop("attachment_data", None)  # never send binary over JSON
@@ -144,7 +155,10 @@ def api_student_notifications_inbox():
         cursor.execute(
             """
             SELECT n.notification_id, n.notification_type, n.title, n.message,
-                   n.course_scope, n.is_read, COALESCE(n.can_reply, 1) AS can_reply, n.created_at,
+                   n.course_scope, n.is_read,
+                   CASE WHEN n.message_origin IN ('manual', 'reply')
+                        THEN COALESCE(n.can_reply, 0) ELSE 0 END AS can_reply,
+                   n.created_at,
                    n.attachment_name, n.attachment_mime,
                    sender.user_id  AS sender_user_id,
                    sender.full_name AS sender_name,
@@ -175,7 +189,10 @@ def api_student_notifications_sent():
         cursor.execute(
             """
             SELECT n.notification_id, n.title, n.message, n.notification_type,
-                   n.course_scope, COALESCE(n.can_reply, 1) AS can_reply, n.created_at,
+                   n.course_scope,
+                   CASE WHEN n.message_origin IN ('manual', 'reply')
+                        THEN COALESCE(n.can_reply, 0) ELSE 0 END AS can_reply,
+                   n.created_at,
                    n.attachment_name, n.attachment_mime,
                    recip.full_name AS recipient_name,
                    recip.role      AS recipient_role
@@ -299,11 +316,12 @@ def api_student_notifications_send():
 
             cursor.execute(
                 """
-                SELECT n.notification_id, n.sender_id, COALESCE(n.can_reply, 1) AS can_reply
+                SELECT n.notification_id, n.sender_id, COALESCE(n.can_reply, 0) AS can_reply
                 FROM notifications n
                 WHERE n.notification_id = %s
                   AND n.recipient_id = %s
                   AND n.sender_id = %s
+                  AND n.message_origin IN ('manual', 'reply')
                 LIMIT 1
                 """,
                 (int(reply_to_notification_id), user_id, int(value)),
@@ -311,7 +329,7 @@ def api_student_notifications_send():
             row = cursor.fetchone()
             if not row:
                 return jsonify({"error": "Original message was not found for this reply."}), 404
-            if not bool(row.get("can_reply", 1)):
+            if not bool(row.get("can_reply", 0)):
                 return jsonify({"error": "Replies are disabled for this message."}), 403
             recipients = [int(value)]
 
@@ -324,10 +342,20 @@ def api_student_notifications_send():
                 """
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
-                     course_scope, is_read, can_reply, attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, 'system', %s, %s, 'both', FALSE, TRUE, %s, %s, %s)
+                     course_scope, is_read, can_reply, message_origin,
+                     attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, 'system', %s, %s, 'both', FALSE, TRUE, %s, %s, %s, %s)
                 """,
-                (recipient_id, user_id, title, message, att_name, att_mime, att_data),
+                (
+                    recipient_id,
+                    user_id,
+                    title,
+                    message,
+                    "reply" if scope == "reply" else "manual",
+                    att_name,
+                    att_mime,
+                    att_data,
+                ),
             )
         db.commit()
         cursor.close()

@@ -6,8 +6,163 @@
 
 {% block content %}
 <div class="page on" id="pg-feedback">
+  <style>
+    #pg-feedback { padding: 20px 22px 90px; }
+    #pg-feedback .fb-page-head,
+    #pg-feedback .fb-head,
+    #pg-feedback .fb-reviewer,
+    #pg-feedback .fb-tags { display: flex; }
+    #pg-feedback .fb-page-head {
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    #pg-feedback .fb-subtitle {
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+    #pg-feedback .fb-layout {
+      align-items: start;
+      display: grid;
+      gap: 14px;
+      grid-template-columns: minmax(0, 1.65fr) minmax(260px, .85fr);
+    }
+    #pg-feedback .fb-side { display: grid; gap: 14px; }
+    #pg-feedback .fb-list { display: grid; }
+    #pg-feedback .fb-item {
+      border-bottom: 1px solid #edf2ef;
+      padding: 16px;
+    }
+    #pg-feedback .fb-item:last-child { border-bottom: 0; }
+    #pg-feedback .fb-head {
+      align-items: flex-start;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    #pg-feedback .fb-reviewer { align-items: center; gap: 10px; min-width: 0; }
+    #pg-feedback .fb-avatar {
+      align-items: center;
+      background: var(--green-light);
+      border-radius: 50%;
+      color: var(--green);
+      display: flex;
+      flex: 0 0 38px;
+      font-size: 11px;
+      font-weight: 900;
+      height: 38px;
+      justify-content: center;
+    }
+    #pg-feedback .fb-name {
+      color: var(--color-text-primary);
+      font-size: 13px;
+      font-weight: 900;
+    }
+    #pg-feedback .fb-role,
+    #pg-feedback .fb-date,
+    #pg-feedback .fb-project {
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+    #pg-feedback .fb-date { padding-top: 2px; white-space: nowrap; }
+    #pg-feedback .fb-project {
+      color: var(--green);
+      font-weight: 800;
+      margin-top: 12px;
+    }
+    #pg-feedback .fb-text {
+      color: var(--color-text-primary);
+      font-size: 13px;
+      line-height: 1.75;
+      margin-top: 7px;
+      white-space: pre-wrap;
+    }
+    #pg-feedback .fb-tags { flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+    #pg-feedback .fb-chip {
+      background: var(--green-light);
+      border-radius: 999px;
+      color: var(--green);
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 4px 9px;
+    }
+    #pg-feedback .fb-chip.important { background: var(--amber-light); color: var(--amber); }
+    #pg-feedback .fb-chip.urgent { background: var(--coral-light); color: var(--coral); }
+    #pg-feedback .fb-chip.score { background: var(--blue-light); color: var(--blue); }
+    #pg-feedback .fb-item-points {
+      display: grid;
+      gap: 6px;
+      margin-top: 11px;
+    }
+    #pg-feedback .fb-item-point,
+    #pg-feedback .fb-area {
+      background: var(--color-background-tertiary);
+      border-radius: 9px;
+      color: var(--color-text-primary);
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 8px 10px;
+    }
+    #pg-feedback .fb-item-point::before { color: var(--green); content: "- "; font-weight: 900; }
+    #pg-feedback .fb-item-point.resolved,
+    #pg-feedback .fb-area.resolved { color: var(--green); text-decoration: line-through; }
+    #pg-feedback .fb-summary {
+      padding: 10px 16px 16px;
+      text-align: center;
+    }
+    #pg-feedback .fb-average {
+      color: var(--green);
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1;
+      margin: 7px 0 4px;
+    }
+    #pg-feedback .fb-muted,
+    #pg-feedback .fb-empty {
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    #pg-feedback .fb-score-list,
+    #pg-feedback .fb-area-list { display: grid; gap: 7px; padding: 0 16px 16px; }
+    #pg-feedback .fb-score-row {
+      align-items: center;
+      display: grid;
+      gap: 7px;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    #pg-feedback .fb-score-name {
+      color: var(--color-text-primary);
+      font-size: 11px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #pg-feedback .fb-score-value { color: var(--green); font-size: 12px; font-weight: 900; }
+    #pg-feedback .fb-score-track {
+      background: #edf2ef;
+      border-radius: 999px;
+      grid-column: 1 / -1;
+      height: 5px;
+      overflow: hidden;
+    }
+    #pg-feedback .fb-score-fill { background: var(--green); border-radius: inherit; height: 100%; }
+    #pg-feedback .fb-area.important { background: var(--amber-light); color: var(--amber); }
+    #pg-feedback .fb-area.urgent { background: var(--coral-light); color: var(--coral); }
+    #pg-feedback .fb-empty { padding: 26px 16px; text-align: center; }
+    @media (max-width: 840px) {
+      #pg-feedback { padding: 14px 12px 80px; }
+      #pg-feedback .fb-layout { grid-template-columns: 1fr; }
+      #pg-feedback .fb-head { display: grid; }
+    }
+  </style>
+
   <div id="regLockOverlay" style="display:none;text-align:center;padding:60px 20px">
-    <div style="font-size:48px;margin-bottom:16px">🔒</div>
     <div style="font-size:18px;font-weight:700;color:var(--color-text-primary);margin-bottom:8px">Registration Required</div>
     <div style="font-size:14px;color:#667085;max-width:380px;margin:0 auto 20px">
       This page is available after your supervisor is assigned and the coordinator approves your team.
@@ -15,113 +170,169 @@
     <a href="/student/registration" class="btn btn-primary" style="text-decoration:none">Go to Registration</a>
   </div>
 
-  <div id="regPageContent"><div class="two-col" style="align-items:start">
-    <div>
-      <div class="card">
-        <div class="card-hd"><span class="card-title">All Feedback</span></div>
-        <div class="fb-item">
-          <div class="fb-head">
-            <div class="fb-avatar" style="background:var(--green-light);color:var(--green)">NH</div>
-            <div>
-              <div class="fb-name">Dr. Naema Harbawi</div>
-              <div class="fb-role">Supervisor</div>
-            </div>
-            <div class="fb-date">Feb 3, 2026</div>
-          </div>
-          <div class="fb-text">The report is generally good. I recommend elaborating more on the system
-            architecture section and adding detailed ERD diagrams. Also ensure consistency of technical terms
-            across all chapters.</div>
-          <div class="fb-score"><span style="font-size:12px;color:var(--color-text-secondary)">Initial
-              Grade:</span><span class="score-chip sc-b">78/100</span></div>
-        </div>
-        <div class="fb-item">
-          <div class="fb-head">
-            <div class="fb-avatar" style="background:var(--blue-light);color:var(--blue)">MS</div>
-            <div>
-              <div class="fb-name">Dr. Mahmoud Salem</div>
-              <div class="fb-role">Committee Member</div>
-            </div>
-            <div class="fb-date">Jan 20, 2026</div>
-          </div>
-          <div class="fb-text">The AI section needs more detail, especially regarding the chatbot training
-            methodology and accuracy evaluation. I recommend adding an NLP model comparison table.</div>
-          <div class="fb-score"><span style="font-size:12px;color:var(--color-text-secondary)">Grade:</span><span
-              class="score-chip sc-b">75/100</span></div>
-        </div>
-        <div class="fb-item" style="border:none;padding-bottom:0">
-          <div class="fb-head">
-            <div class="fb-avatar" style="background:#FBEAF0;color:#993556">LH</div>
-            <div>
-              <div class="fb-name">Dr. Lina Haddad</div>
-              <div class="fb-role">Committee Member</div>
-            </div>
-            <div class="fb-date">Jan 20, 2026</div>
-          </div>
-          <div class="fb-text">The proposed interface is very appropriate and well-thought-out. I recommend
-            considering Accessibility requirements and adding support for users with special needs.</div>
-          <div class="fb-score"><span style="font-size:12px;color:var(--color-text-secondary)">Grade:</span><span
-              class="score-chip sc-a">82/100</span></div>
-        </div>
+  <div id="regPageContent">
+    <div class="fb-page-head">
+      <div>
+        <div style="font-size:15px;font-weight:900;color:var(--color-text-primary)">Supervisor Feedback</div>
+        <div class="fb-subtitle">Review the notes and improvement points sent by your supervisor.</div>
       </div>
+      <button class="btn btn-outline" type="button" onclick="loadStudentFeedback()">Refresh</button>
     </div>
-    <div>
+
+    <div class="fb-layout">
       <div class="card">
-        <div class="card-hd"><span class="card-title">Grades Summary</span></div>
-        <div style="text-align:center;padding:10px 0 16px">
-          <div style="font-size:36px;font-weight:700;color:var(--green)">78.3</div>
-          <div style="font-size:12px;color:var(--color-text-secondary)">Average grade so far</div>
+        <div class="card-hd">
+          <span class="card-title">All Feedback</span>
+          <span id="feedbackCount" class="fb-muted">Loading...</span>
         </div>
-        <div class="prog-wrap">
-          <div class="prog-label"><span>Dr. Naema Harbawi</span><span>78</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:78%;background:var(--green)"></div>
-          </div>
-        </div>
-        <div class="prog-wrap">
-          <div class="prog-label"><span>Dr. Mahmoud Salem</span><span>75</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:75%;background:var(--blue)"></div>
-          </div>
-        </div>
-        <div class="prog-wrap">
-          <div class="prog-label"><span>Dr. Lina Haddad</span><span>82</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:82%;background:var(--amber)"></div>
-          </div>
+        <div id="feedbackList" class="fb-list">
+          <div class="fb-empty">Loading feedback...</div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Areas Needing Improvement</span></div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <div
-            style="font-size:12px;padding:7px 10px;background:var(--coral-light);border-radius:var(--rm);color:var(--coral)">
-            ⚑ Elaborate system architecture and ERD</div>
-          <div
-            style="font-size:12px;padding:7px 10px;background:var(--amber-light);border-radius:var(--rm);color:var(--amber)">
-            ⚑ Chatbot training and evaluation methodology</div>
-          <div
-            style="font-size:12px;padding:7px 10px;background:var(--blue-light);border-radius:var(--rm);color:var(--blue)">
-            ⚑ Add Accessibility support to the UI</div>
-          <div
-            style="font-size:12px;padding:7px 10px;background:var(--green-light);border-radius:var(--rm);color:var(--green)">
-            ✓ Upload presentation slides before Feb 15</div>
+
+      <div class="fb-side">
+        <div class="card">
+          <div class="card-hd"><span class="card-title">Grades Summary</span></div>
+          <div class="fb-summary">
+            <div id="feedbackAverage" class="fb-average">-</div>
+            <div class="fb-muted">Average grade so far</div>
+          </div>
+          <div id="feedbackScores" class="fb-score-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd"><span class="card-title">Areas Needing Improvement</span></div>
+          <div id="feedbackAreas" class="fb-area-list">
+            <div class="fb-empty" style="padding:12px 0">No improvement points yet.</div>
+          </div>
         </div>
       </div>
     </div>
   </div>
+</div>
+{% endblock %}
 
-</div></div><!-- /regPageContent --><script>
-  (function () {
-    fetch('/student/api/registration-check')
-      .then(r => r.json())
-      .then(data => {
-        if (!data.registered) {
-          var ov = document.getElementById('regLockOverlay');
-          var ct = document.getElementById('regPageContent');
-          if (ov) ov.style.display = '';
-          if (ct) ct.style.display = 'none';
-        }
-      }).catch(() => {});
-  })();
+{% block extra_scripts %}
+<script>
+(function () {
+  function esc(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function label(value) {
+    return String(value || '').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  function reviewerRole(role) {
+    return ({
+      supervisor: 'Supervisor',
+      coordinator: 'Coordinator',
+      head_of_department: 'Head of Department'
+    }[role] || label(role));
+  }
+
+  function feedbackHtml(item) {
+    const points = item.improvement_points || [];
+    const priority = item.priority || 'normal';
+    return `
+      <article class="fb-item">
+        <div class="fb-head">
+          <div class="fb-reviewer">
+            <div class="fb-avatar">${esc(item.reviewer_initials || 'FB')}</div>
+            <div>
+              <div class="fb-name">${esc(item.reviewer_name || 'Faculty Member')}</div>
+              <div class="fb-role">${esc(reviewerRole(item.reviewer_role))} &middot; ${esc(label(item.feedback_type))}</div>
+            </div>
+          </div>
+          <div class="fb-date">${esc(item.created_at || '')}</div>
+        </div>
+        <div class="fb-project">${esc(item.course_code || '')} &middot; ${esc(item.project_title || 'Project')}</div>
+        <div class="fb-text">${esc(item.feedback_text || '')}</div>
+        <div class="fb-tags">
+          <span class="fb-chip ${esc(priority)}">${esc(label(priority))} Priority</span>
+          ${item.score == null ? '' : `<span class="fb-chip score">Grade: ${esc(item.score)}/100</span>`}
+        </div>
+        ${points.length ? `
+          <div class="fb-item-points">
+            ${points.map(point => `<div class="fb-item-point ${point.is_resolved ? 'resolved' : ''}">${esc(point.point_text)}</div>`).join('')}
+          </div>
+        ` : ''}
+      </article>
+    `;
+  }
+
+  function renderScores(items, summary) {
+    const average = document.getElementById('feedbackAverage');
+    const box = document.getElementById('feedbackScores');
+    const scores = items.filter(item => item.score != null);
+    average.textContent = summary.average_score == null ? '-' : summary.average_score;
+    box.innerHTML = scores.length
+      ? scores.map(item => `
+          <div class="fb-score-row">
+            <div class="fb-score-name">${esc(item.reviewer_name)} &middot; ${esc(item.project_title)}</div>
+            <div class="fb-score-value">${esc(item.score)}</div>
+            <div class="fb-score-track"><div class="fb-score-fill" style="width:${Math.max(0, Math.min(100, Number(item.score) || 0))}%"></div></div>
+          </div>
+        `).join('')
+      : '<div class="fb-empty" style="padding:2px 0">No grades have been added yet.</div>';
+  }
+
+  function renderAreas(items) {
+    const box = document.getElementById('feedbackAreas');
+    const areas = items.flatMap(item => (item.improvement_points || []).map(point => ({
+      ...point,
+      priority: item.priority || 'normal'
+    })));
+    box.innerHTML = areas.length
+      ? areas.map(point => `
+          <div class="fb-area ${esc(point.priority)} ${point.is_resolved ? 'resolved' : ''}">${esc(point.point_text)}</div>
+        `).join('')
+      : '<div class="fb-empty" style="padding:12px 0">No improvement points yet.</div>';
+  }
+
+  async function loadStudentFeedback() {
+    const list = document.getElementById('feedbackList');
+    const count = document.getElementById('feedbackCount');
+    list.innerHTML = '<div class="fb-empty">Loading feedback...</div>';
+    count.textContent = 'Loading...';
+
+    try {
+      const response = await fetch('/student/api/feedback', { headers: { Accept: 'application/json' } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.error) throw new Error(data.error || 'Could not load feedback.');
+      const items = data.feedback || [];
+      const summary = data.summary || {};
+      count.textContent = `${items.length} item(s)`;
+      list.innerHTML = items.length
+        ? items.map(feedbackHtml).join('')
+        : '<div class="fb-empty">No feedback has been sent by your supervisor yet.</div>';
+      renderScores(items, summary);
+      renderAreas(items);
+    } catch (error) {
+      count.textContent = 'Error';
+      list.innerHTML = `<div class="fb-empty">Feedback error: ${esc(error.message)}</div>`;
+      renderScores([], {});
+      renderAreas([]);
+    }
+  }
+
+  fetch('/student/api/registration-check')
+    .then(response => response.json())
+    .then(data => {
+      if (!data.registered) {
+        document.getElementById('regLockOverlay').style.display = '';
+        document.getElementById('regPageContent').style.display = 'none';
+      }
+    })
+    .catch(() => {});
+
+  window.loadStudentFeedback = loadStudentFeedback;
+  document.addEventListener('DOMContentLoaded', loadStudentFeedback);
+})();
 </script>
 {% endblock %}

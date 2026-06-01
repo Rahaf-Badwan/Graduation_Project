@@ -256,8 +256,28 @@ def _insert_notification(
     course_scope="both",
 ):
     notification_type = _safe_notification_type(cursor, notification_type)
+    has_course_scope = _db_column_exists(cursor, "notifications", "course_scope")
+    has_can_reply = _db_column_exists(cursor, "notifications", "can_reply")
 
-    if _db_column_exists(cursor, "notifications", "course_scope"):
+    if has_course_scope and has_can_reply:
+        cursor.execute(
+            """
+            INSERT INTO notifications
+                (recipient_id, sender_id, notification_type, title, message,
+                 course_scope, related_project_id, is_read, can_reply)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, FALSE)
+            """,
+            (
+                recipient_id,
+                sender_id,
+                notification_type,
+                title,
+                message,
+                course_scope,
+                related_project_id,
+            ),
+        )
+    elif has_course_scope:
         cursor.execute(
             """
             INSERT INTO notifications
@@ -272,6 +292,23 @@ def _insert_notification(
                 title,
                 message,
                 course_scope,
+                related_project_id,
+            ),
+        )
+    elif has_can_reply:
+        cursor.execute(
+            """
+            INSERT INTO notifications
+                (recipient_id, sender_id, notification_type, title, message,
+                 related_project_id, is_read, can_reply)
+            VALUES (%s, %s, %s, %s, %s, %s, FALSE, FALSE)
+            """,
+            (
+                recipient_id,
+                sender_id,
+                notification_type,
+                title,
+                message,
                 related_project_id,
             ),
         )
@@ -312,6 +349,24 @@ def _project_student_user_ids(cursor, project_id):
 
 def _deliverable_student_user_ids(cursor, semester_id, course_scope):
     if course_scope == "graduation_project":
+        recipients = set()
+
+        if _table_exists(cursor, "student_course_results"):
+            cursor.execute(
+                """
+                SELECT DISTINCT u.user_id
+                FROM student_course_results scr
+                JOIN students st ON st.student_id = scr.student_id
+                JOIN users u ON u.user_id = st.user_id
+                WHERE scr.status = 'passed'
+                  AND scr.promoted_to_semester_id = %s
+                  AND u.role = 'student'
+                  AND u.is_active = TRUE
+                """,
+                (semester_id,),
+            )
+            recipients.update(row["user_id"] for row in cursor.fetchall())
+
         cursor.execute(
             """
             SELECT DISTINCT u.user_id
@@ -325,7 +380,8 @@ def _deliverable_student_user_ids(cursor, semester_id, course_scope):
             """,
             (semester_id,),
         )
-        return [row["user_id"] for row in cursor.fetchall()]
+        recipients.update(row["user_id"] for row in cursor.fetchall())
+        return sorted(recipients)
 
     cursor.execute(
         """
@@ -334,6 +390,13 @@ def _deliverable_student_user_ids(cursor, semester_id, course_scope):
         JOIN students st ON st.student_id = scr.student_id
         JOIN users u ON u.user_id = st.user_id
         WHERE scr.semester_id = %s
+          AND NOT (
+              scr.status = 'passed'
+              AND (
+                  scr.promoted_to_semester_id IS NOT NULL
+                  OR scr.promoted_at IS NOT NULL
+              )
+          )
           AND u.role = 'student'
           AND u.is_active = TRUE
         """,
@@ -343,11 +406,25 @@ def _deliverable_student_user_ids(cursor, semester_id, course_scope):
     if recipients:
         return recipients
 
-    cursor.execute("""
-        SELECT user_id
-        FROM users
-        WHERE role = 'student' AND is_active = TRUE
-        """)
+    cursor.execute(
+        """
+        SELECT DISTINCT u.user_id
+        FROM users u
+        JOIN students st ON st.user_id = u.user_id
+        WHERE u.role = 'student'
+          AND u.is_active = TRUE
+          AND NOT EXISTS (
+              SELECT 1
+              FROM student_course_results scr
+              WHERE scr.student_id = st.student_id
+                AND scr.status = 'passed'
+                AND (
+                    scr.promoted_to_semester_id IS NOT NULL
+                    OR scr.promoted_at IS NOT NULL
+                )
+          )
+        """
+    )
     return [row["user_id"] for row in cursor.fetchall()]
 
 
@@ -1120,17 +1197,189 @@ def api_coordinator_update_lecture_date(lecture_id):
         _ensure_lecture_tables(cursor)
         cursor.execute(
             """
+            SELECT lecture_id, semester_id, course_scope, title, lecture_date
+            FROM coordinator_lectures
+            WHERE lecture_id = %s
+            """,
+            (lecture_id,),
+        )
+        lecture = cursor.fetchone()
+        if not lecture:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Lecture not found."}), 404
+
+        old_lecture_date = lecture.get("lecture_date")
+        cursor.execute(
+            """
             UPDATE coordinator_lectures
             SET lecture_date = %s,
                 status = CASE WHEN %s IS NULL THEN status ELSE 'scheduled' END
             WHERE lecture_id = %s
-        """,
+            """,
             (lecture_date, lecture_date, lecture_id),
         )
+
+        sent_count = 0
+        if (
+            lecture.get("semester_id")
+            and lecture_date
+            and str(old_lecture_date or "") != str(lecture_date)
+        ):
+            recipients = sorted(
+                set(
+                    _deliverable_student_user_ids(
+                        cursor,
+                        lecture.get("semester_id"),
+                        lecture.get("course_scope") or "introduction",
+                    )
+                )
+            )
+            course_scope = lecture.get("course_scope") or "introduction"
+            scope_label = (
+                "Project Introduction"
+                if course_scope == "introduction"
+                else "Graduation Project"
+            )
+            message = (
+                f'The lecture date for "{lecture.get("title")}" in {scope_label} '
+                f"has been confirmed for {lecture_date}. "
+                "Open from your student timeline: /student/timeline"
+            )
+            for recipient_id in recipients:
+                _insert_notification(
+                    cursor,
+                    recipient_id,
+                    session.get("user_id"),
+                    "system",
+                    f'Lecture Date Confirmed: {lecture.get("title")}',
+                    message,
+                    None,
+                    course_scope,
+                )
+            sent_count = len(recipients)
+
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": "Lecture date updated."})
+        return jsonify(
+            {
+                "message": f"Lecture date updated. {sent_count} student notification(s) sent.",
+                "notifications_sent": sent_count,
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/lectures/<int:lecture_id>", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_update_lecture(lecture_id):
+    try:
+        data = request.get_json(silent=True) or {}
+        title = (data.get("title") or "").strip()
+        if not title:
+            return jsonify({"error": "Lecture title is required."}), 400
+
+        status = (
+            data.get("status")
+            if data.get("status") in ("scheduled", "completed", "cancelled")
+            else "scheduled"
+        )
+        description = (data.get("description") or "").strip() or None
+        lecture_date = data.get("lecture_date") or None
+        week_label = (data.get("week_label") or "").strip() or None
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_lecture_tables(cursor)
+        cursor.execute(
+            """
+            SELECT lecture_id, semester_id, course_scope, title, description,
+                   lecture_date, week_label, status
+            FROM coordinator_lectures
+            WHERE lecture_id = %s
+            """,
+            (lecture_id,),
+        )
+        lecture = cursor.fetchone()
+        if not lecture:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Lecture not found."}), 404
+
+        changed = any(
+            (
+                str(lecture.get("title") or "") != title,
+                str(lecture.get("description") or "") != str(description or ""),
+                str(lecture.get("lecture_date") or "") != str(lecture_date or ""),
+                str(lecture.get("week_label") or "") != str(week_label or ""),
+                str(lecture.get("status") or "") != status,
+            )
+        )
+
+        cursor.execute(
+            """
+            UPDATE coordinator_lectures
+            SET title = %s,
+                description = %s,
+                lecture_date = %s,
+                week_label = %s,
+                status = %s
+            WHERE lecture_id = %s
+            """,
+            (title, description, lecture_date, week_label, status, lecture_id),
+        )
+
+        sent_count = 0
+        if changed and lecture.get("semester_id"):
+            course_scope = lecture.get("course_scope") or "introduction"
+            recipients = sorted(
+                set(
+                    _deliverable_student_user_ids(
+                        cursor, lecture.get("semester_id"), course_scope
+                    )
+                )
+            )
+            scope_label = (
+                "Project Introduction"
+                if course_scope == "introduction"
+                else "Graduation Project"
+            )
+            date_text = f" Date: {lecture_date}." if lecture_date else ""
+            week_text = f" {week_label}." if week_label else ""
+            details_text = f" Details: {description}" if description else ""
+            message = (
+                f'The lecture "{title}" for {scope_label} has been updated.'
+                f"{date_text}{week_text} Status: {status.replace('_', ' ').title()}."
+                f"{details_text} Open from your student timeline: /student/timeline"
+            )
+            for recipient_id in recipients:
+                _insert_notification(
+                    cursor,
+                    recipient_id,
+                    session.get("user_id"),
+                    "system",
+                    f"Lecture Updated: {title}",
+                    message,
+                    None,
+                    course_scope,
+                )
+            sent_count = len(recipients)
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify(
+            {
+                "message": (
+                    f"Lecture updated successfully. {sent_count} student notification(s) sent."
+                    if changed
+                    else "No lecture changes to save."
+                ),
+                "notifications_sent": sent_count,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1977,7 +2226,11 @@ def _ensure_notification_attachment_columns(cursor):
         )
     if not _db_column_exists(cursor, "notifications", "can_reply"):
         cursor.execute(
-            "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read"
+            "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 0 AFTER is_read"
+        )
+    if not _db_column_exists(cursor, "notifications", "message_origin"):
+        cursor.execute(
+            "ALTER TABLE notifications ADD COLUMN message_origin ENUM('dynamic','manual','reply') NOT NULL DEFAULT 'dynamic' AFTER can_reply"
         )
 
 
@@ -1987,9 +2240,12 @@ def _notification_attachment_select_fields(cursor):
     if _db_column_exists(cursor, "notifications", "attachment_name"):
         attachment_fields = "n.attachment_name, n.attachment_mime, n.attachment_data IS NOT NULL AS has_attachment"
 
-    reply_field = "1 AS can_reply"
+    reply_field = "0 AS can_reply"
     if _db_column_exists(cursor, "notifications", "can_reply"):
-        reply_field = "COALESCE(n.can_reply, 1) AS can_reply"
+        reply_field = (
+            "CASE WHEN n.message_origin IN ('manual', 'reply') "
+            "THEN COALESCE(n.can_reply, 0) ELSE 0 END AS can_reply"
+        )
 
     return f"{attachment_fields}, {reply_field}"
 
@@ -2002,7 +2258,7 @@ def _notification_row_to_json(row):
     if clean.get("created_at") is not None:
         clean["created_at"] = str(clean["created_at"])
     clean["is_read"] = bool(clean.get("is_read"))
-    clean["can_reply"] = bool(clean.get("can_reply", 1))
+    clean["can_reply"] = bool(clean.get("can_reply", 0))
     clean["course_scope"] = clean.get("course_scope") or "both"
     clean["has_attachment"] = bool(clean.get("has_attachment"))
     if not clean["has_attachment"]:
@@ -2543,11 +2799,12 @@ def api_coordinator_notifications_send():
                 return jsonify({"error": "This reply cannot be sent because the original message was not identified."}), 400
             cursor.execute(
                 """
-                SELECT n.notification_id, n.sender_id, COALESCE(n.can_reply, 1) AS can_reply
+                SELECT n.notification_id, n.sender_id, COALESCE(n.can_reply, 0) AS can_reply
                 FROM notifications n
                 WHERE n.notification_id = %s
                   AND n.recipient_id = %s
                   AND n.sender_id = %s
+                  AND n.message_origin IN ('manual', 'reply')
                 LIMIT 1
                 """,
                 (reply_to_notification_id, sender_id, value),
@@ -2557,7 +2814,7 @@ def api_coordinator_notifications_send():
                 cursor.close()
                 db.close()
                 return jsonify({"error": "Original message was not found for this reply."}), 404
-            if not bool(original_message.get("can_reply", 1)):
+            if not bool(original_message.get("can_reply", 0)):
                 cursor.close()
                 db.close()
                 return jsonify({"error": "Replies are disabled for this message."}), 403
@@ -2578,8 +2835,8 @@ def api_coordinator_notifications_send():
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
                      course_scope, related_project_id, is_read, can_reply,
-                     attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s)
+                     message_origin, attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s, %s)
                 """,
                 (
                     recipient_id,
@@ -2589,6 +2846,7 @@ def api_coordinator_notifications_send():
                     message,
                     course_scope,
                     1 if allow_reply else 0,
+                    "reply" if scope == "reply" else "manual",
                     attachment_name,
                     attachment_mime,
                     attachment_data,

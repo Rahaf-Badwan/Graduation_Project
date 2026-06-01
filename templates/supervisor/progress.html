@@ -1,7 +1,7 @@
 {% extends 'supervisor/base.html' %}
-{% block page_title %}Submitted Files{% endblock %}
+{% block page_title %}Submit Files{% endblock %}
 {% block page_id %}progress{% endblock %}
-{% block topbar_title %}Submitted Files{% endblock %}
+{% block topbar_title %}Submit Files{% endblock %}
 
 {% block content %}
 <div class="page page-single on" id="pg-supervisor-submissions">
@@ -222,9 +222,9 @@
   <div class="card">
     <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
       <div>
-        <span class="card-title">Student Submitted Files</span>
+        <span class="card-title">Submit Files</span>
         <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
-          This page shows only submitted files for projects assigned to you as supervisor.
+          Review student submissions assigned to you as supervisor.
         </div>
       </div>
 
@@ -232,15 +232,15 @@
     </div>
 
     <div class="info-box">
-      Projects are shown first. Under each project you will see its submitted files. If a project has no submissions yet, the project still appears.
+      COMP4200 submissions appear here when the coordinator publishes a task for the supervisor. COMP4300 project files for your assigned graduation projects also appear here.
     </div>
 
     <div class="submission-toolbar">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <select id="submissionCourseFilter" onchange="renderSupervisorSubmissionFiles()">
           <option value="all">All Courses</option>
-          <option value="COMP4200">COMP4200</option>
-          <option value="COMP4300">COMP4300</option>
+          <option value="COMP4200">Project Introduction - COMP4200</option>
+          <option value="COMP4300">Graduation Project - COMP4300</option>
         </select>
 
         <input id="submissionSearch" type="search" placeholder="Search student, project, file..."
@@ -268,7 +268,6 @@
 <script>
 (function () {
   let submissionFilesState = [];
-  let supervisorProjectsState = [];
 
   function safeText(value) {
     return String(value ?? '')
@@ -289,11 +288,11 @@
     return raw || 'Other';
   }
 
-  function updateSubmissionStats(files, projects) {
+  function updateSubmissionStats(files) {
     const total = files.length;
-    const c4200 = projects.filter(p => normalizeCourseScope(p) === 'COMP4200').length;
-    const c4300 = projects.filter(p => normalizeCourseScope(p) === 'COMP4300').length;
-    const other = projects.length - c4200 - c4300;
+    const c4200 = files.filter(file => normalizeCourseScope(file) === 'COMP4200').length;
+    const c4300 = files.filter(file => normalizeCourseScope(file) === 'COMP4300').length;
+    const other = total - c4200 - c4300;
 
     document.getElementById('subTotal').textContent = total;
     document.getElementById('sub4200').textContent = c4200;
@@ -301,73 +300,103 @@
     document.getElementById('subOther').textContent = other;
   }
 
-  function filesForProject(project, files) {
-    const projectId = String(project.project_id || '').trim();
-    return files.filter(file => String(file.project_id || '').trim() === projectId);
+  function submissionFolderKey(file) {
+    const courseCode = normalizeCourseScope(file);
+    const title = String(file.submission_title || file.file_type || 'Submission').trim().toLowerCase();
+    return `${courseCode}:title:${title}`;
   }
 
-  function projectMatchesSearch(project, files, q) {
-    if (!q) return true;
-    const projectFiles = filesForProject(project, files);
-    const haystack = [
-      project.title,
-      project.members,
-      project.status,
-      project.course_code,
-      project.course_label,
-      project.submission_date,
-      project.updated_at,
-      ...projectFiles.flatMap(file => [
-        file.submission_title,
-        file.submitted_by,
-        file.file_name,
-        file.file_type,
-        file.uploaded_at,
-        file.team_members
-      ])
-    ].join(' ').toLowerCase();
-
-    return haystack.includes(q);
-  }
-
-  function groupProjectFilesBySubmission(files) {
-    const groups = new Map();
+  function groupSubmissionFiles(files) {
+    const folders = new Map();
 
     files.forEach(file => {
-      const key = [
-        file.submission_title || file.file_type || 'Submission',
-        file.submitted_by || '',
-        file.uploaded_at || '',
-        file.source || '',
-        file.source_id || ''
-      ].join('|');
-
-      if (!groups.has(key)) {
-        groups.set(key, {
+      const key = submissionFolderKey(file);
+      if (!folders.has(key)) {
+        folders.set(key, {
           submission_title: file.submission_title || file.file_type || 'Submission',
+          course_code: normalizeCourseScope(file),
+          course_label: file.course_label || '',
+          files: []
+        });
+      }
+      folders.get(key).files.push(file);
+    });
+
+    return Array.from(folders.values());
+  }
+
+  function groupStudentSubmissions(files) {
+    const submissions = new Map();
+
+    files.forEach(file => {
+      const projectId = String(file.project_id || '').trim();
+      const key = projectId
+        ? `project:${projectId}`
+        : `${file.source || 'file'}:${file.source_id || ''}:${file.submitted_by || ''}`;
+
+      if (!submissions.has(key)) {
+        submissions.set(key, {
+          project_id: file.project_id,
+          project_title: file.project_title,
           submitted_by: file.submitted_by || 'Student Submission',
-          uploaded_at: file.uploaded_at || '',
+          team_members: file.team_members,
           files: []
         });
       }
 
-      groups.get(key).files.push(file);
+      submissions.get(key).files.push(file);
     });
 
-    return Array.from(groups.values());
+    return Array.from(submissions.values());
   }
 
-  function renderProjectSubmissions(projectFiles) {
-    if (!projectFiles.length) {
-      return '<div class="no-submissions">No submissions yet.</div>';
+  function renderSupervisorSubmissionFiles() {
+    const box = document.getElementById('submissionFilesBox');
+    const status = document.getElementById('submissionStatus');
+    if (!box) return;
+
+    const course = document.getElementById('submissionCourseFilter')?.value || 'all';
+    const q = (document.getElementById('submissionSearch')?.value || '').trim().toLowerCase();
+
+    updateSubmissionStats(submissionFilesState);
+
+    let files = submissionFilesState.slice();
+
+    if (course !== 'all') {
+      files = files.filter(file => normalizeCourseScope(file) === course);
     }
 
-    const groups = groupProjectFilesBySubmission(projectFiles);
+    if (q) {
+      files = files.filter(file => {
+        const haystack = [
+          file.submission_title,
+          file.project_title,
+          file.submitted_by,
+          file.team_members,
+          file.file_name,
+          file.file_type,
+          file.course_label,
+          file.course_scope,
+          file.uploaded_at
+        ].join(' ').toLowerCase();
 
-    return `
-      <div class="project-submissions">
-        ${groups.map(group => {
-          const attachments = group.files.map(file => {
+        return haystack.includes(q);
+      });
+    }
+
+    if (status) {
+      status.textContent = `${groupSubmissionFiles(files).length} folder(s) shown - ${files.length} submitted file(s)`;
+    }
+
+    if (!files.length) {
+      box.innerHTML = '<div class="empty">No submitted files found for this filter.</div>';
+      return;
+    }
+
+    box.innerHTML = groupSubmissionFiles(files).map(folder => {
+      const studentSubmissions = groupStudentSubmissions(folder.files);
+      const submissionRows = studentSubmissions.map(submission => {
+        const attachments = submission.files.map(file => {
             const downloadUrl = file.download_url || '';
             const downloadButton = downloadUrl
               ? `<a class="btn btn-outline" href="${safeText(downloadUrl)}" target="_blank" rel="noopener">Download</a>`
@@ -379,7 +408,6 @@
                   <b>${safeText((file.file_type || 'attachment').replaceAll('_', ' '))}:</b>
                   ${safeText(file.file_name || '-')}
                   ${file.file_size_mb ? ` &middot; ${safeText(file.file_size_mb)} MB` : ''}
-                  ${file.uploaded_at ? ` &middot; Submitted: ${safeText(file.uploaded_at)}` : ''}
                 </div>
                 ${downloadButton}
               </div>
@@ -390,11 +418,11 @@
             <div class="submission-student-row">
               <div class="submission-student-header">
                 <div>
-                  <div class="submission-file-name">${safeText(group.submission_title)}</div>
+                  <div class="submission-file-name">${safeText(submission.submitted_by || 'Student Submission')}</div>
                   <div class="submission-meta">
-                    <b>Submitted by:</b> ${safeText(group.submitted_by)}<br>
-                    <b>Attachments:</b> ${group.files.length}
-                    ${group.uploaded_at ? `<br><b>Submitted at:</b> ${safeText(group.uploaded_at)}` : ''}
+                    <b>Project:</b> ${safeText(submission.project_title || '-')}<br>
+                    <b>Team:</b> ${safeText(submission.team_members || '-')}<br>
+                    <b>Attachments:</b> ${submission.files.length}
                   </div>
                 </div>
               </div>
@@ -403,65 +431,24 @@
               </div>
             </div>
           `;
-        }).join('')}
-      </div>
-    `;
-  }
-
-  function renderSupervisorSubmissionFiles() {
-    const box = document.getElementById('submissionFilesBox');
-    const status = document.getElementById('submissionStatus');
-    if (!box) return;
-
-    const course = document.getElementById('submissionCourseFilter')?.value || 'all';
-    const q = (document.getElementById('submissionSearch')?.value || '').trim().toLowerCase();
-
-    let projects = supervisorProjectsState.slice();
-    let files = submissionFilesState.slice();
-
-    if (course !== 'all') {
-      projects = projects.filter(project => normalizeCourseScope(project) === course);
-      const allowedIds = new Set(projects.map(project => String(project.project_id || '')));
-      files = files.filter(file => allowedIds.has(String(file.project_id || '')));
-    }
-
-    if (q) {
-      projects = projects.filter(project => projectMatchesSearch(project, files, q));
-      const allowedIds = new Set(projects.map(project => String(project.project_id || '')));
-      files = files.filter(file => allowedIds.has(String(file.project_id || '')));
-    }
-
-    updateSubmissionStats(files, projects);
-
-    if (status) {
-      status.textContent = `${projects.length} project(s) shown - ${files.length} submitted file(s)`;
-    }
-
-    if (!projects.length) {
-      box.innerHTML = '<div class="empty">No projects found for this filter.</div>';
-      return;
-    }
-
-    box.innerHTML = projects.map(project => {
-      const projectFiles = filesForProject(project, files);
+        }).join('');
 
       return `
-        <div class="project-card">
-          <div class="project-header">
+        <div class="submission-folder">
+          <div class="submission-folder-header">
             <div>
               <span class="submission-badge">
-                ${safeText(normalizeCourseScope(project))} &middot; ${safeText(project.course_label || '')}
+                ${safeText(folder.course_code)} &middot; ${safeText(folder.course_label || '')}
               </span>
-              <div class="project-title">${safeText(project.title || 'Untitled Project')}</div>
+              <div class="submission-title">${safeText(folder.submission_title || 'Submission')}</div>
               <div class="submission-meta">
-                <b>Team:</b> ${safeText(project.members || '-')}<br>
-                <b>Status:</b> ${safeText(project.status || '-')}<br>
-                <b>Submissions:</b> ${projectFiles.length}
+                <b>Student submissions:</b> ${studentSubmissions.length}
               </div>
             </div>
           </div>
-
-          ${renderProjectSubmissions(projectFiles)}
+          <div class="submission-files">
+            ${submissionRows}
+          </div>
         </div>
       `;
     }).join('');
@@ -480,46 +467,21 @@
     }
 
     try {
-      const urls = [
-        '/supervisor/api/supervisor/progress/submissions',
-        '/general-supervisor/api/supervisor/progress/submissions',
-        '/api/supervisor/progress/submissions'
-      ];
+      const res = await fetch('/api/supervisor/progress/submissions', {
+        headers: { 'Accept': 'application/json' }
+      });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
 
-      let data = {};
-      let lastError = null;
-
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, {
-            headers: { 'Accept': 'application/json' }
-          });
-
-          const text = await res.text();
-          data = text ? JSON.parse(text) : {};
-
-          if (!res.ok || data.error) {
-            throw new Error(data.error || ('Request failed: ' + res.status));
-          }
-
-          lastError = null;
-          break;
-        } catch (err) {
-          lastError = err;
-        }
+      if (!res.ok || data.error) {
+        throw new Error(data.error || ('Request failed: ' + res.status));
       }
 
-      if (lastError) {
-        throw lastError;
-      }
-
-      supervisorProjectsState = data.projects || [];
       submissionFilesState = data.files || [];
       renderSupervisorSubmissionFiles();
     } catch (err) {
-      supervisorProjectsState = [];
       submissionFilesState = [];
-      updateSubmissionStats(submissionFilesState, supervisorProjectsState);
+      updateSubmissionStats(submissionFilesState);
 
       if (box) {
         box.innerHTML = `<div class="empty">Submission files error: ${safeText(err.message)}</div>`;

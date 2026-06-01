@@ -39,6 +39,7 @@ def dashboard():
 SUPERVISOR_PAGES = {
     "dashboard": "supervisor/index.html",
     "mystudents": "supervisor/mystudents.html",
+    "progress": "supervisor/progress.html",
     "feedback": "supervisor/feedback.html",
     "evaluation": "supervisor/evaluation.html",
     "search": "shared/archive_search.html",
@@ -242,7 +243,12 @@ def _ensure_supervisor_notification_schema(cursor):
             """)
 
         if not _supervisor_db_column_exists(cursor, "notifications", "can_reply"):
-            cursor.execute("ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read")
+            cursor.execute("ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 0 AFTER is_read")
+
+        if not _supervisor_db_column_exists(cursor, "notifications", "message_origin"):
+            cursor.execute(
+                "ALTER TABLE notifications ADD COLUMN message_origin ENUM('dynamic','manual','reply') NOT NULL DEFAULT 'dynamic' AFTER can_reply"
+            )
 
         if not _supervisor_db_column_exists(cursor, "notifications", "attachment_name"):
             cursor.execute("ALTER TABLE notifications ADD COLUMN attachment_name VARCHAR(255) NULL")
@@ -268,7 +274,10 @@ def _row_to_json(row):
     r["course_scope"] = r.get("course_scope") or "both"
     r["created_at"] = str(r.get("created_at")) if r.get("created_at") else None
     r["has_attachment"] = bool(r.get("has_attachment"))
-    r["can_reply"] = bool(r.get("can_reply", True))
+    r["can_reply"] = (
+        r.get("message_origin") in {"manual", "reply"}
+        and bool(r.get("can_reply", False))
+    )
     if not r["has_attachment"]:
         r["attachment_name"] = None
         r["attachment_mime"] = None
@@ -715,7 +724,7 @@ def _supervisor_reply_allowed(cursor, notification_id, current_user_id, target_u
     """Allow reply only when the original received notification has can_reply = 1."""
     if not notification_id:
         return False
-    can_reply_expr = "COALESCE(can_reply, 1)" if _supervisor_db_column_exists(cursor, "notifications", "can_reply") else "1"
+    can_reply_expr = "COALESCE(can_reply, 0)" if _supervisor_db_column_exists(cursor, "notifications", "can_reply") else "0"
     cursor.execute(
         f"""
         SELECT notification_id
@@ -723,6 +732,7 @@ def _supervisor_reply_allowed(cursor, notification_id, current_user_id, target_u
         WHERE notification_id = %s
           AND recipient_id = %s
           AND sender_id = %s
+          AND message_origin IN ('manual', 'reply')
           AND {can_reply_expr} = 1
         LIMIT 1
         """,
@@ -808,15 +818,16 @@ def send():
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
                      course_scope, related_project_id, is_read, can_reply,
-                     attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s)
-            """, (r, sender_id, notification_type, title, message, course_scope, 1 if can_reply else 0, attachment_name, attachment_mime, attachment_data))
+                     message_origin, attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s, %s)
+            """, (r, sender_id, notification_type, title, message, course_scope, 1 if can_reply else 0, "reply" if scope == "reply" else "manual", attachment_name, attachment_mime, attachment_data))
         else:
             cursor.execute("""
                 INSERT INTO notifications
-                    (recipient_id, sender_id, notification_type, title, message, is_read)
-                VALUES (%s, %s, %s, %s, %s, FALSE)
-            """, (r, sender_id, notification_type, title, message))
+                    (recipient_id, sender_id, notification_type, title, message,
+                     is_read, can_reply, message_origin)
+                VALUES (%s, %s, %s, %s, %s, FALSE, %s, %s)
+            """, (r, sender_id, notification_type, title, message, 1 if can_reply else 0, "reply" if scope == "reply" else "manual"))
 
     db.commit()
     cursor.close()

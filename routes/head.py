@@ -423,7 +423,11 @@ def _ensure_head_notification_schema(cursor):
             cursor.execute("ALTER TABLE notifications ADD COLUMN attachment_data LONGBLOB NULL")
         if not _head_db_column_exists(cursor, "notifications", "can_reply"):
             cursor.execute(
-                "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 1 AFTER is_read"
+                "ALTER TABLE notifications ADD COLUMN can_reply TINYINT(1) NOT NULL DEFAULT 0 AFTER is_read"
+            )
+        if not _head_db_column_exists(cursor, "notifications", "message_origin"):
+            cursor.execute(
+                "ALTER TABLE notifications ADD COLUMN message_origin ENUM('dynamic','manual','reply') NOT NULL DEFAULT 'dynamic' AFTER can_reply"
             )
 
     cursor.execute(
@@ -455,8 +459,11 @@ def _head_notification_attachment_select_fields(cursor):
 
 def _head_notification_can_reply_select_field(cursor):
     if _head_db_column_exists(cursor, "notifications", "can_reply"):
-        return "COALESCE(n.can_reply, 1) AS can_reply"
-    return "1 AS can_reply"
+        return (
+            "CASE WHEN n.message_origin IN ('manual', 'reply') "
+            "THEN COALESCE(n.can_reply, 0) ELSE 0 END AS can_reply"
+        )
+    return "0 AS can_reply"
 
 
 def _head_notification_row_to_json(row):
@@ -466,7 +473,7 @@ def _head_notification_row_to_json(row):
     if clean.get("created_at") is not None:
         clean["created_at"] = str(clean["created_at"])
     clean["is_read"] = bool(clean.get("is_read"))
-    clean["can_reply"] = bool(clean.get("can_reply", True))
+    clean["can_reply"] = bool(clean.get("can_reply", False))
     clean["course_scope"] = clean.get("course_scope") or "both"
     clean["has_attachment"] = bool(clean.get("has_attachment"))
     if not clean["has_attachment"]:
@@ -603,7 +610,7 @@ def _head_reply_permission_check(cursor, original_notification_id, reply_to_user
     inbox message belongs to the current user and has can_reply = 1.
     """
     has_can_reply = _head_db_column_exists(cursor, "notifications", "can_reply")
-    can_reply_expr = "COALESCE(can_reply, 1)" if has_can_reply else "1"
+    can_reply_expr = "COALESCE(can_reply, 0)" if has_can_reply else "0"
 
     if original_notification_id:
         cursor.execute(
@@ -613,6 +620,7 @@ def _head_reply_permission_check(cursor, original_notification_id, reply_to_user
             WHERE notification_id = %s
               AND recipient_id = %s
               AND sender_id = %s
+              AND message_origin IN ('manual', 'reply')
               AND {can_reply_expr} = 1
             LIMIT 1
             """,
@@ -630,6 +638,7 @@ def _head_reply_permission_check(cursor, original_notification_id, reply_to_user
         FROM notifications
         WHERE recipient_id = %s
           AND sender_id = %s
+          AND message_origin IN ('manual', 'reply')
           AND {can_reply_expr} = 1
         ORDER BY created_at DESC, notification_id DESC
         LIMIT 1
@@ -1035,8 +1044,8 @@ def api_head_notifications_send():
                 INSERT INTO notifications
                     (recipient_id, sender_id, notification_type, title, message,
                      course_scope, related_project_id, is_read, can_reply,
-                     attachment_name, attachment_mime, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s)
+                     message_origin, attachment_name, attachment_mime, attachment_data)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, FALSE, %s, %s, %s, %s, %s)
                 """,
                 (
                     recipient_id,
@@ -1046,6 +1055,7 @@ def api_head_notifications_send():
                     message,
                     course_scope,
                     1 if can_reply else 0,
+                    "reply" if scope == "reply" else "manual",
                     attachment_name,
                     attachment_mime,
                     attachment_data,
