@@ -2604,6 +2604,19 @@ def _notification_recipients(cursor, scope, value=None, course_scope="both"):
         )
         return [r["user_id"] for r in cursor.fetchall()]
 
+    if scope == "all_users":
+        cursor.execute(
+        """
+        SELECT user_id
+        FROM users
+        WHERE is_active = TRUE
+          AND role IN ('student', 'supervisor', 'coordinator', 'head_of_department')
+          AND user_id <> %s
+        ORDER BY role, full_name
+        """,
+        (session.get("user_id"),)
+    )
+    return [r["user_id"] for r in cursor.fetchall()]
     return []
 
 
@@ -3778,6 +3791,11 @@ def api_coordinator_distribution_data():
             LEFT JOIN users u_sup ON u_sup.user_id = fsup.user_id
             WHERE p.semester_id = %s
               AND p.status <> 'solo_pending'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM project_course_promotions pcp
+                  WHERE pcp.source_project_id = p.project_id
+              )
             GROUP BY
                 p.project_id,
                 p.title,
@@ -4452,6 +4470,307 @@ def _sync_comp4200_group_student_results(cursor, project_id, status, notes, upda
     return cursor.rowcount
 
 
+def _sql_value_for_copy(value):
+    """Convert mysql-connector SET values and date/time values into insert-safe values."""
+    if isinstance(value, set):
+        return ",".join(sorted(str(v) for v in value))
+    return value
+
+
+def _get_comp4300_promotion_semester(cursor, academic_year=None):
+    """Return the target COMP4300 semester used when a COMP4200 group succeeds."""
+    if academic_year:
+        cursor.execute(
+            """
+            SELECT semester_id, academic_year, semester_number, course_code
+            FROM semesters
+            WHERE course_code = 'COMP4300'
+              AND academic_year = %s
+            ORDER BY is_active DESC, semester_id DESC
+            LIMIT 1
+            """,
+            (academic_year,),
+        )
+        semester = cursor.fetchone()
+        if semester:
+            return semester
+
+    semester = _get_active_semester_by_course(cursor, "COMP4300")
+    if semester:
+        return semester
+
+    cursor.execute(
+        """
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE course_code = 'COMP4300'
+        ORDER BY semester_id DESC
+        LIMIT 1
+        """
+    )
+    return cursor.fetchone()
+
+
+def _copy_project_optional_rows_to_promoted_project(cursor, source_project_id, promoted_project_id):
+    """Copy project-related data that should continue with the group in COMP4300."""
+    if _table_exists(cursor, "project_files"):
+        cursor.execute(
+            """
+            INSERT IGNORE INTO project_files
+                (project_id, file_type, file_name, file_path, file_data, file_mime,
+                 file_size_mb, upload_status, uploaded_by, uploaded_at, version)
+            SELECT %s, file_type, file_name, file_path, file_data, file_mime,
+                   file_size_mb, upload_status, uploaded_by, uploaded_at, version
+            FROM project_files
+            WHERE project_id = %s
+            """,
+            (promoted_project_id, source_project_id),
+        )
+
+    if _table_exists(cursor, "project_progress"):
+        cursor.execute(
+            """
+            INSERT IGNORE INTO project_progress
+                (project_id, component, percentage, updated_by)
+            SELECT %s, component, percentage, updated_by
+            FROM project_progress
+            WHERE project_id = %s
+            """,
+            (promoted_project_id, source_project_id),
+        )
+
+    if _table_exists(cursor, "project_lifecycle"):
+        cursor.execute(
+            """
+            INSERT IGNORE INTO project_lifecycle
+                (project_id, stage, status, scheduled_date, completed_date, notes)
+            SELECT %s, stage, status, scheduled_date, completed_date, notes
+            FROM project_lifecycle
+            WHERE project_id = %s
+            """,
+            (promoted_project_id, source_project_id),
+        )
+
+    if _table_exists(cursor, "supervisor_notes"):
+        cursor.execute(
+            """
+            INSERT INTO supervisor_notes
+                (project_id, supervisor_id, note_text, urgency)
+            SELECT %s, supervisor_id, note_text, urgency
+            FROM supervisor_notes
+            WHERE project_id = %s
+            """,
+            (promoted_project_id, source_project_id),
+        )
+
+    if _table_exists(cursor, "project_report_readers"):
+        cursor.execute(
+            """
+            INSERT IGNORE INTO project_report_readers
+                (project_id, faculty_id, reader_order)
+            SELECT %s, faculty_id, reader_order
+            FROM project_report_readers
+            WHERE project_id = %s
+            """,
+            (promoted_project_id, source_project_id),
+        )
+
+
+def _promote_comp4200_group_to_comp4300(cursor, source_project_id, promoted_by=None):
+    """
+    When a COMP4200 group succeeds, create its continuation in COMP4300.
+
+    The new COMP4300 project keeps the same group name, title, students,
+    supervisor, preferences, and copied project data. The source COMP4200 row is
+    kept for history, but project_course_promotions hides it from active COMP4200
+    coordinator lists.
+    """
+    _ensure_section_results_schema(cursor)
+
+    cursor.execute(
+        """
+        SELECT p.*, sem.academic_year, sem.semester_id AS source_semester_id
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE p.project_id = %s
+          AND sem.course_code = 'COMP4200'
+          AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.project_id)
+        LIMIT 1
+        """,
+        (source_project_id,),
+    )
+    source_project = cursor.fetchone()
+    if not source_project:
+        raise ValueError("COMP4200 project/group was not found or has no students.")
+
+    cursor.execute(
+        """
+        SELECT promoted_project_id
+        FROM project_course_promotions
+        WHERE source_project_id = %s
+        LIMIT 1
+        """,
+        (source_project_id,),
+    )
+    existing = cursor.fetchone()
+    if existing:
+        return {
+            "promoted_project_id": existing["promoted_project_id"],
+            "created": False,
+            "students_copied": 0,
+        }
+
+    target_semester = _get_comp4300_promotion_semester(
+        cursor, source_project.get("academic_year")
+    )
+    if not target_semester:
+        raise ValueError("No COMP4300 semester found. Create/activate a COMP4300 semester first.")
+
+    copy_columns = []
+    copy_values = []
+
+    for column in [
+        "group_name",
+        "title",
+        "title_en",
+        "abstract",
+        "keywords",
+        "project_type",
+        "supervisor_id",
+        "preferred_supervisor_1",
+        "preferred_supervisor_2",
+        "preferred_supervisor_3",
+        "coordinator_notes",
+    ]:
+        if _db_column_exists(cursor, "projects", column):
+            copy_columns.append(column)
+            copy_values.append(_sql_value_for_copy(source_project.get(column)))
+
+    copy_columns.extend(["semester_id", "status", "submission_date"])
+    copy_values.extend([target_semester["semester_id"], "submitted", datetime.now().date()])
+
+    placeholders = ", ".join(["%s"] * len(copy_values))
+    cursor.execute(
+        f"""
+        INSERT INTO projects ({', '.join(copy_columns)})
+        VALUES ({placeholders})
+        """,
+        tuple(copy_values),
+    )
+    promoted_project_id = cursor.lastrowid
+
+    cursor.execute(
+        """
+        INSERT IGNORE INTO project_members
+            (project_id, student_id, is_primary_contact)
+        SELECT %s, student_id, is_primary_contact
+        FROM project_members
+        WHERE project_id = %s
+        """,
+        (promoted_project_id, source_project_id),
+    )
+    students_copied = cursor.rowcount
+
+    _copy_project_optional_rows_to_promoted_project(
+        cursor, source_project_id, promoted_project_id
+    )
+
+    cursor.execute(
+        """
+        INSERT INTO project_course_promotions
+            (source_project_id, promoted_project_id, promoted_to_semester_id, promoted_by, promoted_at)
+        VALUES (%s, %s, %s, %s, NOW())
+        """,
+        (
+            source_project_id,
+            promoted_project_id,
+            target_semester["semester_id"],
+            promoted_by,
+        ),
+    )
+
+    if _table_exists(cursor, "student_course_results"):
+        cursor.execute(
+            """
+            INSERT INTO student_course_results
+                (student_id, semester_id, status, updated_by, notes,
+                 promoted_to_semester_id, promoted_by, promoted_at)
+            SELECT DISTINCT pm.student_id, %s, 'passed', %s,
+                   'Automatically promoted to COMP4300 after group success.',
+                   %s, %s, NOW()
+            FROM project_members pm
+            WHERE pm.project_id = %s
+            ON DUPLICATE KEY UPDATE
+                status = 'passed',
+                updated_by = VALUES(updated_by),
+                promoted_to_semester_id = VALUES(promoted_to_semester_id),
+                promoted_by = VALUES(promoted_by),
+                promoted_at = COALESCE(student_course_results.promoted_at, NOW()),
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                source_project.get("source_semester_id"),
+                promoted_by,
+                target_semester["semester_id"],
+                promoted_by,
+                source_project_id,
+            ),
+        )
+
+    group_name = source_project.get("group_name") or source_project.get("title") or f"Group {source_project_id}"
+    notification_message = (
+        f"Your COMP4200 group ({group_name}) succeeded and was moved to COMP4300. "
+        "The same students and supervisor were kept for the graduation project."
+    )
+
+    for recipient_id in _project_student_user_ids(cursor, source_project_id):
+        _insert_notification(
+            cursor,
+            recipient_id,
+            promoted_by,
+            "status_changed",
+            "Moved to COMP4300",
+            notification_message,
+            promoted_project_id,
+            "graduation_project",
+        )
+
+    supervisor_user_id = None
+    if source_project.get("supervisor_id"):
+        cursor.execute(
+            """
+            SELECT u.user_id
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE f.faculty_id = %s
+              AND u.is_active = TRUE
+            LIMIT 1
+            """,
+            (source_project.get("supervisor_id"),),
+        )
+        supervisor = cursor.fetchone()
+        supervisor_user_id = supervisor.get("user_id") if supervisor else None
+
+    if supervisor_user_id:
+        _insert_notification(
+            cursor,
+            supervisor_user_id,
+            promoted_by,
+            "status_changed",
+            "COMP4200 Group Promoted to COMP4300",
+            f"{group_name} was moved to COMP4300 with the same students under your supervision.",
+            promoted_project_id,
+            "graduation_project",
+        )
+
+    return {
+        "promoted_project_id": promoted_project_id,
+        "created": True,
+        "students_copied": students_copied,
+    }
+
+
+
 def _placeholder_list(values):
     return ",".join(["%s"] * len(values))
 
@@ -4993,6 +5312,7 @@ def api_coordinator_mark_section_result():
             (course_scope, reference_id, status, notes, session.get("user_id")),
         )
         reset_info = None
+        promotion_info = None
         if course_scope == "introduction" and status == "not_succeeded":
             reset_info = _reset_failed_comp4200_group(
                 cursor,
@@ -5015,6 +5335,12 @@ def api_coordinator_mark_section_result():
                 notes,
                 session.get("user_id"),
             )
+            if status == "succeeded":
+                promotion_info = _promote_comp4200_group_to_comp4300(
+                    cursor,
+                    reference_id,
+                    session.get("user_id"),
+                )
         db.commit()
         cursor.close()
         db.close()
@@ -5029,7 +5355,14 @@ def api_coordinator_mark_section_result():
                     "reset": reset_info,
                 }
             )
-        return jsonify({"message": "Section result saved successfully."})
+
+        message = "Section result saved successfully."
+        if promotion_info and promotion_info.get("created"):
+            message = "Section succeeded and moved to COMP4300 successfully."
+        elif promotion_info:
+            message = "Section result saved successfully. This group was already moved to COMP4300."
+
+        return jsonify({"message": message, "promotion": promotion_info})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -5101,7 +5434,10 @@ def api_coordinator_succeed_all_section_results():
         notes = (data.get("notes") or "Marked succeeded by coordinator bulk action.").strip() or None
         marked_by = session.get("user_id")
 
+        promotion_count = 0
+
         def mark_rows(scope, ids):
+            nonlocal promotion_count
             count = 0
             for reference_id in ids:
                 cursor.execute(
@@ -5127,6 +5463,13 @@ def api_coordinator_succeed_all_section_results():
                         notes,
                         marked_by,
                     )
+                    promotion_info = _promote_comp4200_group_to_comp4300(
+                        cursor,
+                        reference_id,
+                        marked_by,
+                    )
+                    if promotion_info.get("created"):
+                        promotion_count += 1
             return count
 
         intro_count = mark_rows("introduction", intro_ids)
@@ -5139,10 +5482,14 @@ def api_coordinator_succeed_all_section_results():
         total = intro_count + grad_count
         return jsonify(
             {
-                "message": f"Successfully marked {total} section/group item(s) as succeeded.",
+                "message": (
+                    f"Successfully marked {total} section/group item(s) as succeeded. "
+                    f"Moved {promotion_count} COMP4200 group(s) to COMP4300."
+                ),
                 "updated": total,
                 "introduction_updated": intro_count,
                 "graduation_updated": grad_count,
+                "promoted_to_comp4300": promotion_count,
             }
         )
     except Exception as e:

@@ -1,0 +1,422 @@
+{% extends 'supervisor/base.html' %}
+
+{% block page_title %}Project Hours{% endblock %}
+{% block page_id %}hours{% endblock %}
+{% block topbar_title %}Project Hours{% endblock %}
+
+{% block content %}
+<style>
+  #pg-supervisor-hours {
+    width: 100%;
+    min-height: calc(100vh - 120px);
+    padding: 24px 32px;
+    box-sizing: border-box;
+  }
+
+  #pg-supervisor-hours .hours-wrap {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  #pg-supervisor-hours .hero-card,
+  #pg-supervisor-hours .course-card {
+    background: var(--color-background-primary, #fff);
+    border: 1px solid #e6ece8;
+    border-radius: 22px;
+    box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
+  }
+
+  #pg-supervisor-hours .hero-card {
+    width: 100%;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+  }
+
+  #pg-supervisor-hours .hero-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--color-text-primary, #17202a);
+    margin: 0 0 8px;
+  }
+
+  #pg-supervisor-hours .hero-text {
+    color: var(--color-text-secondary, #667085);
+    font-size: 14px;
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  #pg-supervisor-hours .course-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  #pg-supervisor-hours .course-card {
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  #pg-supervisor-hours .card-hd {
+    padding: 18px 20px;
+    border-bottom: 1px solid #edf2ef;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  #pg-supervisor-hours .card-title {
+    font-size: 17px;
+    font-weight: 900;
+    color: var(--color-text-primary, #17202a);
+  }
+
+  #pg-supervisor-hours .status-pill {
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 900;
+    background: #e8f5ec;
+    color: #2e7d42;
+    white-space: nowrap;
+  }
+
+  #pg-supervisor-hours .form-body {
+    padding: 20px;
+  }
+
+  #pg-supervisor-hours .hint-box {
+    background: var(--color-background-tertiary, #f7faf8);
+    border-left: 5px solid #2e7d42;
+    border-radius: 14px;
+    padding: 13px 14px;
+    color: var(--color-text-primary, #17202a);
+    line-height: 1.6;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  #pg-supervisor-hours .summary-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  #pg-supervisor-hours .mini-stat {
+    background: var(--color-background-tertiary, #f7faf8);
+    border: 1px solid #e7eee9;
+    border-radius: 16px;
+    padding: 14px;
+    min-height: 82px;
+  }
+
+  #pg-supervisor-hours .mini-value {
+    color: #2e7d42;
+    font-size: 24px;
+    font-weight: 900;
+    margin-bottom: 6px;
+  }
+
+  #pg-supervisor-hours .mini-label {
+    color: #667085;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  #pg-supervisor-hours label {
+    display: block;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--color-text-primary, #17202a);
+    margin-bottom: 7px;
+  }
+
+  #pg-supervisor-hours input,
+  #pg-supervisor-hours textarea {
+    width: 100%;
+    border: 1px solid #d8e2dc;
+    border-radius: 14px;
+    padding: 12px 14px;
+    background: var(--color-background-primary, #fff);
+    color: var(--color-text-primary, #17202a);
+    font: inherit;
+    outline: none;
+  }
+
+  #pg-supervisor-hours input:focus,
+  #pg-supervisor-hours textarea:focus {
+    border-color: #2e7d42;
+    box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
+  }
+
+  #pg-supervisor-hours .btn-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  #pg-supervisor-hours .btn-main {
+    border: 0;
+    background: #2e7d42;
+    color: #fff;
+    padding: 11px 18px;
+    border-radius: 14px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+  }
+
+  #pg-supervisor-hours .btn-main:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  #pg-supervisor-hours .btn-light {
+    border: 1px solid #d8e2dc;
+    background: var(--color-background-primary, #fff);
+    color: var(--color-text-primary, #17202a);
+    padding: 10px 16px;
+    border-radius: 14px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  #pg-supervisor-hours .meta-line {
+    color: #667085;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  #pg-supervisor-hours .msg {
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  #pg-supervisor-hours .msg.ok { color: #2e7d42; }
+  #pg-supervisor-hours .msg.err { color: #b42318; }
+
+  @media(max-width: 980px) {
+    #pg-supervisor-hours {
+      padding: 18px;
+    }
+
+    #pg-supervisor-hours .course-grid,
+    #pg-supervisor-hours .summary-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="page page-single on" id="pg-supervisor-hours">
+  <div class="hours-wrap">
+    <section class="hero-card">
+      <h1 class="hero-title">Project Supervision Hours</h1>
+      <p class="hero-text">
+        Send only the number of project supervision hours you want to take for COMP4200 and COMP4300.
+        This is not your total teaching load. Maximum per course is 4.5 project hours.
+      </p>
+    </section>
+
+    <div class="course-grid">
+      <section class="course-card" data-scope="introduction">
+        <div class="card-hd">
+          <span class="card-title">Project Introduction Hours</span>
+          <span class="status-pill" id="status-introduction">Loading...</span>
+        </div>
+
+        <div class="form-body">
+          <div class="hint-box">
+            <b>COMP4200:</b> enter only how many Project Introduction project hours you want to take.
+            Maximum is 4.5 project hours. The coordinator will use it while distributing COMP4200 students/sections.
+          </div>
+
+          <div class="summary-row">
+            <div class="mini-stat">
+              <div class="mini-value" id="wanted-introduction">0.0</div>
+              <div class="mini-label">Wanted COMP4200 project hours</div>
+            </div>
+            <div class="mini-stat">
+              <div class="mini-value" id="used-introduction">0.0</div>
+              <div class="mini-label">Used project hours from assigned COMP4200 students</div>
+            </div>
+            <div class="mini-stat">
+              <div class="mini-value" id="remaining-introduction">0.0</div>
+              <div class="mini-label">Remaining project hours available for COMP4200 students</div>
+            </div>
+          </div>
+
+          <label for="hours-introduction">Project hours I want to take</label>
+          <input id="hours-introduction" type="number" min="0" max="4.5" step="0.5" placeholder="Example: 3">
+
+          <div class="meta-line" id="meta-introduction">Academic year: - · Course: COMP4200</div>
+
+          <div class="btn-row">
+            <button class="btn-main" type="button" id="save-introduction" onclick="saveProjectHours('introduction')">Submit COMP4200 Hours</button>
+            <button class="btn-light" type="button" onclick="loadProjectHours()">Refresh</button>
+            <span class="msg" id="msg-introduction"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="course-card" data-scope="graduation_project">
+        <div class="card-hd">
+          <span class="card-title">Graduation Project Hours</span>
+          <span class="status-pill" id="status-graduation_project">Loading...</span>
+        </div>
+
+        <div class="form-body">
+          <div class="hint-box">
+            <b>COMP4300:</b> enter only how many Graduation Project project hours you want to take.
+            Maximum is 4.5 project hours. The coordinator will use it while assigning graduation project groups.
+          </div>
+
+          <div class="summary-row">
+            <div class="mini-stat">
+              <div class="mini-value" id="wanted-graduation_project">0.0</div>
+              <div class="mini-label">Wanted COMP4300 project hours</div>
+            </div>
+            <div class="mini-stat">
+              <div class="mini-value" id="used-graduation_project">0.0</div>
+              <div class="mini-label">Used project hours from assigned COMP4300 students</div>
+            </div>
+            <div class="mini-stat">
+              <div class="mini-value" id="remaining-graduation_project">0.0</div>
+              <div class="mini-label">Remaining project hours available for COMP4300 students</div>
+            </div>
+          </div>
+
+          <label for="hours-graduation_project">Project hours I want to take</label>
+          <input id="hours-graduation_project" type="number" min="0" max="4.5" step="0.5" placeholder="Example: 3">
+
+          <div class="meta-line" id="meta-graduation_project">Academic year: - · Course: COMP4300</div>
+
+          <div class="btn-row">
+            <button class="btn-main" type="button" id="save-graduation_project" onclick="saveProjectHours('graduation_project')">Submit COMP4300 Hours</button>
+            <button class="btn-light" type="button" onclick="loadProjectHours()">Refresh</button>
+            <span class="msg" id="msg-graduation_project"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const courseInfo = {
+    introduction: { code: 'COMP4200', label: 'Project Introduction' },
+    graduation_project: { code: 'COMP4300', label: 'Graduation Project' }
+  };
+
+  let projectHoursState = { hours: {}, semesters: {} };
+
+  function safeText(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+  }
+
+  function numberText(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? n.toFixed(1) : '0.0';
+  }
+
+  function setMsg(scope, text, type) {
+    const msg = document.getElementById(`msg-${scope}`);
+    if (!msg) return;
+    msg.textContent = text || '';
+    msg.className = 'msg ' + (type || '');
+  }
+
+  async function projectHoursApi(url, options) {
+    const res = await fetch(url, Object.assign({
+      headers: { 'Content-Type': 'application/json' }
+    }, options || {}));
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Request failed');
+    }
+
+    return data;
+  }
+
+  function renderCourse(scope) {
+    const info = courseInfo[scope];
+    const row = projectHoursState.hours?.[scope] || {};
+    const semester = projectHoursState.semesters?.[scope] || {};
+
+    document.getElementById(`hours-${scope}`).value = row.requested_hours ?? 0;
+    document.getElementById(`wanted-${scope}`).textContent = numberText(row.requested_hours);
+    document.getElementById(`used-${scope}`).textContent = numberText(row.used_hours);
+    document.getElementById(`remaining-${scope}`).textContent = numberText(row.remaining_hours);
+
+    const academicYear = semester.academic_year ? safeText(semester.academic_year) : '-';
+    document.getElementById(`meta-${scope}`).textContent = `Academic year: ${academicYear} · Course: ${info.code}`;
+    document.getElementById(`status-${scope}`).textContent = row.updated_at ? 'Submitted' : 'Not Submitted Yet';
+  }
+
+  function renderAllCourses() {
+    renderCourse('introduction');
+    renderCourse('graduation_project');
+  }
+
+  async function loadProjectHours() {
+    try {
+      projectHoursState = await projectHoursApi('/supervisor/api/project-hours');
+      renderAllCourses();
+      setMsg('introduction', '', '');
+      setMsg('graduation_project', '', '');
+    } catch (err) {
+      setMsg('introduction', err.message, 'err');
+      setMsg('graduation_project', err.message, 'err');
+      document.getElementById('status-introduction').textContent = 'Error';
+      document.getElementById('status-graduation_project').textContent = 'Error';
+    }
+  }
+
+  async function saveProjectHours(scope) {
+    const btn = document.getElementById(`save-${scope}`);
+    const value = Number(document.getElementById(`hours-${scope}`).value || 0);
+
+    if (value < 0 || value > 4.5) {
+      setMsg(scope, 'Project hours must be between 0 and 4.5.', 'err');
+      return;
+    }
+
+    btn.disabled = true;
+    setMsg(scope, 'Saving...', '');
+
+    try {
+      projectHoursState = await projectHoursApi('/supervisor/api/project-hours', {
+        method: 'POST',
+        body: JSON.stringify({
+          course_scope: scope,
+          requested_hours: value
+        })
+      });
+      renderAllCourses();
+      setMsg(scope, `${courseInfo[scope].code} project hours saved and sent to coordinator.`, 'ok');
+    } catch (err) {
+      setMsg(scope, err.message, 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadProjectHours);
+</script>
+{% endblock %}
