@@ -16,13 +16,41 @@ _REGISTRATION_ONLY_PATHS = {
 
 @student_bp.before_app_request
 def restrict_unapproved_student_workspace():
-    """Keep COMP4200 students on registration until coordinator approval."""
+    """Keep COMP4200 students on registration and close graduated accounts after grace period."""
     if (
         session.get("role") != "student"
         or not session.get("user_id")
         or not request.path.startswith("/student/")
-        or request.path in _REGISTRATION_ONLY_PATHS
     ):
+        return None
+
+    # After the project is archived, students keep access for 20 days only.
+    # When the grace period ends, end the session immediately.
+    db = None
+    cursor = None
+    try:
+        from db import get_db
+        from .common import _student_graduation_access
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        grad_access = _student_graduation_access(cursor, session["user_id"])
+        db.commit()
+        if grad_access and grad_access.get("is_expired"):
+            session.clear()
+            if request.path.startswith("/student/api/"):
+                return jsonify({"error": "Your student account access period has ended."}), 401
+            return redirect("/login")
+    except Exception:
+        # Do not block the student if the optional graduation-access check fails.
+        pass
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+    if request.path in _REGISTRATION_ONLY_PATHS:
         return None
 
     db = None

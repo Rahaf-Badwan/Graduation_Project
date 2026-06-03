@@ -528,8 +528,12 @@
     _modalItemTitle = itemTitle;
 
     document.getElementById('modal-milestone-title').textContent = itemTitle;
-    document.getElementById('modal-submitted-to').textContent =
-      submittedTo === 'coordinator' ? 'Course Coordinator' : 'Supervisor';
+    const submittedToLabel = submittedTo === 'both'
+      ? 'Supervisor & Course Coordinator'
+      : submittedTo === 'coordinator'
+        ? 'Course Coordinator'
+        : 'Supervisor';
+    document.getElementById('modal-submitted-to').textContent = submittedToLabel;
     document.getElementById('modal-submitted-to').style.color =
       submittedTo === 'coordinator' ? 'var(--blue,#185FA5)' : 'var(--green)';
 
@@ -665,8 +669,17 @@
         const prev = submissionsMap[item.item_id];
 
         /* Use submitted_to field directly from DB */
-        const subTo = (item.submitted_to || 'supervisor') === 'coordinator' ? 'coordinator' : 'supervisor';
-        const subToLabel = subTo === 'coordinator' ? 'Course Coordinator' : 'Supervisor';
+        const rawSubmittedTo = item.submitted_to || 'supervisor';
+        const subTo = rawSubmittedTo === 'both'
+          ? 'both'
+          : rawSubmittedTo === 'coordinator'
+            ? 'coordinator'
+            : 'supervisor';
+        const subToLabel = subTo === 'both'
+          ? 'Supervisor & Course Coordinator'
+          : subTo === 'coordinator'
+            ? 'Course Coordinator'
+            : 'Supervisor';
 
         /* Detect final report milestones → redirect to Submit Project page */
         const titleLower = (item.title || '').toLowerCase();

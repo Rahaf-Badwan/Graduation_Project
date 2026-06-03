@@ -39,7 +39,7 @@ def _comp4300_dashboard_deadlines(cursor, semester_id):
     from datetime import datetime, timedelta
 
     window = _comp4300_final_submission_window(cursor, semester_id)
-    due_at = (window or {}).get("due_at")
+    due_at = (window or {}).get("effective_due_at") or (window or {}).get("due_at")
     if not due_at or due_at + timedelta(days=2) < datetime.now():
         return []
     return [
@@ -52,6 +52,35 @@ def _comp4300_dashboard_deadlines(cursor, semester_id):
             "submit_url": "/student/submit",
         }
     ]
+
+
+def _comp4300_failed_result(cursor, project_id):
+    if not project_id or not _table_exists_student(cursor, "section_completion_status"):
+        return None
+    cursor.execute(
+        """
+        SELECT status, notes, marked_at
+        FROM section_completion_status
+        WHERE course_scope = 'graduation_project'
+          AND reference_id = %s
+        LIMIT 1
+        """,
+        (project_id,),
+    )
+    row = cursor.fetchone()
+    if not row or row.get("status") != "not_succeeded":
+        return None
+    return {
+        "status": "not_succeeded",
+        "title": "COMP4300 Result: Not Succeeded",
+        "message": (
+            "You did not pass COMP4300. Your team and supervisor remain assigned, "
+            "and your workspace has been reset for a new attempt. Your previous "
+            "challenges and feedback remain available."
+        ),
+        "note": row.get("notes") or "",
+        "marked_at": _fmt_date(row.get("marked_at")),
+    }
 
 
 def _student_dashboard_notifications(
@@ -131,6 +160,7 @@ def api_dashboard_data():
         "project_type_distribution": [],
         "final_submission_window": None,
         "comp4300_submission_window": None,
+        "course_result": None,
         "milestone_progress": {
             "submitted": 0,
             "total": 0,
@@ -141,6 +171,7 @@ def api_dashboard_data():
         },
         "weekly_progress": [None] * 12,
         "weekly_expected": [],
+        "graduation_notice": None,
     }
 
     db = None
@@ -363,6 +394,9 @@ def api_dashboard_data():
                         }
                         for m in cursor.fetchall()
                     ]
+                    result["course_result"] = _comp4300_failed_result(
+                        cursor, project_id
+                    )
             if target_course == "COMP4300":
                 result["comp4300_submission_window"] = (
                     _comp4300_final_submission_window(cursor, semester_id)
@@ -401,6 +435,8 @@ def api_dashboard_data():
         }
         result["supervisor_name"] = project["supervisor_name"] or "—"
         result["registration_date"] = _fmt_date(project.get("joined_at"))
+        if target_course == "COMP4300":
+            result["course_result"] = _comp4300_failed_result(cursor, project_id)
 
         # Flag: group exists but has no project idea/title yet (coordinator-assigned COMP4200 groups)
         result["needs_title"] = (
@@ -580,9 +616,8 @@ def api_dashboard_data():
         result["deadlines"] = deadlines
 
         if deadlines and target_course == "COMP4300":
-            window_due_at = (result.get("comp4300_submission_window") or {}).get(
-                "due_at"
-            )
+            window = result.get("comp4300_submission_window") or {}
+            window_due_at = window.get("effective_due_at") or window.get("due_at")
             if window_due_at:
                 result["days_to_deadline"] = max(
                     (window_due_at.date() - date.today()).days, 0
@@ -712,6 +747,13 @@ def api_dashboard_data():
         result["weekly_progress"] = weekly_prog
         result["weekly_expected"] = weekly_exp
 
+        try:
+            graduation_notice = _student_graduation_access(cursor, user_id)
+            if graduation_notice:
+                result["graduation_notice"] = graduation_notice
+        except Exception:
+            result["graduation_notice"] = None
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -726,6 +768,22 @@ def api_dashboard_data():
             pass
 
     return jsonify(_json_safe(result))
+
+
+@student_bp.route("/api/graduation-notice/seen", methods=["POST"])
+@login_required(role="student")
+def api_graduation_notice_seen():
+    user_id = session["user_id"]
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        notice = _student_mark_graduation_notice_seen(cursor, user_id)
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({"success": True, "graduation_notice": _json_safe(notice)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @student_bp.route("/api/set-project-idea", methods=["POST"])

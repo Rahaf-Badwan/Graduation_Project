@@ -601,6 +601,52 @@
     });
   }
 
+
+  function showGraduationNotice(notice) {
+    if (!notice || notice.is_expired) return;
+    const modalId = 'graduation-notice-modal';
+    let modal = document.getElementById(modalId);
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = modalId;
+      modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.48);padding:18px;backdrop-filter:blur(4px)';
+      modal.innerHTML = `
+        <div style="width:min(560px,100%);background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);border-radius:24px;box-shadow:0 24px 70px rgba(15,23,42,.25);overflow:hidden">
+          <div style="padding:26px 26px 18px;background:linear-gradient(135deg,rgba(26,107,58,.12),rgba(24,95,165,.10));text-align:center">
+            <div style="width:68px;height:68px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;margin:0 auto 14px;box-shadow:0 14px 30px rgba(26,107,58,.25)">
+              <span class="material-symbols-outlined" style="font-size:36px">school</span>
+            </div>
+            <div style="font-size:24px;font-weight:850;color:var(--color-text-primary);margin-bottom:6px">Congratulations, graduate! 🎓</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.6">Your graduation project has been archived successfully.</div>
+          </div>
+          <div style="padding:22px 26px 24px">
+            <div id="graduation-notice-project" style="font-size:15px;font-weight:750;color:var(--color-text-primary);margin-bottom:10px"></div>
+            <div id="graduation-notice-copy" style="font-size:13px;line-height:1.7;color:var(--color-text-secondary);margin-bottom:18px"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+              <a href="/student/result" class="btn btn-primary" style="text-decoration:none">View My Grade</a>
+              <button type="button" id="graduation-notice-close" class="btn">Continue</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      document.getElementById('graduation-notice-close').addEventListener('click', async () => {
+        modal.style.display = 'none';
+        try { await fetch('/student/api/graduation-notice/seen', { method: 'POST' }); } catch (_) {}
+      });
+    }
+
+    const days = Number(notice.days_left || 0);
+    const project = notice.project_title || 'your graduation project';
+    document.getElementById('graduation-notice-project').textContent = project;
+    document.getElementById('graduation-notice-copy').innerHTML =
+      `You can now check your final grade from the Course Result page. ` +
+      `Your student account will remain available for <b>${days}</b> day${days === 1 ? '' : 's'} after archiving, then your session/account access will be closed automatically.`;
+
+    if (!notice.notice_seen) {
+      modal.style.display = 'flex';
+    }
+  }
+
   function updateUI(d) {
     const project = d.project || {};
     const members = d.team_members || [];
@@ -617,6 +663,8 @@
     const sourceUploaded = fileUploaded(files, 'source_code');
     const targetCourse = d.target_course || 'COMP4200';
     const isComp4300 = targetCourse === 'COMP4300';
+    const courseResult = d.course_result || {};
+    const failedCourse = courseResult.status === 'not_succeeded';
     const comp4300Window = d.comp4300_submission_window || {};
     const comp4300Published = Boolean(comp4300Window.deliverable_id);
     const comp4300WindowOpen = Boolean(comp4300Window.is_active);
@@ -632,17 +680,19 @@
     const deadlinesCard = document.getElementById('upcoming-deadlines-card');
     const secondaryAction = document.getElementById('next-action-secondary');
 
+    showGraduationNotice(d.graduation_notice);
+
     document.getElementById('stat-student').textContent = safeText(d.student_name);
     document.getElementById('stat-supervisor').textContent = safeText(d.supervisor_name);
     document.getElementById('stat-team').textContent = members.length || '—';
 
     const focusStat = document.getElementById('stat-overall');
-    focusStat.textContent = finalUploaded ? 'Complete' : milestoneTotal ? `${readiness}%` : isComp4300 ? 'COMP4300' : hasProject ? 'Timeline' : 'Register';
-    focusStat.style.color = finalUploaded ? 'var(--green)' : milestoneTotal ? 'var(--blue)' : 'var(--amber)';
+    focusStat.textContent = failedCourse ? 'Not Succeeded' : finalUploaded ? 'Complete' : milestoneTotal ? `${readiness}%` : isComp4300 ? 'COMP4300' : hasProject ? 'Timeline' : 'Register';
+    focusStat.style.color = failedCourse ? 'var(--coral)' : finalUploaded ? 'var(--green)' : milestoneTotal ? 'var(--blue)' : 'var(--amber)';
 
     const pill = document.getElementById('pill-status');
-    if (project.status) {
-      pill.textContent = statusLabel;
+    if (failedCourse || project.status) {
+      pill.textContent = failedCourse ? 'Not Succeeded' : statusLabel;
       pill.style.display = '';
     } else {
       pill.style.display = 'none';
@@ -661,7 +711,9 @@
     milestonesSnapshot.style.display = hasProject ? '' : 'none';
     deadlinesCard.style.display = hasProject ? '' : 'none';
     secondaryAction.style.display = hasProject ? '' : 'none';
-    document.getElementById('report-chip').textContent = finalUploaded
+    document.getElementById('report-chip').textContent = failedCourse
+      ? 'Workspace reset for new attempt'
+      : finalUploaded
       ? 'Milestones: final report submitted'
       : isComp4300
         ? comp4300WindowOpen
@@ -673,7 +725,12 @@
         ? `Milestones: ${milestoneSubmitted} of ${milestoneTotal} submitted`
         : 'Milestones: timeline not published yet';
 
-    if (!hasProject) {
+    if (failedCourse) {
+      document.getElementById('next-action-title').textContent = courseResult.title || 'COMP4300 result: not succeeded';
+      document.getElementById('next-action-copy').textContent = courseResult.message || 'Your team and supervisor remain assigned. Your workspace has been reset for a new attempt.';
+      setActionLink('next-action-primary', '/student/submit', 'Project Files', { disabled: !comp4300WindowOpen });
+      setActionLink('next-action-secondary', '/student/feedback', 'View Feedback');
+    } else if (!hasProject) {
       document.getElementById('next-action-title').textContent = isComp4300 ? 'Prepare final project files' : 'Register your project group';
       document.getElementById('next-action-copy').textContent = isComp4300
         ? 'Your COMP4300 workspace uses the promoted COMP4200 team data.'
@@ -725,7 +782,31 @@
       setActionLink('next-action-secondary', projectFilesUrl, 'Project Files', { disabled: !projectFilesWindowOpen });
     }
 
-    const checklist = [
+    const failedChecklist = [
+      {
+        title: 'Team and supervisor kept',
+        meta: 'Your COMP4300 team and supervisor assignment are still active.',
+        tag: 'Kept',
+        icon: 'groups',
+        done: true
+      },
+      {
+        title: 'Workspace reset',
+        meta: 'Old submissions, evaluation setup, and project files were cleared for a new attempt.',
+        tag: 'Reset',
+        icon: 'restart_alt',
+        waiting: true
+      },
+      {
+        title: 'Challenges and feedback kept',
+        meta: 'Your previous challenges and published feedback remain available.',
+        tag: 'Kept',
+        icon: 'forum',
+        done: true
+      }
+    ];
+
+    const checklist = failedCourse ? failedChecklist : [
       {
         title: 'Project group registered',
         meta: hasProject ? `Role: ${project.workspace_type === 'section' ? 'Section Member' : project.is_primary_contact ? 'Primary Contact' : 'Team Member'}` : 'Registration is needed before submissions can be tracked.',

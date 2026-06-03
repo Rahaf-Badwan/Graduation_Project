@@ -15,6 +15,35 @@ from db import get_db
 from .blueprint import student_bp
 from .common import *
 
+
+def _comp4200_failed_notice(cursor, user_id, semester_id):
+    if not user_id or not semester_id or not _table_exists_student(cursor, "student_course_results"):
+        return None
+    cursor.execute(
+        """
+        SELECT scr.notes, scr.updated_at
+        FROM student_course_results scr
+        JOIN students st ON st.student_id = scr.student_id
+        WHERE st.user_id = %s
+          AND scr.semester_id = %s
+          AND scr.status = 'failed'
+          AND scr.promoted_at IS NULL
+        ORDER BY scr.updated_at DESC, scr.result_id DESC
+        LIMIT 1
+        """,
+        (user_id, semester_id),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    return {
+        "title": "COMP4200 Result: Not Succeeded",
+        "message": "You did not pass COMP4200. Please register again to start a new attempt.",
+        "note": row.get("notes") or "",
+        "updated_at": str(row.get("updated_at") or ""),
+    }
+
+
 @student_bp.route("/registration")
 @login_required(role="student")
 def registration():
@@ -87,6 +116,9 @@ def api_student_registration_check():
             distribution_open = distribution_open and _dt.now() < close_at
         if target_course != "COMP4200":
             distribution_open = False
+        failed_notice = _comp4200_failed_notice(
+            cursor, user_id, semester["semester_id"]
+        )
 
         cursor.execute(
             """
@@ -137,6 +169,7 @@ def api_student_registration_check():
                     "distribution_open": distribution_open,
                     "target_course": target_course,
                     "timeline_available": target_course != "COMP4300",
+                    "failed_notice": failed_notice,
                 }
             )
         return jsonify(
@@ -146,6 +179,7 @@ def api_student_registration_check():
                 "distribution_open": distribution_open,
                 "target_course": target_course,
                 "timeline_available": target_course != "COMP4300",
+                "failed_notice": failed_notice,
             }
         )
     except Exception as e:
@@ -371,6 +405,7 @@ def api_student_distribution_submit():
             )
         project_id = cursor.lastrowid
 
+        registered_student_ids = []
         for i, uid in enumerate(member_ids):
             cursor.execute(
                 """
@@ -384,10 +419,29 @@ def api_student_distribution_submit():
             )
             row = cursor.fetchone()
             if row:
+                registered_student_ids.append(row["student_id"])
                 cursor.execute(
                     "INSERT IGNORE INTO project_members (project_id, student_id, is_primary_contact) VALUES (%s, %s, %s)",
                     (project_id, row["student_id"], i == 0),
                 )
+
+        if registered_student_ids and _table_exists_student(cursor, "student_course_results"):
+            placeholders = ", ".join(["%s"] * len(registered_student_ids))
+            cursor.execute(
+                f"""
+                INSERT INTO student_course_results
+                    (student_id, semester_id, status, updated_by, notes)
+                SELECT st.student_id, %s, 'pending', %s, NULL
+                FROM students st
+                WHERE st.student_id IN ({placeholders})
+                ON DUPLICATE KEY UPDATE
+                    status = IF(student_course_results.promoted_at IS NULL, 'pending', student_course_results.status),
+                    updated_by = IF(student_course_results.promoted_at IS NULL, VALUES(updated_by), student_course_results.updated_by),
+                    notes = IF(student_course_results.promoted_at IS NULL, NULL, student_course_results.notes),
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (semester["semester_id"], user_id, *registered_student_ids),
+            )
 
         actor_name = session.get("full_name") or "A teammate"
         _notify_project_team(

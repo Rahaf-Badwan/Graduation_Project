@@ -1873,10 +1873,34 @@ def api_coordinator_submission_files():
 
         if _table_exists(cursor, "milestone_submissions"):
             params = []
+            duplicate_project_report_filter = ""
+            if _table_exists(cursor, "project_files"):
+                duplicate_project_report_filter = """
+                     AND NOT (
+                         EXISTS (
+                             SELECT 1
+                             FROM project_files pf_dup
+                             WHERE pf_dup.project_id = ms.project_id
+                               AND pf_dup.file_type = 'final_report'
+                               AND (
+                                     COALESCE(pf_dup.upload_status, 'uploaded') = 'uploaded'
+                                     OR pf_dup.uploaded_at IS NOT NULL
+                                     OR pf_dup.file_data IS NOT NULL
+                                     OR COALESCE(pf_dup.file_path, '') <> ''
+                                   )
+                         )
+                         AND (
+                               LOWER(COALESCE(ms.file_name, '')) LIKE '%%final%%'
+                               OR LOWER(COALESCE(ti.milestone_label, ti.title, '')) LIKE '%%final%%'
+                               OR LOWER(COALESCE(ti.milestone_label, ti.title, '')) LIKE '%%graduation%%'
+                             )
+                     )
+                """
             where = (
                 """WHERE ms.submitted_to IN ('coordinator', 'both')
                      AND """
                 + _COORDINATOR_MILESTONE_SUBMISSION_CLOSED_SQL
+                + duplicate_project_report_filter
             )
             if academic_year:
                 where += " AND s.academic_year = %s"
@@ -3252,6 +3276,10 @@ def api_coordinator_intro_timeline_save():
                 ),
                 400,
             )
+        submitted_to = (item.get("submitted_to") or "supervisor").strip().lower()
+        if submitted_to not in ("supervisor", "coordinator", "both"):
+            submitted_to = "supervisor"
+
         clean_items.append(
             {
                 "order": int(item.get("item_order") or index),
@@ -3263,7 +3291,7 @@ def api_coordinator_intro_timeline_save():
                 "due_time": due_time,
                 "milestone_label": milestone_label,
                 "is_deadline": is_deadline,
-                "submitted_to": item.get("submitted_to") or "supervisor",
+                "submitted_to": submitted_to,
             }
         )
 
@@ -4171,6 +4199,7 @@ def api_add_section():
             SELECT project_id
             FROM projects
             WHERE semester_id = %s
+              AND status <> 'solo_pending'
               AND LOWER(TRIM(COALESCE(NULLIF(group_name, ''), CONCAT('Group ', project_id)))) =
                   LOWER(TRIM(%s))
             LIMIT 1
@@ -4423,6 +4452,301 @@ def _sync_comp4200_group_student_results(cursor, project_id, status, notes, upda
     return cursor.rowcount
 
 
+def _placeholder_list(values):
+    return ",".join(["%s"] * len(values))
+
+
+def _delete_table_where(cursor, table_name, where_sql, params=()):
+    if not _table_exists(cursor, table_name):
+        return 0
+    cursor.execute(f"DELETE FROM `{table_name}` WHERE {where_sql}", tuple(params))
+    return cursor.rowcount
+
+
+def _delete_scoped_reference_rows(cursor, table_name, course_scope, reference_id):
+    if not _table_exists(cursor, table_name):
+        return 0
+    if (
+        _db_column_exists(cursor, table_name, "course_scope")
+        and _db_column_exists(cursor, table_name, "reference_id")
+    ):
+        return _delete_table_where(
+            cursor,
+            table_name,
+            "course_scope = %s AND reference_id = %s",
+            (course_scope, reference_id),
+        )
+    if _db_column_exists(cursor, table_name, "project_id"):
+        return _delete_table_where(cursor, table_name, "project_id = %s", (reference_id,))
+    return 0
+
+
+def _reset_failed_comp4200_group(cursor, project_id, notes=None, updated_by=None):
+    """Return failed COMP4200 students to a clean registration/workspace state."""
+    cursor.execute(
+        """
+        SELECT p.project_id, p.semester_id
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE p.project_id = %s
+          AND sem.course_code = 'COMP4200'
+        LIMIT 1
+        """,
+        (project_id,),
+    )
+    project = cursor.fetchone()
+    if not project:
+        return {"students_reset": 0, "deleted_project": False}
+
+    cursor.execute(
+        """
+        SELECT DISTINCT st.student_id, st.user_id
+        FROM project_members pm
+        JOIN students st ON st.student_id = pm.student_id
+        WHERE pm.project_id = %s
+        """,
+        (project_id,),
+    )
+    members = cursor.fetchall()
+    student_ids = [row["student_id"] for row in members if row.get("student_id")]
+    user_ids = [row["user_id"] for row in members if row.get("user_id")]
+
+    if student_ids and _table_exists(cursor, "milestone_submissions"):
+        placeholders = _placeholder_list(student_ids)
+        cursor.execute(
+            f"""
+            DELETE FROM milestone_submissions
+            WHERE project_id = %s
+               OR student_id IN ({placeholders})
+            """,
+            (project_id, *student_ids),
+        )
+
+    if student_ids and _table_exists(cursor, "coordinator_deliverable_submissions"):
+        placeholders = _placeholder_list(student_ids)
+        cursor.execute(
+            f"""
+            DELETE FROM coordinator_deliverable_submissions
+            WHERE project_id = %s
+               OR student_id IN ({placeholders})
+            """,
+            (project_id, *student_ids),
+        )
+
+    if user_ids and _table_exists(cursor, "notifications"):
+        placeholders = _placeholder_list(user_ids)
+        parts = [
+            f"recipient_id IN ({placeholders})",
+            f"sender_id IN ({placeholders})",
+        ]
+        params = [*user_ids, *user_ids]
+        if _db_column_exists(cursor, "notifications", "related_project_id"):
+            parts.append("related_project_id = %s")
+            params.append(project_id)
+        if _db_column_exists(cursor, "notifications", "project_id"):
+            parts.append("project_id = %s")
+            params.append(project_id)
+        cursor.execute(f"DELETE FROM notifications WHERE {' OR '.join(parts)}", tuple(params))
+    elif _table_exists(cursor, "notifications"):
+        parts = []
+        params = []
+        if _db_column_exists(cursor, "notifications", "related_project_id"):
+            parts.append("related_project_id = %s")
+            params.append(project_id)
+        if _db_column_exists(cursor, "notifications", "project_id"):
+            parts.append("project_id = %s")
+            params.append(project_id)
+        if parts:
+            cursor.execute(f"DELETE FROM notifications WHERE {' OR '.join(parts)}", tuple(params))
+
+    if student_ids:
+        placeholders = _placeholder_list(student_ids)
+        if _table_exists(cursor, "student_course_results"):
+            failure_note = (
+                notes
+                or "You did not pass COMP4200. Please register again to start a new attempt."
+            )
+            cursor.execute(
+                f"""
+                INSERT INTO student_course_results
+                    (student_id, semester_id, status, updated_by, notes)
+                SELECT DISTINCT pm.student_id, p.semester_id, 'failed', %s, %s
+                FROM projects p
+                JOIN project_members pm ON pm.project_id = p.project_id
+                WHERE p.project_id = %s
+                  AND pm.student_id IN ({placeholders})
+                ON DUPLICATE KEY UPDATE
+                    status = IF(student_course_results.promoted_at IS NULL, 'failed', student_course_results.status),
+                    updated_by = IF(student_course_results.promoted_at IS NULL, VALUES(updated_by), student_course_results.updated_by),
+                    notes = IF(student_course_results.promoted_at IS NULL, VALUES(notes), student_course_results.notes),
+                    promoted_to_semester_id = IF(student_course_results.promoted_at IS NULL, NULL, student_course_results.promoted_to_semester_id),
+                    promoted_by = IF(student_course_results.promoted_at IS NULL, NULL, student_course_results.promoted_by),
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (updated_by, failure_note, project_id, *student_ids),
+            )
+        _delete_table_where(
+            cursor,
+            "student_groups",
+            f"student_id IN ({placeholders})",
+            tuple(student_ids),
+        )
+
+    for table_name in ("evaluation_windows", "evaluation_grade_tasks", "evaluation_scores"):
+        _delete_scoped_reference_rows(cursor, table_name, "introduction", project_id)
+    _delete_table_where(
+        cursor,
+        "section_completion_status",
+        "course_scope = 'introduction' AND reference_id = %s",
+        (project_id,),
+    )
+
+    for table_name in (
+        "deadlines",
+        "project_report_readers",
+        "supervisor_assignments",
+        "project_course_promotions",
+    ):
+        if table_name == "project_course_promotions":
+            _delete_table_where(
+                cursor,
+                table_name,
+                "source_project_id = %s OR promoted_project_id = %s",
+                (project_id, project_id),
+            )
+        else:
+            _delete_table_where(cursor, table_name, "project_id = %s", (project_id,))
+
+    cursor.execute("DELETE FROM projects WHERE project_id = %s", (project_id,))
+    return {"students_reset": len(student_ids), "deleted_project": cursor.rowcount > 0}
+
+
+def _reset_failed_comp4300_project(cursor, project_id, notes=None, marked_by=None):
+    """Reset a failed COMP4300 workspace while keeping team, supervisor, challenges, and feedback."""
+    cursor.execute(
+        """
+        SELECT p.project_id, p.semester_id, p.title, p.supervisor_id
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE p.project_id = %s
+          AND sem.course_code = 'COMP4300'
+        LIMIT 1
+        """,
+        (project_id,),
+    )
+    project = cursor.fetchone()
+    if not project:
+        return {"students_reset": 0, "notifications_sent": 0, "kept_team": True}
+
+    cursor.execute(
+        """
+        SELECT DISTINCT st.student_id, st.user_id
+        FROM project_members pm
+        JOIN students st ON st.student_id = pm.student_id
+        WHERE pm.project_id = %s
+        """,
+        (project_id,),
+    )
+    members = cursor.fetchall()
+    student_ids = [row["student_id"] for row in members if row.get("student_id")]
+    user_ids = [row["user_id"] for row in members if row.get("user_id")]
+
+    if student_ids and _table_exists(cursor, "milestone_submissions"):
+        placeholders = _placeholder_list(student_ids)
+        cursor.execute(
+            f"""
+            DELETE FROM milestone_submissions
+            WHERE project_id = %s
+               OR student_id IN ({placeholders})
+            """,
+            (project_id, *student_ids),
+        )
+
+    if student_ids and _table_exists(cursor, "coordinator_deliverable_submissions"):
+        placeholders = _placeholder_list(student_ids)
+        cursor.execute(
+            f"""
+            DELETE FROM coordinator_deliverable_submissions
+            WHERE project_id = %s
+               OR student_id IN ({placeholders})
+            """,
+            (project_id, *student_ids),
+        )
+
+    _delete_table_where(cursor, "project_files", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "project_progress", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "project_lifecycle", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "deadlines", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "coordinator_decisions", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "final_decisions", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "supervisor_notes", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "committees", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "project_report_readers", "project_id = %s", (project_id,))
+    _delete_table_where(cursor, "committee_plan_projects", "project_id = %s", (project_id,))
+
+    for table_name in ("evaluation_windows", "evaluation_grade_tasks", "evaluation_scores", "evaluation_final_results"):
+        _delete_scoped_reference_rows(cursor, table_name, "graduation_project", project_id)
+
+    if user_ids and _table_exists(cursor, "notifications"):
+        placeholders = _placeholder_list(user_ids)
+        parts = [
+            f"recipient_id IN ({placeholders})",
+            f"sender_id IN ({placeholders})",
+        ]
+        params = [*user_ids, *user_ids]
+        if _db_column_exists(cursor, "notifications", "related_project_id"):
+            parts.append("related_project_id = %s")
+            params.append(project_id)
+        if _db_column_exists(cursor, "notifications", "project_id"):
+            parts.append("project_id = %s")
+            params.append(project_id)
+        cursor.execute(f"DELETE FROM notifications WHERE {' OR '.join(parts)}", tuple(params))
+
+    update_parts = ["status = 'submitted'"]
+    if _db_column_exists(cursor, "projects", "final_score"):
+        update_parts.append("final_score = NULL")
+    if _db_column_exists(cursor, "projects", "files_count"):
+        update_parts.append("files_count = 0")
+    if _db_column_exists(cursor, "projects", "coordinator_notes"):
+        update_parts.append("coordinator_notes = NULL")
+    if _db_column_exists(cursor, "projects", "rejection_reason"):
+        update_parts.append("rejection_reason = NULL")
+    cursor.execute(
+        f"UPDATE projects SET {', '.join(update_parts)} WHERE project_id = %s",
+        (project_id,),
+    )
+
+    notification_title = "COMP4300 Result: Not Succeeded"
+    notification_message = (
+        "Your COMP4300 graduation project was marked as not succeeded. "
+        "Your team and supervisor remain assigned, and your project workspace has been reset for a new attempt. "
+        "Your previous challenges and feedback remain available."
+    )
+    if notes:
+        notification_message += f" Coordinator note: {notes}"
+
+    notifications_sent = 0
+    for recipient_id in sorted(set(user_ids)):
+        _insert_notification(
+            cursor,
+            recipient_id,
+            marked_by,
+            "status_changed",
+            notification_title,
+            notification_message,
+            project_id,
+            "graduation_project",
+        )
+        notifications_sent += 1
+
+    return {
+        "students_reset": len(student_ids),
+        "notifications_sent": notifications_sent,
+        "kept_team": True,
+        "kept_supervisor": True,
+    }
+
+
 @coordinator_bp.route("/api/coordinator/section-results", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_section_results():
@@ -4668,7 +4992,22 @@ def api_coordinator_mark_section_result():
             """,
             (course_scope, reference_id, status, notes, session.get("user_id")),
         )
-        if course_scope == "introduction":
+        reset_info = None
+        if course_scope == "introduction" and status == "not_succeeded":
+            reset_info = _reset_failed_comp4200_group(
+                cursor,
+                reference_id,
+                notes=notes,
+                updated_by=session.get("user_id"),
+            )
+        elif course_scope == "graduation_project" and status == "not_succeeded":
+            reset_info = _reset_failed_comp4300_project(
+                cursor,
+                reference_id,
+                notes=notes,
+                marked_by=session.get("user_id"),
+            )
+        elif course_scope == "introduction":
             _sync_comp4200_group_student_results(
                 cursor,
                 reference_id,
@@ -4679,6 +5018,17 @@ def api_coordinator_mark_section_result():
         db.commit()
         cursor.close()
         db.close()
+        if reset_info:
+            scope_label = "Section" if course_scope == "introduction" else "Project"
+            return jsonify(
+                {
+                    "message": (
+                        f"{scope_label} marked not succeeded. "
+                        f"{reset_info['students_reset']} student(s) reset to a clean workspace."
+                    ),
+                    "reset": reset_info,
+                }
+            )
         return jsonify({"message": "Section result saved successfully."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

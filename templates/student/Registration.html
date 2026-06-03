@@ -21,6 +21,21 @@
     </div>
   </div>
 
+  <div id="failedBanner" style="display:none">
+    <div class="card" style="border-left:4px solid var(--red,#dc2626);margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
+        <span class="material-symbols-outlined icon-inline"
+          style="font-size:28px;color:var(--red,#dc2626)">error</span>
+        <div>
+          <div style="font-weight:700;color:var(--red,#dc2626);margin-bottom:2px">COMP4200 Result: Not Succeeded</div>
+          <div id="failedDetails" style="font-size:13px;color:var(--color-text-secondary)">
+            You did not pass COMP4200. Please register again to start a new attempt.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Already Registered Banner (hidden by default) ──────── -->
   <div id="alreadyBanner" style="display:none">
     <div class="card" style="border-left:4px solid var(--green,#22c55e);margin-bottom:20px">
@@ -260,6 +275,8 @@
     const alreadyDetails = document.getElementById("alreadyDetails");
     const closedBanner = document.getElementById("closedBanner");
     const closedDetails = document.getElementById("closedDetails");
+    const failedBanner = document.getElementById("failedBanner");
+    const failedDetails = document.getElementById("failedDetails");
     const statusContent = document.getElementById("statusContent");
     const formSection = document.getElementById("formSection");
     const successScreen = document.getElementById("successScreen");
@@ -381,13 +398,26 @@
         const data = await res.json();
 
         const isOpen = !!data.distribution_open;
+        const failedNotice = data.failed_notice || null;
+        if (failedNotice && !data.registered) {
+          failedBanner.style.display = "";
+          failedDetails.innerHTML = `${esc(failedNotice.message || "You did not pass COMP4200. Please register again to start a new attempt.")}`
+            + (failedNotice.note ? `<div style="margin-top:4px"><b>Coordinator note:</b> ${esc(failedNotice.note)}</div>` : "");
+        } else {
+          failedBanner.style.display = "none";
+        }
 
         if (!isOpen && !(data.registered && data.project)) {
           closedBanner.style.display = "";
           formSection.style.display = "none";
           const deadlineText = data.deadline ? ` Registration closed at: ${esc(data.deadline)}.` : "";
-          closedDetails.innerHTML = `The coordinator will open it when registration starts.${deadlineText}`;
-          statusContent.innerHTML = `<div style="color:var(--orange,#f59e0b);font-weight:600">Registration Closed</div>`;
+          closedDetails.innerHTML = failedNotice
+            ? `You can register again when the coordinator opens COMP4200 registration.${deadlineText}`
+            : `The coordinator will open it when registration starts.${deadlineText}`;
+          statusContent.innerHTML = failedNotice
+            ? `<div style="color:var(--red,#dc2626);font-weight:600">Not Succeeded</div>
+               <div style="margin-top:4px">Please register again when registration opens.</div>`
+            : `<div style="color:var(--orange,#f59e0b);font-weight:600">Registration Closed</div>`;
           return;
         }
 
@@ -435,9 +465,11 @@
           document.getElementById("regTitle").readOnly = true;
           prefSelects.forEach(s => s.disabled = true);
         } else {
-          statusContent.innerHTML =
-            `<div style="color:var(--orange,#f59e0b);font-weight:600">Not Yet Registered</div>
-           <div style="margin-top:4px">Fill the form and submit your group.</div>`;
+          statusContent.innerHTML = failedNotice
+            ? `<div style="color:var(--red,#dc2626);font-weight:600">Not Succeeded</div>
+               <div style="margin-top:4px">Please register again to start a new attempt.</div>`
+            : `<div style="color:var(--orange,#f59e0b);font-weight:600">Not Yet Registered</div>
+               <div style="margin-top:4px">Fill the form and submit your group.</div>`;
         }
       } catch {
         statusContent.textContent = "Could not load status.";

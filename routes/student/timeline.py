@@ -38,10 +38,11 @@ def _comp4300_timeline_payload(cursor, semester):
     if not window:
         return payload
 
-    due_at = window.get("due_at")
+    due_at = window.get("effective_due_at") or window.get("due_at")
     if due_at and due_at + timedelta(days=2) < datetime.now():
+        # Keep the published milestone visible even after it closes; the
+        # frontend will render it as Closed and disable the upload action.
         payload["message"] = "The COMP4300 final submission window has ended."
-        return payload
 
     payload["items"] = [
         {
@@ -55,8 +56,8 @@ def _comp4300_timeline_payload(cursor, semester):
                 else ""
             ),
             "due_date": (
-                window["due_at"].isoformat(timespec="minutes")
-                if window.get("due_at")
+                due_at.isoformat(timespec="minutes")
+                if due_at
                 else ""
             ),
             "milestone_label": "Graduation Project",

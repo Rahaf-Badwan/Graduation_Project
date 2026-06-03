@@ -1253,6 +1253,17 @@ def api_milestone_submit():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
+        try:
+            cursor.execute(
+                """
+                ALTER TABLE milestone_submissions
+                MODIFY COLUMN submitted_to ENUM('supervisor','coordinator','both')
+                NOT NULL DEFAULT 'supervisor'
+                """
+            )
+        except Exception:
+            pass
+
         # Migration: add snapshot columns if not exist (use existing dictionary cursor)
         for _col, _col_def in [
             ("item_title", "VARCHAR(255) NULL"),

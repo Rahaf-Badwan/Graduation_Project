@@ -851,7 +851,7 @@ def api_supervisor_submitted_files():
             project["submission_date"] = _dt(project.get("submission_date"))
             project["updated_at"] = _dt(project.get("updated_at"))
 
-        # 1) COMP4300 / general project files
+        # 1) COMP4200 / COMP4300 project files
         if _table_exists(cursor, "project_files"):
             cursor.execute(
                 f"""
@@ -887,7 +887,7 @@ def api_supervisor_submitted_files():
                 LEFT JOIN students primary_st ON primary_st.student_id = primary_pm.student_id
                 LEFT JOIN users primary_user ON primary_user.user_id = primary_st.user_id
                 WHERE {access_filter}
-                  AND s.course_code = 'COMP4300'
+                  AND s.course_code IN ('COMP4200', 'COMP4300')
                   AND (
                         COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
                         OR pf.uploaded_at IS NOT NULL
@@ -937,6 +937,29 @@ def api_supervisor_submitted_files():
             and _table_exists(cursor, "comp4200_timeline_items")
             and _table_exists(cursor, "comp4200_timelines")
         ):
+            duplicate_project_report_filter = ""
+            if _table_exists(cursor, "project_files"):
+                duplicate_project_report_filter = """
+                  AND NOT (
+                        EXISTS (
+                            SELECT 1
+                            FROM project_files pf_dup
+                            WHERE pf_dup.project_id = ms.project_id
+                              AND pf_dup.file_type = 'final_report'
+                              AND (
+                                    COALESCE(pf_dup.upload_status, 'uploaded') = 'uploaded'
+                                    OR pf_dup.uploaded_at IS NOT NULL
+                                    OR pf_dup.file_data IS NOT NULL
+                                    OR COALESCE(pf_dup.file_path, '') <> ''
+                                  )
+                        )
+                        AND (
+                              LOWER(COALESCE(ms.file_name, '')) LIKE '%%final%%'
+                              OR LOWER(COALESCE(ti.milestone_label, ti.title, '')) LIKE '%%final%%'
+                              OR LOWER(COALESCE(ti.milestone_label, ti.title, '')) LIKE '%%graduation%%'
+                            )
+                      )
+                """
             cursor.execute(
                 f"""
                 SELECT
@@ -970,6 +993,7 @@ def api_supervisor_submitted_files():
                 WHERE {access_filter}
                   AND tl.is_published = TRUE
                   AND ms.submitted_to IN ('supervisor', 'both')
+                  {duplicate_project_report_filter}
                 GROUP BY
                     ms.submission_id, ms.project_id, ms.file_name, ms.file_mime,
                     ms.file_size_mb, ms.submitted_at, ti.title, ti.milestone_label,
@@ -1031,7 +1055,7 @@ def api_supervisor_download_project_file(file_id):
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.file_id = %s
               AND {access_filter}
-              AND s.course_code = 'COMP4300'
+              AND s.course_code IN ('COMP4200', 'COMP4300')
               AND (
                     COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
                     OR pf.uploaded_at IS NOT NULL

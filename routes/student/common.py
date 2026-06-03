@@ -185,6 +185,58 @@ def _student_course_context(cursor, user_id):
     )
 
 
+def _student_visible_project_ids(cursor, user_id):
+    """Projects whose feedback/challenges should remain visible to the student.
+
+    Includes current project memberships plus COMP4200 source projects linked to
+    a promoted COMP4300 continuation.
+    """
+    cursor.execute(
+        "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
+        (user_id,),
+    )
+    student = cursor.fetchone()
+    if not student:
+        return []
+
+    student_id = student["student_id"]
+    project_ids = []
+
+    cursor.execute(
+        """
+        SELECT pm.project_id
+        FROM project_members pm
+        JOIN projects p ON p.project_id = pm.project_id
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE pm.student_id = %s
+        ORDER BY sem.semester_id DESC, pm.project_id DESC
+        """,
+        (student_id,),
+    )
+    for row in cursor.fetchall():
+        project_id = row.get("project_id")
+        if project_id and project_id not in project_ids:
+            project_ids.append(project_id)
+
+    if _table_exists_student(cursor, "project_course_promotions"):
+        cursor.execute(
+            """
+            SELECT pcp.source_project_id
+            FROM project_course_promotions pcp
+            JOIN project_members pm ON pm.project_id = pcp.promoted_project_id
+            WHERE pm.student_id = %s
+            ORDER BY pcp.promoted_at DESC, pcp.source_project_id DESC
+            """,
+            (student_id,),
+        )
+        for row in cursor.fetchall():
+            project_id = row.get("source_project_id")
+            if project_id and project_id not in project_ids:
+                project_ids.append(project_id)
+
+    return project_ids
+
+
 def _cleanup_comp4200_state_for_promoted_student(cursor, student_id, promoted_at=None):
     """Clear old COMP4200 student-facing state once a student is promoted."""
     if not student_id:
@@ -651,10 +703,22 @@ def _comp4300_final_submission_window(cursor, semester_id):
     cursor.execute(
         """
         SELECT deliverable_id, semester_id, title, description, start_at, due_at,
+               CASE
+                   WHEN due_at IS NOT NULL AND TIME(due_at) = '00:00:00'
+                       THEN TIMESTAMP(DATE(due_at), '23:59:59')
+                   ELSE due_at
+               END AS effective_due_at,
                status, is_published, published_at,
                (
                    (start_at IS NULL OR start_at <= NOW())
-                   AND (due_at IS NULL OR due_at >= NOW())
+                   AND (
+                       due_at IS NULL
+                       OR CASE
+                           WHEN TIME(due_at) = '00:00:00'
+                               THEN TIMESTAMP(DATE(due_at), '23:59:59')
+                           ELSE due_at
+                       END >= NOW()
+                   )
                ) AS is_active
         FROM coordinator_deliverables
         WHERE semester_id = %s
@@ -931,6 +995,17 @@ def _ensure_milestone_submissions_table(cursor):
                 ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
+
+    try:
+        cursor.execute(
+            """
+            ALTER TABLE milestone_submissions
+            MODIFY COLUMN submitted_to ENUM('supervisor','coordinator','both')
+            NOT NULL DEFAULT 'supervisor'
+            """
+        )
+    except Exception:
+        pass
 
     for col_name, col_def in [
         ("project_id", "INT NULL"),
@@ -1209,6 +1284,195 @@ def _sync_lifecycle(cursor, project_id):
         )
 
 
+# ─────────────────────────────────────────────────────────────
+# Graduation archive access helpers
+# ─────────────────────────────────────────────────────────────
+
+def _ensure_student_graduation_access_schema(cursor):
+    """Track the 20-day grace period after a COMP4300 project is archived."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS student_graduation_access (
+            access_id INT PRIMARY KEY AUTO_INCREMENT,
+            student_id INT NOT NULL,
+            project_id INT NOT NULL,
+            archived_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            access_expires_at DATETIME NOT NULL,
+            notice_seen_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_student_graduation_project (student_id, project_id),
+            INDEX idx_student_graduation_student (student_id),
+            INDEX idx_student_graduation_expires (access_expires_at),
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
+
+def _student_archived_project_row(cursor, student_id):
+    """Return the latest archived/succeeded COMP4300 project for this student, if any."""
+    if not student_id:
+        return None
+
+    has_final_decisions = _table_exists_student(cursor, "final_decisions")
+    has_lifecycle = _table_exists_student(cursor, "project_lifecycle")
+    has_archived_at = _db_column_exists_student(cursor, "projects", "archived_at")
+    has_updated_at = _db_column_exists_student(cursor, "projects", "updated_at")
+
+    score_expr = "p.final_score"
+    decision_join = ""
+    decision_condition = ""
+    decision_date = "NULL"
+    if has_final_decisions:
+        decision_join = "LEFT JOIN final_decisions fd ON fd.project_id = p.project_id"
+        score_expr = "COALESCE(fd.final_score, p.final_score)"
+        decision_condition = "OR LOWER(COALESCE(fd.decision, '')) IN ('accepted','passed','succeeded')"
+        decision_date = "fd.decided_at"
+
+    lifecycle_join = ""
+    lifecycle_condition = ""
+    lifecycle_date = "NULL"
+    if has_lifecycle:
+        lifecycle_join = """
+            LEFT JOIN project_lifecycle pl_archive
+              ON pl_archive.project_id = p.project_id
+             AND pl_archive.stage = 'archiving'
+        """
+        lifecycle_condition = "OR LOWER(COALESCE(pl_archive.status, '')) = 'completed'"
+        lifecycle_date = "pl_archive.completed_date"
+
+    archived_date_expr_parts = []
+    if has_archived_at:
+        archived_date_expr_parts.append("p.archived_at")
+    archived_date_expr_parts.append(lifecycle_date)
+    archived_date_expr_parts.append(decision_date)
+    if has_updated_at:
+        archived_date_expr_parts.append("p.updated_at")
+    archived_date_expr_parts.append("CURRENT_TIMESTAMP")
+    archived_at_expr = "COALESCE(" + ", ".join(archived_date_expr_parts) + ")"
+
+    cursor.execute(
+        f"""
+        SELECT p.project_id,
+               COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS project_title,
+               sem.academic_year,
+               {score_expr} AS final_score,
+               {archived_at_expr} AS archived_at
+        FROM project_members pm
+        JOIN projects p ON p.project_id = pm.project_id
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        {decision_join}
+        {lifecycle_join}
+        WHERE pm.student_id = %s
+          AND sem.course_code = 'COMP4300'
+          AND (
+                LOWER(COALESCE(p.status, '')) IN ('archived','accepted','completed','succeeded','passed')
+                {decision_condition}
+                {lifecycle_condition}
+              )
+        ORDER BY {archived_at_expr} DESC, p.project_id DESC
+        LIMIT 1
+        """,
+        (student_id,),
+    )
+    return cursor.fetchone()
+
+
+def _student_graduation_access(cursor, user_id):
+    """Return graduation notice/session-expiry state for a student user."""
+    from datetime import datetime
+
+    cursor.execute(
+        """
+        SELECT st.student_id, u.full_name, u.university_id
+        FROM students st
+        JOIN users u ON u.user_id = st.user_id
+        WHERE st.user_id = %s
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    student = cursor.fetchone()
+    if not student:
+        return None
+
+    _ensure_student_graduation_access_schema(cursor)
+    archived_project = _student_archived_project_row(cursor, student["student_id"])
+    if not archived_project:
+        return None
+
+    archived_at = archived_project.get("archived_at")
+    if not archived_at:
+        archived_at = datetime.now()
+
+    # Keep one stable expiry date per student/project once detected.
+    cursor.execute(
+        """
+        INSERT INTO student_graduation_access
+            (student_id, project_id, archived_at, access_expires_at)
+        VALUES (%s, %s, %s, DATE_ADD(%s, INTERVAL 20 DAY))
+        ON DUPLICATE KEY UPDATE
+            archived_at = LEAST(archived_at, VALUES(archived_at)),
+            access_expires_at = DATE_ADD(LEAST(archived_at, VALUES(archived_at)), INTERVAL 20 DAY)
+        """,
+        (
+            student["student_id"],
+            archived_project["project_id"],
+            archived_at,
+            archived_at,
+        ),
+    )
+
+    cursor.execute(
+        """
+        SELECT access_id, student_id, project_id, archived_at, access_expires_at, notice_seen_at,
+               GREATEST(DATEDIFF(access_expires_at, NOW()), 0) AS days_left,
+               CASE WHEN NOW() >= access_expires_at THEN 1 ELSE 0 END AS is_expired
+        FROM student_graduation_access
+        WHERE student_id = %s AND project_id = %s
+        LIMIT 1
+        """,
+        (student["student_id"], archived_project["project_id"]),
+    )
+    access = cursor.fetchone() or {}
+    if not access:
+        return None
+
+    return {
+        "student_id": student["student_id"],
+        "student_name": student.get("full_name") or "",
+        "university_id": student.get("university_id") or "",
+        "project_id": archived_project.get("project_id"),
+        "project_title": archived_project.get("project_title") or "Graduation Project",
+        "academic_year": archived_project.get("academic_year") or "",
+        "final_score": float(archived_project["final_score"]) if archived_project.get("final_score") is not None else None,
+        "archived_at": access.get("archived_at"),
+        "access_expires_at": access.get("access_expires_at"),
+        "days_left": int(access.get("days_left") or 0),
+        "is_expired": bool(access.get("is_expired")),
+        "notice_seen": bool(access.get("notice_seen_at")),
+        "result_url": "/student/result",
+    }
+
+
+def _student_mark_graduation_notice_seen(cursor, user_id):
+    access = _student_graduation_access(cursor, user_id)
+    if not access:
+        return None
+    cursor.execute(
+        """
+        UPDATE student_graduation_access
+        SET notice_seen_at = COALESCE(notice_seen_at, NOW())
+        WHERE student_id = %s AND project_id = %s
+        """,
+        (access["student_id"], access["project_id"]),
+    )
+    access["notice_seen"] = True
+    return access
+
+
 __all__ = [
     "ALLOWED_EXTENSIONS",
     "MAX_FILE_MB",
@@ -1225,6 +1489,7 @@ __all__ = [
     "_table_exists_student",
     "_student_course_context_for_id",
     "_student_course_context",
+    "_student_visible_project_ids",
     "_cleanup_comp4200_state_for_promoted_student",
     "_notify_project_team",
     "_student_intro_section",
@@ -1245,4 +1510,7 @@ __all__ = [
     "_sync_final_report_timeline_submission",
     "_get_active_semester_st",
     "_sync_lifecycle",
+    "_ensure_student_graduation_access_schema",
+    "_student_graduation_access",
+    "_student_mark_graduation_notice_seen",
 ]

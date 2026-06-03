@@ -29,8 +29,24 @@ def api_student_feedback():
     db = get_db()
     cursor = db.cursor(dictionary=True)
     try:
+        project_ids = _student_visible_project_ids(cursor, user_id)
+        if not project_ids:
+            return jsonify(
+                {
+                    "feedback": [],
+                    "summary": {
+                        "total_feedback": 0,
+                        "projects": 0,
+                        "average_score": None,
+                        "urgent_count": 0,
+                        "open_points": 0,
+                    },
+                }
+            )
+
+        placeholders = ", ".join(["%s"] * len(project_ids))
         cursor.execute(
-            """
+            f"""
             SELECT DISTINCT
                    f.feedback_id,
                    f.project_id,
@@ -47,14 +63,12 @@ def api_student_feedback():
             FROM feedback f
             JOIN projects p ON p.project_id = f.project_id
             JOIN semesters sem ON sem.semester_id = p.semester_id
-            JOIN project_members pm ON pm.project_id = p.project_id
-            JOIN students st ON st.student_id = pm.student_id
             JOIN users reviewer ON reviewer.user_id = f.reviewer_id
-            WHERE st.user_id = %s
+            WHERE f.project_id IN ({placeholders})
               AND COALESCE(f.is_draft, FALSE) = FALSE
             ORDER BY f.created_at DESC, f.feedback_id DESC
             """,
-            (user_id,),
+            tuple(project_ids),
         )
         rows = cursor.fetchall()
 

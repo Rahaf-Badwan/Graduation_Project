@@ -214,6 +214,13 @@
       border: 1px solid #fecdca;
     }
 
+    #pg-exams .exam-msg.loading {
+      display: block;
+      color: var(--color-text-secondary);
+      background: var(--color-background-secondary);
+      border: 1px solid var(--color-border-tertiary);
+    }
+
 
     #pg-exams .submission-toolbar {
       display: flex;
@@ -468,6 +475,8 @@
           <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(true)">Save & Publish to
             Students</button>
         </div>
+
+        <div id="introTimelineMsg" class="exam-msg"></div>
 
         <div class="timeline-table-wrap">
           <table class="timeline-table">
@@ -827,6 +836,7 @@
           <select class="tl-submitted-to timeline-small-input" style="font-size:12px">
             <option value="supervisor" ${(rowItem.submitted_to || 'supervisor') === 'supervisor' ? 'selected' : ''}>→ Supervisor</option>
             <option value="coordinator" ${(rowItem.submitted_to || '') === 'coordinator' ? 'selected' : ''}>→ Course Coordinator</option>
+            <option value="both" ${(rowItem.submitted_to || '') === 'both' ? 'selected' : ''}>→ Supervisor & Course Coordinator</option>
           </select>
         </td>
 
@@ -957,7 +967,21 @@
     }
   }
 
+  function setIntroTimelineMessage(message, type) {
+    const msg = document.getElementById('introTimelineMsg');
+    if (!msg) return;
+
+    msg.textContent = message || '';
+    msg.className = 'exam-msg';
+
+    if (type) {
+      msg.classList.add(type);
+    }
+  }
+
   async function saveIntroTimeline(publishAfter) {
+    setIntroTimelineMessage(publishAfter ? 'Publishing timeline...' : 'Saving draft...', 'loading');
+
     try {
       const title = document.getElementById('timelineTitle').value.trim();
       const note = document.getElementById('timelineNote').value.trim();
@@ -978,7 +1002,7 @@
         const checkedItems = collectTimelineItems(true);
 
         if (checkedItems.length === 0) {
-          alert('No items selected. Please check at least one item to publish.');
+          setIntroTimelineMessage('No items selected. Please check at least one item to publish.', 'error');
           return;
         }
 
@@ -986,7 +1010,7 @@
         const missingDate = checkedItems.filter(it => !it.due_date);
         if (missingDate.length > 0) {
           const nums = missingDate.map(it => it.item_order).join(', ');
-          alert(`Please set a Close / Deadline date for checked item(s): #${nums}`);
+          setIntroTimelineMessage(`Please set a Close / Deadline date for checked item(s): #${nums}`, 'error');
           return;
         }
 
@@ -1002,13 +1026,16 @@
         });
 
         updateTimelineMeta(published.timeline);
-        alert(published.message || `Timeline published (${checkedItems.length} item(s) sent to students).`);
+        setIntroTimelineMessage(
+          published.message || `Timeline published (${checkedItems.length} item(s) sent to students).`,
+          'ok'
+        );
       } else {
         updateTimelineMeta(saved.timeline);
-        alert(saved.message || 'Timeline saved as draft.');
+        setIntroTimelineMessage(saved.message || 'Timeline saved as draft.', 'ok');
       }
     } catch (err) {
-      alert(err.message);
+      setIntroTimelineMessage(err.message || 'Timeline request failed.', 'error');
     }
   }
 

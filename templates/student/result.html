@@ -170,6 +170,26 @@
     }
   </style>
 
+
+  {% if graduation_notice and not graduation_notice.is_expired %}
+  <div class="result-hero" style="background:linear-gradient(135deg,rgba(26,107,58,.13),rgba(24,95,165,.10));border-color:rgba(26,107,58,.22)">
+    <div>
+      <div class="result-kicker">Graduation Notice</div>
+      <div class="result-title">Congratulations! Your project has been archived 🎓</div>
+      <div class="result-meta">
+        Your graduation project archive is complete. You can review your final grade here.<br>
+        Your student account access will close automatically after {{ graduation_notice.days_left }} day{% if graduation_notice.days_left != 1 %}s{% endif %}.
+      </div>
+    </div>
+    <div class="score-panel">
+      <div>
+        <div class="score-value">{{ graduation_notice.days_left }}</div>
+        <div class="score-label">Days Left</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {% if error %}
   <div class="card">
     <div class="empty-state">
