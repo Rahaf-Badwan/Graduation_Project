@@ -1,457 +1,579 @@
 {% extends 'coordinator/base.html' %}
 
-{% block page_title %}Section Results{% endblock %}
-{% block page_id %}sections{% endblock %}
-{% block topbar_title %}Section Results{% endblock %}
+{% block page_title %}Lectures &amp; Deliverables{% endblock %}
+{% block page_id %}lectures{% endblock %}
+{% block topbar_title %}Lectures &amp; Deliverables{% endblock %}
 
 {% block content %}
-<div class="page page-single on" id="pg-sections">
-
-  <style>
-    html,
-    body {
-      scroll-behavior: auto !important;
-    }
-
-    #pg-sections {
-      padding: 20px 22px 90px !important;
-      margin: 0 !important;
-      display: block !important;
-      min-height: auto !important;
-      height: auto !important;
-    }
-
-    #pg-sections .sections-header-card {
-      background: var(--color-background-primary);
-      border: 1px solid #e6ece8;
-      border-radius: 18px;
-      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
-      overflow: hidden;
-      margin-bottom: 16px;
-    }
-
-    #pg-sections .sections-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      padding: 16px 18px;
-      border-bottom: 1px solid #edf2ef;
-    }
-
-    #pg-sections .sections-title {
-      font-size: 18px;
-      font-weight: 900;
-      color: var(--color-text-primary);
-    }
-
-    #pg-sections .sections-subtitle {
-      font-size: 12px;
-      color: #667085;
-      margin-top: 4px;
-      line-height: 1.6;
-      max-width: 820px;
-    }
-
-    #pg-sections .sections-info-box {
-      border-left: 5px solid #2e7d42;
-      background: var(--color-background-tertiary);
-      border-radius: 14px;
-      padding: 13px 14px;
-      color: var(--color-text-primary);
-      line-height: 1.55;
-      font-size: 13px;
-      margin: 16px 18px 18px;
-    }
-
-    #pg-sections .sections-refresh-btn {
-      border: 1px solid #d7e3dc;
-      background: var(--color-background-tertiary);
-      color: var(--green);
-      border-radius: 12px;
-      padding: 8px 12px;
-      font-weight: 800;
-      cursor: pointer;
-      transition: 0.18s ease;
-      box-shadow: none !important;
-    }
-
-    #pg-sections .sections-refresh-btn:hover {
-      background: var(--green-light);
-      border-color: #b9d7c2;
-    }
-
-    #pg-sections .result-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(150px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    #pg-sections .result-stat {
-      background: var(--color-background-primary);
-      border: 1px solid #e6ece8;
-      border-radius: 18px;
-      padding: 16px;
-      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
-    }
-
-    #pg-sections .result-stat .num {
-      font-size: 28px;
-      font-weight: 900;
-      color: var(--accent);
-      margin-bottom: 4px;
-    }
-
-    #pg-sections .result-stat .lbl {
-      font-size: 13px;
-      color: #667085;
-      font-weight: 700;
-      line-height: 1.4;
-    }
-
-    #pg-sections .section-tabs {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin: 0 0 16px 0;
-      padding: 0;
-    }
-
-    #pg-sections .section-tab {
-      border: 1px solid #d7e3dc;
-      background: var(--color-background-primary);
-      color: var(--color-text-primary);
-      border-radius: 999px;
-      padding: 8px 13px;
-      font-size: 13px;
-      font-weight: 800;
-      cursor: pointer;
-      transition: 0.18s ease;
-      box-shadow: none !important;
-    }
-
-    #pg-sections .section-tab:hover {
-      background: var(--color-background-tertiary);
-      border-color: #b9d7c2;
-    }
-
-    #pg-sections .section-tab.on {
-      background: #2e7d42;
-      border-color: var(--accent);
-      color: #ffffff;
-      box-shadow: none !important;
-    }
-
-    #pg-sections .section-card {
-      border: 1px solid #e6ece8;
-      border-radius: 18px;
-      background: var(--color-background-primary);
-      padding: 16px;
-      margin-bottom: 12px;
-      display: grid;
-      grid-template-columns: 1fr minmax(260px, 320px);
-      gap: 16px;
-      align-items: start;
-      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.05);
-    }
-
-    #pg-sections .section-title {
-      font-weight: 900;
-      color: var(--color-text-primary);
-      font-size: 15px;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    #pg-sections .section-meta {
-      font-size: 12px;
-      color: #667085;
-      line-height: 1.7;
-    }
-
-    #pg-sections .section-meta b {
-      color: var(--color-text-primary);
-    }
-
-    #pg-sections .section-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-    }
-
-    #pg-sections .section-actions select,
-    #pg-sections .section-actions textarea {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #d8e2dc;
-      border-radius: 12px;
-      background: var(--color-background-primary);
-      font: inherit;
-      font-size: 12px;
-      outline: none;
-    }
-
-    #pg-sections .section-actions select:focus,
-    #pg-sections .section-actions textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
-    }
-
-    #pg-sections .section-actions textarea {
-      resize: vertical;
-      min-height: 64px;
-      line-height: 1.5;
-    }
-
-    #pg-sections .status-pill {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 4px 10px;
-      font-size: 11px;
-      font-weight: 900;
-      white-space: nowrap;
-    }
-
-    #pg-sections .status-pending {
-      background: var(--color-background-tertiary);
-      color: var(--color-text-secondary);
-    }
-
-    #pg-sections .status-succeeded {
-      background: var(--green-light);
-      color: var(--green);
-    }
-
-    #pg-sections .status-not_succeeded {
-      background: var(--coral-light);
-      color: #b42318;
-    }
-
-    #pg-sections .empty-box {
-      padding: 22px;
-      border: 1px dashed #cddbd2;
-      border-radius: 16px;
-      color: #667085;
-      background: var(--color-background-tertiary);
-      text-align: center;
-      font-size: 13px;
-    }
-
-    #pg-sections .btn {
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-weight: 800;
-      cursor: pointer;
-      transition: 0.18s ease;
-    }
-
-    #pg-sections .btn-primary {
-      background: #2e7d42;
-      color: #fff;
-      border: 1px solid #2e7d42;
-    }
-
-    #pg-sections .btn-primary:hover {
-      background: #256b36;
-      border-color: var(--green);
-    }
-
-    #pg-sections .btn-outline {
-      background: var(--color-background-primary);
-      color: var(--accent);
-      border: 1px solid #ccebd5;
-    }
-
-    #pg-sections .btn-outline:hover {
-      background: var(--color-background-tertiary);
-    }
-
-    #pg-sections .sections-message {
-      display: none;
-      margin-bottom: 12px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    #pg-sections .sections-message.ok {
-      display: block;
-      color: var(--green);
-      background: var(--green-light);
-      border: 1px solid #abefc6;
-    }
-
-    #pg-sections .sections-message.error {
-      display: block;
-      color: #b42318;
-      background: var(--coral-light);
-      border: 1px solid #fecdca;
-    }
-
-    #pg-sections .sections-message.loading {
-      display: block;
-      color: var(--color-text-primary);
-      background: var(--color-background-tertiary);
-      border: 1px solid #eaecf0;
-    }
-
-    @media(max-width: 1000px) {
-      #pg-sections .result-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      #pg-sections .section-card {
-        grid-template-columns: 1fr;
-      }
-
-      #pg-sections .section-actions {
-        min-width: 0;
-      }
-    }
-
-    @media(max-width: 620px) {
-      #pg-sections .result-grid {
-        grid-template-columns: 1fr;
-      }
-
-      #pg-sections .section-tab {
-        width: 100%;
-        text-align: center;
-      }
-
-      #pg-sections .sections-refresh-btn {
-        width: 100%;
-      }
-    }
-  </style>
-
-  <div class="sections-header-card">
-    <div class="sections-header">
-      <div>
-        <div class="sections-title">Sections Completion</div>
-        <div class="sections-subtitle">
-          Mark Project Introduction sections and Graduation Project groups as succeeded.
-          Only succeeded items will appear for the Head of Department.
-        </div>
-      </div>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <button class="sections-refresh-btn" type="button" onclick="loadSectionResults()">
-          Refresh
-        </button>
-        <button class="btn btn-primary" type="button" onclick="successAllSections()">
-          Success All Sections
-        </button>
-      </div>
-    </div>
-
-    <div class="sections-info-box">
-      Use this page to update the completion result for each section.
-      When you mark a section as <b>Succeeded</b>, it becomes visible to the Head of Department.
-    </div>
-  </div>
-
-  <div class="result-grid">
-    <div class="result-stat">
-      <div class="num" id="introTotal">0</div>
-      <div class="lbl">Introduction Sections</div>
-    </div>
-
-    <div class="result-stat">
-      <div class="num" id="introDone">0</div>
-      <div class="lbl">Succeeded Introduction</div>
-    </div>
-
-    <div class="result-stat">
-      <div class="num" id="gradTotal">0</div>
-      <div class="lbl">Graduation Project Groups</div>
-    </div>
-
-    <div class="result-stat">
-      <div class="num" id="gradDone">0</div>
-      <div class="lbl">Succeeded Graduation</div>
-    </div>
-  </div>
-
-  <div class="section-tabs" role="tablist" aria-label="Section result tabs">
-    <button class="tab section-tab on" type="button" onclick="showResultTab('introBox', this)">
-      Project Introduction — COMP4200 Sections
-    </button>
-
-    <button class="tab section-tab" type="button" onclick="showResultTab('gradBox', this)">
-      Graduation Project — COMP4300 Sections
-    </button>
-  </div>
-
-  <div id="sectionsMsg" class="sections-message"></div>
-
-  <div id="introBox">
-    <div class="empty-box">Loading introduction sections...</div>
-  </div>
-
-  <div id="gradBox" style="display:none">
-    <div class="empty-box">Loading graduation project sections...</div>
-  </div>
-</div>
-
-<script>
-  if ('scrollRestoration' in history) {
-    history.scrollRestoration = 'manual';
+<style>
+  html,
+  body {
+    scroll-behavior: auto !important;
   }
 
-  function resetSectionsScroll() {
+  #pg-lectures {
+    padding: 20px 22px 90px !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    display: block !important;
+  }
+
+  #pg-lectures .lecture-tabs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 0 16px 0;
+    padding: 0;
+  }
+
+  #pg-lectures .lecture-tab {
+    border: 1px solid #d7e3dc;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.18s ease;
+  }
+
+  #pg-lectures .lecture-tab:hover {
+    background: var(--color-background-tertiary);
+  }
+
+  #pg-lectures .lecture-tab.on {
+    background: #2e7d42;
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
+  }
+
+  #pg-lectures .lecture-section {
+    display: none;
+  }
+
+  #pg-lectures .lecture-section.active {
+    display: block;
+  }
+
+  #pg-lectures .course-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  #pg-lectures .course-badge {
+    background: #2e7d42;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  #pg-lectures .course-ar {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+  }
+
+  #pg-lectures .lecture-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  #pg-lectures .card {
+    margin-top: 0 !important;
+    background: var(--color-background-primary);
+    border: 1px solid #e6ece8;
+    border-radius: 18px;
+    box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
+    overflow: hidden;
+  }
+
+  #pg-lectures .card-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 16px 18px;
+    border-bottom: 1px solid #edf2ef;
+  }
+
+  #pg-lectures .card-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--color-text-primary);
+  }
+
+  #pg-lectures .card-action {
+    border: 1px solid #d7e3dc;
+    background: var(--color-background-tertiary);
+    color: var(--green);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.18s ease;
+  }
+
+  #pg-lectures .card-action:hover {
+    background: var(--green-light);
+    border-color: #b9d7c2;
+  }
+
+  #pg-lectures .lecture-note {
+    border-left: 5px solid #2e7d42;
+    background: var(--color-background-tertiary);
+    border-radius: 14px;
+    padding: 13px 14px;
+    color: var(--color-text-primary);
+    line-height: 1.55;
+    font-size: 13px;
+    margin: 14px 18px;
+  }
+
+  #pg-lectures .mini-form {
+    display: none;
+    border: 1px solid #e7eee9;
+    border-radius: 14px;
+    padding: 14px;
+    margin: 0 18px 14px 18px;
+    background: var(--color-background-tertiary);
+  }
+
+  #pg-lectures .mini-form.on {
+    display: block;
+  }
+
+  #pg-lectures .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  #pg-lectures label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--color-text-primary);
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  #pg-lectures input,
+  #pg-lectures select,
+  #pg-lectures textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d8e2dc;
+    border-radius: 12px;
+    background: var(--color-background-primary);
+    font: inherit;
+    outline: none;
+  }
+
+  #pg-lectures input:focus,
+  #pg-lectures select:focus,
+  #pg-lectures textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
+  }
+
+  #pg-lectures textarea {
+    resize: vertical;
+  }
+
+  #pg-lectures .empty-box {
+    border: 1px dashed #cddbd2;
+    border-radius: 14px;
+    padding: 18px;
+    color: #667085;
+    background: var(--color-background-tertiary);
+    font-size: 13px;
+    text-align: center;
+    margin: 0 18px 18px 18px;
+  }
+
+  #pg-lectures .lec-card,
+  #pg-lectures .deliv-row {
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    gap: 12px;
+    align-items: flex-start;
+    border: 1px solid #e7eee9;
+    background: var(--color-background-primary);
+    border-radius: 16px;
+    padding: 13px 14px;
+    margin: 0 18px 12px 18px;
+  }
+
+  #pg-lectures .lec-num,
+  #pg-lectures .deliv-token {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: var(--green-light);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+  }
+
+  #pg-lectures .lecture-item-title {
+    font-weight: 900;
+    color: var(--color-text-primary);
+    margin-bottom: 4px;
+  }
+
+  #pg-lectures .lecture-item-meta {
+    font-size: 12px;
+    color: #667085;
+    line-height: 1.5;
+  }
+
+  #pg-lectures .lecture-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  #pg-lectures .lecture-date-input {
+    max-width: 160px;
+    padding: 8px 10px;
+  }
+
+  #pg-lectures .lecture-small-btn {
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  #pg-lectures .pill {
+    border-radius: 999px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  #pg-lectures .submission-filter-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 18px 14px 18px;
+  }
+
+  #pg-lectures .submission-filter-btn {
+    border: 1px solid #d7e3dc;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  #pg-lectures .submission-filter-btn.on {
+    background: #2e7d42;
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  #pg-lectures .submission-file-card {
+    border: 1px solid #e7eee9;
+    background: var(--color-background-primary);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
+  }
+
+  #pg-lectures .submission-folder {
+    border: 1px solid #dfe9e3;
+    background: var(--color-background-primary);
+    border-radius: 16px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(16, 24, 40, 0.04);
+  }
+
+  #pg-lectures .submission-folder-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 13px 16px;
+    background: var(--color-background-tertiary);
+    border-bottom: 1px solid #e7eee9;
+  }
+
+  #pg-lectures .submission-folder-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: var(--color-text-primary);
+  }
+
+  #pg-lectures .submission-folder-meta {
+    font-size: 12px;
+    color: #667085;
+    margin-top: 3px;
+  }
+
+  #pg-lectures .submission-file-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 13px 16px;
+    border-bottom: 1px solid #eef3f0;
+  }
+
+  #pg-lectures .submission-file-row:last-child {
+    border-bottom: 0;
+  }
+
+  #pg-lectures .submission-file-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  #pg-lectures .submission-file-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: var(--color-text-primary);
+  }
+
+  #pg-lectures .submission-file-meta {
+    font-size: 12px;
+    color: #667085;
+    line-height: 1.6;
+  }
+
+  #pg-lectures .submission-file-link {
+    display: inline-flex;
+    margin-top: 10px;
+    padding: 8px 11px;
+    border-radius: 10px;
+    background: var(--color-background-tertiary);
+    border: 1px solid #d7e3dc;
+    color: var(--green);
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  #pg-lectures .submission-file-link:hover {
+    background: var(--green-light);
+  }
+
+  @media(max-width:900px) {
+
+    #pg-lectures .lecture-grid,
+    #pg-lectures .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-lectures .lecture-tab {
+      width: 100%;
+      text-align: center;
+    }
+
+    #pg-lectures .lec-card,
+    #pg-lectures .deliv-row {
+      grid-template-columns: 42px 1fr;
+    }
+  }
+</style>
+
+<div class="page page-single on" id="pg-lectures">
+
+  <div class="lecture-tabs" role="tablist" aria-label="Lectures and Deliverables tabs">
+    <button class="lecture-tab on" type="button" role="tab" aria-selected="true"
+      onclick="showLectureSection('introduction', this)">
+      Project Introduction — COMP4200
+    </button>
+
+    <button class="lecture-tab" type="button" role="tab" aria-selected="false"
+      onclick="showLectureSection('graduation_project', this)">
+      Graduation Projects — COMP4300
+    </button>
+  </div>
+
+  <div id="introLectures" class="lecture-section active" data-scope="introduction">
+    <div class="course-head">
+      <span class="course-badge">◑ Project Introduction — COMP4200</span>
+
+    </div>
+
+    <div class="lecture-grid">
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Coordinator Lectures</span>
+          <button class="card-action" type="button" onclick="toggleLectureForm('introduction')">+ Add Lecture</button>
+        </div>
+
+        <div class="lecture-note">
+          Add lecture dates and publish the semester lecture plan.
+        </div>
+
+        <div id="lectureForm-introduction" class="mini-form"></div>
+        <div id="lectureList-introduction"></div>
+      </div>
+
+
+    </div>
+  </div>
+
+  <div id="gradLectures" class="lecture-section" data-scope="graduation_project">
+    <div class="course-head">
+      <span class="course-badge">✦ Graduation Projects — COMP4300</span>
+
+    </div>
+
+    <div class="lecture-grid">
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Coordinator Lectures</span>
+          <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add
+            Lecture</button>
+        </div>
+
+        <div class="lecture-note">
+          Add lecture dates and publish the semester lecture plan.
+        </div>
+
+        <div id="lectureForm-graduation_project" class="mini-form"></div>
+        <div id="lectureList-graduation_project"></div>
+      </div>
+
+
+    </div>
+  </div>
+
+  <div id="submissionFilesLectures" class="lecture-section" data-scope="submission_files">
+    <div class="course-head">
+      <span class="course-badge">▣ Submission Files</span>
+      <span class="course-ar">ملفات التسليم</span>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">Students Submitted Files</span>
+        <button class="card-action" type="button" onclick="loadSubmissionFiles()">Refresh</button>
+      </div>
+
+      <div class="lecture-note">
+        This tab shows submitted files such as reports and final submissions.
+        Example: <b>Report One — COMP4200</b>, submitted by the student name with the uploaded file.
+      </div>
+
+      <div class="submission-filter-row">
+        <button class="submission-filter-btn on" type="button" onclick="filterSubmissionFiles('all', this)">All</button>
+        <button class="submission-filter-btn" type="button"
+          onclick="filterSubmissionFiles('COMP4200', this)">COMP4200</button>
+        <button class="submission-filter-btn" type="button"
+          onclick="filterSubmissionFiles('COMP4300', this)">COMP4300</button>
+      </div>
+
+      <div id="submissionFilesList" style="padding:0 18px 18px 18px">
+        <div class="empty-box">Loading submitted files...</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const scopeLabels = {
+    introduction: 'Project Introduction',
+    graduation_project: 'Graduation Projects'
+  };
+
+  let lecturesState = {
+    lectures: {
+      introduction: [],
+      graduation_project: []
+    },
+    deliverables: {
+      introduction: [],
+      graduation_project: []
+    }
+  };
+
+  let submissionFilesState = [];
+  let currentSubmissionFilter = 'all';
+
+  function resetLectureScroll() {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
 
-    ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-sections'].forEach(selector => {
+    ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-lectures'].forEach(selector => {
       const el = document.querySelector(selector);
-      if (el) {
-        el.scrollTop = 0;
-      }
+      if (el) el.scrollTop = 0;
     });
   }
 
-  function setSectionsMessage(message, type) {
-    const msg = document.getElementById('sectionsMsg');
-    if (!msg) return;
-
-    msg.textContent = message || '';
-    msg.className = 'sections-message';
-
-    if (type) {
-      msg.classList.add(type);
-    }
-  }
-
-  function showResultTab(id, btn) {
-    ['introBox', 'gradBox'].forEach(boxId => {
-      const box = document.getElementById(boxId);
-      if (box) {
-        box.style.display = boxId === id ? 'block' : 'none';
-      }
+  function showLectureSection(scope, btn) {
+    document.querySelectorAll('#pg-lectures .lecture-section').forEach(section => {
+      section.classList.remove('active');
     });
 
-    document.querySelectorAll('#pg-sections .section-tab').forEach(tab => {
-      tab.classList.remove('on');
-    });
+    let sectionId = 'introLectures';
 
-    if (btn) {
-      btn.classList.add('on');
+    if (scope === 'graduation_project') {
+      sectionId = 'gradLectures';
     }
 
-    setTimeout(resetSectionsScroll, 0);
+    if (scope === 'submission_files') {
+      sectionId = 'submissionFilesLectures';
+      loadSubmissionFiles();
+    }
+
+    const selected = document.getElementById(sectionId);
+
+    if (selected) {
+      selected.classList.add('active');
+    }
+
+    document.querySelectorAll('#pg-lectures .lecture-tab').forEach(tab => {
+      const isActive = tab === btn;
+      tab.classList.toggle('on', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    setTimeout(resetLectureScroll, 0);
   }
 
-  function escapeHtml(value) {
+  function pillClass(status) {
+    if (status === 'completed') return 'p-accepted';
+    if (status === 'cancelled' || status === 'closed') return 'p-rejected';
+    if (status === 'in_progress' || status === 'open') return 'p-review';
+    return 'p-pending';
+  }
+
+  function niceStatus(status) {
+    return String(status || 'scheduled')
+      .replaceAll('_', ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function safe(value) {
     return String(value ?? '')
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')
@@ -459,198 +581,595 @@
       .replaceAll('"', '&quot;');
   }
 
-  function statusText(status) {
-    if (status === 'succeeded') return 'Succeeded';
-    if (status === 'not_succeeded') return 'Not Succeeded';
-    return 'Pending';
-  }
-
-  function cardTemplate(row) {
-    const scopeLabel = row.course_scope === 'introduction'
-      ? 'COMP4200 · Project Introduction'
-      : 'COMP4300 · Graduation Project';
-
-    const status = row.result_status || 'pending';
-
+  function lectureFormHtml(scope) {
     return `
-      <div class="section-card" data-scope="${escapeHtml(row.course_scope)}" data-id="${escapeHtml(row.reference_id)}">
+      <div class="form-grid">
         <div>
-          <div class="section-title">
-            ${escapeHtml(row.section_name)}
-            <span class="status-pill status-${escapeHtml(status)}">${statusText(status)}</span>
-          </div>
-
-          <div class="section-meta"><b>${scopeLabel}</b></div>
-          <div class="section-meta">Project: <b>${escapeHtml(row.project_title || 'Untitled project')}</b></div>
-          <div class="section-meta">Supervisor: <b>${escapeHtml(row.supervisor_name || '—')}</b></div>
-          <div class="section-meta">Students (${escapeHtml(row.student_count || 0)}): ${escapeHtml(row.students || 'No students')}</div>
-
-          ${
-            row.marked_at
-              ? `<div class="section-meta">Last update: ${escapeHtml(row.marked_at)} by ${escapeHtml(row.marked_by_name || 'Coordinator')}</div>`
-              : ''
-          }
+          <label>Lecture Title</label>
+          <input id="lecTitle-${scope}" placeholder="Example: Turnitin Upload & Similarity">
         </div>
 
-        <div class="section-actions">
-          <select class="result-status">
-            <option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option>
-            <option value="succeeded" ${status === 'succeeded' ? 'selected' : ''}>Succeeded / ناجح</option>
-            <option value="not_succeeded" ${status === 'not_succeeded' ? 'selected' : ''}>Not Succeeded</option>
+        <div>
+          <label>Lecture Date</label>
+          <input id="lecDate-${scope}" type="date">
+        </div>
+
+        <div>
+          <label>Week Label</label>
+          <input id="lecWeek-${scope}" placeholder="Example: Week 3">
+        </div>
+
+        <div>
+          <label>Status</label>
+          <select id="lecStatus-${scope}">
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
-
-          <textarea class="result-notes" placeholder="Optional note for Head of Department">${escapeHtml(row.notes || '')}</textarea>
-
-          <button class="btn btn-primary" type="button" onclick="saveSectionResult(this)">
-            Save Result
-          </button>
         </div>
+
+        <div style="grid-column:1/-1">
+          <label>Description</label>
+          <textarea id="lecDesc-${scope}" rows="2" placeholder="What will be covered in this lecture?"></textarea>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" type="button" onclick="saveLecture('${scope}')">Save Lecture</button>
+        <button class="btn btn-outline" type="button" onclick="toggleLectureForm('${scope}')">Cancel</button>
       </div>
     `;
   }
 
-  function renderList(containerId, rows) {
-    const box = document.getElementById(containerId);
+  function deliverableFormHtml(scope) {
+    return `
+      <div class="form-grid">
+        <div>
+          <label>Deliverable Title</label>
+          <input id="delTitle-${scope}" placeholder="Example: Final Report + Turnitin">
+        </div>
+
+        <div>
+          <label>Due Date</label>
+          <input id="delDue-${scope}" type="date">
+        </div>
+
+        <div>
+          <label>Mark Points</label>
+          <input id="delMark-${scope}" type="number" min="0" value="5">
+        </div>
+
+        <div>
+          <label>Status</label>
+          <select id="delStatus-${scope}">
+            <option value="not_open">Not Open Yet</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+
+        <div style="grid-column:1/-1">
+          <label>Description</label>
+          <textarea id="delDesc-${scope}" rows="2" placeholder="Submission details"></textarea>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-primary" type="button" onclick="saveDeliverable('${scope}')">Save Deliverable</button>
+        <button class="btn btn-outline" type="button" onclick="toggleDeliverableForm('${scope}')">Cancel</button>
+      </div>
+    `;
+  }
+
+  function toggleLectureForm(scope) {
+    const box = document.getElementById(`lectureForm-${scope}`);
+    if (!box) return;
+
+    if (!box.innerHTML.trim()) {
+      box.innerHTML = lectureFormHtml(scope);
+    }
+
+    box.classList.toggle('on');
+  }
+
+  function toggleDeliverableForm(scope) {
+    const box = document.getElementById(`deliverableForm-${scope}`);
+    if (!box) return;
+
+    if (!box.innerHTML.trim()) {
+      box.innerHTML = deliverableFormHtml(scope);
+    }
+
+    box.classList.toggle('on');
+  }
+
+  function renderLectures(scope) {
+    const list = document.getElementById(`lectureList-${scope}`);
+    const rows = lecturesState.lectures[scope] || [];
+
+    if (!list) return;
+
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-box">No lectures yet. Click + Add Lecture to create one.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map((lecture, index) => `
+      <div class="lec-card">
+        <div class="lec-num">${index + 1}</div>
+
+        <div>
+          <div class="lecture-item-title">${safe(lecture.title)}</div>
+
+          <div class="lecture-item-meta">
+            ${safe(lecture.description || '')}
+            ${lecture.week_label ? ' · ' + safe(lecture.week_label) : ''}
+            ${lecture.lecture_date ? ' · ' + safe(lecture.lecture_date) : ''}
+          </div>
+
+          <div class="lecture-actions">
+            <span class="pill ${pillClass(lecture.status)}">${niceStatus(lecture.status)}</span>
+
+            <input
+              class="field-input lecture-date-input"
+              type="date"
+              value="${safe(lecture.lecture_date || '')}"
+              id="lecDateUpdate-${lecture.lecture_id}">
+
+            <button
+              class="btn btn-primary lecture-small-btn"
+              type="button"
+              onclick="updateLectureDate(${lecture.lecture_id})">
+              Confirm Date
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderDeliverables(scope) {
+    const list = document.getElementById(`deliverableList-${scope}`);
+    const rows = lecturesState.deliverables[scope] || [];
+
+    if (!list) return;
+
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-box">No deliverables yet. Click + Add Deliverable to create one.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map((deliverable, index) => `
+      <div class="deliv-row">
+        <div class="deliv-token">T${index + 1}</div>
+
+        <div>
+          <div class="lecture-item-title">${safe(deliverable.title)}</div>
+
+          <div class="lecture-item-meta">
+            ${deliverable.due_date ? safe(deliverable.due_date) : 'No due date'}
+            · Commitment mark: ${safe(deliverable.mark_points || 0)} pts
+          </div>
+
+          <div class="lecture-item-meta">
+            ${safe(deliverable.description || '')}
+          </div>
+        </div>
+
+        <div>
+          <span class="pill ${pillClass(deliverable.status === 'open' ? 'in_progress' : deliverable.status)}">
+            ${niceStatus(deliverable.status)}
+          </span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderAll() {
+    ['introduction', 'graduation_project'].forEach(scope => {
+      renderLectures(scope);
+      renderDeliverables(scope);
+    });
+  }
+
+  async function apiFetch(url, options) {
+    const res = await fetch(
+      url,
+      Object.assign(
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        },
+        options || {}
+      )
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Request failed');
+    }
+
+    return data;
+  }
+
+  async function loadLecturesData() {
+    try {
+      lecturesState = await apiFetch('/api/coordinator/lectures-data');
+      renderAll();
+    } catch (err) {
+      alert('Lectures page error: ' + err.message);
+    }
+  }
+
+  async function saveLecture(scope) {
+    const payload = {
+      course_scope: scope,
+      title: document.getElementById(`lecTitle-${scope}`).value.trim(),
+      description: document.getElementById(`lecDesc-${scope}`).value.trim(),
+      lecture_date: document.getElementById(`lecDate-${scope}`).value,
+      week_label: document.getElementById(`lecWeek-${scope}`).value.trim(),
+      status: document.getElementById(`lecStatus-${scope}`).value
+    };
+
+    if (!payload.title) {
+      alert('Lecture title is required.');
+      return;
+    }
+
+    await apiFetch('/api/coordinator/lectures', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById(`lectureForm-${scope}`).classList.remove('on');
+    document.getElementById(`lectureForm-${scope}`).innerHTML = '';
+
+    await loadLecturesData();
+  }
+
+  async function saveDeliverable(scope) {
+    const payload = {
+      course_scope: scope,
+      title: document.getElementById(`delTitle-${scope}`).value.trim(),
+      description: document.getElementById(`delDesc-${scope}`).value.trim(),
+      due_date: document.getElementById(`delDue-${scope}`).value,
+      mark_points: Number(document.getElementById(`delMark-${scope}`).value || 0),
+      status: document.getElementById(`delStatus-${scope}`).value
+    };
+
+    if (!payload.title) {
+      alert('Deliverable title is required.');
+      return;
+    }
+
+    await apiFetch('/api/coordinator/deliverables', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById(`deliverableForm-${scope}`).classList.remove('on');
+    document.getElementById(`deliverableForm-${scope}`).innerHTML = '';
+
+    await loadLecturesData();
+  }
+
+  async function updateLectureDate(lectureId) {
+    const dateInput = document.getElementById(`lecDateUpdate-${lectureId}`);
+
+    await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, {
+      method: 'POST',
+      body: JSON.stringify({
+        lecture_date: dateInput.value
+      })
+    });
+
+    await loadLecturesData();
+  }
+
+  function buildSubmissionFileHref(file) {
+    if (file.download_url) {
+      return file.download_url;
+    }
+
+    const path = String(file.file_path || '');
+
+    if (!path) return '#';
+
+    const cleanPath = path.replaceAll('\\', '/');
+
+    if (cleanPath.startsWith('/static/')) return cleanPath;
+    if (cleanPath.startsWith('static/')) return '/' + cleanPath;
+
+    return `/static/${cleanPath}`;
+  }
+
+  function filterSubmissionFiles(scope, btn) {
+    currentSubmissionFilter = scope || 'all';
+
+    document.querySelectorAll('#pg-lectures .submission-filter-btn').forEach(button => {
+      button.classList.remove('on');
+    });
+
+    if (btn) btn.classList.add('on');
+
+    renderSubmissionFiles();
+  }
+
+  function renderGroupedSubmissionFiles(rows) {
+    // Separate project files vs timeline/deliverable
+    const projectGroups = {};  // keyed by project_id
+    const otherGroups = {};   // keyed by course::title::source
+
+    rows.forEach(file => {
+      if (file.source === 'project' && file.project_id) {
+        if (!projectGroups[file.project_id]) {
+          projectGroups[file.project_id] = {
+            project_id: file.project_id,
+            project_title: file.project_title || 'Untitled Project',
+            project_type: file.project_type || '',
+            supervisor_name: file.supervisor_name || '',
+            team_members: file.team_members || '',
+            course_scope: file.course_scope || '',
+            course_label: file.course_label || file.course_scope || 'Project',
+            submitted_by: file.submitted_by || '',
+            uploaded_at: file.uploaded_at || '',
+            files: []
+          };
+        }
+        projectGroups[file.project_id].files.push(file);
+      } else {
+        const key = [file.course_scope || 'Course', file.submission_title || 'Submission', file.source || 'submission'].join('::');
+        if (!otherGroups[key]) otherGroups[key] = {
+          title: file.submission_title || 'Submission',
+          course: file.course_scope || 'Course',
+          label: file.course_label || file.course_scope || 'Submission',
+          files: []
+        };
+        otherGroups[key].files.push(file);
+      }
+    });
+
+    // ── Build inner project card (expandable) ─────────────
+    function projectTypeLabel(value) {
+      const labels = {
+        web: 'Web',
+        mobile: 'Mobile',
+        ai: 'Artificial Intelligence',
+        software_engineering: 'Software Engineering',
+        security: 'Security',
+        databases: 'Databases',
+        other: 'Other'
+      };
+      return String(value || '')
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean)
+        .map(v => labels[v.toLowerCase()] || v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))
+        .join(', ');
+    }
+
+    function buildProjectCard(g) {
+      const pid = 'proj-' + g.project_id;
+      const typeText = projectTypeLabel(g.project_type);
+      const typeLabel = g.project_type
+        ? `<span style="font-size:11px;background:var(--color-background-tertiary);border:1px solid var(--color-border-tertiary);
+                        border-radius:6px;padding:2px 8px;color:var(--green)">
+             ${safe(typeText)}
+           </span>` : '';
+
+      const filesHtml = g.files.map(f => {
+        const href = buildSubmissionFileHref(f);
+        const sz = Number(f.file_size_mb || 0) > 0 ? ' · ' + Number(f.file_size_mb).toFixed(2) + ' MB' : '';
+        const icon = f.file_type === 'final_report' ? '📄' : f.file_type === 'source_code' ? '💾' : f.file_type === 'presentation' ? '📊' : '📁';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;
+                             padding:8px 0;border-top:1px solid #eef1ee">
+          <div style="font-size:13px;color:var(--color-text-primary)">
+            ${icon} <b>${safe((f.file_type || 'file').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</b>
+            <span style="color:#888;font-size:11px">${sz}</span>
+          </div>
+          <a class="submission-file-link" href="${safe(href)}" target="_blank"
+             style="font-size:12px;padding:4px 10px" onclick="event.stopPropagation()">
+            ${href === '#' ? 'Unavailable' : safe(f.file_name || 'Download')}
+          </a>
+        </div>`;
+      }).join('');
+
+      return `
+        <div style="border:1px solid #e7eee9;border-radius:10px;margin-bottom:8px;overflow:hidden">
+          <div style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+                      background:var(--color-background-secondary)"
+               onclick="var b=document.getElementById('${pid}');
+                        b.style.display=b.style.display==='none'?'block':'none';
+                        this.querySelector('.pa').textContent=b.style.display==='none'?'▸':'▾'">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="pa" style="color:var(--green);font-size:13px">▸</span>
+              <span style="font-weight:700;font-size:14px">${safe(g.project_title)}</span>
+              ${typeLabel}
+            </div>
+            <span style="font-size:12px;color:#667085">${g.files.length} file${g.files.length === 1 ? '' : 's'} · ${safe(g.submitted_by)}</span>
+          </div>
+          <div id="${pid}" style="display:none;padding:0 14px 10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;
+                        margin:8px 0;font-size:12px;color:var(--color-text-primary);
+                        background:var(--color-background-tertiary);border-radius:8px;padding:8px 12px">
+              ${g.supervisor_name ? `<div>🎓 <b>Supervisor:</b> ${safe(g.supervisor_name)}</div>` : ''}
+              ${g.team_members ? `<div style="grid-column:1/-1">👥 <b>Team:</b> ${safe(g.team_members)}</div>` : ''}
+              ${g.uploaded_at ? `<div>🕐 <b>Submitted:</b> ${safe(g.uploaded_at)}</div>` : ''}
+            </div>
+            ${filesHtml}
+          </div>
+        </div>`;
+    }
+
+    // ── Group projects by course → one big outer folder per course ──
+    const byCourseFolders = {};
+    Object.values(projectGroups).forEach(g => {
+      const course = g.course_scope || 'Other';
+      if (!byCourseFolders[course]) byCourseFolders[course] = {
+        label: g.course_label || course,
+        projects: []
+      };
+      byCourseFolders[course].projects.push(g);
+    });
+
+    const outerFolders = Object.entries(byCourseFolders).map(([course, cg]) => {
+      const uid = 'cf-' + course.replace(/\W/g, '');
+      const total = cg.projects.length;
+      const inner = cg.projects.map(buildProjectCard).join('');
+
+      return `
+        <section class="submission-folder" style="cursor:default">
+          <div class="submission-folder-head" style="cursor:pointer;user-select:none"
+               onclick="var b=document.getElementById('${uid}');
+                        b.style.display=b.style.display==='none'?'block':'none';
+                        this.querySelector('.ca').textContent=b.style.display==='none'?'▸':'▾'">
+            <div>
+              <div class="submission-folder-title" style="display:flex;align-items:center;gap:8px">
+                <span class="ca" style="color:var(--green);font-size:16px">▾</span>
+                Final Submissions — ${safe(course)}
+              </div>
+              <div class="submission-folder-meta">${total} project${total === 1 ? '' : 's'} submitted</div>
+            </div>
+            <span class="pill p-review">${safe(cg.label)}</span>
+          </div>
+          <div id="${uid}">${inner}</div>
+        </section>`;
+    }).join('');
+
+    // ── Timeline / deliverable groups (unchanged style) ──
+    const otherCards = Object.values(otherGroups).map(group => `
+      <section class="submission-folder">
+        <div class="submission-folder-head">
+          <div>
+            <div class="submission-folder-title">${safe(group.title)} — ${safe(group.course)}</div>
+            <div class="submission-folder-meta">${group.files.length} submitted file${group.files.length === 1 ? '' : 's'}</div>
+          </div>
+          <span class="pill p-review">${safe(group.label)}</span>
+        </div>
+        ${group.files.map(file => {
+      const href = buildSubmissionFileHref(file);
+      const sz = Number(file.file_size_mb || 0) > 0 ? ` - ${Number(file.file_size_mb).toFixed(2)} MB` : '';
+      return `<div class="submission-file-row">
+            <div>
+              <div class="submission-file-title">${safe(file.project_title || 'Untitled Project')}</div>
+              <div class="submission-file-meta">Submitted by: <b>${safe(file.submitted_by || 'Unknown')}</b></div>
+              <div class="submission-file-meta">Uploaded at: ${safe(file.uploaded_at || '-')}${sz}</div>
+            </div>
+            <a class="submission-file-link" href="${safe(href)}" target="_blank">
+              ${href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file')}
+            </a>
+          </div>`;
+    }).join('')}
+      </section>`).join('');
+
+    return outerFolders + otherCards;
+  }
+
+
+  function renderSubmissionFiles() {
+    const box = document.getElementById('submissionFilesList');
 
     if (!box) return;
 
-    if (!rows || !rows.length) {
-      box.innerHTML = '<div class="empty-box">No sections found.</div>';
+    const rows = currentSubmissionFilter === 'all'
+      ? submissionFilesState
+      : submissionFilesState.filter(file => file.course_scope === currentSubmissionFilter);
+
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty-box">No submitted files found.</div>';
       return;
     }
 
-    box.innerHTML = rows.map(cardTemplate).join('');
+    box.innerHTML = renderGroupedSubmissionFiles(rows);
+    return;
+
+    box.innerHTML = rows.map(file => {
+      const href = buildSubmissionFileHref(file);
+      const sourceLabel = file.source === 'timeline'
+        ? 'Timeline submission'
+        : file.source === 'deliverable'
+          ? 'Deliverable submission'
+          : 'Project submitted';
+      const targetLabel = file.submitted_to
+        ? ` - ${safe(niceStatus(file.submitted_to))}`
+        : '';
+      const sizeLabel = Number(file.file_size_mb || 0) > 0
+        ? ` Â· ${safe(Number(file.file_size_mb).toFixed(2))} MB`
+        : '';
+      const linkText = href === '#' ? 'File unavailable' : safe(file.file_name || 'Open file');
+      const title = `${safe(file.submission_title || 'Submission')} — ${safe(file.course_scope || 'Course')}`;
+
+      return `
+        <div class="submission-file-card">
+          <div class="submission-file-head">
+            <div>
+              <div class="submission-file-title">${title}</div>
+
+              <div class="submission-file-meta">
+                Project: <b>${safe(file.project_title || 'Untitled Project')}</b>
+              </div>
+
+              <div class="submission-file-meta">
+                Submitted by: <b>${safe(file.submitted_by || 'Unknown student')}</b>
+              </div>
+
+              <div class="submission-file-meta">
+                Uploaded at: ${safe(file.uploaded_at || '—')}
+              </div>
+
+              <div class="submission-file-meta">
+                Details: <b>${safe(sourceLabel)}</b>${targetLabel}${sizeLabel}
+              </div>
+            </div>
+
+            <span class="pill p-review">${safe(file.course_label || file.course_scope || 'Submission')}</span>
+          </div>
+
+          <a class="submission-file-link" href="${safe(href)}" target="_blank">
+            ${linkText}
+          </a>
+        </div>
+      `;
+    }).join('');
   }
 
-  async function loadSectionResults() {
-    setSectionsMessage('Loading section results...', 'loading');
+
+
+  async function loadSubmissionFiles() {
+    const box = document.getElementById('submissionFilesList');
+
+    if (box) {
+      box.innerHTML = '<div class="empty-box">Loading submitted files...</div>';
+    }
 
     try {
-      const res = await fetch('/api/coordinator/section-results');
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to load section results.');
-      }
-
-      const intro = data.introduction_sections || [];
-      const grad = data.graduation_sections || [];
-      const stats = data.stats || {};
-
-      document.getElementById('introTotal').textContent =
-        stats.introduction_total ?? intro.length;
-      document.getElementById('introDone').textContent =
-        stats.introduction_succeeded ??
-        intro.filter(item => item.result_status === 'succeeded').length;
-
-      document.getElementById('gradTotal').textContent =
-        stats.graduation_total ?? grad.length;
-      document.getElementById('gradDone').textContent =
-        stats.graduation_succeeded ??
-        grad.filter(item => item.result_status === 'succeeded').length;
-
-      renderList('introBox', intro);
-      renderList('gradBox', grad);
-
-      setSectionsMessage('', '');
+      const data = await apiFetch('/api/coordinator/submission-files');
+      submissionFilesState = data.files || [];
+      renderSubmissionFiles();
     } catch (err) {
-      setSectionsMessage(err.message, 'error');
+      if (box) {
+        box.innerHTML = `<div class="empty-box">Submission files error: ${safe(err.message)}</div>`;
+      }
     }
   }
-
-  async function saveSectionResult(button) {
-    const card = button.closest('.section-card');
-
-    if (!card) return;
-
-    const payload = {
-      course_scope: card.dataset.scope,
-      reference_id: Number(card.dataset.id),
-      status: card.querySelector('.result-status').value,
-      notes: card.querySelector('.result-notes').value.trim()
-    };
-
-    button.disabled = true;
-    button.textContent = 'Saving...';
-
-    try {
-      const res = await fetch('/api/coordinator/section-results/mark', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to save.');
-      }
-
-      await loadSectionResults();
-      setSectionsMessage(data.message || 'Section result saved successfully.', 'ok');
-
-      setTimeout(function () {
-        setSectionsMessage('', '');
-      }, 2500);
-    } catch (err) {
-      setSectionsMessage(err.message, 'error');
-    } finally {
-      button.disabled = false;
-      button.textContent = 'Save Result';
-    }
-  }
-
-  async function successAllSections() {
-    if (!confirm('Mark ALL Project Introduction sections and Graduation Project groups as Succeeded?')) {
-      return;
-    }
-
-    setSectionsMessage('Marking all sections as succeeded...', 'loading');
-
-    try {
-      const res = await fetch('/api/coordinator/section-results/succeed-all', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          course_scope: 'all',
-          notes: 'Marked succeeded by coordinator bulk action.'
-        })
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to mark all sections as succeeded.');
-      }
-
-      await loadSectionResults();
-      setSectionsMessage(data.message || 'All sections were marked as succeeded.', 'ok');
-
-      setTimeout(function () {
-        setSectionsMessage('', '');
-      }, 3000);
-    } catch (err) {
-      setSectionsMessage(err.message, 'error');
-    }
-  }
-
 
   document.addEventListener('DOMContentLoaded', function () {
-    loadSectionResults();
+    loadLecturesData();
+    loadSubmissionFiles();
 
-    const firstTab = document.querySelector('#pg-sections .section-tab');
-    showResultTab('introBox', firstTab);
+    const firstTab = document.querySelector('#pg-lectures .lecture-tab');
+    showLectureSection('introduction', firstTab);
 
-    setTimeout(resetSectionsScroll, 0);
-    setTimeout(resetSectionsScroll, 100);
+    setTimeout(resetLectureScroll, 0);
+    setTimeout(resetLectureScroll, 100);
   });
 
   window.addEventListener('load', function () {
-    setTimeout(resetSectionsScroll, 0);
+    setTimeout(resetLectureScroll, 0);
   });
 </script>
 {% endblock %}

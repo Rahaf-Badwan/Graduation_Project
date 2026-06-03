@@ -5361,59 +5361,189 @@ GROUP BY
     
     
     
-    
 USE apms_db;
 
 CREATE TABLE IF NOT EXISTS faculty_load_settings (
     load_id INT PRIMARY KEY AUTO_INCREMENT,
     faculty_id INT NOT NULL,
     semester_id INT NOT NULL,
+    introduction_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
     graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+    min_hours DECIMAL(5,2) NOT NULL DEFAULT 12,
+    max_hours DECIMAL(5,2) NOT NULL DEFAULT 36,
+    employment_type ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time',
+    intro_students INT NOT NULL DEFAULT 0,
+    extra_bonus DECIMAL(5,2) NOT NULL DEFAULT 0,
+    assigned_courses TEXT NULL,
+    notes TEXT NULL,
     updated_by INT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id),
-    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
-    FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
-    FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+    UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET @db := DATABASE();
 
-SET @sql := (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0',
-        'SELECT 1'
-    )
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = @db
-      AND TABLE_NAME = 'faculty_load_settings'
-      AND COLUMN_NAME = 'graduation_project_hours'
-);
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN introduction_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER semester_id', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='introduction_project_hours');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-SET @sql := (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE faculty_load_settings ADD COLUMN updated_by INT NULL',
-        'SELECT 1'
-    )
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = @db
-      AND TABLE_NAME = 'faculty_load_settings'
-      AND COLUMN_NAME = 'updated_by'
-);
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='graduation_project_hours');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-SET @sql := (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE faculty_load_settings ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
-        'SELECT 1'
-    )
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = @db
-      AND TABLE_NAME = 'faculty_load_settings'
-      AND COLUMN_NAME = 'updated_at'
-);
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN notes TEXT NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='notes');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+USE apms_db;
+
+SET SQL_SAFE_UPDATES = 0;
+SET @db := DATABASE();
+
+CREATE TABLE IF NOT EXISTS faculty_load_settings (
+    load_id INT PRIMARY KEY AUTO_INCREMENT,
+    faculty_id INT NOT NULL,
+    semester_id INT NOT NULL,
+    introduction_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+    graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+    min_hours DECIMAL(5,2) NOT NULL DEFAULT 12,
+    max_hours DECIMAL(5,2) NOT NULL DEFAULT 4.5,
+    employment_type ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time',
+    intro_students INT NOT NULL DEFAULT 0,
+    extra_bonus DECIMAL(5,2) NOT NULL DEFAULT 0,
+    assigned_courses TEXT NULL,
+    notes TEXT NULL,
+    updated_by INT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN introduction_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER semester_id', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='introduction_project_hours');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='graduation_project_hours');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN max_hours DECIMAL(5,2) NOT NULL DEFAULT 4.5', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='max_hours');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE faculty_load_settings ADD COLUMN notes TEXT NULL', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='faculty_load_settings' AND COLUMN_NAME='notes');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- This feature stores ONLY project supervision hours, not the total teaching load.
+-- Maximum per course is 4.5 project hours.
+UPDATE faculty_load_settings
+SET max_hours = 4.5
+WHERE max_hours IS NULL OR max_hours <> 4.5;
+
+UPDATE faculty_load_settings
+SET introduction_project_hours = 4.5
+WHERE introduction_project_hours > 4.5;
+
+UPDATE faculty_load_settings
+SET graduation_project_hours = 4.5
+WHERE graduation_project_hours > 4.5;
+
+-- Create missing load rows for all active supervisors in COMP4200 and COMP4300 with 0 requested project hours.
+INSERT INTO faculty_load_settings (faculty_id, semester_id, introduction_project_hours, graduation_project_hours, max_hours, updated_at)
+SELECT f.faculty_id, s.semester_id, 0, 0, 4.5, NOW()
+FROM faculty f
+JOIN users u ON u.user_id = f.user_id
+JOIN semesters s ON s.course_code IN ('COMP4200', 'COMP4300')
+WHERE u.role = 'supervisor'
+  AND u.is_active = TRUE
+ON DUPLICATE KEY UPDATE
+    max_hours = 4.5,
+    updated_at = NOW();
+
+SELECT
+    f.faculty_id,
+    u.full_name,
+    s.course_code,
+    fls.introduction_project_hours,
+    fls.graduation_project_hours,
+    fls.max_hours
+FROM faculty_load_settings fls
+JOIN faculty f ON f.faculty_id = fls.faculty_id
+JOIN users u ON u.user_id = f.user_id
+JOIN semesters s ON s.semester_id = fls.semester_id
+WHERE u.role = 'supervisor'
+  AND s.course_code IN ('COMP4200', 'COMP4300')
+ORDER BY u.full_name, s.course_code;
+
+SET SQL_SAFE_UPDATES = 1;
+
+
+
+
+
+USE apms_db;
+
+SELECT
+    p.project_id,
+    COALESCE(p.group_name, CONCAT('Group ', p.project_id)) AS group_name,
+    p.title,
+    p.status,
+    s.course_code,
+    s.academic_year,
+    COUNT(DISTINCT pm.student_id) AS students_count,
+    GROUP_CONCAT(DISTINCT u.full_name ORDER BY u.full_name SEPARATOR ', ') AS students
+FROM projects p
+JOIN semesters s ON s.semester_id = p.semester_id
+LEFT JOIN project_members pm ON pm.project_id = p.project_id
+LEFT JOIN students st ON st.student_id = pm.student_id
+LEFT JOIN users u ON u.user_id = st.user_id
+WHERE p.supervisor_id IS NULL
+  AND s.course_code IN ('COMP4200', 'COMP4300')
+  AND p.title NOT LIKE 'Committee Demo%'
+  AND LOWER(COALESCE(p.status, '')) NOT IN ('draft', 'archived', 'rejected', 'cancelled')
+GROUP BY
+    p.project_id,
+    p.group_name,
+    p.title,
+    p.status,
+    s.course_code,
+    s.academic_year
+HAVING students_count > 0
+ORDER BY s.course_code, p.project_id;
+
+
+
+
+
+USE apms_db;
+SET SQL_SAFE_UPDATES = 0;
+
+CREATE TABLE IF NOT EXISTS project_course_promotions (
+    promotion_id INT PRIMARY KEY AUTO_INCREMENT,
+    source_project_id INT NOT NULL,
+    promoted_project_id INT NOT NULL,
+    promoted_to_semester_id INT NOT NULL,
+    promoted_by INT NULL,
+    promoted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_project_course_promotion_source (source_project_id),
+    UNIQUE KEY uq_project_course_promotion_target (promoted_project_id),
+    FOREIGN KEY (source_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (promoted_project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+    FOREIGN KEY (promoted_to_semester_id) REFERENCES semesters(semester_id) ON DELETE RESTRICT,
+    FOREIGN KEY (promoted_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Optional check: make sure a COMP4300 semester exists.
+SELECT semester_id, academic_year, semester_number, course_code, is_active
+FROM semesters
+WHERE course_code = 'COMP4300'
+ORDER BY is_active DESC, semester_id DESC;
+
+SET SQL_SAFE_UPDATES = 1;
+
