@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
   <title>Activate Account — APMS</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
   <script>try{if(localStorage.getItem('apmsTheme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
@@ -69,16 +71,189 @@
       border-color: #30363d !important;
     }
     html[data-theme="dark"] #tab-supervisor { color: #4ade80 !important; }
+
+    :root {
+      --activate-card: rgba(255, 255, 255, .96);
+      --activate-card-head: rgba(248, 250, 252, .96);
+      --activate-text: #111827;
+      --activate-muted: #475569;
+      --activate-border: #d6dee8;
+      --activate-field: #ffffff;
+      --activate-field-focus: #f8fbff;
+      --activate-primary: #2f7d46;
+      --activate-primary-hover: #276a3a;
+      --activate-primary-text: #ffffff;
+      --activate-secondary: rgba(255, 255, 255, .88);
+      --activate-secondary-text: #064e3b;
+      --activate-secondary-border: rgba(255, 255, 255, .96);
+      --activate-track: #d9e2ec;
+      --activate-shadow: 0 18px 50px rgba(15, 23, 42, .24);
+    }
+
+    html[data-theme="dark"] {
+      --activate-card: rgba(18, 24, 32, .96);
+      --activate-card-head: rgba(24, 31, 41, .98);
+      --activate-text: #e5edf7;
+      --activate-muted: #b5c0cf;
+      --activate-border: #334155;
+      --activate-field: #0f1720;
+      --activate-field-focus: #111c28;
+      --activate-primary: #4fb36a;
+      --activate-primary-hover: #62c77c;
+      --activate-primary-text: #07130b;
+      --activate-secondary: rgba(17, 24, 39, .88);
+      --activate-secondary-text: #d7ffe3;
+      --activate-secondary-border: rgba(148, 163, 184, .72);
+      --activate-track: #2f3a49;
+      --activate-shadow: 0 22px 60px rgba(0, 0, 0, .48);
+    }
+
+    #student-card .card,
+    #sup-card .card {
+      background: var(--activate-card) !important;
+      color: var(--activate-text) !important;
+      border: 1px solid var(--activate-border) !important;
+      box-shadow: var(--activate-shadow) !important;
+      backdrop-filter: blur(10px);
+    }
+
+    #student-card .card > div:first-child,
+    #sup-card .card > div:first-child {
+      background: var(--activate-card-head) !important;
+      border-bottom-color: var(--activate-border) !important;
+    }
+
+    #card-title,
+    #sup-card-title,
+    #phase-not-found [style*="font-weight:600"],
+    #sup-phase-not-found [style*="font-weight:600"],
+    #phase-success [style*="font-weight:600"],
+    #sup-phase-success [style*="font-weight:600"] {
+      color: var(--activate-text) !important;
+    }
+
+    #student-card div[style*="color:#6b7280"],
+    #sup-card div[style*="color:#6b7280"],
+    #student-card div[style*="color: #6b7280"],
+    #sup-card div[style*="color: #6b7280"] {
+      color: var(--activate-muted) !important;
+    }
+
+    #fullName,
+    #universityId,
+    #email,
+    #password,
+    #confirmPassword,
+    #supervisor-id,
+    #supervisor-email,
+    #sup-hours,
+    #sup-password,
+    #sup-confirmPassword {
+      background: var(--activate-field) !important;
+      color: var(--activate-text) !important;
+      border-color: var(--activate-border) !important;
+      caret-color: var(--activate-primary);
+      box-shadow: none !important;
+    }
+
+    #fullName:focus,
+    #universityId:focus,
+    #email:focus,
+    #password:focus,
+    #confirmPassword:focus,
+    #supervisor-id:focus,
+    #supervisor-email:focus,
+    #sup-hours:focus,
+    #sup-password:focus,
+    #sup-confirmPassword:focus {
+      background: var(--activate-field-focus) !important;
+      border-color: var(--activate-primary) !important;
+      box-shadow: 0 0 0 3px rgba(47, 125, 70, .16) !important;
+    }
+
+    input::placeholder {
+      color: var(--activate-muted) !important;
+      opacity: .72;
+    }
+
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus {
+      -webkit-text-fill-color: var(--activate-text) !important;
+      box-shadow: 0 0 0 1000px var(--activate-field) inset !important;
+      transition: background-color 9999s ease-out 0s !important;
+    }
+
+    #tab-student,
+    #tab-supervisor,
+    #verifyBtn,
+    #setPassBtn,
+    #sup-verifyBtn,
+    #sup-setPassBtn {
+      background: var(--activate-primary) !important;
+      color: var(--activate-primary-text) !important;
+    }
+
+    #tab-student,
+    #tab-supervisor {
+      min-height: 38px;
+      font-weight: 750 !important;
+      border: 1px solid transparent !important;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, .18);
+      backdrop-filter: blur(8px);
+    }
+
+    #tab-student:hover,
+    #tab-supervisor:hover,
+    #verifyBtn:hover,
+    #setPassBtn:hover,
+    #sup-verifyBtn:hover,
+    #sup-setPassBtn:hover {
+      background: var(--activate-primary-hover) !important;
+    }
+
+    #tab-student:not(.is-active),
+    #tab-supervisor:not(.is-active) {
+      background: var(--activate-secondary) !important;
+      color: var(--activate-secondary-text) !important;
+      border: 1px solid var(--activate-secondary-border) !important;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .22), inset 0 1px 0 rgba(255, 255, 255, .55);
+    }
+
+    html[data-theme="dark"] #tab-student:not(.is-active),
+    html[data-theme="dark"] #tab-supervisor:not(.is-active) {
+      box-shadow: 0 10px 26px rgba(0, 0, 0, .42), inset 0 1px 0 rgba(255, 255, 255, .08);
+    }
+
+    #pill-2,
+    #sup-pill-2 {
+      background: var(--activate-track) !important;
+    }
+
+    #phase-password button:not(#setPassBtn),
+    #phase-not-found button,
+    #sup-phase-password button:not(#sup-setPassBtn),
+    #sup-phase-not-found button {
+      background: var(--activate-secondary) !important;
+      color: var(--activate-secondary-text) !important;
+      border-color: var(--activate-secondary-border) !important;
+    }
+
+    #activate-theme-btn {
+      background: var(--activate-card) !important;
+      color: var(--activate-text) !important;
+      border-color: var(--activate-border) !important;
+    }
   </style>
 </head>
-<body>
+<body autocomplete="off">
 
 <div class="hero" style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
   <div style="width:100%; max-width:440px;">
 
     <!-- ── Role toggle tabs ── -->
     <div style="display:flex; gap:8px; margin-bottom:14px;">
-      <button id="tab-student" onclick="switchRole('student')" style="
+      <button id="tab-student" class="is-active" onclick="switchRole('student')" style="
         flex:1; padding:8px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;
         background:#2d6a38; color:#fff; border:none;">
         Student
@@ -111,17 +286,17 @@
           <div id="phase-verify">
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Full Name</div>
-              <input id="fullName" type="text" autocomplete="off" name="student_full-name" placeholder="e.g. Taima Abed"
+              <input id="fullName" type="text" autocomplete="new-password" name="apms_activation_name" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="e.g. Taima Abed"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID</div>
-              <input id="universityId" type="text" maxlength="7" placeholder="7-digit student ID"
+              <input id="universityId" type="text" maxlength="7" inputmode="numeric" autocomplete="new-password" name="apms_activation_uid" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="7-digit student ID"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
-              <input id="email" type="email" name="student_email" autocomplete="off" placeholder="student@students.birzeit.edu"
+              <input id="email" type="email" name="apms_activation_mail" autocomplete="new-password" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="student@students.birzeit.edu"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-top:18px;">
@@ -138,7 +313,7 @@
           <div id="phase-password" style="display:none;">
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
-              <input id="password" type="password" placeholder="At least 8 characters" oninput="updateStrength()"
+              <input id="password" type="password" autocomplete="new-password" name="apms_activation_password" data-lpignore="true" placeholder="At least 8 characters" oninput="updateStrength()"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
               <div style="height:3px; background:#e5e7eb; border-radius:99px; margin-top:6px; overflow:hidden;">
                 <div id="strength-bar" style="height:100%; border-radius:99px; width:0%; transition:width 0.3s, background 0.3s;"></div>
@@ -146,7 +321,7 @@
             </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Confirm Password</div>
-              <input id="confirmPassword" type="password" placeholder="Re-enter your password"
+              <input id="confirmPassword" type="password" autocomplete="new-password" name="apms_activation_confirm" data-lpignore="true" placeholder="Re-enter your password"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="display:flex; gap:8px; margin-top:18px;">
@@ -219,12 +394,12 @@
           <div id="sup-phase-verify">
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID (4 digits)</div>
-              <input id="supervisor-id" type="text" maxlength="4" placeholder="e.g. 1234"
+              <input id="supervisor-id" type="text" maxlength="4" inputmode="numeric" autocomplete="new-password" name="apms_supervisor_activation_uid" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="e.g. 1234"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
-              <input id="supervisor-email" type="email" placeholder="supervisor@birzeit.edu"
+              <input id="supervisor-email" type="email" autocomplete="new-password" name="apms_supervisor_activation_mail" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="supervisor@birzeit.edu"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-top:18px;">
@@ -241,12 +416,12 @@
           <div id="sup-phase-password" style="display:none;">
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Graduation Project Hours</div>
-              <input id="sup-hours" type="number" min="0" step="0.5" placeholder="e.g. 3"
+              <input id="sup-hours" type="number" min="0" step="0.5" autocomplete="new-password" name="apms_supervisor_hours" data-lpignore="true" placeholder="e.g. 3"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
-              <input id="sup-password" type="password" placeholder="At least 8 characters" oninput="updateSupStrength()"
+              <input id="sup-password" type="password" autocomplete="new-password" name="apms_supervisor_activation_password" data-lpignore="true" placeholder="At least 8 characters" oninput="updateSupStrength()"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
               <div style="height:3px; background:#e5e7eb; border-radius:99px; margin-top:6px; overflow:hidden;">
                 <div id="sup-strength-bar" style="height:100%; border-radius:99px; width:0%; transition:width 0.3s, background 0.3s;"></div>
@@ -254,7 +429,7 @@
             </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Confirm Password</div>
-              <input id="sup-confirmPassword" type="password" placeholder="Re-enter your password"
+              <input id="sup-confirmPassword" type="password" autocomplete="new-password" name="apms_supervisor_activation_confirm" data-lpignore="true" placeholder="Re-enter your password"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="display:flex; gap:8px; margin-top:18px;">

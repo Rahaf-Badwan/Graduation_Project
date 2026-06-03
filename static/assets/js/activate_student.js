@@ -42,6 +42,8 @@ function switchRole(role) {
 
   var tabS   = document.getElementById('tab-student');
   var tabSup = document.getElementById('tab-supervisor');
+  tabS.classList.toggle('is-active', isStudent);
+  tabSup.classList.toggle('is-active', !isStudent);
   tabS.style.background   = isStudent ? '#2d6a38' : 'transparent';
   tabS.style.color        = isStudent ? '#fff'    : 'var(--green)';
   tabS.style.border       = isStudent ? 'none'    : '0.5px solid #e5e7eb';
@@ -49,6 +51,51 @@ function switchRole(role) {
   tabSup.style.color      = isStudent ? 'var(--green)' : '#fff';
   tabSup.style.border     = isStudent ? '0.5px solid #e5e7eb' : 'none';
 }
+
+function activationColor(token, fallback) {
+  var value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+  return value || fallback;
+}
+
+function clearActivationFields() {
+  [
+    'fullName',
+    'universityId',
+    'email',
+    'password',
+    'confirmPassword',
+    'supervisor-id',
+    'supervisor-email',
+    'sup-hours',
+    'sup-password',
+    'sup-confirmPassword'
+  ].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (document.activeElement === el) return;
+    el.value = '';
+    el.defaultValue = '';
+    el.setAttribute('autocomplete', 'new-password');
+    if (['fullName', 'universityId', 'email', 'supervisor-id', 'supervisor-email'].indexOf(id) !== -1) {
+      el.setAttribute('readonly', 'readonly');
+    }
+  });
+
+  pendingUserId = null;
+  pendingSupUserId = null;
+  try { sessionStorage.removeItem('activateStudentDraft'); } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  clearActivationFields();
+  switchRole('student');
+  setTimeout(clearActivationFields, 80);
+  setTimeout(clearActivationFields, 450);
+});
+
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) clearActivationFields();
+});
 
 
 /* ─────────────────────────────────────────────────────────────
@@ -66,7 +113,11 @@ function goToPhase(id) {
 }
 
 function setStepPills(p1, p2) {
-  var colors = { active: '#3b82f6', done: '#10b981', '': '#e5e7eb' };
+  var colors = {
+    active: activationColor('--activate-primary', '#2d6a38'),
+    done: '#10b981',
+    '': activationColor('--activate-track', '#e5e7eb')
+  };
   document.getElementById('pill-1').style.background = colors[p1] || colors[''];
   document.getElementById('pill-2').style.background = colors[p2] || colors[''];
 }
@@ -168,6 +219,10 @@ async function setPassword() {
 
 function resetToStep1() {
   pendingUserId = null;
+  ['password', 'confirmPassword'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   goToPhase('phase-verify');
   setStepPills('active', '');
   hideFeedback('verify-feedback');
@@ -190,7 +245,11 @@ function goToSupPhase(id) {
 }
 
 function setSupPills(p1, p2) {
-  var colors = { active: '#3b82f6', done: '#10b981', '': '#e5e7eb' };
+  var colors = {
+    active: activationColor('--activate-primary', '#2d6a38'),
+    done: '#10b981',
+    '': activationColor('--activate-track', '#e5e7eb')
+  };
   document.getElementById('sup-pill-1').style.background = colors[p1] || colors[''];
   document.getElementById('sup-pill-2').style.background = colors[p2] || colors[''];
 }
@@ -310,6 +369,10 @@ async function setSupPassword() {
 
 function resetSupToStep1() {
   pendingSupUserId = null;
+  ['sup-hours', 'sup-password', 'sup-confirmPassword'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   goToSupPhase('sup-phase-verify');
   setSupPills('active', '');
   hideFeedback('sup-verify-feedback');
