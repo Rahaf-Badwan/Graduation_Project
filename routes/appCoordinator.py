@@ -728,24 +728,46 @@ def coordinator_dashboard():
 @coordinator_bp.route("/api/coordinator/dashboard-data", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_dashboard_data():
+    """Dashboard counters for the coordinator.
+
+    Counts are based on the current academic year and the real COMP4200/COMP4300
+    groups only. Groups already marked as succeeded are hidden from coordinator
+    active counters because they were sent to Head approval.
+    """
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        semester = _get_active_semester(cursor)
-        semester_id = semester["semester_id"] if semester else None
+        _ensure_section_results_schema(cursor)
+        db.commit()
 
-        where = "WHERE p.semester_id = %s" if semester_id else ""
-        params = (semester_id,) if semester_id else ()
+        semester = _get_active_semester(cursor)
+        academic_year = semester.get("academic_year") if semester else None
+
+        base_where_parts = [
+            f"{_ci('s.course_code')} IN ({_lit('COMP4200')}, {_lit('COMP4300')})",
+            "EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)",
+            f"{_ci('p.status')} <> {_lit('solo_pending')}",
+            f"{_ci('p.title')} NOT LIKE {_lit('Committee Demo%')}",
+            _COORDINATOR_PROJECT_NOT_SUCCEEDED_SQL,
+        ]
+        base_params = []
+        if academic_year:
+            base_where_parts.append("CONVERT(s.academic_year USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(%s USING utf8mb4) COLLATE utf8mb4_unicode_ci")
+            base_params.append(academic_year)
+
+        where = "WHERE " + " AND ".join(base_where_parts)
+        params = tuple(base_params)
 
         cursor.execute(
             f"""
             SELECT
-                COUNT(*) AS total_projects,
-                SUM(CASE WHEN p.status IN ('submitted','under_review','needs_revision') THEN 1 ELSE 0 END) AS awaiting_review,
-                SUM(CASE WHEN p.status = 'committee_evaluation' THEN 1 ELSE 0 END) AS under_evaluation,
-                SUM(CASE WHEN p.status IN ('accepted','archived') THEN 1 ELSE 0 END) AS accepted,
-                SUM(CASE WHEN p.status = 'rejected' THEN 1 ELSE 0 END) AS rejected
+                COUNT(DISTINCT p.project_id) AS total_projects,
+                SUM(CASE WHEN {_ci('p.status')} IN ({_lit('submitted')}, {_lit('under_review')}, {_lit('needs_revision')}) THEN 1 ELSE 0 END) AS awaiting_review,
+                SUM(CASE WHEN {_ci('p.status')} = {_lit('committee_evaluation')} THEN 1 ELSE 0 END) AS under_evaluation,
+                SUM(CASE WHEN {_ci('p.status')} IN ({_lit('accepted')}, {_lit('archived')}) THEN 1 ELSE 0 END) AS accepted,
+                SUM(CASE WHEN {_ci('p.status')} = {_lit('rejected')} THEN 1 ELSE 0 END) AS rejected
             FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
             {where}
             """,
             params,
@@ -754,8 +776,9 @@ def api_coordinator_dashboard_data():
 
         cursor.execute(
             f"""
-            SELECT p.status, COUNT(*) AS count
+            SELECT p.status, COUNT(DISTINCT p.project_id) AS count
             FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
             {where}
             GROUP BY p.status
             ORDER BY count DESC
@@ -766,8 +789,9 @@ def api_coordinator_dashboard_data():
 
         cursor.execute(
             f"""
-            SELECT p.project_type, COUNT(*) AS count
+            SELECT p.project_type, COUNT(DISTINCT p.project_id) AS count
             FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
             {where}
             GROUP BY p.project_type
             ORDER BY count DESC
@@ -783,6 +807,7 @@ def api_coordinator_dashboard_data():
                    sup.full_name AS supervisor_name,
                    COALESCE(GROUP_CONCAT(DISTINCT stu.full_name ORDER BY pm.is_primary_contact DESC, stu.full_name SEPARATOR ', '), '') AS team_members
             FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
             LEFT JOIN faculty sf ON sf.faculty_id = p.supervisor_id
             LEFT JOIN users sup ON sup.user_id = sf.user_id
             LEFT JOIN project_members pm ON pm.project_id = p.project_id
@@ -808,26 +833,20 @@ def api_coordinator_dashboard_data():
         )
         committees = cursor.fetchone() or {}
 
-        # ── Active students count ──────────────────────────────────────────
-        cursor.execute("""
-            SELECT COUNT(*) AS active_students
-            FROM users
-            WHERE role = 'student' AND is_active = TRUE
-        """)
+        cursor.execute(
+            f"""
+            SELECT COUNT(DISTINCT pm.student_id) AS active_students
+            FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
+            JOIN project_members pm ON pm.project_id = p.project_id
+            {where}
+            """,
+            params,
+        )
         students_row = cursor.fetchone() or {}
 
-        # ── Sections count (student_distribution_sections if table exists) ─
-        sections_count = 0
-        if _table_exists(cursor, "student_distribution_sections"):
-            cursor.execute("""
-                SELECT COUNT(*) AS total_sections
-                FROM student_distribution_sections
-            """)
-            sections_row = cursor.fetchone() or {}
-            sections_count = int(sections_row.get("total_sections") or 0)
+        sections_count = int(stats.get("total_projects") or 0)
 
-        # ── Archived projects count per type (for Projects by Type panel) ──
-        # project_type is a SET column so we use FIND_IN_SET per type
         cursor.execute("""
             SELECT
                 SUM(CASE WHEN FIND_IN_SET('web',                  project_type) > 0 THEN 1 ELSE 0 END) AS web,
@@ -843,14 +862,14 @@ def api_coordinator_dashboard_data():
         """)
         archive_type_row = cursor.fetchone() or {}
         archive_by_type = {
-            "web":                  int(archive_type_row.get("web")                  or 0),
-            "mobile":               int(archive_type_row.get("mobile")               or 0),
-            "ai":                   int(archive_type_row.get("ai")                   or 0),
+            "web": int(archive_type_row.get("web") or 0),
+            "mobile": int(archive_type_row.get("mobile") or 0),
+            "ai": int(archive_type_row.get("ai") or 0),
             "software_engineering": int(archive_type_row.get("software_engineering") or 0),
-            "security":             int(archive_type_row.get("security")             or 0),
-            "databases":            int(archive_type_row.get("databases")            or 0),
-            "other":                int(archive_type_row.get("other")                or 0),
-            "_total":               int(archive_type_row.get("total_archived")       or 0),
+            "security": int(archive_type_row.get("security") or 0),
+            "databases": int(archive_type_row.get("databases") or 0),
+            "other": int(archive_type_row.get("other") or 0),
+            "_total": int(archive_type_row.get("total_archived") or 0),
         }
 
         cursor.close()
@@ -1384,6 +1403,56 @@ def api_coordinator_update_lecture(lecture_id):
         return jsonify({"error": str(e)}), 500
 
 
+
+@coordinator_bp.route("/api/coordinator/lectures/reset-scheduled", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_reset_scheduled_lectures():
+    """Delete scheduled lectures for one course without touching completed/cancelled lectures."""
+    try:
+        data = request.get_json(silent=True) or {}
+        course_scope = (
+            data.get("course_scope")
+            if data.get("course_scope") in ("introduction", "graduation_project")
+            else "introduction"
+        )
+
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_lecture_tables(cursor)
+
+        semester = _semester_for_course_scope(cursor, course_scope)
+        params = [course_scope]
+        semester_filter = ""
+        if semester:
+            semester_filter = " AND semester_id = %s"
+            params.append(semester["semester_id"])
+
+        cursor.execute(
+            f"""
+            DELETE FROM coordinator_lectures
+            WHERE course_scope = %s
+              AND status = 'scheduled'
+              {semester_filter}
+            """,
+            tuple(params),
+        )
+        deleted_count = cursor.rowcount
+
+        db.commit()
+        cursor.close()
+        db.close()
+
+        course_label = "COMP4200" if course_scope == "introduction" else "COMP4300"
+        return jsonify(
+            {
+                "message": f"Restart done. Deleted {deleted_count} scheduled lecture(s) for {course_label}.",
+                "deleted_count": deleted_count,
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @coordinator_bp.route("/api/coordinator/deliverables", methods=["POST"])
 @login_required(role="coordinator")
 def api_coordinator_create_deliverable():
@@ -1732,24 +1801,33 @@ def _download_static_path(file_path):
     return redirect(url_for("static", filename=clean_path))
 
 
-_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL = """
+
+def _ci(expr):
+    return f"CONVERT({expr} USING utf8mb4) COLLATE utf8mb4_unicode_ci"
+
+
+def _lit(value):
+    return f"'{value}' COLLATE utf8mb4_unicode_ci"
+
+
+_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL = f"""
     (
         EXISTS (
             SELECT 1
             FROM deadlines d
             WHERE d.semester_id = s.semester_id
-              AND d.deadline_type = 'file_submission'
+              AND {_ci("d.deadline_type")} = {_lit("file_submission")}
               AND (d.project_id IS NULL OR d.project_id = p.project_id)
               AND d.deadline_date < CURDATE()
         )
         OR (
-            s.course_code = 'COMP4300'
+            {_ci("s.course_code")} = {_lit("COMP4300")}
             AND EXISTS (
                 SELECT 1
                 FROM coordinator_deliverables cd_final
                 WHERE cd_final.semester_id = s.semester_id
-                  AND cd_final.course_scope = 'graduation_project'
-                  AND cd_final.title = 'Graduation Project Final Submission'
+                  AND {_ci("cd_final.course_scope")} = {_lit("graduation_project")}
+                  AND {_ci("cd_final.title")} = {_lit("Graduation Project Final Submission")}
                   AND cd_final.is_published = TRUE
                   AND cd_final.due_at < NOW()
             )
@@ -1773,6 +1851,53 @@ _COORDINATOR_DELIVERABLE_SUBMISSION_CLOSED_SQL = """
 """
 
 
+_COORDINATOR_PROJECT_NOT_SUCCEEDED_SQL = f"""
+    NOT EXISTS (
+        SELECT 1
+        FROM section_completion_status scs_hide
+        WHERE scs_hide.reference_id = p.project_id
+          AND {_ci("scs_hide.status")} = {_lit("succeeded")}
+          AND (
+              (
+                  {_ci("s.course_code")} = {_lit("COMP4300")}
+                  AND {_ci("scs_hide.course_scope")} = {_lit("graduation_project")}
+              )
+              OR
+              (
+                  {_ci("s.course_code")} = {_lit("COMP4200")}
+                  AND {_ci("scs_hide.course_scope")} = {_lit("introduction")}
+              )
+          )
+    )
+"""
+
+_COORDINATOR_MILESTONE_PROJECT_NOT_SUCCEEDED_SQL = f"""
+    (
+        ms.project_id IS NULL
+        OR NOT EXISTS (
+            SELECT 1
+            FROM section_completion_status scs_hide
+            WHERE scs_hide.reference_id = ms.project_id
+              AND {_ci("scs_hide.status")} = {_lit("succeeded")}
+              AND {_ci("scs_hide.course_scope")} = {_lit("introduction")}
+        )
+    )
+"""
+
+_COORDINATOR_DELIVERABLE_PROJECT_NOT_SUCCEEDED_SQL = f"""
+    (
+        cds.project_id IS NULL
+        OR NOT EXISTS (
+            SELECT 1
+            FROM section_completion_status scs_hide
+            WHERE scs_hide.reference_id = cds.project_id
+              AND {_ci("scs_hide.status")} = {_lit("succeeded")}
+              AND {_ci("scs_hide.course_scope")} = {_ci("cd.course_scope")}
+        )
+    )
+"""
+
+
 @coordinator_bp.route("/api/coordinator/submission-files", methods=["GET"])
 @login_required(role="coordinator")
 def api_coordinator_submission_files():
@@ -1787,10 +1912,11 @@ def api_coordinator_submission_files():
         if _table_exists(cursor, "project_files"):
             params = []
             where = """
-                WHERE COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
-                  AND """ + _COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL
+                WHERE COALESCE(CONVERT(pf.upload_status USING utf8mb4) COLLATE utf8mb4_unicode_ci, 'uploaded' COLLATE utf8mb4_unicode_ci) = 'uploaded' COLLATE utf8mb4_unicode_ci
+                  AND """ + _COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL + """
+                  AND """ + _COORDINATOR_PROJECT_NOT_SUCCEEDED_SQL
             if academic_year:
-                where += " AND s.academic_year = %s"
+                where += " AND CONVERT(s.academic_year USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(%s USING utf8mb4) COLLATE utf8mb4_unicode_ci"
                 params.append(academic_year)
 
             cursor.execute(
@@ -1805,8 +1931,8 @@ def api_coordinator_submission_files():
                                SELECT cd.title
                                FROM coordinator_deliverables cd
                                WHERE cd.semester_id = s.semester_id
-                                 AND cd.course_scope = 'graduation_project'
-                                 AND cd.title = 'Graduation Project Final Submission'
+                                 AND CONVERT(cd.course_scope USING utf8mb4) COLLATE utf8mb4_unicode_ci = 'graduation_project' COLLATE utf8mb4_unicode_ci
+                                 AND CONVERT(cd.title USING utf8mb4) COLLATE utf8mb4_unicode_ci = 'Graduation Project Final Submission' COLLATE utf8mb4_unicode_ci
                                  AND cd.is_published = TRUE
                                ORDER BY cd.deliverable_id DESC
                                LIMIT 1
@@ -1874,12 +2000,15 @@ def api_coordinator_submission_files():
         if _table_exists(cursor, "milestone_submissions"):
             params = []
             where = (
-                """WHERE ms.submitted_to IN ('coordinator', 'both')
+                """WHERE CONVERT(ms.submitted_to USING utf8mb4) COLLATE utf8mb4_unicode_ci IN ('coordinator' COLLATE utf8mb4_unicode_ci, 'both' COLLATE utf8mb4_unicode_ci)
                      AND """
                 + _COORDINATOR_MILESTONE_SUBMISSION_CLOSED_SQL
+                + """
+                     AND """
+                + _COORDINATOR_MILESTONE_PROJECT_NOT_SUCCEEDED_SQL
             )
             if academic_year:
-                where += " AND s.academic_year = %s"
+                where += " AND CONVERT(s.academic_year USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(%s USING utf8mb4) COLLATE utf8mb4_unicode_ci"
                 params.append(academic_year)
 
             cursor.execute(
@@ -1950,9 +2079,14 @@ def api_coordinator_submission_files():
 
         if _table_exists(cursor, "coordinator_deliverable_submissions"):
             params = []
-            where = "WHERE " + _COORDINATOR_DELIVERABLE_SUBMISSION_CLOSED_SQL
+            where = (
+                "WHERE "
+                + _COORDINATOR_DELIVERABLE_SUBMISSION_CLOSED_SQL
+                + " AND "
+                + _COORDINATOR_DELIVERABLE_PROJECT_NOT_SUCCEEDED_SQL
+            )
             if academic_year:
-                where += " AND s.academic_year = %s"
+                where += " AND CONVERT(s.academic_year USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(%s USING utf8mb4) COLLATE utf8mb4_unicode_ci"
                 params.append(academic_year)
 
             cursor.execute(
@@ -2042,6 +2176,8 @@ def api_coordinator_download_project_file(file_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+        db.commit()
 
         cursor.execute(
             f"""
@@ -2050,8 +2186,9 @@ def api_coordinator_download_project_file(file_id):
             JOIN projects p ON p.project_id = pf.project_id
             JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.file_id = %s
-              AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+              AND COALESCE(CONVERT(pf.upload_status USING utf8mb4) COLLATE utf8mb4_unicode_ci, 'uploaded' COLLATE utf8mb4_unicode_ci) = 'uploaded' COLLATE utf8mb4_unicode_ci
               AND {_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL}
+              AND {_COORDINATOR_PROJECT_NOT_SUCCEEDED_SQL}
             """,
             (file_id,),
         )
@@ -2088,6 +2225,8 @@ def api_coordinator_download_project_files(project_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+        db.commit()
         cursor.execute(
             f"""
             SELECT p.title AS project_title, pf.file_id, pf.file_name, pf.file_data
@@ -2095,9 +2234,10 @@ def api_coordinator_download_project_files(project_id):
             JOIN projects p ON p.project_id = pf.project_id
             JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.project_id = %s
-              AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+              AND COALESCE(CONVERT(pf.upload_status USING utf8mb4) COLLATE utf8mb4_unicode_ci, 'uploaded' COLLATE utf8mb4_unicode_ci) = 'uploaded' COLLATE utf8mb4_unicode_ci
               AND pf.file_data IS NOT NULL
               AND {_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL}
+              AND {_COORDINATOR_PROJECT_NOT_SUCCEEDED_SQL}
             ORDER BY pf.file_type, pf.file_id
             """,
             (project_id,),
@@ -2141,14 +2281,23 @@ def api_coordinator_download_milestone_submission(submission_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+        db.commit()
         cursor.execute(
             f"""
             SELECT ms.file_name, ms.file_data, ms.file_mime
             FROM milestone_submissions ms
             JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
             WHERE ms.submission_id = %s
-              AND ms.submitted_to IN ('coordinator', 'both')
+              AND CONVERT(ms.submitted_to USING utf8mb4) COLLATE utf8mb4_unicode_ci IN ('coordinator' COLLATE utf8mb4_unicode_ci, 'both' COLLATE utf8mb4_unicode_ci)
               AND {_COORDINATOR_MILESTONE_SUBMISSION_CLOSED_SQL}
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM section_completion_status scs_hide
+                  WHERE scs_hide.reference_id = ms.project_id
+                    AND CONVERT(scs_hide.status USING utf8mb4) COLLATE utf8mb4_unicode_ci = 'succeeded' COLLATE utf8mb4_unicode_ci
+                    AND CONVERT(scs_hide.course_scope USING utf8mb4) COLLATE utf8mb4_unicode_ci = 'introduction' COLLATE utf8mb4_unicode_ci
+              )
             """,
             (submission_id,),
         )
@@ -2177,6 +2326,8 @@ def api_coordinator_download_deliverable_submission(submission_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+        db.commit()
         cursor.execute(
             f"""
             SELECT cds.file_name, cds.file_path, cds.file_data, cds.file_mime
@@ -2185,6 +2336,13 @@ def api_coordinator_download_deliverable_submission(submission_id):
               ON cd.deliverable_id = cds.deliverable_id
             WHERE cds.submission_id = %s
               AND {_COORDINATOR_DELIVERABLE_SUBMISSION_CLOSED_SQL}
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM section_completion_status scs_hide
+                  WHERE scs_hide.reference_id = cds.project_id
+                    AND CONVERT(scs_hide.status USING utf8mb4) COLLATE utf8mb4_unicode_ci = 'succeeded' COLLATE utf8mb4_unicode_ci
+                    AND CONVERT(scs_hide.course_scope USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(cd.course_scope USING utf8mb4) COLLATE utf8mb4_unicode_ci
+              )
             """,
             (submission_id,),
         )
@@ -2582,17 +2740,18 @@ def _notification_recipients(cursor, scope, value=None, course_scope="both"):
 
     if scope == "all_users":
         cursor.execute(
-        """
-        SELECT user_id
-        FROM users
-        WHERE is_active = TRUE
-          AND role IN ('student', 'supervisor', 'coordinator', 'head_of_department')
-          AND user_id <> %s
-        ORDER BY role, full_name
-        """,
-        (session.get("user_id"),)
-    )
-    return [r["user_id"] for r in cursor.fetchall()]
+            """
+            SELECT user_id
+            FROM users
+            WHERE is_active = TRUE
+              AND role IN ('student', 'supervisor', 'coordinator', 'head_of_department')
+              AND user_id <> %s
+            ORDER BY role, full_name
+            """,
+            (session.get("user_id"),),
+        )
+        return [r["user_id"] for r in cursor.fetchall()]
+
     return []
 
 
@@ -4410,13 +4569,17 @@ def _ensure_section_results_schema(cursor):
 
 
 def _sync_comp4200_group_student_results(cursor, project_id, status, notes, updated_by):
-    """Keep each COMP4200 member result aligned with the coordinator's group result."""
+    """
+    Coordinator marks are requests.
+    COMP4200 students become passed/promoted only after Head approval, so a
+    coordinator "succeeded" mark remains pending here.
+    """
     if not _table_exists(cursor, "student_course_results"):
         return 0
 
     student_status = {
         "pending": "pending",
-        "succeeded": "passed",
+        "succeeded": "pending",
         "not_succeeded": "failed",
     }[status]
 
@@ -4440,6 +4603,82 @@ def _sync_comp4200_group_student_results(cursor, project_id, status, notes, upda
     )
     return cursor.rowcount
 
+
+
+def _notify_heads_section_success_request(cursor, course_scope, project_id, coordinator_id):
+    """Notify all active Heads that a section/group success needs approval."""
+    course_code = "COMP4200" if course_scope == "introduction" else "COMP4300"
+    course_title = (
+        "Project Introduction — COMP4200"
+        if course_scope == "introduction"
+        else "Graduation Project — COMP4300"
+    )
+
+    has_group_name = _db_column_exists(cursor, "projects", "group_name")
+    group_name_expr = (
+        "COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id))"
+        if has_group_name
+        else "CONCAT('Group ', p.project_id)"
+    )
+    group_name_group_by = ", p.group_name" if has_group_name else ""
+
+    cursor.execute(
+        f"""
+        SELECT
+            {group_name_expr} AS group_name,
+            COALESCE(NULLIF(p.title, ''), {group_name_expr}) AS project_title,
+            COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+            GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', ') AS students
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        JOIN project_members pm ON pm.project_id = p.project_id
+        JOIN students st ON st.student_id = pm.student_id
+        JOIN users u_st ON u_st.user_id = st.user_id
+        LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+        LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+        WHERE p.project_id = %s
+          AND CONVERT(sem.course_code USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(%s USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        GROUP BY p.project_id, p.title{group_name_group_by}, u_sup.full_name
+        LIMIT 1
+        """,
+        (project_id, course_code),
+    )
+    project = cursor.fetchone() or {}
+
+    cursor.execute(
+        """
+        SELECT user_id
+        FROM users
+        WHERE role = 'head_of_department'
+          AND is_active = TRUE
+        """
+    )
+    heads = cursor.fetchall()
+
+    title = f"{course_code} Success Approval Required"
+    message = (
+        f"The coordinator marked {project.get('group_name') or 'a group'} as succeeded "
+        f"in {course_title}. Please review and approve the result. "
+        f"Project: {project.get('project_title') or '-'}. "
+        f"Supervisor: {project.get('supervisor_name') or 'Not assigned'}. "
+        f"Students: {project.get('students') or 'No students'}."
+    )
+
+    sent_count = 0
+    for head in heads:
+        _insert_notification(
+            cursor,
+            head["user_id"],
+            coordinator_id,
+            "system",
+            title,
+            message,
+            project_id,
+            course_scope,
+        )
+        sent_count += 1
+
+    return sent_count
 
 
 def _sql_value_for_copy(value):
@@ -4761,15 +5000,16 @@ def api_coordinator_section_results():
 
         # Project Introduction groups are saved from the COMP4200 registration page
         # in projects + project_members, not in student_distribution_sections.
-        intro_where_parts = ["sem.course_code = 'COMP4200'"]
+        intro_where_parts = [f"{_ci('sem.course_code')} = {_lit('COMP4200')}"]
         intro_params_list = []
         if intro_semester:
             intro_where_parts.append("p.semester_id = %s")
             intro_params_list.append(intro_semester["semester_id"])
         intro_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
         intro_where_parts.append("NOT EXISTS (SELECT 1 FROM project_course_promotions pcp WHERE pcp.source_project_id = p.project_id)")
-        intro_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
-        intro_where_parts.append("p.title NOT LIKE 'COMP4300 Graduation Project%'")
+        intro_where_parts.append(f"COALESCE({_ci('scs.status')}, {_lit('pending')}) <> {_lit('succeeded')}")
+        intro_where_parts.append(f"{_ci('p.title')} NOT LIKE {_lit('Committee Demo%')}")
+        intro_where_parts.append(f"{_ci('p.title')} NOT LIKE {_lit('COMP4300 Graduation Project%')}")
         intro_where = "WHERE " + " AND ".join(intro_where_parts)
 
         cursor.execute(
@@ -4794,7 +5034,7 @@ def api_coordinator_section_results():
             LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
             LEFT JOIN section_completion_status scs
-              ON scs.course_scope = 'introduction' AND scs.reference_id = p.project_id
+              ON {_ci('scs.course_scope')} = {_lit('introduction')} AND scs.reference_id = p.project_id
             LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
             {intro_where}
             GROUP BY p.project_id, p.title, p.status, u_sup.full_name,
@@ -4807,13 +5047,14 @@ def api_coordinator_section_results():
         introduction_sections = cursor.fetchall()
 
         # Graduation Project groups come from real COMP4300 projects only.
-        grad_where_parts = ["sem.course_code = 'COMP4300'"]
+        grad_where_parts = [f"{_ci('sem.course_code')} = {_lit('COMP4300')}"]
         grad_params_list = []
         if grad_semester:
             grad_where_parts.append("p.semester_id = %s")
             grad_params_list.append(grad_semester["semester_id"])
         grad_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
-        grad_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
+        grad_where_parts.append(f"{_ci('p.title')} NOT LIKE {_lit('Committee Demo%')}")
+        grad_where_parts.append(f"COALESCE({_ci('scs.status')}, {_lit('pending')}) <> {_lit('succeeded')}")
         grad_where = "WHERE " + " AND ".join(grad_where_parts)
 
         cursor.execute(
@@ -4838,7 +5079,7 @@ def api_coordinator_section_results():
             LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
             LEFT JOIN section_completion_status scs
-              ON scs.course_scope = 'graduation_project' AND scs.reference_id = p.project_id
+              ON {_ci('scs.course_scope')} = {_lit('graduation_project')} AND scs.reference_id = p.project_id
             LEFT JOIN users u_mark ON u_mark.user_id = scs.marked_by
             {grad_where}
             GROUP BY p.project_id, p.title, p.status, u_sup.full_name,
@@ -4853,10 +5094,10 @@ def api_coordinator_section_results():
         # Keep the summary cumulative even after a succeeded COMP4200 group is
         # promoted and hidden from the active Introduction list.
         intro_stats_where_parts = [
-            "sem.course_code = 'COMP4200'",
+            f"{_ci('sem.course_code')} = {_lit('COMP4200')}",
             "EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)",
-            "p.title NOT LIKE 'Committee Demo%'",
-            "p.title NOT LIKE 'COMP4300 Graduation Project%'",
+            f"{_ci('p.title')} NOT LIKE {_lit('Committee Demo%')}",
+            f"{_ci('p.title')} NOT LIKE {_lit('COMP4300 Graduation Project%')}",
         ]
         intro_stats_params = []
         if intro_semester:
@@ -4866,12 +5107,12 @@ def api_coordinator_section_results():
             f"""
             SELECT COUNT(DISTINCT p.project_id) AS total,
                    COUNT(DISTINCT CASE
-                       WHEN scs.status = 'succeeded' THEN p.project_id
+                       WHEN {_ci('scs.status')} = {_lit('succeeded')} THEN p.project_id
                    END) AS succeeded
             FROM projects p
             JOIN semesters sem ON sem.semester_id = p.semester_id
             LEFT JOIN section_completion_status scs
-              ON scs.course_scope = 'introduction'
+              ON {_ci('scs.course_scope')} = {_lit('introduction')}
              AND scs.reference_id = p.project_id
             WHERE {" AND ".join(intro_stats_where_parts)}
             """,
@@ -4880,9 +5121,9 @@ def api_coordinator_section_results():
         introduction_stats = cursor.fetchone() or {}
 
         grad_stats_where_parts = [
-            "sem.course_code = 'COMP4300'",
+            f"{_ci('sem.course_code')} = {_lit('COMP4300')}",
             "EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)",
-            "p.title NOT LIKE 'Committee Demo%'",
+            f"{_ci('p.title')} NOT LIKE {_lit('Committee Demo%')}",
         ]
         grad_stats_params = []
         if grad_semester:
@@ -4892,12 +5133,12 @@ def api_coordinator_section_results():
             f"""
             SELECT COUNT(DISTINCT p.project_id) AS total,
                    COUNT(DISTINCT CASE
-                       WHEN scs.status = 'succeeded' THEN p.project_id
+                       WHEN {_ci('scs.status')} = {_lit('succeeded')} THEN p.project_id
                    END) AS succeeded
             FROM projects p
             JOIN semesters sem ON sem.semester_id = p.semester_id
             LEFT JOIN section_completion_status scs
-              ON scs.course_scope = 'graduation_project'
+              ON {_ci('scs.course_scope')} = {_lit('graduation_project')}
              AND scs.reference_id = p.project_id
             WHERE {" AND ".join(grad_stats_where_parts)}
             """,
@@ -4914,9 +5155,11 @@ def api_coordinator_section_results():
                     "introduction_sections": introduction_sections,
                     "graduation_sections": graduation_sections,
                     "stats": {
-                        "introduction_total": introduction_stats.get("total", 0),
+                        # visible/waiting groups in the coordinator page
+                        "introduction_total": len(introduction_sections),
+                        "graduation_total": len(graduation_sections),
+                        # groups already sent to Head approval
                         "introduction_succeeded": introduction_stats.get("succeeded", 0),
-                        "graduation_total": graduation_stats.get("total", 0),
                         "graduation_succeeded": graduation_stats.get("succeeded", 0),
                     },
                 }
@@ -4962,7 +5205,7 @@ def api_coordinator_mark_section_result():
             FROM projects p
             JOIN semesters sem ON sem.semester_id = p.semester_id
             WHERE p.project_id = %s
-              AND sem.course_code = %s
+              AND CONVERT(sem.course_code USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(%s USING utf8mb4) COLLATE utf8mb4_unicode_ci
               AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.project_id)
             LIMIT 1
             """,
@@ -4987,7 +5230,7 @@ def api_coordinator_mark_section_result():
             """,
             (course_scope, reference_id, status, notes, session.get("user_id")),
         )
-        promotion_info = None
+        head_notifications = 0
         if course_scope == "introduction":
             _sync_comp4200_group_student_results(
                 cursor,
@@ -4996,23 +5239,28 @@ def api_coordinator_mark_section_result():
                 notes,
                 session.get("user_id"),
             )
-            if status == "succeeded":
-                promotion_info = _promote_comp4200_group_to_comp4300(
-                    cursor,
-                    reference_id,
-                    session.get("user_id"),
-                )
+
+        if status == "succeeded":
+            head_notifications = _notify_heads_section_success_request(
+                cursor,
+                course_scope,
+                reference_id,
+                session.get("user_id"),
+            )
+
         db.commit()
         cursor.close()
         db.close()
 
-        message = "Section result saved successfully."
-        if promotion_info and promotion_info.get("created"):
-            message = "Section succeeded and moved to COMP4300 successfully."
-        elif promotion_info:
-            message = "Section result saved successfully. This group was already moved to COMP4300."
+        if status == "succeeded":
+            message = (
+                "Success request sent to Head of Department for approval. "
+                "This item is now hidden from the coordinator active list."
+            )
+        else:
+            message = "Section result saved successfully."
 
-        return jsonify({"message": message, "promotion": promotion_info})
+        return jsonify({"message": message, "head_notifications": head_notifications})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -5037,15 +5285,16 @@ def api_coordinator_succeed_all_section_results():
 
         if course_scope in {"all", "introduction"}:
             intro_semester = _get_active_semester_by_course(cursor, "COMP4200")
-            intro_where_parts = ["sem.course_code = 'COMP4200'"]
+            intro_where_parts = [f"{_ci('sem.course_code')} = {_lit('COMP4200')}"]
             intro_params_list = []
             if intro_semester:
                 intro_where_parts.append("p.semester_id = %s")
                 intro_params_list.append(intro_semester["semester_id"])
             intro_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
             intro_where_parts.append("NOT EXISTS (SELECT 1 FROM project_course_promotions pcp WHERE pcp.source_project_id = p.project_id)")
-            intro_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
-            intro_where_parts.append("p.title NOT LIKE 'COMP4300 Graduation Project%'")
+            intro_where_parts.append(f"NOT EXISTS (SELECT 1 FROM section_completion_status scs WHERE {_ci('scs.course_scope')} = {_lit('introduction')} AND scs.reference_id = p.project_id AND {_ci('scs.status')} = {_lit('succeeded')})")
+            intro_where_parts.append(f"{_ci('p.title')} NOT LIKE {_lit('Committee Demo%')}")
+            intro_where_parts.append(f"{_ci('p.title')} NOT LIKE {_lit('COMP4300 Graduation Project%')}")
             intro_where = "WHERE " + " AND ".join(intro_where_parts)
             cursor.execute(
                 f"""
@@ -5061,13 +5310,14 @@ def api_coordinator_succeed_all_section_results():
 
         if course_scope in {"all", "graduation_project"}:
             grad_semester = _get_active_semester_by_course(cursor, "COMP4300")
-            grad_where_parts = ["sem.course_code = 'COMP4300'"]
+            grad_where_parts = [f"{_ci('sem.course_code')} = {_lit('COMP4300')}"]
             grad_params_list = []
             if grad_semester:
                 grad_where_parts.append("p.semester_id = %s")
                 grad_params_list.append(grad_semester["semester_id"])
             grad_where_parts.append("EXISTS (SELECT 1 FROM project_members pmx WHERE pmx.project_id = p.project_id)")
-            grad_where_parts.append("p.title NOT LIKE 'Committee Demo%'")
+            grad_where_parts.append(f"{_ci('p.title')} NOT LIKE {_lit('Committee Demo%')}")
+            grad_where_parts.append(f"NOT EXISTS (SELECT 1 FROM section_completion_status scs WHERE {_ci('scs.course_scope')} = {_lit('graduation_project')} AND scs.reference_id = p.project_id AND {_ci('scs.status')} = {_lit('succeeded')})")
             grad_where = "WHERE " + " AND ".join(grad_where_parts)
             cursor.execute(
                 f"""
@@ -5084,10 +5334,10 @@ def api_coordinator_succeed_all_section_results():
         notes = (data.get("notes") or "Marked succeeded by coordinator bulk action.").strip() or None
         marked_by = session.get("user_id")
 
-        promotion_count = 0
+        head_notification_count = 0
 
         def mark_rows(scope, ids):
-            nonlocal promotion_count
+            nonlocal head_notification_count
             count = 0
             for reference_id in ids:
                 cursor.execute(
@@ -5113,13 +5363,12 @@ def api_coordinator_succeed_all_section_results():
                         notes,
                         marked_by,
                     )
-                    promotion_info = _promote_comp4200_group_to_comp4300(
-                        cursor,
-                        reference_id,
-                        marked_by,
-                    )
-                    if promotion_info.get("created"):
-                        promotion_count += 1
+                head_notification_count += _notify_heads_section_success_request(
+                    cursor,
+                    scope,
+                    reference_id,
+                    marked_by,
+                )
             return count
 
         intro_count = mark_rows("introduction", intro_ids)
@@ -5133,13 +5382,13 @@ def api_coordinator_succeed_all_section_results():
         return jsonify(
             {
                 "message": (
-                    f"Successfully marked {total} section/group item(s) as succeeded. "
-                    f"Moved {promotion_count} COMP4200 group(s) to COMP4300."
+                    f"Successfully sent {total} success request(s) to Head of Department. "
+                    "They are now hidden from the coordinator active list."
                 ),
                 "updated": total,
                 "introduction_updated": intro_count,
                 "graduation_updated": grad_count,
-                "promoted_to_comp4300": promotion_count,
+                "head_notifications": head_notification_count,
             }
         )
     except Exception as e:
@@ -5407,7 +5656,7 @@ def api_review_projects():
         files_join = """
             LEFT JOIN project_files pf
               ON pf.project_id = p.project_id
-             AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+             AND COALESCE(CONVERT(pf.upload_status USING utf8mb4) COLLATE utf8mb4_unicode_ci, 'uploaded' COLLATE utf8mb4_unicode_ci) = 'uploaded' COLLATE utf8mb4_unicode_ci
         """ if has_project_files else ""
 
         files_count_select = (
@@ -5509,6 +5758,8 @@ def api_coordinator_project_files(project_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_section_results_schema(cursor)
+        db.commit()
 
         if not _table_exists(cursor, "project_files"):
             cursor.close()
@@ -5530,8 +5781,9 @@ def api_coordinator_project_files(project_id):
             JOIN projects p ON p.project_id = pf.project_id
             JOIN semesters s ON s.semester_id = p.semester_id
             WHERE pf.project_id = %s
-              AND COALESCE(pf.upload_status, 'uploaded') = 'uploaded'
+              AND COALESCE(CONVERT(pf.upload_status USING utf8mb4) COLLATE utf8mb4_unicode_ci, 'uploaded' COLLATE utf8mb4_unicode_ci) = 'uploaded' COLLATE utf8mb4_unicode_ci
               AND {_COORDINATOR_PROJECT_SUBMISSION_CLOSED_SQL}
+              AND {_COORDINATOR_PROJECT_NOT_SUCCEEDED_SQL}
             ORDER BY pf.uploaded_at DESC, pf.file_id DESC
             """,
             (project_id,),
