@@ -190,6 +190,16 @@ function hideFeedback(){
 
 
 /*  Promote and Archive Modal  */
+
+function escapeText(value){
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function openPromoteModal(){
   document.getElementById('promote-overlay').classList.add('open');
   loadPassedStudents();
@@ -201,6 +211,28 @@ function closePromoteModal(e){
   document.getElementById('promote-overlay').classList.remove('open');
 }
 
+function renderGroupRow(group, badgeText, badgeColor){
+  var name = group.group_name || group.title || ('Project ' + group.project_id);
+  var title = group.title && group.title !== name ? group.title : '';
+  var students = group.students || '-';
+  var supervisor = group.supervisor_name || 'Not assigned';
+  var count = group.student_count || 0;
+
+  return '<div style="padding:10px 12px; border-bottom:0.5px solid var(--color-border-tertiary);">' +
+    '<div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">' +
+      '<div style="min-width:0; flex:1;">' +
+        '<div style="font-size:13px; font-weight:700; color:var(--color-text-primary);">' + escapeText(name) + '</div>' +
+        (title ? '<div style="font-size:11px; color:var(--color-text-secondary); margin-top:2px;">' + escapeText(title) + '</div>' : '') +
+      '</div>' +
+      '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-tertiary); color:' + badgeColor + '; border:0.5px solid var(--color-border-tertiary); white-space:nowrap;">' + escapeText(badgeText) + '</span>' +
+    '</div>' +
+    '<div style="font-size:11px; color:var(--color-text-secondary); margin-top:6px; line-height:1.5;">' +
+      '<b>Students (' + escapeText(count) + '):</b> ' + escapeText(students) + '<br>' +
+      '<b>Supervisor:</b> ' + escapeText(supervisor) +
+    '</div>' +
+  '</div>';
+}
+
 async function loadPassedStudents(){
   var list = document.getElementById('passed-students-list');
   list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">Loading...</div>';
@@ -208,6 +240,11 @@ async function loadPassedStudents(){
   try{
     var res = await fetch('/head/api/students/passes');
     var data = await res.json();
+
+    if(!res.ok || data.error){
+      throw new Error(data.error || 'Could not load promoted groups.');
+    }
+
     var groups = data.groups || [];
 
     if(!groups.length){
@@ -215,17 +252,11 @@ async function loadPassedStudents(){
       return;
     }
 
-    list.innerHTML = groups.map(function(group){
-      return '<div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">' +
-        '<div style="flex:1; min-width:0;">' +
-          '<div style="font-size:13px; font-weight:500;">' + group.group_name + '</div>' +
-          '<div style="font-size:11px; color:var(--color-text-secondary);">' + group.students + '</div>' +
-        '</div>' +
-        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-success); color:var(--color-text-success); border: 0.5px solid var(--color-border-tertiary);">Succeeded COMP4200</span>' +
-      '</div>';
+    list.innerHTML = groups.map(function(g){
+      return renderGroupRow(g, 'Ready for COMP4300', 'var(--green)');
     }).join('');
   }catch(e){
-    list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">Could not load students.</div>';
+    list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">' + escapeText(e.message || 'Could not load groups.') + '</div>';
   }
 }
 
@@ -236,6 +267,11 @@ async function loadComp4300Students(){
   try{
     var res = await fetch('/head/api/students/comp4300');
     var data = await res.json();
+
+    if(!res.ok || data.error){
+      throw new Error(data.error || 'Could not load COMP4300 projects.');
+    }
+
     var projects = data.projects || [];
 
     if(!projects.length){
@@ -243,17 +279,11 @@ async function loadComp4300Students(){
       return;
     }
 
-    list.innerHTML = projects.map(function(project){
-      return '<div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">' +
-        '<div style="flex:1; min-width:0;">' +
-          '<div style="font-size:13px; font-weight:500;">' + project.group_name + '</div>' +
-          '<div style="font-size:11px; color:var(--color-text-secondary);">' + project.students + '</div>' +
-        '</div>' +
-        '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-info); color:var(--color-text-info); border: 0.5px solid var(--color-border-tertiary);">Succeeded COMP4300</span>' +
-      '</div>';
+    list.innerHTML = projects.map(function(p){
+      return renderGroupRow(p, 'Ready for Archive', '#dc2626');
     }).join('');
   }catch(e){
-    list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">Could not load students.</div>';
+    list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">' + escapeText(e.message || 'Could not load projects.') + '</div>';
   }
 }
 
@@ -269,9 +299,10 @@ async function promoteAll(){
     if(res.ok){
       showFeedback_promote('promote-feedback', data.message, 'success');
       loadPassedStudents();
+      loadComp4300Students();
+      loadStudents();
     }else{
-      showFeedback_promote('promote-feedback', data.error || 'something want wrong.', 'error');
-
+      showFeedback_promote('promote-feedback', data.error || 'Something went wrong.', 'error');
     }
   }catch(e){
     showFeedback_promote('promote-feedback', 'Could not reach the server.', 'error');
@@ -293,6 +324,7 @@ async function archiveAll(){
     if(res.ok){
       showFeedback_promote('archive-feedback', data.message, 'success');
       loadComp4300Students();
+      loadStudents();
     }else{
       showFeedback_promote('archive-feedback', data.error || 'Something went wrong.', 'error');
     }

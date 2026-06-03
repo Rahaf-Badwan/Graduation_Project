@@ -479,6 +479,11 @@
       return;
     }
 
+    if (supervisorSelect && supervisorSelect.selectedOptions[0]?.disabled) {
+      setSectionMessage('This supervisor is not available for assignment.', 'error');
+      return;
+    }
+
     if (studentIds.length === 0) {
       setSectionMessage('Please select at least one student.', 'error');
       return;
@@ -663,9 +668,14 @@
       groups.forEach(function (g) {
         const opt = document.createElement('option');
         opt.value = g.project_id;
+        const supervisorAvailable = !!g.supervisor_can_take_one_student;
         opt.textContent = (g.group_name || ('Group ' + g.project_id))
           + ' — ' + g.team_members
           + ' (' + g.member_count + '/3)';
+        if (!supervisorAvailable) {
+          opt.disabled = true;
+          opt.textContent += ' — supervisor unavailable';
+        }
         select.appendChild(opt);
       });
       if (!groups.length) {
@@ -683,6 +693,10 @@
 
     if (!projectId) {
       setSectionMessage('Please choose an existing group.', 'error');
+      return;
+    }
+    if (select && select.selectedOptions[0]?.disabled) {
+      setSectionMessage('This group cannot take more students because its supervisor is not available.', 'error');
       return;
     }
     if (studentIds.length === 0) {

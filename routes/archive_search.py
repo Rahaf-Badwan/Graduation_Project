@@ -131,6 +131,68 @@ def _find_archived_report_path(*hints):
     return best if best_score else None
 
 
+def _archive_table_exists(cursor, table_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+        """,
+        (table_name,),
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _archive_related_project_ids(cursor, project_id):
+    """Return archived project plus its same-team COMP4200/COMP4300 siblings."""
+    project_ids = [project_id]
+
+    if _archive_table_exists(cursor, "project_course_promotions"):
+        cursor.execute(
+            """
+            SELECT source_project_id AS project_id
+            FROM project_course_promotions
+            WHERE promoted_project_id = %s
+            UNION
+            SELECT promoted_project_id AS project_id
+            FROM project_course_promotions
+            WHERE source_project_id = %s
+            """,
+            (project_id, project_id),
+        )
+        for row in cursor.fetchall():
+            pid = row.get("project_id")
+            if pid and pid not in project_ids:
+                project_ids.append(pid)
+
+    cursor.execute(
+        """
+        SELECT GROUP_CONCAT(DISTINCT student_id ORDER BY student_id SEPARATOR ',') AS team_key
+        FROM project_members
+        WHERE project_id = %s
+        """,
+        (project_id,),
+    )
+    team_key = (cursor.fetchone() or {}).get("team_key")
+    if team_key:
+        cursor.execute(
+            """
+            SELECT pm.project_id
+            FROM project_members pm
+            GROUP BY pm.project_id
+            HAVING GROUP_CONCAT(DISTINCT pm.student_id ORDER BY pm.student_id SEPARATOR ',') = %s
+            """,
+            (team_key,),
+        )
+        for row in cursor.fetchall():
+            pid = row.get("project_id")
+            if pid and pid not in project_ids:
+                project_ids.append(pid)
+
+    return project_ids
+
+
 def _inline_pdf_response(path):
     return send_file(path, mimetype="application/pdf", as_attachment=False)
 
@@ -430,16 +492,22 @@ def api_archived_project_detail(project_id):
         )
         members = [dict(r) for r in cursor.fetchall()]
 
+        challenge_project_ids = _archive_related_project_ids(cursor, project_id)
+        placeholders = ",".join(["%s"] * len(challenge_project_ids))
         cursor.execute(
-            """
-             SELECT cr.type, cr.title, cr.description, cr.solution_lesson
-    FROM   challenges_reflections cr
-    WHERE  cr.project_id = %s
-    ORDER  BY cr.challenge_id
-        """,
-            (project_id,),
+            f"""
+            SELECT DISTINCT cr.type, cr.title, cr.description, cr.solution_lesson,
+                   cr.created_at, cr.challenge_id
+            FROM   challenges_reflections cr
+            WHERE  cr.project_id IN ({placeholders})
+            ORDER  BY cr.created_at DESC, cr.challenge_id DESC
+            """,
+            tuple(challenge_project_ids),
         )
         challenges = [dict(r) for r in cursor.fetchall()]
+        for challenge in challenges:
+            challenge.pop("created_at", None)
+            challenge.pop("challenge_id", None)
 
         cursor.execute(
             """

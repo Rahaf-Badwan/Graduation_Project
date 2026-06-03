@@ -52,7 +52,7 @@ def _student_challenge_scope(cursor, user_id):
     # 1) direct memberships for this student across all courses/semesters
     cursor.execute(
         """
-        SELECT DISTINCT pm.project_id
+        SELECT DISTINCT pm.project_id, s.course_code, s.semester_id
         FROM project_members pm
         JOIN projects p ON p.project_id = pm.project_id
         JOIN semesters s ON s.semester_id = p.semester_id
@@ -109,7 +109,7 @@ def _student_challenge_scope(cursor, user_id):
         placeholders = ",".join(["%s"] * len(team_student_ids))
         cursor.execute(
             f"""
-            SELECT DISTINCT pm.project_id
+            SELECT DISTINCT pm.project_id, s.course_code, s.semester_id
             FROM project_members pm
             JOIN projects p ON p.project_id = pm.project_id
             JOIN semesters s ON s.semester_id = p.semester_id
@@ -140,6 +140,35 @@ def _student_challenge_scope(cursor, user_id):
                 team_student_ids.append(sid)
 
     return student_id, project_ids, team_student_ids
+
+
+def _normalize_legacy_challenge_authors(cursor):
+    """Move old challenge author ids from students.student_id to users.user_id.
+
+    Some databases named challenges_reflections.student_id but constrained it to
+    users.user_id. Older code inserted students.student_id; if that number also
+    existed as a user_id, the row appeared under the wrong person.
+    """
+    cursor.execute(
+        """
+        UPDATE challenges_reflections cr
+        JOIN project_members pm_legacy
+          ON pm_legacy.project_id = cr.project_id
+         AND pm_legacy.student_id = cr.student_id
+        JOIN students legacy_st
+          ON legacy_st.student_id = pm_legacy.student_id
+        LEFT JOIN students current_st
+          ON current_st.user_id = cr.student_id
+        LEFT JOIN project_members pm_current
+          ON pm_current.project_id = cr.project_id
+         AND pm_current.student_id = current_st.student_id
+        SET cr.student_id = legacy_st.user_id
+        WHERE legacy_st.user_id IS NOT NULL
+          AND pm_current.member_id IS NULL
+          AND cr.student_id <> legacy_st.user_id
+        """
+    )
+    return cursor.rowcount
 
 
 def _get_student_project(user_id):
@@ -174,6 +203,8 @@ def api_challenges_list():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        if _normalize_legacy_challenge_authors(cursor):
+            db.commit()
 
         student_id, project_ids, team_student_ids = _student_challenge_scope(cursor, user_id)
         if not student_id or (not project_ids and not team_student_ids):
@@ -183,6 +214,7 @@ def api_challenges_list():
 
         where_parts = []
         params = []
+        team_user_ids = []
 
         if project_ids:
             placeholders = ",".join(["%s"] * len(project_ids))
@@ -191,13 +223,28 @@ def api_challenges_list():
 
         if team_student_ids:
             placeholders = ",".join(["%s"] * len(team_student_ids))
-            # cr.student_id is supposed to store students.student_id.
-            # The second condition keeps old/legacy rows visible if user_id was
-            # accidentally stored in cr.student_id before the fix.
-            where_parts.append(
-                f"(cr.student_id IN ({placeholders}) OR legacy_st.student_id IN ({placeholders}))"
+            cursor.execute(
+                f"""
+                SELECT user_id
+                FROM students
+                WHERE student_id IN ({placeholders})
+                """,
+                team_student_ids,
             )
-            params.extend(team_student_ids)
+            team_user_ids = [
+                row["user_id"] for row in cursor.fetchall() if row.get("user_id")
+            ]
+
+        if team_user_ids:
+            placeholders = ",".join(["%s"] * len(team_user_ids))
+            where_parts.append(f"cr.student_id IN ({placeholders})")
+            params.extend(team_user_ids)
+
+        if team_student_ids:
+            placeholders = ",".join(["%s"] * len(team_student_ids))
+            # Legacy support for old rows from databases where cr.student_id
+            # stored students.student_id instead of users.user_id.
+            where_parts.append(f"legacy_st.student_id IN ({placeholders})")
             params.extend(team_student_ids)
 
         cursor.execute(
@@ -216,9 +263,9 @@ def api_challenges_list():
                    legacy_st.student_id AS legacy_student_id,
                    sem.course_code
             FROM   challenges_reflections cr
-            LEFT JOIN students author_st ON author_st.student_id = cr.student_id
-            LEFT JOIN users author ON author.user_id = author_st.user_id
-            LEFT JOIN students legacy_st ON legacy_st.user_id = cr.student_id
+            LEFT JOIN users author ON author.user_id = cr.student_id
+            LEFT JOIN students author_st ON author_st.user_id = author.user_id
+            LEFT JOIN students legacy_st ON legacy_st.student_id = cr.student_id
             LEFT JOIN users legacy_author ON legacy_author.user_id = legacy_st.user_id
             LEFT JOIN projects p ON p.project_id = cr.project_id
             LEFT JOIN semesters sem ON sem.semester_id = p.semester_id
@@ -268,13 +315,15 @@ def api_challenges_add():
 
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        if _normalize_legacy_challenge_authors(cursor):
+            db.commit()
         cursor.execute(
             """
             INSERT INTO challenges_reflections
                 (project_id, student_id, type, title, description, solution_lesson)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (info["project_id"], info["student_id"], ch_type, title, details, solution),
+            (info["project_id"], user_id, ch_type, title, details, solution),
         )
         db.commit()
         new_id = cursor.lastrowid
@@ -301,8 +350,7 @@ def api_challenges_add():
                    cr.type, cr.title, cr.description, cr.solution_lesson,
                    cr.created_at, u.full_name
             FROM   challenges_reflections cr
-            JOIN   students st ON st.student_id = cr.student_id
-            JOIN   users u ON u.user_id = st.user_id
+            JOIN   users u ON u.user_id = cr.student_id
             WHERE  cr.challenge_id = %s
             """,
             (new_id,),
@@ -338,13 +386,15 @@ def api_challenges_update(challenge_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        if _normalize_legacy_challenge_authors(cursor):
+            db.commit()
         cursor.execute(
             """
             SELECT cr.student_id,
-                   COALESCE(author_st.user_id, legacy_st.user_id) AS author_user_id
+                   COALESCE(author.user_id, legacy_st.user_id) AS author_user_id
             FROM challenges_reflections cr
-            LEFT JOIN students author_st ON author_st.student_id = cr.student_id
-            LEFT JOIN students legacy_st ON legacy_st.user_id = cr.student_id
+            LEFT JOIN users author ON author.user_id = cr.student_id
+            LEFT JOIN students legacy_st ON legacy_st.student_id = cr.student_id
             WHERE cr.challenge_id = %s
             """,
             (challenge_id,),
@@ -397,9 +447,8 @@ def api_challenges_update(challenge_id):
                    cr.type, cr.title, cr.description, cr.solution_lesson,
                    cr.created_at, COALESCE(u.full_name, legacy_u.full_name, 'Team member') AS full_name
             FROM   challenges_reflections cr
-            LEFT JOIN students st ON st.student_id = cr.student_id
-            LEFT JOIN users u ON u.user_id = st.user_id
-            LEFT JOIN students legacy_st ON legacy_st.user_id = cr.student_id
+            LEFT JOIN users u ON u.user_id = cr.student_id
+            LEFT JOIN students legacy_st ON legacy_st.student_id = cr.student_id
             LEFT JOIN users legacy_u ON legacy_u.user_id = legacy_st.user_id
             WHERE  cr.challenge_id = %s
             """,
@@ -425,10 +474,10 @@ def api_challenges_delete(challenge_id):
         cursor.execute(
             """
             SELECT cr.student_id,
-                   COALESCE(author_st.user_id, legacy_st.user_id) AS author_user_id
+                   COALESCE(author.user_id, legacy_st.user_id) AS author_user_id
             FROM challenges_reflections cr
-            LEFT JOIN students author_st ON author_st.student_id = cr.student_id
-            LEFT JOIN students legacy_st ON legacy_st.user_id = cr.student_id
+            LEFT JOIN users author ON author.user_id = cr.student_id
+            LEFT JOIN students legacy_st ON legacy_st.student_id = cr.student_id
             WHERE cr.challenge_id = %s
             """,
             (challenge_id,),

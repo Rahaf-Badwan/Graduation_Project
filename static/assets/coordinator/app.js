@@ -286,6 +286,8 @@ function renderSupervisorOptions(professors) {
     opt.dataset.usedHours = String(usedHours);
     if (wantedHours <= 0) {
       opt.textContent = `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`;
+      opt.disabled = true;
+      opt.title = 'This doctor has not submitted project hours.';
     } else {
       opt.textContent = `${prof.full_name} — wants ${wantedHours.toFixed(1)} project hours, used ${usedHours.toFixed(1)}, remaining ${remainingHours.toFixed(1)}`;
     }
@@ -303,7 +305,7 @@ function updateSectionSupervisorAvailability(selectedCount) {
     if (index === 0) return;
     const remainingHours = Number(option.dataset.remainingHours || 0);
     const wantedHours = Number(option.dataset.wantedHours || 0);
-    option.disabled = wantedHours > 0 && remainingHours < requiredHours;
+    option.disabled = wantedHours <= 0 || remainingHours < requiredHours;
   });
 
   if (select.selectedOptions[0]?.disabled) {
@@ -334,7 +336,8 @@ function renderForms(forms, professors) {
         const wantedHours = Number(prof.wanted_hours || prof.graduation_project_hours || prof.project_hours || 0);
         const usedHours = Number(prof.used_hours || prof.current_hours || prof.assigned_hours || 0);
         const remainingHours = Math.max(0, Number(prof.remaining_hours ?? (wantedHours - usedHours)));
-        const disabled = wantedHours > 0 && remainingHours < Math.max(Number(form.member_count || 1), 1) * 0.5 ? 'disabled' : '';
+        const requiredHours = Math.max(Number(form.member_count || 1), 1) * 0.5;
+        const disabled = wantedHours <= 0 || remainingHours < requiredHours ? 'disabled' : '';
         const label = wantedHours <= 0
           ? `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`
           : `${prof.full_name} — wants ${wantedHours.toFixed(1)} project hours / remaining ${remainingHours.toFixed(1)}`;
@@ -468,6 +471,17 @@ async function assignGroupSupervisor(projectId) {
     return;
   }
 
+  if (select && select.selectedOptions[0]?.disabled) {
+    const message = 'This supervisor is not available for assignment.';
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '600';
+      msg.textContent = message;
+    }
+    alert(message);
+    return;
+  }
+
   try {
     if (msg) {
       msg.style.color = '#444';
@@ -521,8 +535,9 @@ async function deleteGroup(projectId, groupName) {
 }
 
 async function addSectionEntry() {
+  const sectionSupervisor = document.getElementById('sectionSupervisor');
   const sectionName = document.getElementById('sectionName')?.value.trim();
-  const supervisorId = document.getElementById('sectionSupervisor')?.value;
+  const supervisorId = sectionSupervisor?.value;
   const selectedStudents = getSelectedStudentIds();
   const msg = document.getElementById('sectionMsg');
   const addBtn = document.querySelector('button[onclick="createSectionNoDuplicate()"]');
@@ -534,6 +549,15 @@ async function addSectionEntry() {
       msg.textContent = 'Please enter the group name and choose a supervisor.';
     }
     throw new Error('Please enter the group name and choose a supervisor.');
+  }
+
+  if (sectionSupervisor?.selectedOptions[0]?.disabled) {
+    if (msg) {
+      msg.style.color = '#c62828';
+      msg.style.fontWeight = '600';
+      msg.textContent = 'This supervisor is not available for assignment.';
+    }
+    throw new Error('This supervisor is not available for assignment.');
   }
 
   if (!selectedStudents.length) {

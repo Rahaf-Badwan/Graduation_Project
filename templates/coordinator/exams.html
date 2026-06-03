@@ -6,12 +6,8 @@
 
 {% block content %}
 <div class="page page-single on" id="pg-exams">
-
   <style>
-    html,
-    body {
-      scroll-behavior: auto !important;
-    }
+    html, body { scroll-behavior: auto !important; }
 
     #pg-exams {
       display: block !important;
@@ -41,9 +37,7 @@
       transition: 0.18s ease;
     }
 
-    #pg-exams .exam-tab:hover {
-      background: var(--color-background-tertiary);
-    }
+    #pg-exams .exam-tab:hover { background: var(--color-background-tertiary); }
 
     #pg-exams .exam-tab.on {
       background: #2e7d42;
@@ -58,13 +52,8 @@
       padding: 0 !important;
     }
 
-    #pg-exams .exam-section.active {
-      display: block !important;
-    }
-
-    #pg-exams .card {
-      margin-top: 0 !important;
-    }
+    #pg-exams .exam-section.active { display: block !important; }
+    #pg-exams .card { margin-top: 0 !important; }
 
     #pg-exams .exam-info-box {
       border-left: 5px solid #2e7d42;
@@ -172,9 +161,7 @@
       box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.10);
     }
 
-    #pg-exams .timeline-order {
-      width: 52px;
-    }
+    #pg-exams .timeline-order { width: 52px; }
 
     #pg-exams .grad-final-box {
       border: 1px solid #e7eee9;
@@ -241,12 +228,6 @@
       font-size: 13px;
     }
 
-    #pg-exams .submission-toolbar input:focus,
-    #pg-exams .submission-toolbar select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.10);
-    }
-
     #pg-exams .submission-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(120px, 1fr));
@@ -276,21 +257,7 @@
       font-weight: 700;
     }
 
-    #pg-exams .submission-list {
-      display: grid;
-      gap: 10px;
-    }
-
-    #pg-exams .submission-card {
-      border: 1px solid #e7eee9;
-      background: var(--color-background-primary);
-      border-radius: 16px;
-      padding: 13px;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: start;
-    }
+    #pg-exams .submission-list { display: grid; gap: 10px; }
 
     #pg-exams .submission-folder {
       border: 1px solid #e7eee9;
@@ -300,7 +267,8 @@
     }
 
     #pg-exams .submission-folder-header,
-    #pg-exams .submission-file-row {
+    #pg-exams .submission-student-header,
+    #pg-exams .submission-attachment {
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 12px;
@@ -314,23 +282,6 @@
       border-top: 1px solid #e7eee9;
     }
 
-    #pg-exams .submission-file-row {
-      padding: 11px 0;
-      border-bottom: 1px solid #e7eee9;
-    }
-
-    #pg-exams .submission-file-row:last-child {
-      border-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    #pg-exams .submission-file-name {
-      color: var(--color-text-primary);
-      font-size: 13px;
-      font-weight: 800;
-      margin-bottom: 3px;
-    }
-
     #pg-exams .submission-student-row {
       padding: 12px 0;
       border-bottom: 1px solid #e7eee9;
@@ -339,14 +290,6 @@
     #pg-exams .submission-student-row:last-child {
       border-bottom: 0;
       padding-bottom: 0;
-    }
-
-    #pg-exams .submission-student-header,
-    #pg-exams .submission-attachment {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: start;
     }
 
     #pg-exams .submission-attachments {
@@ -366,6 +309,13 @@
       font-weight: 900;
       color: var(--color-text-primary);
       margin-bottom: 5px;
+    }
+
+    #pg-exams .submission-file-name {
+      color: var(--color-text-primary);
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 3px;
     }
 
     #pg-exams .submission-meta {
@@ -395,7 +345,6 @@
     }
 
     @media (max-width: 760px) {
-
       #pg-exams .exam-form-grid,
       #pg-exams .grad-final-row,
       #pg-exams .submission-grid {
@@ -405,6 +354,12 @@
       #pg-exams .exam-tab {
         width: 100%;
         text-align: center;
+      }
+
+      #pg-exams .submission-folder-header,
+      #pg-exams .submission-student-header,
+      #pg-exams .submission-attachment {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -426,27 +381,20 @@
     </button>
   </div>
 
-  <!-- =========================================================
-       TAB 1: COMP4200 Timeline
-  ========================================================== -->
   <div id="introTimeline" class="exam-section active" role="tabpanel">
     <div class="card">
       <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div>
           <span class="card-title">Project Introduction — COMP4200 Timeline Builder</span>
           <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
-            Design the COMP4200 student timeline here. After publishing, students will see it in their Student Timeline
-            page and receive a notification.
+            Design the COMP4200 student timeline here. After publishing, students will see it in their Student Timeline page and receive a notification.
           </div>
         </div>
-
         <span class="pill p-review" id="timelinePublishState">Draft</span>
       </div>
 
       <div class="exam-info-box">
         Use this tab for <b>Project Introduction</b> milestones, submissions, and deadlines.
-        The student submission link opens on the <b>Open submission</b> date and closes after the <b>Close /
-          Deadline</b> date.
       </div>
 
       <form id="introTimelineForm" onsubmit="return false;">
@@ -472,8 +420,7 @@
           <button class="btn btn-outline" type="button" onclick="addTimelineRow()">+ Add Milestone</button>
           <button class="btn btn-outline" type="button" onclick="loadDefaultTimeline()">Load COMP4200 Sample</button>
           <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(false)">Save Draft</button>
-          <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(true)">Save & Publish to
-            Students</button>
+          <button class="btn btn-primary" type="button" onclick="saveIntroTimeline(true)">Save & Publish to Students</button>
         </div>
 
         <div id="introTimelineMsg" class="exam-msg"></div>
@@ -499,26 +446,20 @@
     </div>
   </div>
 
-  <!-- =========================================================
-       TAB 2: COMP4300 Timeline
-  ========================================================== -->
   <div id="gradTimeline" class="exam-section" role="tabpanel">
     <div class="card">
       <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div>
-          <span class="card-title">Graduation Project  — COMP4300 Final Submission</span>
+          <span class="card-title">Graduation Project — COMP4300 Final Submission</span>
           <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
             Set the opening time and final deadline for COMP4300 final project submission.
           </div>
         </div>
-
         <span class="pill p-review" id="gradPublishState">Draft</span>
       </div>
 
       <div class="exam-info-box">
-        This tab is only for <b>COMP4300 Graduation Project</b> final submission.
-        Students can submit starting from the <b>Start Date / Time</b> and the submission closes after the <b>Final
-          Deadline</b>.
+        Students can submit starting from the <b>Start Date / Time</b> and the submission closes after the <b>Final Deadline</b>.
       </div>
 
       <form id="gradFinalForm" onsubmit="return false;">
@@ -555,17 +496,9 @@
         </div>
 
         <div class="btn-row" style="margin-top:14px;flex-wrap:wrap">
-          <button class="btn btn-primary" type="button" onclick="saveGradTimeline(false)">
-            Save Draft
-          </button>
-
-          <button class="btn btn-primary" type="button" onclick="saveGradTimeline(true)">
-            Save & Publish to Students
-          </button>
-
-          <button class="btn btn-outline" type="button" onclick="clearGradTimeline()">
-            Clear
-          </button>
+          <button class="btn btn-primary" type="button" onclick="saveGradTimeline(false)">Save Draft</button>
+          <button class="btn btn-primary" type="button" onclick="saveGradTimeline(true)">Save & Publish to Students</button>
+          <button class="btn btn-outline" type="button" onclick="clearGradTimeline()">Clear</button>
         </div>
 
         <div id="gradTimelineMsg" class="exam-msg"></div>
@@ -573,26 +506,20 @@
     </div>
   </div>
 
-
-  <!-- =========================================================
-       TAB 3: Student Submissions
-  ========================================================== -->
   <div id="studentSubmissions" class="exam-section" role="tabpanel">
     <div class="card">
       <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div>
           <span class="card-title">Student Submitted Files</span>
           <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
-            This tab reads student submissions from the database and displays COMP4200 and COMP4300 files.
+            This tab reads submitted files from the database. Succeeded groups are hidden automatically after the coordinator sends them to Head approval.
           </div>
         </div>
-
         <button class="btn btn-outline" type="button" onclick="loadSubmissionFiles()">Refresh</button>
       </div>
 
       <div class="exam-info-box">
-        Student submissions sent to the coordinator appear here. If no files are shown, make sure the student has submitted successfully and that
-        <b>/api/coordinator/submission-files</b> returns files.
+        Student submissions sent to the coordinator appear here. If a COMP4200 or COMP4300 group is marked as <b>Succeeded</b>, its submissions disappear from this tab.
       </div>
 
       <div class="submission-toolbar">
@@ -622,7 +549,6 @@
       </div>
     </div>
   </div>
-
 </div>
 
 <script>
@@ -637,9 +563,7 @@
 
     ['.content-area', '.main-content', '.main', '.page-content', '.shell', '#pg-exams'].forEach(selector => {
       const el = document.querySelector(selector);
-      if (el) {
-        el.scrollTop = 0;
-      }
+      if (el) el.scrollTop = 0;
     });
   }
 
@@ -649,9 +573,7 @@
     });
 
     const selected = document.getElementById(id);
-    if (selected) {
-      selected.classList.add('active');
-    }
+    if (selected) selected.classList.add('active');
 
     document.querySelectorAll('#pg-exams .exam-tab').forEach(tab => {
       const isActive = tab === btn;
@@ -663,110 +585,10 @@
   }
 
   const defaultIntroTimeline = [
-    {
-      title: 'Project idea and scope',
-      description: 'Agree on weekly supervisor appointments, define the main project idea, and agree on the initial scope.',
-      start_date: '2025-09-29',
-      due_date: '2025-10-20',
-      milestone_label: 'Milestone 1',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'Related work summary',
-      description: 'Identify relevant articles, previous work, and similar apps. Submit a summary report to the supervisor.',
-      start_date: '2025-10-21',
-      due_date: '2025-11-01',
-      milestone_label: 'Summary report',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'Finalize features and proposal start',
-      description: 'Finalize main features and scope, then start writing the project proposal.',
-      start_date: '2025-11-01',
-      due_date: '2025-11-07',
-      milestone_label: 'Proposed Idea',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'Tools and software selection',
-      description: 'Identify development tools/software, explain their advantages, and how they will be used.',
-      start_date: '2025-11-07',
-      due_date: '2025-11-13',
-      milestone_label: 'Tools section',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'Detailed proposal submission',
-      description: 'Submit the project proposal to the supervisor and electronic copy to the course coordinator using the template.',
-      start_date: '2025-11-13',
-      due_date: '2025-11-20',
-      milestone_label: 'Detailed Proposal',
-      submitted_to: 'coordinator'
-    },
-    {
-      title: 'Learn implementation tools',
-      description: 'Learn the software and tools needed for the project implementation.',
-      start_date: '2025-11-20',
-      due_date: '2025-11-28',
-      milestone_label: 'Learning tools',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'System requirements',
-      description: 'Specify functional and non-functional requirements, use case descriptions, and use case diagram.',
-      start_date: '2025-11-21',
-      due_date: '2025-12-03',
-      milestone_label: 'Requirements',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'System analysis',
-      description: 'Provide conceptual system models including class diagrams, sequence diagrams, and state chart diagrams.',
-      start_date: '2025-12-03',
-      due_date: '2025-12-13',
-      milestone_label: 'Analysis models',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'System design',
-      description: 'Describe high-level architecture, subsystems, and deployment diagram.',
-      start_date: '2025-12-14',
-      due_date: '2025-12-31',
-      milestone_label: 'Design',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'Progress report writing',
-      description: 'Start writing and finalizing the COMP4200 progress report.',
-      start_date: '2026-01-01',
-      due_date: '2026-01-12',
-      milestone_label: 'Progress report',
-      submitted_to: 'coordinator'
-    },
-    {
-      title: 'Turnitin report',
-      description: 'Generate the Turnitin report.',
-      start_date: '2026-01-12',
-      due_date: '2026-01-14',
-      milestone_label: 'Turnitin Report',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'Supervisor report review',
-      description: 'Review the report with your supervisor.',
-      start_date: '2026-01-14',
-      due_date: '2026-01-22',
-      milestone_label: 'Supervisor Review',
-      submitted_to: 'supervisor'
-    },
-    {
-      title: 'Final report submission',
-      description: 'Submit the final report to the department.',
-      start_date: '',
-      due_date: '2026-01-22',
-      milestone_label: 'Graduation Report',
-      submitted_to: 'coordinator'
-    }
+    { title: 'Project idea and scope', description: 'Agree on the project idea and initial scope.', start_date: '', due_date: '', milestone_label: 'Milestone 1', submitted_to: 'supervisor' },
+    { title: 'Detailed proposal submission', description: 'Submit the project proposal to the coordinator.', start_date: '', due_date: '', milestone_label: 'Detailed Proposal', submitted_to: 'coordinator' },
+    { title: 'System requirements', description: 'Submit functional and non-functional requirements.', start_date: '', due_date: '', milestone_label: 'Requirements', submitted_to: 'supervisor' },
+    { title: 'Final report submission', description: 'Submit the final COMP4200 report.', start_date: '', due_date: '', milestone_label: 'Graduation Report', submitted_to: 'coordinator' }
   ];
 
   function escAttr(value) {
@@ -779,9 +601,7 @@
 
   function toDatetimeLocal(value) {
     if (!value) return '';
-    // Already full datetime → keep as-is (preserves whatever coordinator set)
-    if (value.includes('T')) return value;
-    // Date-only from old data → return empty so coordinator sets it manually
+    if (String(value).includes('T')) return String(value).slice(0, 16);
     return '';
   }
 
@@ -790,72 +610,21 @@
 
     return `
       <tr data-row="timeline">
+        <td><input class="tl-order timeline-small-input timeline-order" type="number" min="1" value="${escAttr(rowItem.item_order || index + 1)}"></td>
+        <td><input class="tl-title timeline-small-input" value="${escAttr(rowItem.title)}" placeholder="Milestone title"></td>
+        <td><textarea class="tl-desc timeline-small-input" rows="2" placeholder="Description" style="resize:vertical">${escAttr(rowItem.description)}</textarea></td>
+        <td><input class="tl-start timeline-small-input" type="datetime-local" value="${escAttr(toDatetimeLocal(rowItem.start_date))}"></td>
+        <td><input class="tl-due timeline-small-input" type="datetime-local" value="${escAttr(toDatetimeLocal(rowItem.due_date))}"></td>
         <td>
-          <input
-            class="tl-order timeline-small-input timeline-order"
-            type="number"
-            min="1"
-            value="${escAttr(rowItem.item_order || index + 1)}">
-        </td>
-
-        <td>
-          <input
-            class="tl-title timeline-small-input"
-            value="${escAttr(rowItem.title)}"
-            placeholder="Milestone title">
-        </td>
-
-        <td>
-          <textarea
-            class="tl-desc timeline-small-input"
-            rows="2"
-            placeholder="Description"
-            style="resize:vertical">${escAttr(rowItem.description)}</textarea>
-        </td>
-
-        <td>
-          <input
-            class="tl-start timeline-small-input"
-            type="datetime-local"
-            value="${escAttr(toDatetimeLocal(rowItem.start_date))}">
-        </td>
-
-        <td>
-          <input
-            class="tl-due timeline-small-input"
-            type="datetime-local"
-            value="${escAttr(toDatetimeLocal(rowItem.due_date))}">
-        </td>
-
-        <td>
-          <input
-            class="tl-label timeline-small-input"
-            value="${escAttr(rowItem.milestone_label)}"
-            placeholder="Label (optional)"
-            style="margin-bottom:4px">
+          <input class="tl-label timeline-small-input" value="${escAttr(rowItem.milestone_label)}" placeholder="Label (optional)" style="margin-bottom:4px">
           <select class="tl-submitted-to timeline-small-input" style="font-size:12px">
             <option value="supervisor" ${(rowItem.submitted_to || 'supervisor') === 'supervisor' ? 'selected' : ''}>→ Supervisor</option>
             <option value="coordinator" ${(rowItem.submitted_to || '') === 'coordinator' ? 'selected' : ''}>→ Course Coordinator</option>
             <option value="both" ${(rowItem.submitted_to || '') === 'both' ? 'selected' : ''}>→ Supervisor & Course Coordinator</option>
           </select>
         </td>
-
-        <td style="text-align:center">
-          <input
-            class="tl-deadline"
-            type="checkbox"
-            ${rowItem.is_deadline === false ? '' : 'checked'}>
-        </td>
-
-        <td>
-          <button
-            class="btn btn-outline"
-            type="button"
-            onclick="this.closest('tr').remove(); renumberTimelineRows();"
-            style="padding:7px 9px">
-            Delete
-          </button>
-        </td>
+        <td style="text-align:center"><input class="tl-deadline" type="checkbox" ${rowItem.is_deadline === false ? '' : 'checked'}></td>
+        <td><button class="btn btn-outline" type="button" onclick="this.closest('tr').remove(); renumberTimelineRows();" style="padding:7px 9px">Delete</button></td>
       </tr>
     `;
   }
@@ -863,10 +632,7 @@
   function renderTimelineRows(items) {
     const tbody = document.getElementById('timelineRows');
     if (!tbody) return;
-
-    tbody.innerHTML = (items || [])
-      .map((item, idx) => timelineRowTemplate(item, idx))
-      .join('');
+    tbody.innerHTML = (items || []).map((item, idx) => timelineRowTemplate(item, idx)).join('');
   }
 
   function renumberTimelineRows() {
@@ -878,11 +644,7 @@
   function addTimelineRow(item) {
     const body = document.getElementById('timelineRows');
     if (!body) return;
-
-    body.insertAdjacentHTML(
-      'beforeend',
-      timelineRowTemplate(item || { is_deadline: true }, body.querySelectorAll('tr').length)
-    );
+    body.insertAdjacentHTML('beforeend', timelineRowTemplate(item || { is_deadline: true }, body.querySelectorAll('tr').length));
   }
 
   function loadDefaultTimeline() {
@@ -908,14 +670,7 @@
   async function timelineFetch(url, options) {
     const res = await fetch(
       url,
-      Object.assign(
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        },
-        options || {}
-      )
+      Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {})
     );
 
     const data = await res.json().catch(() => ({}));
@@ -930,7 +685,6 @@
   function updateTimelineMeta(timeline) {
     const state = document.getElementById('timelinePublishState');
     const meta = document.getElementById('timelineMeta');
-
     if (!state || !meta) return;
 
     if (!timeline) {
@@ -940,7 +694,6 @@
     }
 
     state.textContent = timeline.is_published ? 'Published' : 'Draft';
-
     meta.textContent = timeline.is_published
       ? `Published at ${timeline.published_at || '—'}`
       : 'Draft saved — not visible to students yet';
@@ -950,19 +703,14 @@
     try {
       const data = await timelineFetch('/api/coordinator/intro-timeline');
 
-      document.getElementById('timelineTitle').value =
-        data.timeline?.title || 'Project Introduction Timeline';
-
-      document.getElementById('timelineNote').value =
-        data.timeline?.note || '';
+      document.getElementById('timelineTitle').value = data.timeline?.title || 'Project Introduction Timeline';
+      document.getElementById('timelineNote').value = data.timeline?.note || '';
 
       renderTimelineRows(data.items || []);
-
       updateTimelineMeta(data.timeline);
     } catch (err) {
       const meta = document.getElementById('timelineMeta');
       if (meta) meta.textContent = err.message;
-
       renderTimelineRows([]);
     }
   }
@@ -986,13 +734,7 @@
       const title = document.getElementById('timelineTitle').value.trim();
       const note = document.getElementById('timelineNote').value.trim();
 
-      // Draft: save ALL rows; Publish: send only checked rows
-      const draftPayload = {
-        title,
-        note,
-        items: collectTimelineItems(false)
-      };
-
+      const draftPayload = { title, note, items: collectTimelineItems(false) };
       const saved = await timelineFetch('/api/coordinator/intro-timeline', {
         method: 'POST',
         body: JSON.stringify(draftPayload)
@@ -1006,7 +748,6 @@
           return;
         }
 
-        // Validate: checked items must have a due date
         const missingDate = checkedItems.filter(it => !it.due_date);
         if (missingDate.length > 0) {
           const nums = missingDate.map(it => it.item_order).join(', ');
@@ -1014,15 +755,9 @@
           return;
         }
 
-        const publishPayload = {
-          title,
-          note,
-          items: checkedItems
-        };
-
         const published = await timelineFetch('/api/coordinator/intro-timeline/publish', {
           method: 'POST',
-          body: JSON.stringify(publishPayload)
+          body: JSON.stringify({ title, note, items: checkedItems })
         });
 
         updateTimelineMeta(published.timeline);
@@ -1042,19 +777,14 @@
   function setGradMessage(message, type) {
     const msg = document.getElementById('gradTimelineMsg');
     if (!msg) return;
-
     msg.textContent = message || '';
     msg.className = 'exam-msg';
-
-    if (type) {
-      msg.classList.add(type);
-    }
+    if (type) msg.classList.add(type);
   }
 
   function updateGradMeta(isPublished, publishedAt) {
     const state = document.getElementById('gradPublishState');
     const meta = document.getElementById('gradTimelineMeta');
-
     if (!state || !meta) return;
 
     state.textContent = isPublished ? 'Published' : 'Draft';
@@ -1071,6 +801,7 @@
         updateGradMeta(false, null);
         return;
       }
+
       document.getElementById('gradTitle').value = sub.title || 'Graduation Project Final Submission';
       document.getElementById('gradStartAt').value = sub.start_at || '';
       document.getElementById('gradDeadlineAt').value = sub.deadline_at || '';
@@ -1088,21 +819,11 @@
     const deadlineAt = document.getElementById('gradDeadlineAt').value;
     const note = document.getElementById('gradNote').value.trim();
 
-    if (!title) {
-      setGradMessage('Please write a title.', 'error');
-      return;
-    }
-    if (!startAt) {
-      setGradMessage('Please choose the start date and time.', 'error');
-      return;
-    }
-    if (!deadlineAt) {
-      setGradMessage('Please choose the final deadline.', 'error');
-      return;
-    }
+    if (!title) return setGradMessage('Please write a title.', 'error');
+    if (!startAt) return setGradMessage('Please choose the start date and time.', 'error');
+    if (!deadlineAt) return setGradMessage('Please choose the final deadline.', 'error');
     if (new Date(deadlineAt) <= new Date(startAt)) {
-      setGradMessage('Final deadline must be after the start date/time.', 'error');
-      return;
+      return setGradMessage('Final deadline must be after the start date/time.', 'error');
     }
 
     try {
@@ -1116,6 +837,7 @@
           publish: publishAfter
         })
       });
+
       await loadGradTimeline();
       setGradMessage(data.message || (publishAfter ? 'COMP4300 final submission published.' : 'COMP4300 final submission saved as draft.'), 'ok');
     } catch (err) {
@@ -1131,7 +853,6 @@
     updateGradMeta(false, null);
     setGradMessage('Form cleared. Click Save Draft or Save & Publish to update the database.', 'ok');
   }
-
 
   let submissionFilesState = [];
 
@@ -1166,25 +887,23 @@
     document.getElementById('subOther').textContent = other;
   }
 
-  function submissionFolderKey(file) {
-    const courseCode = normalizeCourseScope(file);
-    const title = String(file.submission_title || file.file_type || 'Submission').trim().toLowerCase();
-    return `${courseCode}:title:${title}`;
-  }
-
   function groupSubmissionFiles(files) {
     const folders = new Map();
 
     files.forEach(file => {
-      const key = submissionFolderKey(file);
+      const courseCode = normalizeCourseScope(file);
+      const title = String(file.submission_title || file.file_type || 'Submission').trim().toLowerCase();
+      const key = `${courseCode}:title:${title}`;
+
       if (!folders.has(key)) {
         folders.set(key, {
           submission_title: file.submission_title || file.file_type || 'Submission',
-          course_code: normalizeCourseScope(file),
+          course_code: courseCode,
           course_label: file.course_label,
           files: []
         });
       }
+
       folders.get(key).files.push(file);
     });
 
@@ -1210,6 +929,7 @@
           files: []
         });
       }
+
       submissions.get(key).files.push(file);
     });
 
@@ -1249,8 +969,10 @@
       });
     }
 
+    const folders = groupSubmissionFiles(files);
+
     if (status) {
-      status.textContent = `${groupSubmissionFiles(files).length} folder(s) shown - ${files.length} file(s)`;
+      status.textContent = `${folders.length} folder(s) shown - ${files.length} file(s)`;
     }
 
     if (!files.length) {
@@ -1258,13 +980,14 @@
       return;
     }
 
-    box.innerHTML = groupSubmissionFiles(files).map(folder => {
+    box.innerHTML = folders.map(folder => {
       const studentSubmissions = groupStudentSubmissions(folder.files);
       const submissionRows = studentSubmissions.map(submission => {
         const projectFiles = submission.files.filter(file => file.source === 'project');
         const downloadAllButton = submission.project_id && projectFiles.length > 1
           ? `<a class="btn btn-primary" href="/api/coordinator/projects/${safeSubmissionText(submission.project_id)}/files/download-all">Download All (.zip)</a>`
           : '';
+
         const attachments = submission.files.map(file => {
           const downloadUrl = file.download_url || '';
           const downloadButton = downloadUrl
@@ -1310,14 +1033,10 @@
             <div>
               <span class="submission-badge">${safeSubmissionText(folder.course_code)} &middot; ${safeSubmissionText(folder.course_label || '')}</span>
               <div class="submission-title">${safeSubmissionText(folder.submission_title || 'Submission')}</div>
-              <div class="submission-meta">
-                <b>Student submissions:</b> ${studentSubmissions.length}
-              </div>
+              <div class="submission-meta"><b>Student submissions:</b> ${studentSubmissions.length}</div>
             </div>
           </div>
-          <div class="submission-files">
-            ${submissionRows}
-          </div>
+          <div class="submission-files">${submissionRows}</div>
         </div>
       `;
     }).join('');
@@ -1327,13 +1046,8 @@
     const box = document.getElementById('submissionFilesBox');
     const status = document.getElementById('submissionStatus');
 
-    if (box) {
-      box.innerHTML = '<div class="empty">Loading student submissions...</div>';
-    }
-
-    if (status) {
-      status.textContent = 'Loading...';
-    }
+    if (box) box.innerHTML = '<div class="empty">Loading student submissions...</div>';
+    if (status) status.textContent = 'Loading...';
 
     try {
       const res = await fetch('/api/coordinator/submission-files');
@@ -1359,7 +1073,6 @@
     }
   }
 
-
   document.addEventListener('DOMContentLoaded', function () {
     loadIntroTimeline();
     loadGradTimeline();
@@ -1377,5 +1090,4 @@
     setTimeout(resetExamScroll, 100);
   });
 </script>
-
 {% endblock %}

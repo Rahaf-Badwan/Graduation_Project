@@ -339,7 +339,7 @@
         <div class="sections-title">Sections Completion</div>
         <div class="sections-subtitle">
           Mark Project Introduction sections and Graduation Project groups as succeeded.
-          Only succeeded items will appear for the Head of Department.
+          When a group is marked succeeded, it is sent to the Head of Department for approval and removed from this active coordinator list.
         </div>
       </div>
 
@@ -354,40 +354,40 @@
     </div>
 
     <div class="sections-info-box">
-      Use this page to update the completion result for each section.
-      When you mark a section as <b>Succeeded</b>, it becomes visible to the Head of Department.
+      Use this page to update the completion result for each section/group.
+      When you mark a section as <b>Succeeded</b>, it becomes visible to the Head of Department for approval and disappears from your active list.
     </div>
   </div>
 
   <div class="result-grid">
     <div class="result-stat">
       <div class="num" id="introTotal">0</div>
-      <div class="lbl">Introduction Sections</div>
+      <div class="lbl">Waiting Introduction</div>
     </div>
 
     <div class="result-stat">
       <div class="num" id="introDone">0</div>
-      <div class="lbl">Succeeded Introduction</div>
+      <div class="lbl">Sent to Head — Introduction</div>
     </div>
 
     <div class="result-stat">
       <div class="num" id="gradTotal">0</div>
-      <div class="lbl">Graduation Project Groups</div>
+      <div class="lbl">Waiting Graduation Groups</div>
     </div>
 
     <div class="result-stat">
       <div class="num" id="gradDone">0</div>
-      <div class="lbl">Succeeded Graduation</div>
+      <div class="lbl">Sent to Head — Graduation</div>
     </div>
   </div>
 
   <div class="section-tabs" role="tablist" aria-label="Section result tabs">
     <button class="tab section-tab on" type="button" onclick="showResultTab('introBox', this)">
-      Project Introduction Sections
+      Project Introduction — COMP4200 Sections
     </button>
 
     <button class="tab section-tab" type="button" onclick="showResultTab('gradBox', this)">
-      Graduation Project Sections
+      Graduation Project — COMP4300 Sections
     </button>
   </div>
 
@@ -495,7 +495,7 @@
         <div class="section-actions">
           <select class="result-status">
             <option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option>
-            <option value="succeeded" ${status === 'succeeded' ? 'selected' : ''}>Succeeded</option>
+            <option value="succeeded" ${status === 'succeeded' ? 'selected' : ''}>Succeeded / ناجح</option>
             <option value="not_succeeded" ${status === 'not_succeeded' ? 'selected' : ''}>Not Succeeded</option>
           </select>
 
@@ -570,6 +570,13 @@
       notes: card.querySelector('.result-notes').value.trim()
     };
 
+    if (payload.status === 'succeeded') {
+      const courseName = payload.course_scope === 'graduation_project' ? 'COMP4300' : 'COMP4200';
+      if (!confirm(`Send this ${courseName} group as Succeeded to the Head of Department for approval? It will disappear from this coordinator list.`)) {
+        return;
+      }
+    }
+
     button.disabled = true;
     button.textContent = 'Saving...';
 
@@ -603,11 +610,11 @@
   }
 
   async function successAllSections() {
-    if (!confirm('Mark ALL Project Introduction sections and Graduation Project groups as Succeeded?')) {
+    if (!confirm('Send ALL visible Project Introduction sections and Graduation Project groups as Succeeded to the Head of Department? They will disappear from this active list.')) {
       return;
     }
 
-    setSectionsMessage('Marking all sections as succeeded...', 'loading');
+    setSectionsMessage('Sending success requests to the Head of Department...', 'loading');
 
     try {
       const res = await fetch('/api/coordinator/section-results/succeed-all', {
