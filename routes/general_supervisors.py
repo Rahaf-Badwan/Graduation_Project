@@ -42,6 +42,7 @@ SUPERVISOR_PAGES = {
     "progress": "supervisor/progress.html",
     "feedback": "supervisor/feedback.html",
     "evaluation": "supervisor/evaluation.html",
+    "hours": "supervisor/hours.html",
     "search": "shared/archive_search.html",
     "notifs": "supervisor/notifs.html",
     "ai": "shared/ai.html",
@@ -953,6 +954,391 @@ def _current_supervisor_faculty_id(cursor):
     row = cursor.fetchone()
     return row["faculty_id"] if row else None
 
+
+
+# ============================================================
+# Supervisor Project Hours (COMP4200 + COMP4300)
+# ============================================================
+
+MAX_PROJECT_HOURS_PER_COURSE = 4.5
+
+PROJECT_HOUR_COURSES = {
+    "introduction": {
+        "course_code": "COMP4200",
+        "column": "introduction_project_hours",
+        "label": "Project Introduction",
+        "notice_scope": "introduction",
+    },
+    "graduation_project": {
+        "course_code": "COMP4300",
+        "column": "graduation_project_hours",
+        "label": "Graduation Project",
+        "notice_scope": "graduation_project",
+    },
+}
+
+
+def _ensure_supervisor_hours_schema(cursor):
+    """Create/repair the table used by supervisors to request COMP4200 and COMP4300 hours."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS faculty_load_settings (
+            load_id INT PRIMARY KEY AUTO_INCREMENT,
+            faculty_id INT NOT NULL,
+            semester_id INT NOT NULL,
+            introduction_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+            graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+            min_hours DECIMAL(5,2) NOT NULL DEFAULT 12,
+            max_hours DECIMAL(5,2) NOT NULL DEFAULT 4.5,
+            employment_type ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time',
+            intro_students INT NOT NULL DEFAULT 0,
+            extra_bonus DECIMAL(5,2) NOT NULL DEFAULT 0,
+            assigned_courses TEXT NULL,
+            notes TEXT NULL,
+            updated_by INT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
+    required_columns = {
+        "introduction_project_hours": "ALTER TABLE faculty_load_settings ADD COLUMN introduction_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER semester_id",
+        "graduation_project_hours": "ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0",
+        "min_hours": "ALTER TABLE faculty_load_settings ADD COLUMN min_hours DECIMAL(5,2) NOT NULL DEFAULT 12",
+        "max_hours": "ALTER TABLE faculty_load_settings ADD COLUMN max_hours DECIMAL(5,2) NOT NULL DEFAULT 4.5",
+        "employment_type": "ALTER TABLE faculty_load_settings ADD COLUMN employment_type ENUM('full_time','part_time') NOT NULL DEFAULT 'full_time'",
+        "intro_students": "ALTER TABLE faculty_load_settings ADD COLUMN intro_students INT NOT NULL DEFAULT 0",
+        "extra_bonus": "ALTER TABLE faculty_load_settings ADD COLUMN extra_bonus DECIMAL(5,2) NOT NULL DEFAULT 0",
+        "assigned_courses": "ALTER TABLE faculty_load_settings ADD COLUMN assigned_courses TEXT NULL",
+        "notes": "ALTER TABLE faculty_load_settings ADD COLUMN notes TEXT NULL",
+        "updated_by": "ALTER TABLE faculty_load_settings ADD COLUMN updated_by INT NULL",
+        "updated_at": "ALTER TABLE faculty_load_settings ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+    }
+
+    for column, ddl in required_columns.items():
+        if not _supervisor_db_column_exists(cursor, "faculty_load_settings", column):
+            cursor.execute(ddl)
+
+    # Keep existing databases aligned with the rule: max project hours per course = 4.5.
+    cursor.execute("UPDATE faculty_load_settings SET max_hours = %s WHERE max_hours IS NULL OR max_hours > %s", (MAX_PROJECT_HOURS_PER_COURSE, MAX_PROJECT_HOURS_PER_COURSE))
+
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'faculty_load_settings'
+          AND INDEX_NAME = 'uq_faculty_semester_load'
+        """
+    )
+    if int((cursor.fetchone() or {}).get("cnt") or 0) == 0:
+        try:
+            cursor.execute("ALTER TABLE faculty_load_settings ADD UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id)")
+        except Exception:
+            pass
+
+
+def _supervisor_semester_for_course(cursor, course_code):
+    cursor.execute(
+        """
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE course_code = %s AND is_active = TRUE
+        ORDER BY semester_id DESC
+        LIMIT 1
+        """,
+        (course_code,),
+    )
+    row = cursor.fetchone()
+    if row:
+        return row
+
+    cursor.execute(
+        """
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE course_code = %s
+        ORDER BY semester_id DESC
+        LIMIT 1
+        """,
+        (course_code,),
+    )
+    return cursor.fetchone()
+
+
+def _assigned_units_for_course(cursor, faculty_id, semester_id, course_code):
+    if not faculty_id or not semester_id:
+        return {"assigned_students": 0, "assigned_groups": 0, "used_hours": 0.0}
+
+    if course_code == "COMP4200" and _supervisor_table_exists(cursor, "student_distribution_sections") and _supervisor_table_exists(cursor, "section_students"):
+        cursor.execute(
+            """
+            SELECT
+                COUNT(DISTINCT sec.section_id) AS assigned_groups,
+                COUNT(DISTINCT ss.student_id) AS assigned_students
+            FROM student_distribution_sections sec
+            LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+            WHERE sec.supervisor_id = %s
+            """,
+            (faculty_id,),
+        )
+        row = cursor.fetchone() or {}
+        students = int(row.get("assigned_students") or 0)
+        groups = int(row.get("assigned_groups") or 0)
+        return {"assigned_students": students, "assigned_groups": groups, "used_hours": round(students * 0.5, 2)}
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(DISTINCT p.project_id) AS assigned_groups,
+            COUNT(DISTINCT pm.student_id) AS assigned_students
+        FROM projects p
+        JOIN semesters s ON s.semester_id = p.semester_id
+        LEFT JOIN project_members pm ON pm.project_id = p.project_id
+        WHERE p.supervisor_id = %s
+          AND p.semester_id = %s
+          AND s.course_code = %s
+          AND LOWER(COALESCE(p.status, '')) NOT IN (
+              'draft','archived','archive','rejected','cancelled','search','search_only','imported_archive'
+          )
+        """,
+        (faculty_id, semester_id, course_code),
+    )
+    row = cursor.fetchone() or {}
+    students = int(row.get("assigned_students") or 0)
+    groups = int(row.get("assigned_groups") or 0)
+    used_hours = students * 0.5 if students > 0 else groups * 1.0
+    return {"assigned_students": students, "assigned_groups": groups, "used_hours": round(used_hours, 2)}
+
+
+def _supervisor_hours_payload(cursor, faculty_id, semester, scope):
+    cfg = PROJECT_HOUR_COURSES[scope]
+    semester_id = semester.get("semester_id") if semester else None
+    requested_column = cfg["column"]
+
+    row = None
+    if semester_id:
+        cursor.execute(
+            """
+            SELECT
+                faculty_id,
+                semester_id,
+                introduction_project_hours,
+                graduation_project_hours,
+                min_hours,
+                max_hours,
+                employment_type,
+                intro_students,
+                extra_bonus,
+                assigned_courses,
+                notes,
+                updated_at
+            FROM faculty_load_settings
+            WHERE faculty_id = %s
+              AND semester_id = %s
+            LIMIT 1
+            """,
+            (faculty_id, semester_id),
+        )
+        row = cursor.fetchone()
+
+    if not row:
+        row = {
+            "faculty_id": faculty_id,
+            "semester_id": semester_id,
+            "introduction_project_hours": 0,
+            "graduation_project_hours": 0,
+            "min_hours": 12,
+            "max_hours": MAX_PROJECT_HOURS_PER_COURSE,
+            "employment_type": "full_time",
+            "intro_students": 0,
+            "extra_bonus": 0,
+            "assigned_courses": "",
+            "notes": "",
+            "updated_at": None,
+        }
+
+    assigned = _assigned_units_for_course(cursor, faculty_id, semester_id, cfg["course_code"])
+    requested = float(row.get(requested_column) or 0)
+    row["course_scope"] = scope
+    row["course_code"] = cfg["course_code"]
+    row["requested_hours"] = requested
+    row["used_hours"] = assigned["used_hours"]
+    row["remaining_hours"] = max(round(requested - assigned["used_hours"], 2), 0)
+    row["assigned_students"] = assigned["assigned_students"]
+    row["assigned_groups"] = assigned["assigned_groups"]
+    return _json_safe(row)
+
+
+def _supervisor_all_project_hours(cursor, faculty_id):
+    _ensure_supervisor_hours_schema(cursor)
+    result = {}
+    semesters = {}
+    for scope, cfg in PROJECT_HOUR_COURSES.items():
+        semester = _supervisor_semester_for_course(cursor, cfg["course_code"])
+        semesters[scope] = _json_safe(semester) if semester else None
+        result[scope] = _supervisor_hours_payload(cursor, faculty_id, semester or {}, scope)
+    return result, semesters
+
+
+def _save_project_hours_from_payload(data):
+    scope = (data.get("course_scope") or data.get("scope") or "").strip()
+    if scope not in PROJECT_HOUR_COURSES:
+        return jsonify({"error": "Please choose COMP4200 or COMP4300."}), 400
+
+    raw_hours = data.get("requested_hours", data.get("hours"))
+    try:
+        requested_hours = float(raw_hours)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Please enter a valid number of hours."}), 400
+
+    if requested_hours < 0:
+        return jsonify({"error": "Hours cannot be negative."}), 400
+    if requested_hours > MAX_PROJECT_HOURS_PER_COURSE:
+        return jsonify({"error": f"Project hours cannot be more than {MAX_PROJECT_HOURS_PER_COURSE}."}), 400
+
+    # This column stores the maximum allowed PROJECT hours only, not the total teaching load.
+    max_hours = MAX_PROJECT_HOURS_PER_COURSE
+    notes = (data.get("notes") or "").strip()
+
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id:
+            return jsonify({"error": "Supervisor faculty record was not found."}), 404
+
+        cfg = PROJECT_HOUR_COURSES[scope]
+        semester = _supervisor_semester_for_course(cursor, cfg["course_code"])
+        if not semester:
+            return jsonify({"error": f"No {cfg['course_code']} semester was found."}), 404
+
+        _ensure_supervisor_hours_schema(cursor)
+        _ensure_supervisor_notification_schema(cursor)
+
+        requested_column = cfg["column"]
+        cursor.execute(
+            f"""
+            INSERT INTO faculty_load_settings
+                (faculty_id, semester_id, {requested_column}, max_hours, notes, updated_by)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                {requested_column} = VALUES({requested_column}),
+                max_hours = VALUES(max_hours),
+                notes = VALUES(notes),
+                updated_by = VALUES(updated_by),
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (faculty_id, semester["semester_id"], requested_hours, max_hours, notes, session.get("user_id")),
+        )
+
+        cursor.execute(
+            """
+            SELECT u.full_name
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE f.faculty_id = %s
+            LIMIT 1
+            """,
+            (faculty_id,),
+        )
+        supervisor_name = (cursor.fetchone() or {}).get("full_name") or "A supervisor"
+
+        notification_type = _supervisor_safe_notification_type(cursor, "system")
+        coordinator_ids = _supervisor_coordinator_user_ids_for_scope(cursor, cfg["notice_scope"])
+        for coordinator_id in coordinator_ids:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     related_project_id, is_read, course_scope, can_reply, message_origin)
+                VALUES (%s, %s, %s, %s, %s, NULL, FALSE, %s, 1, 'manual')
+                """,
+                (
+                    coordinator_id,
+                    session.get("user_id"),
+                    notification_type,
+                    f"{cfg['course_code']} project hours updated",
+                    f"{supervisor_name} requested {requested_hours:g} project hour(s) for {cfg['course_code']} ({cfg['label']}). Maximum allowed is 4.5.",
+                    cfg["notice_scope"],
+                ),
+            )
+
+        db.commit()
+        hours, semesters = _supervisor_all_project_hours(cursor, faculty_id)
+        return jsonify({
+            "success": True,
+            "message": f"{cfg['course_code']} project hours saved successfully.",
+            "hours": hours,
+            "semesters": semesters,
+        })
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@general_supervisors_bp.route("/api/project-hours", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_get_project_hours():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id:
+            return jsonify({"error": "Supervisor faculty record was not found."}), 404
+        hours, semesters = _supervisor_all_project_hours(cursor, faculty_id)
+        db.commit()
+        return jsonify({"hours": hours, "semesters": semesters})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@general_supervisors_bp.route("/api/project-hours", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_save_project_hours():
+    return _save_project_hours_from_payload(request.get_json(silent=True) or {})
+
+
+# Backward-compatible endpoints used by older HTML files.
+@general_supervisors_bp.route("/api/graduation-hours", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_get_graduation_hours():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id:
+            return jsonify({"error": "Supervisor faculty record was not found."}), 404
+        _ensure_supervisor_hours_schema(cursor)
+        semester = _supervisor_semester_for_course(cursor, "COMP4300")
+        if not semester:
+            return jsonify({"error": "No COMP4300 semester was found."}), 404
+        db.commit()
+        return jsonify({
+            "semester": _json_safe(semester),
+            "hours": _supervisor_hours_payload(cursor, faculty_id, semester, "graduation_project"),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+
+@general_supervisors_bp.route("/api/graduation-hours", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_save_graduation_hours():
+    data = request.get_json(silent=True) or {}
+    data["course_scope"] = "graduation_project"
+    data["requested_hours"] = data.get("graduation_project_hours", data.get("requested_hours", data.get("hours")))
+    return _save_project_hours_from_payload(data)
 
 def _json_safe(value):
     """Convert MySQL/date/set values to JSON-safe values."""

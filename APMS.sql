@@ -440,47 +440,11 @@ CREATE TABLE IF NOT EXISTS notifications (
     message            TEXT         NOT NULL,
     related_project_id INT          NULL,
     is_read            BOOLEAN      NOT NULL DEFAULT FALSE,
-    can_reply          BOOLEAN      NOT NULL DEFAULT FALSE,
-    message_origin     ENUM(
-                         'dynamic',
-                         'manual',
-                         'reply'
-                       )            NOT NULL DEFAULT 'dynamic',
     created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recipient_id)       REFERENCES users(user_id)    ON DELETE CASCADE,
     FOREIGN KEY (sender_id)          REFERENCES users(user_id)    ON DELETE SET NULL,
     FOREIGN KEY (related_project_id) REFERENCES projects(project_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
-
-SET @sql := (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE notifications ADD COLUMN can_reply BOOLEAN NOT NULL DEFAULT FALSE AFTER is_read',
-        'ALTER TABLE notifications ALTER COLUMN can_reply SET DEFAULT 0'
-    )
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'notifications'
-      AND COLUMN_NAME = 'can_reply'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SET @sql := (
-    SELECT IF(
-        COUNT(*) = 0,
-        'ALTER TABLE notifications ADD COLUMN message_origin ENUM(''dynamic'',''manual'',''reply'') NOT NULL DEFAULT ''dynamic'' AFTER can_reply',
-        'SELECT 1'
-    )
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'notifications'
-      AND COLUMN_NAME = 'message_origin'
-);
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
 
 -- ============================================================
 --  TABLE 20 — challenges_reflections
@@ -5392,3 +5356,64 @@ WHERE p.title IN (
 GROUP BY
     p.project_id, p.title, p.status, p.semester_id, s.course_code,
     p.supervisor_id, u.full_name, p.supervisor_name_override;
+    
+    
+    
+    
+    
+    
+USE apms_db;
+
+CREATE TABLE IF NOT EXISTS faculty_load_settings (
+    load_id INT PRIMARY KEY AUTO_INCREMENT,
+    faculty_id INT NOT NULL,
+    semester_id INT NOT NULL,
+    graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0,
+    updated_by INT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_faculty_semester_load (faculty_id, semester_id),
+    FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @db := DATABASE();
+
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE faculty_load_settings ADD COLUMN graduation_project_hours DECIMAL(5,2) NOT NULL DEFAULT 0',
+        'SELECT 1'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'faculty_load_settings'
+      AND COLUMN_NAME = 'graduation_project_hours'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE faculty_load_settings ADD COLUMN updated_by INT NULL',
+        'SELECT 1'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'faculty_load_settings'
+      AND COLUMN_NAME = 'updated_by'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE faculty_load_settings ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        'SELECT 1'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME = 'faculty_load_settings'
+      AND COLUMN_NAME = 'updated_at'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

@@ -2580,6 +2580,19 @@ def _notification_recipients(cursor, scope, value=None, course_scope="both"):
         )
         return [r["user_id"] for r in cursor.fetchall()]
 
+    if scope == "all_users":
+        cursor.execute(
+        """
+        SELECT user_id
+        FROM users
+        WHERE is_active = TRUE
+          AND role IN ('student', 'supervisor', 'coordinator', 'head_of_department')
+          AND user_id <> %s
+        ORDER BY role, full_name
+        """,
+        (session.get("user_id"),)
+    )
+    return [r["user_id"] for r in cursor.fetchall()]
     return []
 
 

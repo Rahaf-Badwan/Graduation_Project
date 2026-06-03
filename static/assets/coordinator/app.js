@@ -277,10 +277,18 @@ function renderSupervisorOptions(professors) {
   select.innerHTML = '<option value="">Select supervisor...</option>';
   professors.forEach(prof => {
     const opt = document.createElement('option');
-    const remainingHours = Number(prof.remaining_hours || 0);
+    const wantedHours = Number(prof.wanted_hours || prof.graduation_project_hours || prof.project_hours || 0);
+    const usedHours = Number(prof.used_hours || prof.current_hours || prof.assigned_hours || 0);
+    const remainingHours = Math.max(0, Number(prof.remaining_hours ?? (wantedHours - usedHours)));
     opt.value = prof.faculty_id;
     opt.dataset.remainingHours = String(remainingHours);
-    opt.textContent = `${prof.full_name} (${prof.assigned_projects} assigned groups, ${remainingHours.toFixed(1)}h remaining)`;
+    opt.dataset.wantedHours = String(wantedHours);
+    opt.dataset.usedHours = String(usedHours);
+    if (wantedHours <= 0) {
+      opt.textContent = `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`;
+    } else {
+      opt.textContent = `${prof.full_name} — wants ${wantedHours.toFixed(1)} project hours, used ${usedHours.toFixed(1)}, remaining ${remainingHours.toFixed(1)}`;
+    }
     select.appendChild(opt);
   });
   updateSectionSupervisorAvailability(getSelectedStudentIds().length);
@@ -294,7 +302,8 @@ function updateSectionSupervisorAvailability(selectedCount) {
   Array.from(select.options).forEach((option, index) => {
     if (index === 0) return;
     const remainingHours = Number(option.dataset.remainingHours || 0);
-    option.disabled = remainingHours < requiredHours;
+    const wantedHours = Number(option.dataset.wantedHours || 0);
+    option.disabled = wantedHours > 0 && remainingHours < requiredHours;
   });
 
   if (select.selectedOptions[0]?.disabled) {
@@ -322,7 +331,14 @@ function renderForms(forms, professors) {
       '<option value="">Select supervisor...</option>',
       ...professors.map(prof => {
         const selected = String(prof.faculty_id) === String(currentSupervisorId) ? 'selected' : '';
-        return `<option value="${prof.faculty_id}" ${selected}>${escapeHtml(prof.full_name)}</option>`;
+        const wantedHours = Number(prof.wanted_hours || prof.graduation_project_hours || prof.project_hours || 0);
+        const usedHours = Number(prof.used_hours || prof.current_hours || prof.assigned_hours || 0);
+        const remainingHours = Math.max(0, Number(prof.remaining_hours ?? (wantedHours - usedHours)));
+        const disabled = wantedHours > 0 && remainingHours < Math.max(Number(form.member_count || 1), 1) * 0.5 ? 'disabled' : '';
+        const label = wantedHours <= 0
+          ? `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`
+          : `${prof.full_name} — wants ${wantedHours.toFixed(1)} project hours / remaining ${remainingHours.toFixed(1)}`;
+        return `<option value="${prof.faculty_id}" ${selected} ${disabled}>${escapeHtml(label)}</option>`;
       })
     ].join('');
 
@@ -336,8 +352,9 @@ function renderForms(forms, professors) {
           <select class="field-select" id="${selectId}">
             ${supervisorOptions}
           </select>
-          <div style="font-size:12px;color:#667587;margin-top:6px">
-            Current: ${escapeHtml(currentSupervisorName)}
+          <div style="font-size:12px;color:#667587;margin-top:6px;line-height:1.5">
+            Current: ${escapeHtml(currentSupervisorName)}<br>
+            Required for this group: ${((Number(form.member_count || 1) || 1) * 0.5).toFixed(1)}h
           </div>
         </td>
         <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
