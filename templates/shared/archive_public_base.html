@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block page_title %}Archived Projects{% endblock %} - APMS</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <script>try{if(localStorage.getItem('apmsTheme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <style>
+    :root {
+      --green: #1a6b3a;
+      --green-light: #e8f5ee;
+      --blue: #185fa5;
+      --blue-light: #e8f2ff;
+      --purple: #6d4aff;
+      --amber: #ba7517;
+      --amber-light: #fff4dd;
+      --coral: #a33b2f;
+      --color-background-primary: #ffffff;
+      --color-background-secondary: #f7fafc;
+      --color-background-tertiary: #eef3f7;
+      --color-text-primary: #111827;
+      --color-text-secondary: #64748b;
+      --color-border-secondary: #d8e2ec;
+      --color-border-tertiary: #e5ebf1;
+    }
+
+    html[data-theme="dark"] {
+      --green: #63d082;
+      --green-light: rgba(99, 208, 130, .14);
+      --blue: #7ab7ff;
+      --blue-light: rgba(122, 183, 255, .14);
+      --purple: #b7a7ff;
+      --amber: #f2bd6b;
+      --amber-light: rgba(242, 189, 107, .14);
+      --coral: #fb8c85;
+      --color-background-primary: #111827;
+      --color-background-secondary: #0f1720;
+      --color-background-tertiary: #1f2937;
+      --color-text-primary: #e5edf7;
+      --color-text-secondary: #aeb9c8;
+      --color-border-secondary: #334155;
+      --color-border-tertiary: #263244;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      background: var(--color-background-secondary);
+      color: var(--color-text-primary);
+    }
+
+    .public-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .public-topbar {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 24px;
+      background: var(--color-background-primary);
+      border-bottom: 1px solid var(--color-border-tertiary);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .public-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      color: var(--green);
+    }
+
+    .public-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .public-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 7px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--color-border-secondary);
+      background: var(--color-background-primary);
+      color: var(--color-text-primary);
+      text-decoration: none;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .public-btn:hover {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .main {
+      width: calc(100% - 32px);
+      max-width: none;
+      margin: 16px auto;
+      flex: 1;
+    }
+
+    .page.on { display: block; }
+    .card {
+      background: var(--color-background-primary);
+      border: 1px solid var(--color-border-tertiary);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 14px 32px rgba(15, 23, 42, .07);
+    }
+
+    .material-symbols-outlined.icon-inline {
+      font-size: 18px;
+      line-height: 1;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 640px) {
+      .public-topbar { padding: 0 14px; }
+      .main { width: calc(100% - 20px); margin-top: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="public-shell">
+    <header class="public-topbar">
+      <div class="public-brand">
+        <span class="material-symbols-outlined">inventory_2</span>
+        <span>Archived Projects</span>
+      </div>
+      <div class="public-actions">
+        <button class="public-btn" type="button" onclick="togglePublicTheme()" title="Toggle theme">
+          <span class="material-symbols-outlined icon-inline" id="public-theme-icon">dark_mode</span>
+        </button>
+        <a class="public-btn" href="/login">Login</a>
+      </div>
+    </header>
+    <main class="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script>
+    function togglePublicTheme() {
+      var dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      try { localStorage.setItem('apmsTheme', dark ? 'dark' : 'light'); } catch(e) {}
+      updatePublicThemeIcon();
+    }
+    function updatePublicThemeIcon() {
+      var icon = document.getElementById('public-theme-icon');
+      if (icon) icon.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light_mode' : 'dark_mode';
+    }
+    document.addEventListener('DOMContentLoaded', updatePublicThemeIcon);
+  </script>
+</body>
+</html>

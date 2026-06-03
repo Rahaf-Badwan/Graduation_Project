@@ -36,6 +36,39 @@ def archive_search_page():
     return render_template("shared/archive_search.html", base_template=base_template)
 
 
+@archive_bp.route("/archive")
+@archive_bp.route("/archive/search")
+def public_archive_search_page():
+    return render_template(
+        "shared/archive_search.html",
+        base_template="shared/archive_public_base.html",
+        public_archive=True,
+        archive_verified=bool(session.get("archive_public_university_id")),
+    )
+
+
+def _archive_has_access():
+    return bool(session.get("user_id") or session.get("archive_public_university_id"))
+
+
+def _archive_access_denied():
+    return jsonify({"error": "Please enter your university ID to access archived projects."}), 401
+
+
+@archive_bp.route("/api/archive/public/verify", methods=["POST"])
+def api_public_archive_verify():
+    data = request.get_json(silent=True) or {}
+    university_id = re.sub(r"\s+", "", str(data.get("university_id") or ""))
+    # Public archive access only needs any numeric university ID.
+    # It does NOT have to exist in the users table.
+    if not university_id.isdigit():
+        return jsonify({"error": "Please enter numbers only."}), 400
+
+    session["archive_public_university_id"] = university_id
+    session["archive_public_name"] = ""
+    return jsonify({"success": True})
+
+
 def _archive_report_dirs():
     return [
         os.path.abspath(
@@ -198,13 +231,14 @@ def _inline_pdf_response(path):
 
 
 def _can_view_archive_scores():
-    return session.get("role") != "student"
+    return bool(session.get("user_id")) and session.get("role") != "student"
 
 
 @archive_bp.route("/archive/report/<path:filename>")
 @archive_bp.route("/student/archived-report/<path:filename>")
-@login_required()
 def serve_archived_report(filename):
+    if not _archive_has_access():
+        return _archive_access_denied()
     safe = _archive_basename(filename)
     path = _find_archived_report_path(safe)
     if path:
@@ -218,8 +252,9 @@ def serve_archived_report(filename):
 
 @archive_bp.route("/archive/report/project/<int:project_id>")
 @archive_bp.route("/student/archived-report/project/<int:project_id>")
-@login_required()
 def serve_archived_report_project(project_id):
+    if not _archive_has_access():
+        return _archive_access_denied()
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -275,8 +310,9 @@ def serve_archived_report_project(project_id):
 
 @archive_bp.route("/api/archive/projects", methods=["GET"])
 @archive_bp.route("/student/api/archived-projects", methods=["GET"])
-@login_required()
 def api_archived_projects():
+    if not _archive_has_access():
+        return _archive_access_denied()
     q = (request.args.get("q") or "").strip()
     year = (request.args.get("year") or "").strip()
     ptype = (request.args.get("type") or "").strip()
@@ -441,8 +477,9 @@ def api_archived_projects():
 
 @archive_bp.route("/api/archive/project/<int:project_id>", methods=["GET"])
 @archive_bp.route("/student/api/archived-project/<int:project_id>", methods=["GET"])
-@login_required()
 def api_archived_project_detail(project_id):
+    if not _archive_has_access():
+        return _archive_access_denied()
     can_view_scores = _can_view_archive_scores()
     try:
         db = get_db()
