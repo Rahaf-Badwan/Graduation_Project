@@ -589,20 +589,6 @@ request.path.startswith('/head') else 'student/base.html') %}
   }
 </style>
 
-{% if public_archive %}
-<div class="card ap-public-gate" id="apPublicGate"{% if archive_verified %} style="display:none"{% endif %}>  <div class="ap-public-title">Archived Projects Access</div>
-  <div class="ap-public-copy">
-    Enter your university ID to view archived graduation projects. No login is required.
-  </div>
-  <div class="ap-public-form">
-    <input id="apPublicUid" type="text" inputmode="numeric" pattern="[0-9]*"
-      autocomplete="new-password" data-lpignore="true" placeholder="University ID">
-    <button id="apPublicVerifyBtn" type="button">Continue</button>
-  </div>
-  <div class="ap-public-error" id="apPublicError"></div>
-</div>
-{% endif %}
-
 <div class="page on" id="pg-search">
 <div class="card ap-wrap{% if public_archive %} ap-full-page{% endif %}" id="apArchiveContent"{% if public_archive and not archive_verified %} style="display:none"{% endif %}>    <div class="ap-searchbar">
       <span class="material-symbols-outlined icon-inline"
@@ -777,46 +763,6 @@ request.path.startswith('/head') else 'student/base.html') %}
         renderPagination(data.total || 0, state.perPage);
       } catch (error) {
         $('apMeta').textContent = 'Error: ' + error.message;
-      }
-    }
-
-    async function verifyPublicArchive() {
-      const input = $('apPublicUid');
-      const button = $('apPublicVerifyBtn');
-      const error = $('apPublicError');
-      const universityId = (input?.value || '').trim();
-      error.style.display = 'none';
-      error.textContent = '';
-
-      if (!/^\d+$/.test(universityId)) {
-        error.textContent = 'Please enter numbers only.';
-        error.style.display = 'block';
-        return;
-      }
-
-      button.disabled = true;
-      button.textContent = 'Checking...';
-      try {
-        const response = await fetch('/api/archive/public/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ university_id: universityId })
-        });
-        const data = await response.json();
-        if (!response.ok || data.error) {
-          throw new Error(data.error || 'Could not verify this ID.');
-        }
-
-        archiveVerified = true;
-        $('apPublicGate').style.display = 'none';
-        $('apArchiveContent').style.display = '';
-        await load();
-      } catch (err) {
-        error.textContent = err.message || 'Could not verify this ID.';
-        error.style.display = 'block';
-      } finally {
-        button.disabled = false;
-        button.textContent = 'Continue';
       }
     }
 
@@ -1066,17 +1012,6 @@ request.path.startswith('/head') else 'student/base.html') %}
       state.page = 1;
       load();
     });
-
-    if (PUBLIC_ARCHIVE) {
-      const input = $('apPublicUid');
-      const button = $('apPublicVerifyBtn');
-      if (button) button.addEventListener('click', verifyPublicArchive);
-      if (input) {
-        input.addEventListener('keydown', event => {
-          if (event.key === 'Enter') verifyPublicArchive();
-        });
-      }
-    }
 
     $('apList').addEventListener('click', event => {
       const button = event.target.closest('[data-id]');

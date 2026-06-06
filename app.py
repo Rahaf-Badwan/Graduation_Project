@@ -528,12 +528,15 @@ def _load_ai_conversation_context(user_id, session_id, limit=10):
 def api_ai_archived_projects():
     projects = [
         {
+            "project_id": project.get("project_id"),
             "title": project.get("title"),
             "project_type": project.get("project_type"),
             "final_score": project.get("final_score"),
             "pdf": project.get("pdf"),
+            "pdf_key": project.get("pdf_key"),
             "file_path": project.get("file_path"),
             "status": project.get("status"),
+            "source": project.get("source"),
         }
         for project in get_archived_projects()
     ]

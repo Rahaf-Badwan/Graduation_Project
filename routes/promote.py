@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from flask import Blueprint, jsonify, session
+from flask import Blueprint, jsonify, request, session
 
 from auth import login_required
+from ai_pdf_indexer import index_archived_project_reports
 from db import get_db
 
 
@@ -59,6 +60,17 @@ def _ensure_project_course_promotions_schema(cursor):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
     )
+
+
+def _ensure_archive_visibility_schema(cursor):
+    if not _db_column_exists(cursor, "projects", "archive_visibility"):
+        cursor.execute(
+            """
+            ALTER TABLE projects
+            ADD COLUMN archive_visibility ENUM('public','private') NOT NULL DEFAULT 'public'
+            AFTER status
+            """
+        )
 
 
 def _notification_enum_values(cursor):
@@ -629,6 +641,7 @@ def api_get_comp4300_students():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_archive_visibility_schema(cursor)
 
         cursor.execute(
             """
@@ -636,6 +649,7 @@ def api_get_comp4300_students():
                    COALESCE(NULLIF(p.group_name, ''), NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS group_name,
                    COALESCE(NULLIF(p.title, ''), 'Graduation Project') AS title,
                    COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+                   COALESCE(p.archive_visibility, 'public') AS archive_visibility,
                    COALESCE(
                        GROUP_CONCAT(
                            DISTINCT u.full_name
@@ -661,7 +675,8 @@ def api_get_comp4300_students():
               AND COALESCE(p.status, '') <> 'archived'
               AND u.role = 'student'
               AND u.is_active = TRUE
-            GROUP BY p.project_id, p.group_name, p.title, u_sup.full_name, scs.marked_at
+            GROUP BY p.project_id, p.group_name, p.title, p.archive_visibility,
+                     u_sup.full_name, scs.marked_at
             HAVING student_count > 0
             ORDER BY scs.marked_at DESC, p.project_id DESC
             """
@@ -701,6 +716,9 @@ def api_archive_all():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_archive_visibility_schema(cursor)
+        data = request.get_json(silent=True) or {}
+        requested_visibilities = data.get("project_visibilities") or {}
 
         cursor.execute(
             """
@@ -719,11 +737,24 @@ def api_archive_all():
         project_ids = [row["project_id"] for row in cursor.fetchall()]
 
         if project_ids:
-            placeholders = ",".join(["%s"] * len(project_ids))
-            cursor.execute(
-                f"UPDATE projects SET status = 'archived' WHERE project_id IN ({placeholders})",
-                tuple(project_ids),
-            )
+            for project_id in project_ids:
+                visibility = str(
+                    requested_visibilities.get(str(project_id))
+                    or requested_visibilities.get(project_id)
+                    or "public"
+                ).lower()
+                if visibility not in {"public", "private"}:
+                    visibility = "public"
+
+                cursor.execute(
+                    """
+                    UPDATE projects
+                    SET status = 'archived',
+                        archive_visibility = %s
+                    WHERE project_id = %s
+                    """,
+                    (visibility, project_id),
+                )
 
             for project_id in project_ids:
                 for student in _project_student_user_ids(cursor, project_id):
@@ -739,9 +770,30 @@ def api_archive_all():
                     )
 
         db.commit()
+
+        try:
+            index_results = index_archived_project_reports(project_ids)
+        except Exception as index_exc:
+            index_results = [
+                {
+                    "project_id": project_id,
+                    "indexed": False,
+                    "error": str(index_exc),
+                }
+                for project_id in project_ids
+            ]
+        failed_indexes = [
+            result for result in index_results if not result.get("indexed")
+        ]
         cursor.close()
         db.close()
-        return jsonify({"message": f"{len(project_ids)} project(s) archived successfully."}), 200
+        response = {
+            "message": f"{len(project_ids)} project(s) archived successfully.",
+            "indexed_reports": len(index_results) - len(failed_indexes),
+        }
+        if failed_indexes:
+            response["index_warnings"] = failed_indexes
+        return jsonify(response), 200
     except Exception as e:
         try:
             db.rollback()

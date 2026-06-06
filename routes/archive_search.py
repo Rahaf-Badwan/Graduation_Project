@@ -43,16 +43,51 @@ def public_archive_search_page():
         "shared/archive_search.html",
         base_template="shared/archive_public_base.html",
         public_archive=True,
-        archive_verified=bool(session.get("archive_public_university_id")),
+        archive_verified=True,
     )
 
 
 def _archive_has_access():
-    return bool(session.get("user_id") or session.get("archive_public_university_id"))
+    return True
+
+
+def _archive_is_logged_in():
+    return bool(session.get("user_id"))
 
 
 def _archive_access_denied():
-    return jsonify({"error": "Please enter your university ID to access archived projects."}), 401
+    return jsonify({"error": "Please log in to access this archived project."}), 401
+
+
+def _archive_db_column_exists(cursor, table_name, column_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+        """,
+        (table_name, column_name),
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _ensure_archive_visibility_schema(cursor):
+    if not _archive_db_column_exists(cursor, "projects", "archive_visibility"):
+        cursor.execute(
+            """
+            ALTER TABLE projects
+            ADD COLUMN archive_visibility ENUM('public','private') NOT NULL DEFAULT 'public'
+            AFTER status
+            """
+        )
+
+
+def _archive_visibility_condition(alias="p"):
+    if _archive_is_logged_in():
+        return None
+    return f"COALESCE({alias}.archive_visibility, 'public') = 'public'"
 
 
 @archive_bp.route("/api/archive/public/verify", methods=["POST"])
@@ -237,7 +272,7 @@ def _can_view_archive_scores():
 @archive_bp.route("/archive/report/<path:filename>")
 @archive_bp.route("/student/archived-report/<path:filename>")
 def serve_archived_report(filename):
-    if not _archive_has_access():
+    if not _archive_is_logged_in():
         return _archive_access_denied()
     safe = _archive_basename(filename)
     path = _find_archived_report_path(safe)
@@ -258,14 +293,18 @@ def serve_archived_report_project(project_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_archive_visibility_schema(cursor)
+        visibility_sql = _archive_visibility_condition("p")
+        visibility_clause = f" AND {visibility_sql}" if visibility_sql else ""
         cursor.execute(
-            """
+            f"""
             SELECT p.title, pf.file_name, pf.file_path, pf.file_mime, pf.file_data
             FROM   projects p
             LEFT JOIN project_files pf
                    ON pf.project_id = p.project_id
                   AND pf.file_type = 'final_report'
             WHERE  p.project_id = %s AND p.status = 'archived'
+              {visibility_clause}
             LIMIT  1
         """,
             (project_id,),
@@ -324,9 +363,15 @@ def api_archived_projects():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_archive_visibility_schema(cursor)
 
         where = ["p.status = 'archived'"]
         params = []
+        visibility_sql = _archive_visibility_condition("p")
+        if visibility_sql:
+            where.append(visibility_sql)
+        base_where_sql = " AND ".join(where)
+        base_params = list(params)
 
         # Use the manually stored DB values first, then fall back to the real
         # relational data already saved in projects/semesters/faculty/users.
@@ -408,11 +453,11 @@ def api_archived_projects():
             SELECT DISTINCT {year_expr} AS academic_year
             FROM projects p
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
-            WHERE p.status = 'archived'
+            WHERE {base_where_sql}
               AND {year_expr} IS NOT NULL
               AND {year_expr} <> ''
             ORDER BY academic_year DESC
-        """)
+        """, base_params)
         years = [row["academic_year"] for row in cursor.fetchall()]
 
         # Check if any archived project still has no year after fallback.
@@ -420,9 +465,9 @@ def api_archived_projects():
             SELECT COUNT(*) AS cnt
             FROM projects p
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
-            WHERE p.status = 'archived'
+            WHERE {base_where_sql}
               AND ({year_expr} IS NULL OR {year_expr} = '')
-        """)
+        """, base_params)
         has_unknown = (cursor.fetchone() or {}).get("cnt", 0) > 0
 
         # Supervisor filter values: override first, otherwise faculty/user name.
@@ -431,19 +476,24 @@ def api_archived_projects():
             FROM projects p
             LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
-            WHERE p.status = 'archived'
+            WHERE {base_where_sql}
               AND {supervisor_expr} IS NOT NULL
               AND {supervisor_expr} <> ''
             ORDER BY sup_name
-        """)
+        """, base_params)
         supervisors = [{"name": r["sup_name"]} for r in cursor.fetchall()]
 
         # Collect all distinct project types from archived projects
-        cursor.execute("""
-            SELECT DISTINCT project_type
-            FROM projects
-            WHERE status = 'archived' AND project_type IS NOT NULL AND project_type <> ''
-        """)
+        cursor.execute(f"""
+            SELECT DISTINCT p.project_type
+            FROM projects p
+            LEFT JOIN semesters s ON s.semester_id = p.semester_id
+            LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+            WHERE {base_where_sql}
+              AND p.project_type IS NOT NULL
+              AND p.project_type <> ''
+        """, base_params)
         type_set = set()
         for r in cursor.fetchall():
             pt = r["project_type"]
@@ -484,18 +534,23 @@ def api_archived_project_detail(project_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_archive_visibility_schema(cursor)
+        visibility_sql = _archive_visibility_condition("p")
+        visibility_clause = f" AND {visibility_sql}" if visibility_sql else ""
 
         cursor.execute(
-            """
+            f"""
             SELECT p.project_id, p.title, p.abstract, p.keywords,
                    p.project_type, p.final_score, p.submission_date,
                    COALESCE(NULLIF(p.year_override, ''), s.academic_year) AS academic_year,
-                   COALESCE(NULLIF(p.supervisor_name_override, ''), u_sup.full_name) AS supervisor_name
+                   COALESCE(NULLIF(p.supervisor_name_override, ''), u_sup.full_name) AS supervisor_name,
+                   p.archive_visibility
             FROM   projects p
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
             LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
             WHERE  p.project_id = %s AND p.status = 'archived'
+              {visibility_clause}
         """,
             (project_id,),
         )

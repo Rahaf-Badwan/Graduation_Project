@@ -8,6 +8,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+from ai_pdf_indexer import indexed_pdf_key
 from db import get_db
 
 
@@ -380,6 +381,121 @@ def load_catalog():
     return data if isinstance(data, list) else []
 
 
+def _ai_db_column_exists(cursor, table_name, column_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+        """,
+        (table_name, column_name),
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _project_type_to_string(value):
+    if isinstance(value, set):
+        return ", ".join(sorted(value))
+    return str(value or "")
+
+
+def load_db_archived_projects():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        year_expr = (
+            "COALESCE(NULLIF(p.year_override, ''), s.academic_year)"
+            if _ai_db_column_exists(cursor, "projects", "year_override")
+            else "s.academic_year"
+        )
+        supervisor_expr = (
+            "COALESCE(NULLIF(p.supervisor_name_override, ''), u_sup.full_name)"
+            if _ai_db_column_exists(cursor, "projects", "supervisor_name_override")
+            else "u_sup.full_name"
+        )
+
+        cursor.execute(
+            f"""
+            SELECT p.project_id, p.title, p.project_type, p.final_score,
+                   p.status, p.submission_date, p.abstract, p.keywords,
+                   {year_expr} AS academic_year,
+                   {supervisor_expr} AS supervisor_name,
+                   pf.file_name, pf.file_path
+            FROM projects p
+            LEFT JOIN semesters s ON s.semester_id = p.semester_id
+            LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+            LEFT JOIN project_files pf
+              ON pf.project_id = p.project_id
+             AND pf.file_type = 'final_report'
+            WHERE p.status = 'archived'
+            ORDER BY p.submission_date DESC, p.project_id DESC
+            """
+        )
+
+        projects = []
+        for row in cursor.fetchall():
+            file_name = row.get("file_name") or ""
+            file_path = row.get("file_path") or ""
+            pdf_key = indexed_pdf_key(row.get("project_id"), file_name or file_path)
+            projects.append(
+                {
+                    "project_id": row.get("project_id"),
+                    "title": row.get("title") or "",
+                    "project_type": _project_type_to_string(row.get("project_type")),
+                    "final_score": (
+                        float(row["final_score"]) if row.get("final_score") is not None else None
+                    ),
+                    "status": row.get("status") or "archived",
+                    "submission_date": str(row.get("submission_date") or ""),
+                    "academic_year": row.get("academic_year") or "",
+                    "supervisor_name": row.get("supervisor_name") or "",
+                    "abstract": row.get("abstract") or "",
+                    "keywords": row.get("keywords") or "",
+                    "pdf": pdf_key,
+                    "pdf_key": pdf_key,
+                    "file_name": file_name,
+                    "file_path": file_path,
+                    "source": "database",
+                }
+            )
+
+        cursor.close()
+        db.close()
+        return projects
+    except Exception:
+        return []
+
+
+def combined_archived_projects():
+    merged = {}
+    for project in load_catalog():
+        title_key = normalize(project.get("title", ""))
+        if title_key:
+            item = dict(project)
+            item.setdefault("source", "catalog")
+            merged[title_key] = item
+
+    for project in load_db_archived_projects():
+        title_key = normalize(project.get("title", ""))
+        if not title_key:
+            continue
+        previous = merged.get(title_key, {})
+        item = {**previous, **project}
+        db_pdf_key = project.get("pdf_key")
+        indexed_files = load_pdf_index().get("files", {})
+        if db_pdf_key not in indexed_files and previous.get("pdf"):
+            item["pdf"] = previous.get("pdf")
+            item["pdf_key"] = previous.get("pdf_key") or previous.get("pdf")
+            item["file_path"] = previous.get("file_path") or item.get("file_path")
+        merged[title_key] = item
+
+    return list(merged.values())
+
+
 @lru_cache(maxsize=1)
 def load_pdf_index():
     data = _read_json(PDF_INDEX_JSON, {"builtAt": None, "files": {}})
@@ -407,6 +523,25 @@ def compact(text):
 
 def tokenize(text):
     return [part for part in normalize(text).split() if len(part) > 2]
+
+
+GENERIC_PROJECT_TITLE_TOKENS = {
+    "smart",
+    "project",
+    "system",
+    "app",
+    "application",
+    "platform",
+    "website",
+    "web",
+    "mobile",
+    "management",
+}
+
+
+def title_match_tokens(title):
+    tokens = [token for token in tokenize(title) if token not in GENERIC_PROJECT_TITLE_TOKENS]
+    return tokens or tokenize(title)
 
 
 def token_overlap(left, right):
@@ -441,25 +576,36 @@ def is_group_member_query(question):
 
 def match_project(question):
     q = normalize(question)
-    q_words = set(q.split())
+    q_words = set(tokenize(q))
     best = None
     best_score = 0.0
-    for project in load_catalog():
+    for project in combined_archived_projects():
         title = project.get("title", "")
         title_norm = normalize(title)
-        title_words = [word for word in title_norm.split() if len(word) > 3]
+        title_words = title_match_tokens(title)
         if title_norm and (
             title_norm in q
             or (title_words and all(word in q_words for word in title_words))
         ):
             return project
 
+        title_overlap = set(title_words) & q_words
+        compact_title = compact(title)
+        compact_question = compact(q)
+        strong_title_hint = compact_title and (
+            compact_title in compact_question or compact_question in compact_title
+        )
+        if not strong_title_hint and not title_overlap:
+            continue
+
         score = token_overlap(q, title)
+        if len(title_overlap) == 1 and len(title_words) > 1:
+            score *= 0.55
         for key in ("pdf", "file_path", "file_name"):
             value = project.get(key)
             if value:
                 score = max(score, token_overlap(q, Path(str(value)).stem))
-        if score > best_score and score >= 0.30:
+        if score > best_score and (strong_title_hint or score >= 0.30):
             best_score = score
             best = project
     return best
@@ -515,7 +661,7 @@ def _candidate_pdf_names(project):
     if not project:
         return []
     names = []
-    for key in ("pdf", "file_name", "file_path"):
+    for key in ("pdf_key", "pdf", "file_name", "file_path"):
         value = project.get(key)
         if value:
             names.append(Path(str(value)).name)
@@ -531,12 +677,19 @@ def _resolve_pdf_key(project):
             if compact(name) and (compact(name) in compact(key) or compact(key) in compact(name)):
                 return key
 
+    if project and project.get("source") == "database" and project.get("pdf_key"):
+        return None
+
     title = project.get("title", "") if project else ""
+    title_tokens = set(title_match_tokens(title))
     best_key = None
     best_score = 0.0
     for key in files:
         if compact(title) and compact(title) in compact(key):
             return key
+        key_tokens = set(title_match_tokens(Path(key).stem))
+        if title_tokens and key_tokens and not (title_tokens & key_tokens):
+            continue
         score = max(token_overlap(title, key), token_overlap(title, Path(key).stem))
         if score > best_score:
             best_key = key
@@ -1178,7 +1331,7 @@ def ask_apms_ai(question, reply_to=None, conversation_context=None):
 
 
 def get_archived_projects():
-    return load_catalog()
+    return combined_archived_projects()
 
 
 def get_ai_health():

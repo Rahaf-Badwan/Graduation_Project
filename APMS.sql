@@ -147,6 +147,8 @@ CREATE TABLE IF NOT EXISTS projects (
                         'archived',
                         'solo_pending'
                       )               NOT NULL DEFAULT 'draft',
+    archive_visibility ENUM('public','private')
+                                      NOT NULL DEFAULT 'public',
     submission_date   DATE            NULL,
     coordinator_notes TEXT            NULL,
     rejection_reason  TEXT            NULL,
@@ -5137,6 +5139,21 @@ SELECT u.user_id, u.university_id, u.full_name, u.email,
 -- ============================================================
 
 SET @db := DATABASE();
+
+SET @sql := (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE projects ADD COLUMN archive_visibility ENUM(''public'',''private'') NOT NULL DEFAULT ''public'' AFTER status',
+        'SELECT "projects.archive_visibility already exists"'
+    )
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @db
+      AND TABLE_NAME   = 'projects'
+      AND COLUMN_NAME  = 'archive_visibility'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 SET @sql := (
     SELECT IF(

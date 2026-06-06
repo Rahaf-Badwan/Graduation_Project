@@ -16,7 +16,7 @@
       align-items: center;
       gap: 12px;
       justify-content: space-between;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
     #pg-feedback .fb-subtitle {
       color: var(--color-text-secondary);
@@ -27,14 +27,14 @@
     #pg-feedback .fb-layout {
       align-items: start;
       display: grid;
-      gap: 14px;
-      grid-template-columns: minmax(0, 1.65fr) minmax(260px, .85fr);
+      gap: 16px;
+      grid-template-columns: minmax(0, 1.95fr) minmax(280px, .7fr);
     }
     #pg-feedback .fb-side { display: grid; gap: 14px; }
     #pg-feedback .fb-list { display: grid; }
     #pg-feedback .fb-item {
       border-bottom: 1px solid #edf2ef;
-      padding: 16px;
+      padding: 18px;
     }
     #pg-feedback .fb-item:last-child { border-bottom: 0; }
     #pg-feedback .fb-head {
@@ -46,7 +46,8 @@
     #pg-feedback .fb-avatar {
       align-items: center;
       background: var(--green-light);
-      border-radius: 50%;
+      border: 1px solid rgba(22, 101, 52, .12);
+      border-radius: 12px;
       color: var(--green);
       display: flex;
       flex: 0 0 38px;
@@ -69,15 +70,24 @@
     }
     #pg-feedback .fb-date { padding-top: 2px; white-space: nowrap; }
     #pg-feedback .fb-project {
+      align-items: center;
+      background: rgba(22, 101, 52, .08);
+      border-radius: 999px;
       color: var(--green);
+      display: inline-flex;
       font-weight: 800;
       margin-top: 12px;
+      padding: 4px 9px;
     }
     #pg-feedback .fb-text {
+      background: linear-gradient(180deg, var(--color-background-tertiary), rgba(246, 248, 247, .72));
+      border: 1px solid #edf2ef;
+      border-radius: 12px;
       color: var(--color-text-primary);
       font-size: 13px;
       line-height: 1.75;
-      margin-top: 7px;
+      margin-top: 12px;
+      padding: 12px 14px;
       white-space: pre-wrap;
     }
     #pg-feedback .fb-tags { flex-wrap: wrap; gap: 6px; margin-top: 11px; }
@@ -100,61 +110,40 @@
     }
     #pg-feedback .fb-item-point,
     #pg-feedback .fb-area {
-      background: var(--color-background-tertiary);
-      border-radius: 9px;
+      background: #fff8ec;
+      border: 1px solid rgba(217, 119, 6, .12);
+      border-radius: 10px;
       color: var(--color-text-primary);
       font-size: 12px;
       line-height: 1.5;
-      padding: 8px 10px;
+      padding: 9px 11px;
     }
-    #pg-feedback .fb-item-point::before { color: var(--green); content: "- "; font-weight: 900; }
+    #pg-feedback .fb-item-point::before { color: var(--amber); content: "- "; font-weight: 900; }
     #pg-feedback .fb-item-point.resolved,
     #pg-feedback .fb-area.resolved { color: var(--green); text-decoration: line-through; }
-    #pg-feedback .fb-summary {
-      padding: 10px 16px 16px;
-      text-align: center;
-    }
-    #pg-feedback .fb-average {
-      color: var(--green);
-      font-size: 36px;
-      font-weight: 800;
-      line-height: 1;
-      margin: 7px 0 4px;
-    }
     #pg-feedback .fb-muted,
     #pg-feedback .fb-empty {
       color: var(--color-text-secondary);
       font-size: 12px;
       line-height: 1.6;
     }
-    #pg-feedback .fb-score-list,
     #pg-feedback .fb-area-list { display: grid; gap: 7px; padding: 0 16px 16px; }
-    #pg-feedback .fb-score-row {
-      align-items: center;
-      display: grid;
-      gap: 7px;
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-    #pg-feedback .fb-score-name {
-      color: var(--color-text-primary);
-      font-size: 11px;
-      font-weight: 700;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    #pg-feedback .fb-score-value { color: var(--green); font-size: 12px; font-weight: 900; }
-    #pg-feedback .fb-score-track {
-      background: #edf2ef;
-      border-radius: 999px;
-      grid-column: 1 / -1;
-      height: 5px;
-      overflow: hidden;
-    }
-    #pg-feedback .fb-score-fill { background: var(--green); border-radius: inherit; height: 100%; }
     #pg-feedback .fb-area.important { background: var(--amber-light); color: var(--amber); }
     #pg-feedback .fb-area.urgent { background: var(--coral-light); color: var(--coral); }
     #pg-feedback .fb-empty { padding: 26px 16px; text-align: center; }
+    #pg-feedback .fb-side .card {
+      position: sticky;
+      top: 16px;
+    }
+    #pg-feedback .fb-area-list {
+      padding-top: 4px;
+    }
+    #pg-feedback .fb-area-empty-note {
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 0 16px 16px;
+    }
     @media (max-width: 840px) {
       #pg-feedback { padding: 14px 12px 80px; }
       #pg-feedback .fb-layout { grid-template-columns: 1fr; }
@@ -176,7 +165,6 @@
         <div style="font-size:15px;font-weight:900;color:var(--color-text-primary)">Supervisor Feedback</div>
         <div class="fb-subtitle">Review the notes and improvement points sent by your supervisor.</div>
       </div>
-      <button class="btn btn-outline" type="button" onclick="loadStudentFeedback()">Refresh</button>
     </div>
 
     <div class="fb-layout">
@@ -191,15 +179,6 @@
       </div>
 
       <div class="fb-side">
-        <div class="card">
-          <div class="card-hd"><span class="card-title">Grades Summary</span></div>
-          <div class="fb-summary">
-            <div id="feedbackAverage" class="fb-average">-</div>
-            <div class="fb-muted">Average grade so far</div>
-          </div>
-          <div id="feedbackScores" class="fb-score-list"></div>
-        </div>
-
         <div class="card">
           <div class="card-hd"><span class="card-title">Areas Needing Improvement</span></div>
           <div id="feedbackAreas" class="fb-area-list">
@@ -266,22 +245,6 @@
     `;
   }
 
-  function renderScores(items, summary) {
-    const average = document.getElementById('feedbackAverage');
-    const box = document.getElementById('feedbackScores');
-    const scores = items.filter(item => item.score != null);
-    average.textContent = summary.average_score == null ? '-' : summary.average_score;
-    box.innerHTML = scores.length
-      ? scores.map(item => `
-          <div class="fb-score-row">
-            <div class="fb-score-name">${esc(item.reviewer_name)} &middot; ${esc(item.project_title)}</div>
-            <div class="fb-score-value">${esc(item.score)}</div>
-            <div class="fb-score-track"><div class="fb-score-fill" style="width:${Math.max(0, Math.min(100, Number(item.score) || 0))}%"></div></div>
-          </div>
-        `).join('')
-      : '<div class="fb-empty" style="padding:2px 0">No grades have been added yet.</div>';
-  }
-
   function renderAreas(items) {
     const box = document.getElementById('feedbackAreas');
     const areas = items.flatMap(item => (item.improvement_points || []).map(point => ({
@@ -306,17 +269,14 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.error) throw new Error(data.error || 'Could not load feedback.');
       const items = data.feedback || [];
-      const summary = data.summary || {};
       count.textContent = `${items.length} item(s)`;
       list.innerHTML = items.length
         ? items.map(feedbackHtml).join('')
         : '<div class="fb-empty">No feedback has been sent by your supervisor yet.</div>';
-      renderScores(items, summary);
       renderAreas(items);
     } catch (error) {
       count.textContent = 'Error';
       list.innerHTML = `<div class="fb-empty">Feedback error: ${esc(error.message)}</div>`;
-      renderScores([], {});
       renderAreas([]);
     }
   }

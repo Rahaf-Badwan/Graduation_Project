@@ -233,6 +233,36 @@ function renderGroupRow(group, badgeText, badgeColor){
   '</div>';
 }
 
+function renderArchiveProjectRow(project){
+  var name = project.group_name || project.title || ('Project ' + project.project_id);
+  var title = project.title && project.title !== name ? project.title : '';
+  var students = project.students || '-';
+  var supervisor = project.supervisor_name || 'Not assigned';
+  var count = project.student_count || 0;
+  var visibility = project.archive_visibility === 'private' ? 'private' : 'public';
+
+  return '<div style="padding:10px 12px; border-bottom:0.5px solid var(--color-border-tertiary);">' +
+    '<div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">' +
+      '<div style="min-width:0; flex:1;">' +
+        '<div style="font-size:13px; font-weight:700; color:var(--color-text-primary);">' + escapeText(name) + '</div>' +
+        (title ? '<div style="font-size:11px; color:var(--color-text-secondary); margin-top:2px;">' + escapeText(title) + '</div>' : '') +
+      '</div>' +
+      '<span style="font-size:11px; padding:2px 8px; border-radius:20px; background:var(--color-background-tertiary); color:#dc2626; border:0.5px solid var(--color-border-tertiary); white-space:nowrap;">Ready for Archive</span>' +
+    '</div>' +
+    '<div style="font-size:11px; color:var(--color-text-secondary); margin-top:6px; line-height:1.5;">' +
+      '<b>Students (' + escapeText(count) + '):</b> ' + escapeText(students) + '<br>' +
+      '<b>Supervisor:</b> ' + escapeText(supervisor) +
+    '</div>' +
+    '<label style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; font-size:11px; color:var(--color-text-secondary);">' +
+      '<span>Archive visibility</span>' +
+      '<select class="archive-visibility-select" data-project-id="' + escapeText(project.project_id) + '" style="border:0.5px solid var(--color-border-secondary); border-radius:8px; padding:6px 8px; font-size:11px; color:var(--color-text-primary); background:var(--color-background-primary);">' +
+        '<option value="public"' + (visibility === 'public' ? ' selected' : '') + '>Public</option>' +
+        '<option value="private"' + (visibility === 'private' ? ' selected' : '') + '>Private</option>' +
+      '</select>' +
+    '</label>' +
+  '</div>';
+}
+
 async function loadPassedStudents(){
   var list = document.getElementById('passed-students-list');
   list.innerHTML = '<div style="padding:12px; color:var(--color-text-tertiary);">Loading...</div>';
@@ -279,9 +309,7 @@ async function loadComp4300Students(){
       return;
     }
 
-    list.innerHTML = projects.map(function(p){
-      return renderGroupRow(p, 'Ready for Archive', '#dc2626');
-    }).join('');
+    list.innerHTML = projects.map(renderArchiveProjectRow).join('');
   }catch(e){
     list.innerHTML = '<div style="padding:12px; color:var(--color-text-danger);">' + escapeText(e.message || 'Could not load projects.') + '</div>';
   }
@@ -316,9 +344,20 @@ async function archiveAll(){
   var btn = document.getElementById('archiveBtn');
   btn.disabled = true;
   btn.textContent = 'Archiving...';
+  var projectVisibilities = {};
+
+  document.querySelectorAll('.archive-visibility-select').forEach(function(select){
+    if(select.dataset.projectId){
+      projectVisibilities[select.dataset.projectId] = select.value === 'private' ? 'private' : 'public';
+    }
+  });
 
   try{
-    var res = await fetch('/head/api/students/archive-all', {method: 'POST'});
+    var res = await fetch('/head/api/students/archive-all', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({project_visibilities: projectVisibilities})
+    });
     var data = await res.json();
 
     if(res.ok){
