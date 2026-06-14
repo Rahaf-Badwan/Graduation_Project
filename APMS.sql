@@ -682,10 +682,10 @@ INSERT IGNORE INTO users (university_id, full_name, email, password_hash, role, 
 ('1006', 'Dr. Mamoun Nawahdah',     '1006@birzeit.edu', '$2b$12$ljZY7r8ALYi62IyesXQ84uieyNMz2MXVJK.QI4Eu7ot9abWAa7TAG',   'supervisor',         'MN', TRUE),
 ('1007', 'Dr. Hafez Barghouthi',    '1007@birzeit.edu', '$2b$12$.Uge.NmsvHbi9uSDgc1rhOYjO3Q1HAtYCLeN3YL1ctrGUKeRKo1ti',   'supervisor',         'HB', TRUE),
 -- Students            (IDs: 1220xxx)
-('1220654', 'Rahaf Badwan',         '1220654@students.birzeit.edu', '$2b$12$eJmEAFs2Cci7.foj61N6tOthlgHqqs0XccNvIRuzvkK70jQixoWb.', 'student', 'RB', TRUE),
-('1220670', 'Amna Abu Muslim',      '1220670@students.birzeit.edu', '$2b$12$1ONCgGY62binf5lUfYs6qekRIUhkUObqIs55tu.89rGMGOAsp0Llu', 'student', 'AM', TRUE),
-('1220174', 'Tima Abd',             '1220174@students.birzeit.edu', '$2b$12$OxHQ1TKrYWOQ6UUw8pN15.APXR8zjzAvrJkpUPpnkDtJFPPAo92Z.', 'student', 'TA', TRUE),
-('1220900', 'Mona Nassar',          '1220900@students.birzeit.edu', '$2b$12$m/RTVrKRx.lsECFuFa6yguuR1rRxZO8i0QAxQun/7ojQZjq6M7D3G', 'student', 'MN', TRUE);
+('1220654', 'Rahaf Badwan',         '1220654@student.birzeit.edu', '$2b$12$eJmEAFs2Cci7.foj61N6tOthlgHqqs0XccNvIRuzvkK70jQixoWb.', 'student', 'RB', TRUE),
+('1220670', 'Amna Abu Muslim',      '1220670@student.birzeit.edu', '$2b$12$1ONCgGY62binf5lUfYs6qekRIUhkUObqIs55tu.89rGMGOAsp0Llu', 'student', 'AM', TRUE),
+('1220174', 'Tima Abd',             '1220174@student.birzeit.edu', '$2b$12$OxHQ1TKrYWOQ6UUw8pN15.APXR8zjzAvrJkpUPpnkDtJFPPAo92Z.', 'student', 'TA', TRUE),
+('1220900', 'Mona Nassar',          '1220900@student.birzeit.edu', '$2b$12$m/RTVrKRx.lsECFuFa6yguuR1rRxZO8i0QAxQun/7ojQZjq6M7D3G', 'student', 'MN', TRUE);
 
 
 SET @db := DATABASE();

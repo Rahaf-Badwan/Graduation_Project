@@ -35,7 +35,7 @@ from routes.general_supervisors import general_supervisors_bp, supervisor_api_bp
 from routes.supervisor_progress_submitted_api import supervisor_progress_api_bp
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+app.secret_key = os.environ.get("SECRET_KEY", "apms-dev-secret-key")
 AI_RESPONSE_TIMEOUT_SECONDS = int(os.environ.get("AI_RESPONSE_TIMEOUT_SECONDS", "55"))
 _ai_executor = ThreadPoolExecutor(max_workers=2)
 
@@ -44,7 +44,7 @@ app.config["MAIL_SERVER"] = "smtp.gmail.com"
 app.config["MAIL_PORT"] = 587
 app.config["MAIL_USE_TLS"] = True
 app.config["MAIL_USERNAME"] = "rahafbadwan574@gmail.com"
-app.config["MAIL_PASSWORD"] = "ykma scjl fdwg ohlt"
+app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
 app.config["MAIL_DEFAULT_SENDER"] = (
     "APMS — Birzeit University",
     "rahafbadwan574@gmail.com",
