@@ -380,6 +380,24 @@ def reset_password(token):
 # ─── Dashboard ───────────────────────────────────────────────────────────
 @app.route("/dashboard")
 def dashboard():
+    if "user_id" in session and "original_role" not in session:
+        try:
+            db = get_db()
+            cursor = db.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT role FROM users WHERE user_id = %s AND is_active = TRUE",
+                (session.get("user_id"),),
+            )
+            user = cursor.fetchone()
+            cursor.close()
+            db.close()
+            if user:
+                session["role"] = user["role"]
+            else:
+                return redirect(url_for("logout"))
+        except Exception:
+            pass
+
     role = session.get("role")
     routes = {
         "student": "student.dashboard",

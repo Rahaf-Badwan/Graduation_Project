@@ -1,5 +1,6 @@
 from flask import session, redirect, url_for, request, jsonify
 from functools import wraps
+from db import get_db
 
 
 def _wants_json_response():
@@ -19,6 +20,33 @@ def login_required(role=None):
                     )
                 return redirect(url_for("login_page"))
 
+            if "original_role" not in session:
+                try:
+                    db = get_db()
+                    cursor = db.cursor(dictionary=True)
+                    cursor.execute(
+                        """
+                        SELECT role, full_name, avatar_initials
+                        FROM users
+                        WHERE user_id = %s AND is_active = TRUE
+                        """,
+                        (session.get("user_id"),),
+                    )
+                    user = cursor.fetchone()
+                    cursor.close()
+                    db.close()
+                    if not user:
+                        session.clear()
+                        if _wants_json_response():
+                            return jsonify({"error": "Please log in again."}), 401
+                        return redirect(url_for("login_page"))
+                    session["role"] = user["role"]
+                    session["full_name"] = user["full_name"]
+                    if user.get("avatar_initials"):
+                        session["avatar_initials"] = user["avatar_initials"]
+                except Exception:
+                    pass
+
             if role and session.get("role") != role:
                 if _wants_json_response():
                     return (
@@ -27,7 +55,7 @@ def login_required(role=None):
                         ),
                         403,
                     )
-                return redirect(url_for("login_page"))
+                return redirect(url_for("dashboard"))
 
             return f(*args, **kwargs)
 

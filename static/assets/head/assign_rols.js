@@ -133,6 +133,9 @@ function loadCourse(courseCode){
             </option>
           `;
         });
+        if (data.coordinator && data.coordinator.faculty_id) {
+          doctorSelect.value = String(data.coordinator.faculty_id);
+        }
 
       })
       .catch(err => console.error(err));
@@ -159,7 +162,7 @@ function assignCoordinator(facultyId){
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
     },
-    body: `faculty_id=${facultyId}&semester_id=${semesterId}&assigned_by=2`
+    body: `faculty_id=${encodeURIComponent(facultyId)}&semester_id=${encodeURIComponent(semesterId)}&assigned_by=2`
   })
   .then(res => res.json())
   .then(data => {
@@ -173,7 +176,10 @@ function assignCoordinator(facultyId){
       resetBtn();
     }, 1500); 
   })
-  .catch(() => showToast("Something want wrong.", "error"))
+  .catch(() => {
+    showToast("Something went wrong.", "error");
+    resetBtn();
+  })
  
 }
 

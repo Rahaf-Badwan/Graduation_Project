@@ -1,9 +1,23 @@
-from datetime import timedelta
-import datetime
 from flask import Blueprint, jsonify, request
 from db import get_db
 
 assign_rols_bp = Blueprint("assign_rols_bp", __name__)
+
+
+def _sync_coordinator_role(cursor, coordinator_user_id):
+    cursor.execute(
+        """
+        UPDATE users
+        SET role = 'supervisor'
+        WHERE role = 'coordinator'
+          AND user_id != %s
+        """,
+        (coordinator_user_id,),
+    )
+    cursor.execute(
+        "UPDATE users SET role = 'coordinator' WHERE user_id = %s",
+        (coordinator_user_id,),
+    )
 
 
 # get the course info
@@ -29,12 +43,14 @@ def get_course(course_code):
                                ca.assigned_at,
                                f.faculty_id
                         FROM coordinator_assignments ca
+                        JOIN semesters s ON s.semester_id = ca.semester_id
                         JOIN faculty f ON ca.faculty_id = f.faculty_id
                         JOIN users u ON u.user_id = f.user_id
+                        WHERE s.course_code = %s
                         ORDER BY ca.assigned_at DESC
                         LIMIT 1
-                             """
-
+                             """,
+        (course_code,),
     )
     coordinator = cursor.fetchone()
 
@@ -95,7 +111,7 @@ def assign_coordinator():
     format_strings = ",".join(["%s"] * len(codes_to_assign))
     cursor.execute(
         f"""
-        SELECT semester_id FROM semesters 
+        SELECT semester_id FROM semesters
         WHERE course_code IN ({format_strings}) 
         AND academic_year = %s       
         """,
@@ -103,38 +119,14 @@ def assign_coordinator():
     )
     all_semesters = cursor.fetchall()
 
-    now = datetime.datetime.now()
-
-    #   get user_id to new coordinator  
     cursor.execute(
         "SELECT user_id FROM faculty WHERE faculty_id = %s",
-        (faculty_id,)
+        (faculty_id,),
     )
     new_coordinator = cursor.fetchone()
     if not new_coordinator:
         cursor.close(); conn.close()
         return jsonify({"error": "Faculty not found"}), 404
-    
-    new_coordinator_user_id = new_coordinator["user_id"]
-
-    #   set old coordinator to supervisor 
-    cursor.execute(
-        """
-        UPDATE users 
-        SET role = 'supervisor'
-        WHERE role = 'coordinator' 
-        AND user_id != %s
-        AND role != 'head_of_department'
-        """,
-        (new_coordinator_user_id,)
-    )
-
-    #  assign new coordinator 
-    cursor.execute(
-        "UPDATE users SET role = 'coordinator' WHERE user_id = %s",
-        (new_coordinator_user_id,)
-    )
-
 
     for sem in all_semesters:
         sid = sem["semester_id"]
@@ -144,10 +136,6 @@ def assign_coordinator():
         existing = cursor.fetchone()
 
         if existing:
-            days_diff = (now - existing["assigned_at"]).days
-            if days_diff > 20:
-                cursor.close(); conn.close()
-                return jsonify({"error": "Cannot change coordinator after 20 days"})
             cursor.execute(
                 """UPDATE coordinator_assignments
                    SET faculty_id=%s, assigned_at=NOW(), assigned_by=%s
@@ -161,6 +149,7 @@ def assign_coordinator():
                 (faculty_id, sid, assigned_by)
             )
 
+    _sync_coordinator_role(cursor, new_coordinator["user_id"])
     conn.commit()
     cursor.close()
     conn.close()
