@@ -25,6 +25,14 @@
         </span>
       </div>
     </div>
+    {% if session.get('is_switched_to_supervisor') and session.get('original_role') == 'coordinator' %}
+    <form action="{{ url_for('coordinator_bp.switch_back_to_coordinator') }}" method="post">
+      <button class="btn btn-outline" type="submit">
+        <span class="material-symbols-outlined icon-inline">swap_horiz</span>
+        Switch to Coordinator
+      </button>
+    </form>
+    {% endif %}
   </div>
 
   <div class="two-col">

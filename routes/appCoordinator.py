@@ -99,6 +99,14 @@ def _get_active_comp4200_semester(cursor):
     return _get_active_semester_by_course(cursor, "COMP4200")
 
 
+def _get_active_semester_for_committee_scope(cursor, course_scope):
+    course_code = "COMP4200" if course_scope == "introduction" else "COMP4300"
+    semester = _get_active_semester_by_course(cursor, course_code)
+    if semester:
+        return semester
+    return _get_active_semester(cursor)
+
+
 def _get_active_semester_by_course(cursor, course_code):
     # Keep this helper safe even before running the migration.
     has_distribution_open = _db_column_exists(cursor, "semesters", "distribution_open")
@@ -6563,10 +6571,101 @@ def _committee_conflicting_faculty_ids(
     return conflicts
 
 
-def _committee_fetch_faculty_pool(cursor):
+def _committee_fetch_supervising_faculty_ids(cursor, semester_id=None, course_scope=None):
+    """Return active faculty ids that actually supervise groups/projects."""
+    role_filter = ("supervisor", "coordinator", "head_of_department")
+    supervisor_ids = set()
+
+    if course_scope in (None, "introduction"):
+        if semester_id and course_scope == "introduction":
+            _committee_sync_comp4200_project_sections(cursor, semester_id)
+
+        params = []
+        semester_filter = ""
+        if semester_id and course_scope == "introduction":
+            semester_filter = """
+              AND (
+                  EXISTS (
+                      SELECT 1
+                      FROM comp4200_project_sections cps
+                      JOIN projects p ON p.project_id = cps.project_id
+                      JOIN semesters sem ON sem.semester_id = p.semester_id
+                      WHERE cps.section_id = sec.section_id
+                        AND sem.semester_id = %s
+                        AND sem.course_code = 'COMP4200'
+                  )
+                  OR NOT EXISTS (
+                      SELECT 1
+                      FROM comp4200_project_sections cps
+                      WHERE cps.section_id = sec.section_id
+                  )
+              )
+            """
+            params.append(semester_id)
+
+        cursor.execute(
+            f"""
+            SELECT DISTINCT sec.supervisor_id AS faculty_id
+            FROM student_distribution_sections sec
+            JOIN faculty f ON f.faculty_id = sec.supervisor_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE sec.supervisor_id IS NOT NULL
+              AND u.is_active = TRUE
+              AND u.role IN ({",".join(["%s"] * len(role_filter))})
+              {semester_filter}
+            """,
+            tuple(role_filter) + tuple(params),
+        )
+        supervisor_ids.update(int(row["faculty_id"]) for row in cursor.fetchall() if row.get("faculty_id"))
+
+        params = list(role_filter)
+
+        cursor.execute(
+            f"""
+            SELECT DISTINCT p.supervisor_id AS faculty_id
+            FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            JOIN faculty f ON f.faculty_id = p.supervisor_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE p.supervisor_id IS NOT NULL
+              AND u.is_active = TRUE
+              AND u.role IN ({",".join(["%s"] * len(role_filter))})
+            """,
+            tuple(params),
+        )
+        supervisor_ids.update(int(row["faculty_id"]) for row in cursor.fetchall() if row.get("faculty_id"))
+
+    if course_scope in (None, "graduation_project"):
+        params = list(role_filter)
+
+        cursor.execute(
+            f"""
+            SELECT DISTINCT p.supervisor_id AS faculty_id
+            FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            JOIN faculty f ON f.faculty_id = p.supervisor_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE p.supervisor_id IS NOT NULL
+              AND u.is_active = TRUE
+              AND u.role IN ({",".join(["%s"] * len(role_filter))})
+            """,
+            tuple(params),
+        )
+        supervisor_ids.update(int(row["faculty_id"]) for row in cursor.fetchall() if row.get("faculty_id"))
+
+    return supervisor_ids
+
+
+def _committee_fetch_faculty_pool(cursor, supervisor_faculty_ids=None):
     # Do NOT filter by active_committee_count = 0.
-    # Include ALL active doctors so there are always >= 4 specialisations.
-    # _committee_pick_members_for_supervisor already prefers less-loaded doctors.
+    # Include only faculty who actually supervise groups/projects. Coordinator
+    # or head accounts are allowed when they are assigned as a group supervisor.
+    # _committee_pick_members_for_supervisor already prefers less-loaded supervisors.
+    supervisor_faculty_ids = {int(fid) for fid in (supervisor_faculty_ids or []) if fid}
+    if not supervisor_faculty_ids:
+        return defaultdict(list)
+
+    placeholders = ",".join(["%s"] * len(supervisor_faculty_ids))
     cursor.execute("""
         SELECT
             f.faculty_id,
@@ -6582,10 +6681,11 @@ def _committee_fetch_faculty_pool(cursor):
             ) AS active_committee_count
         FROM faculty f
         JOIN users u ON u.user_id = f.user_id
-        WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
+        WHERE f.faculty_id IN ({placeholders})
+          AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
           AND u.is_active = TRUE
         ORDER BY f.specialization, u.full_name
-        """)
+        """.format(placeholders=placeholders), tuple(sorted(supervisor_faculty_ids)))
     rows = cursor.fetchall()
     groups = defaultdict(list)
     for row in rows:
@@ -6613,8 +6713,8 @@ def _committee_pick_members(groups, used_faculty_ids=None, rotation_index=0):
 
     if len(available_specs) < 4:
         raise ValueError(
-            "Not enough available doctors to create another committee. "
-            "A doctor cannot be assigned to more than one active committee."
+            "Not enough available supervisors to create another committee. "
+            "A supervisor cannot be assigned to more than one active committee."
         )
 
     available_specs.sort()
@@ -6634,8 +6734,8 @@ def _committee_pick_members(groups, used_faculty_ids=None, rotation_index=0):
         )
         if not members:
             raise ValueError(
-                "Not enough available doctors to create another committee. "
-                "A doctor cannot be assigned to more than one active committee."
+                "Not enough available supervisors to create another committee. "
+                "A supervisor cannot be assigned to more than one active committee."
             )
         chosen = members[0]
         chosen_members.append(chosen)
@@ -6678,7 +6778,7 @@ def _committee_pick_members_for_supervisor(
     if not supervisor:
         raise ValueError(
             "The project supervisor is not available for committee generation. "
-            "Check that the supervisor has a faculty record and an active user account."
+            "Check that the supervisor has a faculty record, an active user account, and is assigned to a group/project."
         )
 
     supervisor_id = int(supervisor_id)
@@ -6701,7 +6801,7 @@ def _committee_pick_members_for_supervisor(
 
     if len(all_candidates) < 3:
         raise ValueError(
-            "You need at least 4 doctors in the faculty table: the project supervisor plus 3 committee members."
+            "You need at least 4 active group supervisors in the faculty table: the project supervisor plus 3 committee members."
         )
 
     def sort_key(member):
@@ -6745,7 +6845,7 @@ def _committee_pick_members_for_supervisor(
 
     if len(chosen_members) < 4:
         raise ValueError(
-            "Could not create a complete committee. Please add at least 3 doctors beside the supervisor."
+            "Could not create a complete committee. Please add at least 3 active supervisors beside the project supervisor."
         )
 
     return chosen_members
@@ -6801,7 +6901,7 @@ def _committee_pick_members_for_supervisors(
     if len(clean_supervisor_ids) > 4:
         raise ValueError(
             "One committee cannot contain projects/sections from more than 4 different supervisors, "
-            "because every supervisor must be inside the same 4-doctor committee."
+            "because every supervisor must be inside the same 4-supervisor committee."
         )
 
     all_faculty = _committee_flat_faculty_pool(groups)
@@ -6822,7 +6922,7 @@ def _committee_pick_members_for_supervisors(
         if not supervisor:
             raise ValueError(
                 "A project/section supervisor is not available for committee generation. "
-                "Check that every supervisor has a faculty record and an active user account."
+                "Check that every supervisor has a faculty record, an active user account, and a group/project assignment."
             )
         supervisor_member = dict(supervisor)
         supervisor_member["role"] = "supervisor"
@@ -6831,7 +6931,7 @@ def _committee_pick_members_for_supervisors(
         chosen_specs.add(supervisor_member.get("specialization") or "General")
 
     if len(all_faculty) < 4:
-        raise ValueError("At least 4 active doctors are required to generate committees.")
+        raise ValueError("At least 4 active group supervisors are required to generate committees.")
 
     def sort_key(member):
         fid = int(member["faculty_id"])
@@ -6888,14 +6988,52 @@ def _committee_pick_members_for_supervisors(
 
     if len(chosen_members) < 4:
         raise ValueError(
-            "Could not create a complete 4-doctor committee without time conflicts. "
-            "Try a later start time or add more available doctors."
+            "Could not create a complete 4-group-supervisor committee without time conflicts. "
+            "Try a later start time or add more available supervisors."
         )
 
     return chosen_members
 
 def _committee_ensure_course_schema(cursor):
     """Keep committee tables compatible with both COMP4200 and COMP4300."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS student_distribution_sections (
+            section_id INT PRIMARY KEY AUTO_INCREMENT,
+            section_name VARCHAR(100) NOT NULL,
+            supervisor_id INT NOT NULL,
+            entered_by INT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+            FOREIGN KEY (entered_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS section_students (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            section_id INT NOT NULL,
+            student_id INT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_section_student (section_id, student_id),
+            FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS comp4200_project_sections (
+            project_id INT PRIMARY KEY,
+            section_id INT NOT NULL UNIQUE,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+            FOREIGN KEY (section_id) REFERENCES student_distribution_sections(section_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
     if not _db_column_exists(cursor, "committee_plans", "course_scope"):
         cursor.execute(
             "ALTER TABLE committee_plans ADD COLUMN course_scope ENUM('introduction','graduation_project') NOT NULL DEFAULT 'graduation_project' AFTER committee_name"
@@ -6922,12 +7060,115 @@ def _committee_ensure_course_schema(cursor):
     )
 
 
-def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="graduation_project"):
+def _committee_sync_comp4200_project_sections(cursor, semester_id=None):
+    """Mirror real COMP4200 project groups into section tables used by committees."""
+    if not semester_id:
+        return
+
+    cursor.execute(
+        """
+        SELECT
+            p.project_id,
+            LEFT(COALESCE(NULLIF(p.group_name, ''), NULLIF(p.title, ''), CONCAT('Group ', p.project_id)), 100) AS section_name,
+            p.supervisor_id
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE sem.semester_id = %s
+          AND sem.course_code = 'COMP4200'
+          AND p.supervisor_id IS NOT NULL
+          AND p.status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
+          AND p.title NOT LIKE 'Committee Demo%%'
+          AND p.title NOT LIKE 'COMP4300 Graduation Project%%'
+          AND EXISTS (
+              SELECT 1
+              FROM project_members pmx
+              WHERE pmx.project_id = p.project_id
+          )
+        ORDER BY p.project_id
+        """,
+        (semester_id,),
+    )
+    projects = cursor.fetchall()
+
+    for project in projects:
+        project_id = int(project["project_id"])
+        section_name = project.get("section_name") or f"Group {project_id}"
+        supervisor_id = int(project["supervisor_id"])
+
+        cursor.execute(
+            """
+            SELECT section_id
+            FROM comp4200_project_sections
+            WHERE project_id = %s
+            LIMIT 1
+            """,
+            (project_id,),
+        )
+        link = cursor.fetchone()
+
+        if link:
+            section_id = int(link["section_id"])
+            cursor.execute(
+                """
+                UPDATE student_distribution_sections
+                SET section_name = %s, supervisor_id = %s
+                WHERE section_id = %s
+                """,
+                (section_name, supervisor_id, section_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO student_distribution_sections (section_name, supervisor_id, entered_by)
+                VALUES (%s, %s, %s)
+                """,
+                (section_name, supervisor_id, session.get("user_id")),
+            )
+            section_id = cursor.lastrowid
+            cursor.execute(
+                """
+                INSERT INTO comp4200_project_sections (project_id, section_id)
+                VALUES (%s, %s)
+                """,
+                (project_id, section_id),
+            )
+
+        cursor.execute("DELETE FROM section_students WHERE section_id = %s", (section_id,))
+        cursor.execute(
+            """
+            INSERT IGNORE INTO section_students (section_id, student_id)
+            SELECT %s, pm.student_id
+            FROM project_members pm
+            WHERE pm.project_id = %s
+            """,
+            (section_id, project_id),
+        )
+
+
+def _committee_fetch_eligible_projects(
+    cursor,
+    semester_id=None,
+    course_scope="graduation_project",
+    include_assigned=False,
+):
     _committee_ensure_course_schema(cursor)
 
     if course_scope == "introduction":
-        cursor.execute(
+        _committee_sync_comp4200_project_sections(cursor, semester_id)
+        assigned_filter = ""
+        if not include_assigned:
+            assigned_filter = """
+            AND NOT EXISTS (
+                SELECT 1
+                FROM committee_plan_sections cps
+                JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+                WHERE cps.section_id = sec.section_id
+                  AND cp.status <> 'cancelled'
+                  AND cp.course_scope = 'introduction'
+            )
             """
+        cursor.execute(
+            f"""
             SELECT
                 sec.section_id AS project_id,
                 sec.section_id AS section_id,
@@ -6948,14 +7189,8 @@ def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="g
             JOIN section_students ss ON ss.section_id = sec.section_id
             JOIN students st ON st.student_id = ss.student_id
             JOIN users stu_u ON stu_u.user_id = st.user_id
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM committee_plan_sections cps
-                JOIN committee_plans cp ON cp.plan_id = cps.plan_id
-                WHERE cps.section_id = sec.section_id
-                  AND cp.status <> 'cancelled'
-                  AND cp.course_scope = 'introduction'
-            )
+            WHERE 1 = 1
+              {assigned_filter}
             GROUP BY sec.section_id, sec.section_name, sec.supervisor_id,
                      sup_u.full_name, sup_f.specialization
             HAVING COUNT(DISTINCT ss.student_id) > 0
@@ -6966,8 +7201,20 @@ def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="g
         random.shuffle(sections)
         return sections
 
-    cursor.execute(
+    assigned_filter = ""
+    if not include_assigned:
+        assigned_filter = """
+          AND NOT EXISTS (
+              SELECT 1
+              FROM committee_plan_projects cpp
+              JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+              WHERE cpp.project_id = p.project_id
+                AND cp.status <> 'cancelled'
+                AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+          )
         """
+    cursor.execute(
+        f"""
         SELECT
             p.project_id,
             NULL AS section_id,
@@ -6995,6 +7242,7 @@ def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="g
               WHERE s2.semester_id = %s
               LIMIT 1
           )
+          AND sem.course_code = 'COMP4300'
           AND p.supervisor_id IS NOT NULL
           AND p.status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
           AND EXISTS (
@@ -7002,14 +7250,7 @@ def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="g
               FROM project_members pmx
               WHERE pmx.project_id = p.project_id
           )
-          AND NOT EXISTS (
-              SELECT 1
-              FROM committee_plan_projects cpp
-              JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
-              WHERE cpp.project_id = p.project_id
-                AND cp.status <> 'cancelled'
-                AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
-          )
+          {assigned_filter}
         GROUP BY p.project_id, p.title, p.status, p.project_type,
                  p.supervisor_id, sup_u.full_name, sup_f.specialization
         ORDER BY p.supervisor_id ASC, p.project_id DESC
@@ -7019,6 +7260,77 @@ def _committee_fetch_eligible_projects(cursor, semester_id=None, course_scope="g
     projects = cursor.fetchall()
     random.shuffle(projects)
     return projects
+
+
+def _committee_no_eligible_reason(cursor, semester_id, course_scope):
+    if course_scope == "introduction":
+        cursor.execute(
+            """
+            SELECT
+                COUNT(DISTINCT p.project_id) AS real_items,
+                SUM(CASE WHEN cps.section_id IS NOT NULL THEN 1 ELSE 0 END) AS assigned_items
+            FROM projects p
+            JOIN semesters sem ON sem.semester_id = p.semester_id
+            JOIN comp4200_project_sections cps_link ON cps_link.project_id = p.project_id
+            LEFT JOIN committee_plan_sections cps ON cps.section_id = cps_link.section_id
+            LEFT JOIN committee_plans cp
+              ON cp.plan_id = cps.plan_id
+             AND cp.status <> 'cancelled'
+             AND cp.course_scope = 'introduction'
+            WHERE sem.semester_id = %s
+              AND sem.course_code = 'COMP4200'
+              AND p.supervisor_id IS NOT NULL
+              AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.project_id)
+            """,
+            (semester_id,),
+        )
+        row = cursor.fetchone() or {}
+        if int(row.get("real_items") or 0) and int(row.get("assigned_items") or 0) >= int(row.get("real_items") or 0):
+            return (
+                "All eligible COMP4200 sections already have committees. "
+                "Open Generated/Current Committees, or use Reset & Redistribute to rebuild them."
+            )
+        return "No COMP4200 sections with students and assigned supervisors are ready for committee generation."
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(DISTINCT CASE WHEN p.title LIKE 'Committee Demo%%' THEN p.project_id END) AS demo_projects,
+            COUNT(DISTINCT CASE WHEN pm.project_id IS NULL AND p.title NOT LIKE 'Committee Demo%%' THEN p.project_id END) AS no_student_projects,
+            COUNT(DISTINCT CASE WHEN p.status = 'archived' AND pm.project_id IS NOT NULL THEN p.project_id END) AS archived_real_projects,
+            COUNT(DISTINCT CASE WHEN p.supervisor_id IS NULL AND pm.project_id IS NOT NULL THEN p.project_id END) AS no_supervisor_projects,
+            COUNT(DISTINCT CASE WHEN cpp.project_id IS NOT NULL THEN p.project_id END) AS assigned_projects
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        LEFT JOIN (
+            SELECT DISTINCT project_id
+            FROM project_members
+        ) pm ON pm.project_id = p.project_id
+        LEFT JOIN committee_plan_projects cpp ON cpp.project_id = p.project_id
+        LEFT JOIN committee_plans cp
+          ON cp.plan_id = cpp.plan_id
+         AND cp.status <> 'cancelled'
+         AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+        WHERE sem.semester_id = %s
+          AND sem.course_code = 'COMP4300'
+        """,
+        (semester_id,),
+    )
+    row = cursor.fetchone() or {}
+    reasons = []
+    if int(row.get("archived_real_projects") or 0):
+        reasons.append(f"{int(row.get('archived_real_projects') or 0)} real project(s) are archived")
+    if int(row.get("no_student_projects") or 0):
+        reasons.append(f"{int(row.get('no_student_projects') or 0)} project(s) have no students")
+    if int(row.get("demo_projects") or 0):
+        reasons.append(f"{int(row.get('demo_projects') or 0)} demo project(s) are ignored")
+    if int(row.get("no_supervisor_projects") or 0):
+        reasons.append(f"{int(row.get('no_supervisor_projects') or 0)} project(s) have no supervisor")
+    if int(row.get("assigned_projects") or 0):
+        reasons.append(f"{int(row.get('assigned_projects') or 0)} project(s) already have committees")
+
+    detail = "; ".join(reasons) if reasons else "no submitted COMP4300 projects with students were found"
+    return f"No eligible COMP4300 projects available for committee generation: {detail}."
 
 
 def _committee_fetch_plan_rows(cursor):
@@ -7525,7 +7837,12 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
 
 
 def _committee_fetch_faculty_options(cursor):
-    """Return active faculty doctors for manual responsible/reader selectors."""
+    """Return active faculty who actually supervise groups/projects."""
+    supervising_faculty_ids = _committee_fetch_supervising_faculty_ids(cursor)
+    if not supervising_faculty_ids:
+        return []
+
+    placeholders = ",".join(["%s"] * len(supervising_faculty_ids))
     cursor.execute("""
         SELECT
             f.faculty_id,
@@ -7534,25 +7851,28 @@ def _committee_fetch_faculty_options(cursor):
             COALESCE(f.years_experience, 0) AS years_experience
         FROM faculty f
         JOIN users u ON u.user_id = f.user_id
-        WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
+        WHERE f.faculty_id IN ({placeholders})
+          AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
           AND u.is_active = TRUE
         ORDER BY u.full_name ASC
-    """)
+    """.format(placeholders=placeholders), tuple(sorted(supervising_faculty_ids)))
     return cursor.fetchall()
 
 
 def _committee_dashboard_payload(cursor):
     _committee_ensure_course_schema(cursor)
     _committee_ensure_report_readers_table(cursor)
-    active_semester = _get_active_semester(cursor)
+    intro_semester = _get_active_semester_for_committee_scope(cursor, "introduction")
+    grad_semester = _get_active_semester_for_committee_scope(cursor, "graduation_project")
 
     eligible_projects = []
-    if active_semester:
+    if intro_semester:
         eligible_projects.extend(
-            _committee_fetch_eligible_projects(cursor, active_semester["semester_id"], "introduction")
+            _committee_fetch_eligible_projects(cursor, intro_semester["semester_id"], "introduction")
         )
+    if grad_semester:
         eligible_projects.extend(
-            _committee_fetch_eligible_projects(cursor, active_semester["semester_id"], "graduation_project")
+            _committee_fetch_eligible_projects(cursor, grad_semester["semester_id"], "graduation_project")
         )
 
     plan_rows = _committee_fetch_plan_rows(cursor)
@@ -7715,33 +8035,54 @@ def _committee_generate_internal(
     course_scope="graduation_project",
 ):
     course_scope = course_scope if course_scope in ("introduction", "graduation_project") else "graduation_project"
-    active_semester = _get_active_semester(cursor)
+    active_semester = _get_active_semester_for_committee_scope(cursor, course_scope)
     if not active_semester:
-        raise ValueError("No active semester found.")
+        course_code = "COMP4200" if course_scope == "introduction" else "COMP4300"
+        raise ValueError(f"No active {course_code} semester found.")
 
     _committee_ensure_course_schema(cursor)
-
-    if clear_existing:
-        _committee_delete_active_plans(cursor, course_scope)
 
     _committee_seed_rooms(cursor)
 
     eligible_projects = _committee_fetch_eligible_projects(
-        cursor, active_semester["semester_id"], course_scope
+        cursor,
+        active_semester["semester_id"],
+        course_scope,
+        include_assigned=clear_existing,
     )
     if not eligible_projects:
         label = "COMP4200 sections" if course_scope == "introduction" else "COMP4300 projects"
-        raise ValueError(f"No eligible {label} available for committee generation.")
+        if not clear_existing:
+            assigned_items = _committee_fetch_eligible_projects(
+                cursor,
+                active_semester["semester_id"],
+                course_scope,
+                include_assigned=True,
+            )
+            if assigned_items:
+                raise ValueError(
+                    f"All eligible {label} already have committees. "
+                    "Open Generated/Current Committees, or use Reset & Redistribute to rebuild them."
+                )
+        raise ValueError(_committee_no_eligible_reason(cursor, active_semester["semester_id"], course_scope))
 
-    faculty_groups = _committee_fetch_faculty_pool(cursor)
+    if clear_existing:
+        _committee_delete_active_plans(cursor, course_scope)
 
-    # We need 4 active doctors total. Different majors are preferred later inside
+    supervising_faculty_ids = _committee_fetch_supervising_faculty_ids(
+        cursor,
+        active_semester["semester_id"],
+        course_scope,
+    )
+    faculty_groups = _committee_fetch_faculty_pool(cursor, supervising_faculty_ids)
+
+    # We need 4 active group supervisors total. Different majors are preferred later inside
     # _committee_pick_members_for_supervisor(), but they are NOT required.
     # This avoids blocking generation when the department has fewer than 4 majors.
     total_active_doctors = sum(len(members) for members in faculty_groups.values())
     if total_active_doctors < 4:
         raise ValueError(
-            "At least 4 active doctors are required to generate committees."
+            "At least 4 active group supervisors are required to generate committees."
         )
 
     cursor.execute("""
@@ -7898,8 +8239,8 @@ def _committee_generate_internal(
 
         if members is None or committee_start_time is None or last_slot_end is None:
             raise ValueError(
-                f"Could not schedule {course_label} Committee {idx + 1} without doctor time conflicts. "
-                "Try an earlier/later start time or add more available doctors."
+                f"Could not schedule {course_label} Committee {idx + 1} without supervisor time conflicts. "
+                "Try an earlier/later start time or add more available supervisors."
             )
 
         room = rooms[idx]
@@ -8674,7 +9015,10 @@ def api_committee_generate():
     course_scope = (data.get("course_scope") or "graduation_project").strip()
     discussion_date = (data.get("discussion_date") or "").strip()
     start_time = (data.get("start_time") or "").strip()
-    projects_per_committee = int(data.get("projects_per_committee") or 0)
+    try:
+        projects_per_committee = int(data.get("projects_per_committee") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Projects/sections per committee must be a number."}), 400
 
     if course_scope not in ("introduction", "graduation_project"):
         return jsonify({"error": "Invalid committee type."}), 400
@@ -8689,6 +9033,8 @@ def api_committee_generate():
             400,
         )
 
+    db = None
+    cursor = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -8705,6 +9051,30 @@ def api_committee_generate():
         cursor.close()
         db.close()
         return jsonify(payload)
+    except ValueError as e:
+        message = str(e)
+        if (
+            cursor
+            and db
+            and (
+                message.startswith("No eligible ")
+                or "already have committees" in message
+            )
+        ):
+            payload = _committee_dashboard_payload(cursor)
+            payload["message"] = message
+            payload["warning"] = True
+            db.commit()
+            cursor.close()
+            db.close()
+            return jsonify(_json_safe_value(payload))
+        if db:
+            db.rollback()
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+        return jsonify({"error": message}), 400
     except Exception as e:
         if db:
             db.rollback()
@@ -8722,7 +9092,10 @@ def api_committee_reset():
     course_scope = (data.get("course_scope") or "graduation_project").strip()
     discussion_date = (data.get("discussion_date") or "").strip()
     start_time = (data.get("start_time") or "").strip()
-    projects_per_committee = int(data.get("projects_per_committee") or 0)
+    try:
+        projects_per_committee = int(data.get("projects_per_committee") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Projects/sections per committee must be a number."}), 400
 
     if course_scope not in ("introduction", "graduation_project"):
         return jsonify({"error": "Invalid committee type."}), 400
@@ -8737,6 +9110,8 @@ def api_committee_reset():
             400,
         )
 
+    db = None
+    cursor = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -8753,7 +9128,37 @@ def api_committee_reset():
         cursor.close()
         db.close()
         return jsonify(payload)
+    except ValueError as e:
+        message = str(e)
+        if (
+            cursor
+            and db
+            and (
+                message.startswith("No eligible ")
+                or "already have committees" in message
+            )
+        ):
+            payload = _committee_dashboard_payload(cursor)
+            payload["message"] = message
+            payload["warning"] = True
+            db.commit()
+            cursor.close()
+            db.close()
+            return jsonify(_json_safe_value(payload))
+        if db:
+            db.rollback()
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+        return jsonify({"error": message}), 400
     except Exception as e:
+        if db:
+            db.rollback()
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
         return jsonify({"error": str(e)}), 500
 
 
@@ -8785,9 +9190,14 @@ def api_committee_save_responsible(plan_id):
 
         cursor.execute(
             """
-            SELECT faculty_id, role
-            FROM committee_plan_members
-            WHERE plan_id = %s AND faculty_id = %s
+            SELECT cpm.faculty_id, cpm.role
+            FROM committee_plan_members cpm
+            JOIN faculty f ON f.faculty_id = cpm.faculty_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE cpm.plan_id = %s
+              AND cpm.faculty_id = %s
+              AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
+              AND u.is_active = TRUE
             """,
             (plan_id, faculty_id),
         )
@@ -8795,7 +9205,7 @@ def api_committee_save_responsible(plan_id):
         if not member_row:
             cursor.close()
             db.close()
-            return jsonify({"error": "Responsible doctor must be one of the committee members."}), 400
+            return jsonify({"error": "Responsible supervisor must be one of the committee members."}), 400
 
         cursor.execute(
             "UPDATE committee_plans SET responsible_faculty_id = %s WHERE plan_id = %s",
@@ -8813,7 +9223,7 @@ def api_committee_save_responsible(plan_id):
             """,
             (plan_id,),
         )
-        # If the selected responsible doctor is the supervisor, keep role='supervisor'
+        # If the selected responsible supervisor is the item supervisor, keep role='supervisor'
         # and rely on committee_plans.responsible_faculty_id to mark them responsible.
         # Otherwise mark the selected non-supervisor member as responsible.
         cursor.execute(
@@ -8865,7 +9275,7 @@ def api_committee_save_project_readers(plan_id, project_id):
         return jsonify({"error": "Invalid reader id."}), 400
 
     if reader1_id == reader2_id:
-        return jsonify({"error": "Reader 1 and Reader 2 must be different doctors."}), 400
+        return jsonify({"error": "Reader 1 and Reader 2 must be different supervisors."}), 400
 
     try:
         db = get_db()
@@ -8896,10 +9306,14 @@ def api_committee_save_project_readers(plan_id, project_id):
         placeholders = "%s,%s"
         cursor.execute(
             f"""
-            SELECT faculty_id
-            FROM committee_plan_members
-            WHERE plan_id = %s
-              AND faculty_id IN ({placeholders})
+            SELECT cpm.faculty_id
+            FROM committee_plan_members cpm
+            JOIN faculty f ON f.faculty_id = cpm.faculty_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE cpm.plan_id = %s
+              AND cpm.faculty_id IN ({placeholders})
+              AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
+              AND u.is_active = TRUE
             """,
             (plan_id, reader1_id, reader2_id),
         )
@@ -8954,7 +9368,7 @@ def api_committee_save_section_readers(plan_id, section_id):
         return jsonify({"error": "Invalid reader id."}), 400
 
     if reader1_id == reader2_id:
-        return jsonify({"error": "Reader 1 and Reader 2 must be different doctors."}), 400
+        return jsonify({"error": "Reader 1 and Reader 2 must be different supervisors."}), 400
 
     try:
         db = get_db()
@@ -8984,10 +9398,14 @@ def api_committee_save_section_readers(plan_id, section_id):
 
         cursor.execute(
             """
-            SELECT faculty_id
-            FROM committee_plan_members
-            WHERE plan_id = %s
-              AND faculty_id IN (%s, %s)
+            SELECT cpm.faculty_id
+            FROM committee_plan_members cpm
+            JOIN faculty f ON f.faculty_id = cpm.faculty_id
+            JOIN users u ON u.user_id = f.user_id
+            WHERE cpm.plan_id = %s
+              AND cpm.faculty_id IN (%s, %s)
+              AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
+              AND u.is_active = TRUE
             """,
             (plan_id, reader1_id, reader2_id),
         )
@@ -9062,6 +9480,34 @@ def _ensure_evaluation_schema(cursor):
             INDEX idx_eval_task_ref (course_scope, reference_id),
             INDEX idx_eval_task_eval (evaluator_faculty_id),
             FOREIGN KEY (evaluator_faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS evaluation_final_results (
+            result_id INT PRIMARY KEY AUTO_INCREMENT,
+            course_scope ENUM('introduction','graduation_project') NOT NULL,
+            reference_id INT NOT NULL,
+            report_score DECIMAL(6,2) NULL,
+            supervisor_score DECIMAL(6,2) NULL,
+            discussion_score DECIMAL(6,2) NULL,
+            committee_score DECIMAL(6,2) NULL,
+            final_score DECIMAL(6,2) NULL,
+            decision ENUM('pending','accepted','rejected','archived') NOT NULL DEFAULT 'pending',
+            notes TEXT NULL,
+            workflow_status ENUM('draft','sent_to_supervisor','sent_to_head','published_to_students') NOT NULL DEFAULT 'draft',
+            sent_by_coordinator INT NULL,
+            sent_to_supervisor_at DATETIME NULL,
+            supervisor_id INT NULL,
+            supervisor_sent_by INT NULL,
+            supervisor_sent_to_head_at DATETIME NULL,
+            head_published_by INT NULL,
+            head_published_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_eval_final_reference (course_scope, reference_id),
+            INDEX idx_eval_final_workflow (workflow_status),
+            INDEX idx_eval_final_supervisor (supervisor_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
 
@@ -9263,7 +9709,7 @@ def _evaluation_committee_setup_for_item(cursor, course_scope, reference_id):
     if len(member_id_set) < 4:
         return {
             "ok": False,
-            "error": "This committee must have 4 committee doctors before opening evaluation.",
+            "error": "This committee must have 4 committee supervisors before opening evaluation.",
             "status": 400,
         }
 
@@ -9277,7 +9723,7 @@ def _evaluation_committee_setup_for_item(cursor, course_scope, reference_id):
     if not responsible_id:
         return {
             "ok": False,
-            "error": "Choose and save the Responsible Doctor from the Committee page before opening grade entry.",
+            "error": "Choose and save the Responsible Supervisor from the Committee page before opening grade entry.",
             "status": 400,
         }
 
@@ -9285,7 +9731,7 @@ def _evaluation_committee_setup_for_item(cursor, course_scope, reference_id):
     if responsible_id not in member_id_set:
         return {
             "ok": False,
-            "error": "Responsible Doctor must be one of this committee members.",
+            "error": "Responsible Supervisor must be one of this committee members.",
             "status": 400,
         }
 
@@ -9379,7 +9825,7 @@ def _evaluation_autocreate_tasks(cursor, course_scope, reference_id, created_by=
     _evaluation_insert_task(cursor, course_scope, reference_id, setup["supervisor_component"], setup["supervisor_id"], created_by)
     created_faculty_ids.add(int(setup["supervisor_id"]))
 
-    # The discussion/committee doctors are exactly the committee members saved
+    # The discussion/committee supervisors are exactly the committee members saved
     # for the current plan. No random doctors, no old tasks, no fallback.
     for fid in setup["member_ids"]:
         _evaluation_insert_task(cursor, course_scope, reference_id, setup["committee_component"], fid, created_by)
@@ -9552,6 +9998,61 @@ def _evaluation_scores_from_grades(course_scope, grades):
     }
 
 
+def _evaluation_save_final_result(cursor, course_scope, reference_id, scores, supervisor_id, sent_by, notes=None):
+    cursor.execute(
+        """
+        SELECT result_id
+        FROM evaluation_final_results
+        WHERE course_scope = %s AND reference_id = %s
+        LIMIT 1
+        """,
+        (course_scope, reference_id),
+    )
+    existing = cursor.fetchone()
+    values = (
+        scores.get("report_score"),
+        scores.get("supervisor_score"),
+        scores.get("discussion_score"),
+        scores.get("committee_score"),
+        scores.get("final_score"),
+        notes or None,
+        sent_by,
+        supervisor_id,
+    )
+    if existing:
+        cursor.execute(
+            """
+            UPDATE evaluation_final_results
+            SET report_score = %s,
+                supervisor_score = %s,
+                discussion_score = %s,
+                committee_score = %s,
+                final_score = %s,
+                notes = %s,
+                workflow_status = 'sent_to_supervisor',
+                sent_by_coordinator = %s,
+                sent_to_supervisor_at = NOW(),
+                supervisor_id = %s
+            WHERE result_id = %s
+            """,
+            (*values, existing["result_id"]),
+        )
+        return existing["result_id"]
+
+    cursor.execute(
+        """
+        INSERT INTO evaluation_final_results
+            (course_scope, reference_id, report_score, supervisor_score,
+             discussion_score, committee_score, final_score, notes,
+             workflow_status, sent_by_coordinator, sent_to_supervisor_at, supervisor_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s,
+                'sent_to_supervisor', %s, NOW(), %s)
+        """,
+        (course_scope, reference_id, *values),
+    )
+    return cursor.lastrowid
+
+
 
 def _evaluation_reference_supervisor(cursor, course_scope, reference_id):
     """Return the supervisor user/faculty for a section/project evaluation item."""
@@ -9644,6 +10145,13 @@ def api_evaluation_faculty_options():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        supervising_faculty_ids = _committee_fetch_supervising_faculty_ids(cursor)
+        if not supervising_faculty_ids:
+            cursor.close()
+            db.close()
+            return jsonify({"faculty": []})
+
+        placeholders = ",".join(["%s"] * len(supervising_faculty_ids))
         cursor.execute("""
             SELECT f.faculty_id,
                    u.full_name AS name,
@@ -9651,10 +10159,11 @@ def api_evaluation_faculty_options():
                    f.specialization
             FROM faculty f
             JOIN users u ON u.user_id = f.user_id
-            WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
+            WHERE f.faculty_id IN ({placeholders})
+              AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
               AND u.is_active = TRUE
             ORDER BY u.full_name
-        """)
+        """.format(placeholders=placeholders), tuple(sorted(supervising_faculty_ids)))
         faculty_rows = cursor.fetchall()
         cursor.close()
         db.close()
@@ -9684,7 +10193,7 @@ def api_coordinator_committee_schedule_export():
             "Slot Start",
             "Slot End",
             "Room",
-            "Responsible Doctor",
+            "Responsible Supervisor",
             "Item Type",
             "Project / Section",
             "Supervisor",
@@ -10289,6 +10798,15 @@ def api_coordinator_evaluation_send_to_supervisor():
         label = "COMP4200" if course_scope == "introduction" else "COMP4300"
         score_text = f" Final score: {final_score}/100." if final_score is not None else " Final score is not complete yet."
         notes_text = f" Coordinator notes: {notes}" if notes else ""
+        _evaluation_save_final_result(
+            cursor,
+            course_scope,
+            reference_id,
+            scores,
+            supervisor.get("faculty_id"),
+            session.get("user_id"),
+            notes,
+        )
 
         _insert_notification(
             cursor,
@@ -10622,4 +11140,28 @@ def switch_to_supervisor():
     session["role"] = "supervisor"
     session["faculty_id"] = faculty["faculty_id"]
 
-    return redirect(url_for("supervisor_dashboard"))
+    return redirect(url_for("supervisor_dashboard.supervisor_dashboard"))
+
+
+@coordinator_bp.route("/supervisor/switch-to-coordinator", methods=["POST", "GET"])
+@login_required(role="supervisor")
+def switch_back_to_coordinator():
+    if session.get("original_role") != "coordinator":
+        return redirect(url_for("supervisor_dashboard.supervisor_dashboard"))
+
+    original_user_id = session.get("original_user_id")
+    original_full_name = session.get("original_full_name")
+
+    session["role"] = "coordinator"
+    if original_user_id:
+        session["user_id"] = original_user_id
+    if original_full_name:
+        session["full_name"] = original_full_name
+
+    session.pop("original_role", None)
+    session.pop("original_user_id", None)
+    session.pop("original_full_name", None)
+    session.pop("is_switched_to_supervisor", None)
+    session.pop("faculty_id", None)
+
+    return redirect(url_for("coordinator_bp.coordinator_dashboard"))

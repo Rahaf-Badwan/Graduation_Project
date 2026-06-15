@@ -22,8 +22,35 @@ def api_supervisor_my_grades():
     faculty = cursor.fetchone()
     if not faculty:
         cursor.close()
+        db.close()
         return jsonify({"grades": []})
     faculty_id = faculty['faculty_id']
+
+    cursor.execute("""
+        SELECT
+            efr.result_id,
+            efr.final_score,
+            efr.workflow_status,
+            efr.course_scope,
+            sec.section_name AS project_title,
+            GROUP_CONCAT(
+                DISTINCT u.full_name
+                ORDER BY u.full_name
+                SEPARATOR ', '
+            ) AS students
+        FROM evaluation_final_results efr
+        JOIN student_distribution_sections sec
+          ON sec.section_id = efr.reference_id
+         AND efr.course_scope = 'introduction'
+        LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+        LEFT JOIN students st ON st.student_id = ss.student_id
+        LEFT JOIN users u ON u.user_id = st.user_id
+        WHERE sec.supervisor_id = %s
+          AND efr.workflow_status IN ('sent_to_supervisor', 'sent_to_head', 'published_to_students')
+        GROUP BY efr.result_id, efr.final_score, efr.workflow_status,
+                 efr.course_scope, sec.section_name
+    """, (faculty_id,))
+    grades = cursor.fetchall()
 
     cursor.execute("""
         SELECT
@@ -38,7 +65,9 @@ def api_supervisor_my_grades():
                 SEPARATOR ', '
             ) AS students
         FROM evaluation_final_results efr
-        JOIN projects p ON p.project_id = efr.reference_id
+        JOIN projects p
+          ON p.project_id = efr.reference_id
+         AND efr.course_scope = 'graduation_project'
         LEFT JOIN project_members pm ON pm.project_id = p.project_id
         LEFT JOIN students st ON st.student_id = pm.student_id
         LEFT JOIN users u ON u.user_id = st.user_id
@@ -46,10 +75,9 @@ def api_supervisor_my_grades():
           AND efr.workflow_status IN ('sent_to_supervisor', 'sent_to_head', 'published_to_students')
         GROUP BY efr.result_id, efr.final_score, efr.workflow_status,
                  efr.course_scope, p.title
-        ORDER BY p.title
     """, (faculty_id,))
-
-    grades = cursor.fetchall()
+    grades.extend(cursor.fetchall())
+    grades.sort(key=lambda row: row.get("project_title") or "")
     cursor.close()
     db.close()
     return jsonify({"grades": grades})
@@ -66,33 +94,63 @@ def api_send_grades_to_head():
     faculty = cursor.fetchone()
     if not faculty:
         cursor.close()
+        db.close()
         return jsonify({"success": False, "message": "Supervisor not found"})
     faculty_id = faculty['faculty_id']
 
     cursor.execute("""
         SELECT COUNT(*) AS cnt
         FROM evaluation_final_results efr
-        JOIN projects p ON p.project_id = efr.reference_id
-        WHERE p.supervisor_id = %s
-          AND efr.workflow_status = 'sent_to_supervisor'
-    """, (faculty_id,))
+        WHERE efr.workflow_status = 'sent_to_supervisor'
+          AND (
+              EXISTS (
+                  SELECT 1
+                  FROM student_distribution_sections sec
+                  WHERE efr.course_scope = 'introduction'
+                    AND sec.section_id = efr.reference_id
+                    AND sec.supervisor_id = %s
+              )
+              OR EXISTS (
+                  SELECT 1
+                  FROM projects p
+                  WHERE efr.course_scope = 'graduation_project'
+                    AND p.project_id = efr.reference_id
+                    AND p.supervisor_id = %s
+              )
+          )
+    """, (faculty_id, faculty_id))
     count = (cursor.fetchone() or {}).get('cnt', 0)
 
     if not count:
         cursor.close()
+        db.close()
         return jsonify({"success": False, "message": "No grades ready to send."})
 
     cursor.execute("""
         UPDATE evaluation_final_results efr
-        JOIN projects p ON p.project_id = efr.reference_id
         SET
             efr.workflow_status            = 'sent_to_head',
             efr.supervisor_id              = %s,
             efr.supervisor_sent_by         = %s,
             efr.supervisor_sent_to_head_at = NOW()
-        WHERE p.supervisor_id = %s
-          AND efr.workflow_status = 'sent_to_supervisor'
-    """, (faculty_id, user_id, faculty_id))
+        WHERE efr.workflow_status = 'sent_to_supervisor'
+          AND (
+              EXISTS (
+                  SELECT 1
+                  FROM student_distribution_sections sec
+                  WHERE efr.course_scope = 'introduction'
+                    AND sec.section_id = efr.reference_id
+                    AND sec.supervisor_id = %s
+              )
+              OR EXISTS (
+                  SELECT 1
+                  FROM projects p
+                  WHERE efr.course_scope = 'graduation_project'
+                    AND p.project_id = efr.reference_id
+                    AND p.supervisor_id = %s
+              )
+          )
+    """, (faculty_id, user_id, faculty_id, faculty_id))
 
     cursor.execute("SELECT full_name FROM users WHERE user_id = %s", (user_id,))
     sup = cursor.fetchone()
