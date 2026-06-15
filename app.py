@@ -15,9 +15,12 @@ import os
 import csv
 import io
 import re
+import json, os
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+
+
 
 load_dotenv()
 from flask_mail import Mail, Message
@@ -33,7 +36,10 @@ from activate_student import activate_bp
 from announcements import announcements_bp
 from routes.general_supervisors import general_supervisors_bp, supervisor_api_bp
 from routes.supervisor_progress_submitted_api import supervisor_progress_api_bp
-
+from routes.supervisor_mystudents import supervisor_mystudents_bp
+from routes.supervisor_dashboard import supervisor_dashboard_bp
+from routes.supervisor_grades import supervisor_grades_bp
+from routes.head_grades import head_grades_bp
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "apms-dev-secret-key")
 AI_RESPONSE_TIMEOUT_SECONDS = int(os.environ.get("AI_RESPONSE_TIMEOUT_SECONDS", "55"))
@@ -68,6 +74,10 @@ app.register_blueprint(announcements_bp, url_prefix='/head')
 app.register_blueprint(general_supervisors_bp)
 app.register_blueprint(supervisor_api_bp)
 app.register_blueprint(supervisor_progress_api_bp)
+app.register_blueprint(supervisor_mystudents_bp)
+app.register_blueprint(supervisor_dashboard_bp)
+app.register_blueprint(supervisor_grades_bp)
+app.register_blueprint(head_grades_bp)
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def _get_active_semester(cursor):
     cursor.execute("""
@@ -373,7 +383,7 @@ def dashboard():
     role = session.get("role")
     routes = {
         "student": "student.dashboard",
-        "supervisor": "general_supervisors.dashboard",
+        "supervisor": "supervisor_dashboard.supervisor_dashboard",
         "coordinator": "coordinator_bp.coordinator_dashboard",
         "head_of_department": "head.dashboard",
     }
@@ -795,6 +805,24 @@ def api_assign_student():
         return jsonify({"error": str(e)}), 500
 
 
+#change the language
+def get_translations():
+    lang = request.cookies.get('lang', 'en')  # ← cookie بدل session
+    mapping = {'en': 'english', 'ar': 'arabic'}
+    path = os.path.join('translations', f'{mapping[lang]}.json')
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+@app.context_processor
+def inject_translations():
+    return dict(t=get_translations())
+
+@app.route('/set_lang/<lang>')
+def set_lang(lang):
+    response = redirect(request.referrer or '/')
+    if lang in ['ar', 'en']:
+        response.set_cookie('lang', lang, max_age=60*60*24*365)  
+    return response
 # ─── Run ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

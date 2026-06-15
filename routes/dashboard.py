@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, request, session, redirect, url_for
+from flask import Blueprint, jsonify, session
 from db import get_db
 from auth import login_required
 
@@ -8,97 +8,71 @@ dashboard_bp = Blueprint("dashboard_bp", __name__)
 @dashboard_bp.route('/api/dashboard-data')
 @login_required(role="head_of_department")
 def api_dashboard_data():
-    course_code = request.args.get("course", "COMP4200").upper().strip()
-
-    if course_code not in ("COMP4200", "COMP4300"):
-        course_code = "COMP4200"
-
     db = get_db()
     cursor = db.cursor(dictionary=True)
-#numeber of projects
+
+    # Total projects (all courses, all semesters, all statuses)
+    cursor.execute("SELECT COUNT(*) AS total_projects FROM projects")
+    total_projects = (cursor.fetchone() or {}).get("total_projects", 0)
+
+    # Active supervisors
     cursor.execute("""
-            SELECT COUNT(*) AS total_projects
-            FROM projects p
-            JOIN semesters s ON s.semester_id = p.semester_id
-            WHERE s.is_active = TRUE
-                   AND s.course_code = %s 
-                   """, (course_code,))
-    total_projetcs = (cursor.fetchone() or {}).get("total_projects", 0)
-#number of supervisors
-    cursor.execute("""
-            SELECT COUNT(DISTINCT p.supervisor_id) AS active_supervisors
-            FROM projects p
-            JOIN semesters s ON s.semester_id = p.semester_id
-            WHERE s.is_active = TRUE
-                   AND s.course_code = %s
-                   AND p.supervisor_id IS NOT NULL
-                   """,(course_code,))
+        SELECT COUNT(DISTINCT supervisor_id) AS active_supervisors
+        FROM projects
+        WHERE supervisor_id IS NOT NULL
+    """)
     active_supervisors = (cursor.fetchone() or {}).get("active_supervisors", 0)
 
-    #acceptence rate
+    # Acceptance rate
     cursor.execute("""
         SELECT
             SUM(status = 'accepted') AS accepted_count,
             SUM(status = 'rejected') AS rejected_count
-        FROM projects p
-        JOIN semesters s ON s.semester_id = p.semester_id
-        WHERE s.is_active = TRUE
-            AND s.course_code = %s    
-                   """, (course_code,))
+        FROM projects
+    """)
     row = cursor.fetchone() or {}
     accepted = row.get("accepted_count") or 0
     rejected = row.get("rejected_count") or 0
     total_decided = accepted + rejected
     acceptance_rate = round((accepted / total_decided * 100), 1) if total_decided else 0
 
-    #avg of degress
+    # Average grade
     cursor.execute("""
-        SELECT ROUND(AVG(p.final_score), 1) AS avg_grade
-        FROM projects p
-        JOIN semesters s ON s.semester_id = p.semester_id
-        WHERE s.is_active = TRUE
-                AND s.course_code = %s
-                AND p.final_score IS NOT NULL
-                   """, (course_code,))
+        SELECT ROUND(AVG(final_score), 1) AS avg_grade
+        FROM projects
+        WHERE final_score IS NOT NULL
+    """)
     avg_grade = (cursor.fetchone() or {}).get("avg_grade") or 0
 
-    #get the last three notification
+    # Last 3 notifications
     head_user_id = session.get("user_id")
     cursor.execute("""
         SELECT
-            n.notification_id,
-            n.title,
-            n.message,
-            n.notification_type,
-            n.is_read,
-            n.created_at,
-            n.related_project_id
-        FROM notifications n
-        WHERE n.recipient_id = %s
-        ORDER BY n.created_at DESC
+            notification_id, title, message, notification_type,
+            is_read, created_at, related_project_id
+        FROM notifications
+        WHERE recipient_id = %s
+        ORDER BY created_at DESC
         LIMIT 3
-    """, (head_user_id, ))
+    """, (head_user_id,))
     notifications = cursor.fetchall()
-    
+
     for n in notifications:
         if n.get("created_at"):
             n["created_at"] = n["created_at"].strftime("%Y-%m-%dT%H:%M:%S")
 
-    #performance of specialization
+    # Performance per specialization
     cursor.execute("""
-            SELECT
-                f.specialization,
-                ROUND(AVG(p.final_score), 1) AS avg_score,
-                COUNT(p.project_id) AS project_count
-            FROM projects p
-            JOIN semesters s ON s.semester_id = p.semester_id
-            JOIN faculty f ON f.faculty_id = p.supervisor_id
-            WHERE s.is_active = TRUE
-                AND s.course_code = %s
-                AND p.final_score IS NOT NULL
-            GROUP BY f.specialization
-            ORDER BY avg_score DESC
-                   """, (course_code,))
+        SELECT
+            f.specialization,
+            ROUND(AVG(p.final_score), 1) AS avg_score,
+            COUNT(p.project_id) AS project_count
+        FROM projects p
+        JOIN faculty f ON f.faculty_id = p.supervisor_id
+        WHERE p.final_score IS NOT NULL
+        GROUP BY f.specialization
+        ORDER BY avg_score DESC
+    """)
     specialization_raw = cursor.fetchall()
 
     spec_labels = {
@@ -131,7 +105,7 @@ def api_dashboard_data():
         for r in specialization_raw
     ]
 
-    #get the coordinator
+    # Current coordinator (active semester, any course)
     cursor.execute("""
         SELECT u.full_name AS coordinator_name, u.email AS coordinator_email
         FROM coordinator_assignments ca
@@ -139,50 +113,47 @@ def api_dashboard_data():
         JOIN faculty f ON f.faculty_id = ca.faculty_id
         JOIN users u ON u.user_id = f.user_id
         WHERE s.is_active = TRUE
-                AND s.course_code = %s
         LIMIT 1
-                   """, (course_code,))
+    """)
     coordinator = cursor.fetchone() or {}
 
     cursor.close()
     db.close()
 
     return jsonify({
-       "course_code": course_code,
-        "total_projects": total_projetcs,
+        "total_projects": total_projects,
         "active_supervisors": active_supervisors,
         "acceptance_rate": acceptance_rate,
         "avg_grade": avg_grade,
         "notifications": notifications,
         "specializations": specializations,
         "coordinator": coordinator,
-
     })
+
+
 @dashboard_bp.route('/api/switch-role', methods=['POST'])
 @login_required(role="head_of_department")
 def api_switch_role():
     db = get_db()
     cursor = db.cursor(dictionary=True)
-    
+
     user_id = session.get("user_id")
-    
-   
+
     cursor.execute("""
         SELECT f.faculty_id 
         FROM faculty f
         JOIN users u ON u.user_id = f.user_id
         WHERE f.user_id = %s
     """, (user_id,))
-    
+
     faculty = cursor.fetchone()
     cursor.close()
     db.close()
-    
+
     if not faculty:
         return jsonify({"success": False, "message": "No supervisor profile found"})
-    
-    
+
     session["role"] = "supervisor"
-    session["original_role"] = "head_of_department"  # احتفظ بالأصل عشان يرجع
-    
+    session["original_role"] = "head_of_department"
+
     return jsonify({"success": True})

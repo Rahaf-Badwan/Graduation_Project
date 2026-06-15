@@ -87,7 +87,7 @@ def assign_coordinator():
     course_code   = sem_row["course_code"]
     academic_year = sem_row["academic_year"]
 
-    linked_course   = LINKED_COURSES.get(course_code)  # COMP4200 → COMP4300
+    linked_course   = LINKED_COURSES.get(course_code)
     codes_to_assign = [course_code]
     if linked_course:
         codes_to_assign.append(linked_course)
@@ -105,7 +105,37 @@ def assign_coordinator():
 
     now = datetime.datetime.now()
 
-   
+    #   get user_id to new coordinator  
+    cursor.execute(
+        "SELECT user_id FROM faculty WHERE faculty_id = %s",
+        (faculty_id,)
+    )
+    new_coordinator = cursor.fetchone()
+    if not new_coordinator:
+        cursor.close(); conn.close()
+        return jsonify({"error": "Faculty not found"}), 404
+    
+    new_coordinator_user_id = new_coordinator["user_id"]
+
+    #   set old coordinator to supervisor 
+    cursor.execute(
+        """
+        UPDATE users 
+        SET role = 'supervisor'
+        WHERE role = 'coordinator' 
+        AND user_id != %s
+        AND role != 'head_of_department'
+        """,
+        (new_coordinator_user_id,)
+    )
+
+    #  assign new coordinator 
+    cursor.execute(
+        "UPDATE users SET role = 'coordinator' WHERE user_id = %s",
+        (new_coordinator_user_id,)
+    )
+
+
     for sem in all_semesters:
         sid = sem["semester_id"]
         cursor.execute(

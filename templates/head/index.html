@@ -1,53 +1,50 @@
 {% extends 'head/base.html' %}
-{% block page_title %}Head of Department Dashboard{% endblock %}
+{% block page_title %}{{ t['head']['dashboard'] }}{% endblock %}
 {% block page_id %}dashboard{% endblock %}
-{% block topbar_title %}Head of Department Dashboard{% endblock %}
+{% block topbar_title %}{{ t['head']['dashboard'] }}{% endblock %}
 
 {% block content %}
 <div class="page on" id="pg-dashboard">
 
-  <div class="tab-row" style="display: flex; gap: 8px; margin-bottom: 16px;">
-    <button class="tab active" data-course="COMP4200" onclick="selectTab('COMP4200', this)">COMP4200</button>
-    <button class="tab" data-course="COMP4300" onclick="selectTab('COMP4300', this)">COMP4300</button>
-  </div>
   <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
     <div class="stat">
-      <div class="stat-num" id="stat-projects" style="color:var(--teal)" ></div>
-      <div class="stat-label">Projects This Semester</div>
+      <div class="stat-num" id="stat-projects" style="color:var(--teal)"></div>
+      <div class="stat-label">{{ t['head']['projects_this_semester'] }}</div>
     </div>
     <div class="stat">
       <div class="stat-num" id="stat-supervisors" style="color:var(--blue)"></div>
-      <div class="stat-label">Active Supervisors</div>
+      <div class="stat-label">{{ t['head']['active_supervisors'] }}</div>
     </div>
     <div class="stat">
       <div class="stat-num" id="stat-acceptance" style="color:var(--green)"></div>
-      <div class="stat-label">Acceptance Rate</div>
+      <div class="stat-label">{{ t['head']['acceptance_rate'] }}</div>
     </div>
     <div class="stat">
-      <div class="stat-num" id="stat-avg"style="color:var(--amber)"></div>
-      <div class="stat-label">Average Grade</div>
+      <div class="stat-num" id="stat-avg" style="color:var(--amber)"></div>
+      <div class="stat-label">{{ t['head']['average_grade'] }}</div>
     </div>
   </div>
 
   <div class="two-col" style="margin-top:12px">
     <div class="card">
-      <div class="card-hd"><span class="card-title">Quick Actions</span></div>
-      <p id="coordinator-line"  style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">
-        Loading Coordinator...
+      <div class="card-hd"><span class="card-title">{{ t['head']['quick_actions'] }}</span></div>
+      <p id="coordinator-line" style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">
+        {{ t['general']['loading'] }}
       </p>
       <div class="btn-row">
-        <a href="/head/assign" class="btn btn-primary" style="text-decoration:none">Assign Roles &#x2197;</a>
-        <!--<a href="/head/overview" class="btn btn-outline" style="text-decoration:none">Department Overview</a>-->
-        <a href="/head/supervisors" class="btn btn-outline" style="text-decoration:none">Supervisors</a>
+        <a href="/head/assign" class="btn btn-primary" style="text-decoration:none">{{ t['head']['assign'] }} &#x2197;</a>
+        <a href="/head/supervisors" class="btn btn-outline" style="text-decoration:none">{{ t['head']['supervisors'] }}</a>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-hd"><span class="card-title">Recent Notifications</span><a href="/head/notifs"
-          class="card-action">View all &#x2192;</a></div>
+      <div class="card-hd">
+        <span class="card-title">{{ t['head']['recent_notifications'] }}</span>
+        <a href="/head/notifs" class="card-action">{{ t['head']['view_all'] }} &#x2192;</a>
+      </div>
       <div id="notifications-list">
         <div style="color:var(--color-text-secondary); font-size: 13px; padding: 8px 0;">
-          Loading...
+          {{ t['general']['loading'] }}
         </div>
       </div>
     </div>
@@ -55,11 +52,11 @@
 
   <div class="card" style="margin-top:0">
     <div class="card-hd">
-      <span class="card-title">Department Performance Overview</span>
-    </div> 
+      <span class="card-title">{{ t['head']['dept_performance'] }}</span>
+    </div>
     <div id="spec-list" style="display: flex; flex-direction: column; gap: 8px;">
       <div style="color: var(--color-text-secondary); font-size: 13px; padding: 8px 0;">
-        Loading...
+        {{ t['general']['loading'] }}
       </div>
     </div>
   </div>

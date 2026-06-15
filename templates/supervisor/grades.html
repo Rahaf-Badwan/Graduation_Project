@@ -1,0 +1,164 @@
+{% extends 'supervisor/base.html' %}
+{% block page_title %}Grades{% endblock %}
+{% block page_id %}grades{% endblock %}
+{% block topbar_title %}Grades{% endblock %}
+
+{% block content %}
+<div class="page on" id="pg-grades">
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd">
+      <span class="card-title">My Students — Final Grades</span>
+    </div>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">
+      These are the final grades assigned by the coordinator for your supervised projects.
+      Once you review them, you can send them to the Head of Department.
+    </p>
+
+    <div id="grades-list">
+      <div style="color:var(--color-text-secondary);font-size:13px;padding:12px 0">
+        Loading...
+      </div>
+    </div>
+
+    <div style="margin-top:20px;display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" id="sendBtn" onclick="sendGradesToHead()" style="display:none">
+        Send to Head of Department ↑
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" style="
+    display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--green);color:#fff;padding:12px 24px;border-radius:8px;
+    font-size:13px;font-weight:500;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.15)">
+  </div>
+
+</div>
+
+<script>
+async function loadGrades() {
+  try {
+    const res = await fetch('/supervisor/api/my-grades');
+    const data = await res.json();
+    const list = document.getElementById('grades-list');
+    const btn  = document.getElementById('sendBtn');
+
+    if (!data.grades || data.grades.length === 0) {
+      list.innerHTML = `
+        <div style="text-align:center;padding:40px 0;color:var(--color-text-secondary);font-size:13px">
+          <span class="material-symbols-outlined" style="font-size:36px;display:block;margin-bottom:8px">grade</span>
+          No grades available yet. Grades will appear here once the coordinator assigns them.
+        </div>`;
+      return;
+    }
+
+    const alreadySent = data.grades.every(g => g.workflow_status !== 'sent_to_supervisor');
+
+    list.innerHTML = data.grades.map(g => `
+      <div style="padding:14px;border:1px solid var(--color-border);border-radius:10px;
+                  margin-bottom:10px;background:var(--color-surface-alt)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px">
+              ${escHtml(g.project_title)}
+            </div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">
+              Students: ${escHtml(g.students || '—')}
+            </div>
+            <div style="font-size:12px;color:var(--color-text-secondary)">
+              Course: ${escHtml(g.course_scope || '—')}
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:700;color:var(--green)">
+              ${g.final_score ?? '—'}
+            </div>
+            <div style="font-size:11px;color:var(--color-text-secondary)">Final Score</div>
+            <span style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:20px;
+                         font-size:11px;font-weight:500;
+                         background:${statusColor(g.workflow_status)};color:#fff">
+              ${statusLabel(g.workflow_status)}
+            </span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    if (!alreadySent) {
+      btn.style.display = 'inline-flex';
+    } else {
+      btn.style.display = 'none';
+      const info = document.createElement('div');
+      info.style = 'text-align:right;font-size:12px;color:var(--green);margin-top:8px';
+      info.textContent = '✓ Grades already sent to Head of Department.';
+      list.after(info);
+    }
+
+  } catch(err) {
+    document.getElementById('grades-list').innerHTML =
+      '<div style="color:var(--coral);font-size:13px;padding:12px 0">Failed to load grades. Please refresh.</div>';
+  }
+}
+
+async function sendGradesToHead() {
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  try {
+    const res = await fetch('/supervisor/api/send-grades-to-head', { method: 'POST' });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast('✓ Grades sent to Head of Department successfully!');
+      btn.style.display = 'none';
+      setTimeout(() => loadGrades(), 1000);
+    } else {
+      showToast(data.message || 'Something went wrong.', true);
+      btn.disabled = false;
+      btn.textContent = 'Send to Head of Department ↑';
+    }
+  } catch(err) {
+    showToast('Network error. Please try again.', true);
+    btn.disabled = false;
+    btn.textContent = 'Send to Head of Department ↑';
+  }
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isError ? 'var(--coral)' : 'var(--green)';
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3500);
+}
+
+function statusLabel(s) {
+  const map = {
+    'sent_to_supervisor': 'Received',
+    'sent_to_head': 'Sent to Head',
+    'published_to_students': 'Published',
+    'draft': 'Draft',
+  };
+  return map[s] || s;
+}
+
+function statusColor(s) {
+  const map = {
+    'sent_to_supervisor': '#2e7d32',
+    'sent_to_head': '#1565c0',
+    'published_to_students': '#6a1b9a',
+    'draft': '#757575',
+  };
+  return map[s] || '#757575';
+}
+
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.addEventListener('DOMContentLoaded', loadGrades);
+</script>
+{% endblock %}

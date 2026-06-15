@@ -1,134 +1,148 @@
 {% extends 'supervisor/base.html' %}
-{% block page_title %}Students &amp; Projects{% endblock %}
+{% block page_title %}Students & Projects{% endblock %}
 {% block page_id %}mystudents{% endblock %}
-{% block topbar_title %}Students &amp; Projects{% endblock %}
+{% block topbar_title %}Students & Projects{% endblock %}
 
 {% block content %}
-<div class="tab-bar">
-  <button class="tab on">All projects (5)</button>
-  <button class="tab">On track (3)</button>
-  <button class="tab">Late (1)</button>
-  <button class="tab">Complete (1)</button>
-</div>
 
-<div style="display:flex;flex-direction:column;gap:10px">
-  <!-- project 1 -->
-  <div
-    style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--r);padding:16px;border-right:3px solid var(--green)">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
-      <div>
-        <div style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px">Academic Project
-          Lifecycle Management System (APMS)</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div class="person-avatar"
-            style="background:var(--sup-light);color:var(--sup);width:22px;height:22px;font-size:9px">APMS</div>
-          <span style="font-size:11px;color:var(--color-text-secondary)">Taima Abed, Amneh Abu Musallum, Rahaf
-            Badwan</span>
-          <span
-            style="font-size:10px;padding:2px 7px;background:var(--blue-light);color:var(--blue);border-radius:20px">Web
-            + AI</span>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <span class="pill p-review">Under review</span>
-        <span class="score-chip sc-b" style="font-size:11px">78.8</span>
-      </div>
-    </div>
-    <div class="two-col" style="gap:10px">
-      <div>
-        <div class="prog-wrap">
-          <div class="prog-label"><span>Final report</span><span>85%</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:85%;background:var(--green)"></div>
-          </div>
-        </div>
-        <div class="prog-wrap">
-          <div class="prog-label"><span>Source Code</span><span>70%</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:70%;background:var(--blue)"></div>
-          </div>
-        </div>
-        <div class="prog-wrap" style="margin:0">
-          <div class="prog-label"><span>Slides</span><span>60%</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:60%;background:var(--sup-mid)"></div>
-          </div>
-        </div>
-      </div>
-      <div class="btn-row" style="align-items:flex-start;flex-direction:column;gap:6px">
-        <a class="btn btn-primary" style="width:100%;text-decoration:none;text-align:center"
-          href="/supervisor/feedback">✦ Add new feedback</a>
-        <a class="btn btn-outline" style="width:100%;text-decoration:none;text-align:center"
-          href="/supervisor/progress">◎ Submit Files</a>
-      </div>
-    </div>
-  </div>
 
-  <!-- project 2 -->
-  <div
-    style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--r);padding:16px;border-right:3px solid var(--sup-mid)">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
-      <div>
-        <div style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px">Electronic Student
-          Records Management System</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div class="person-avatar"
-            style="background:var(--blue-light);color:var(--blue);width:22px;height:22px;font-size:9px">ESRMS</div>
-          <span style="font-size:11px;color:var(--color-text-secondary)">Salma Al-Khatib</span>
-          <span
-            style="font-size:10px;padding:2px 7px;background:var(--blue-light);color:var(--blue);border-radius:20px">Web</span>
-        </div>
-      </div>
-      <span class="pill p-pending">Waiting</span>
-    </div>
-    <div class="two-col" style="gap:10px">
-      <div>
-        <div class="prog-wrap">
-          <div class="prog-label"><span>Report</span><span>55%</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:55%;background:var(--sup-mid)"></div>
-          </div>
-        </div>
-        <div class="prog-wrap" style="margin:0">
-          <div class="prog-label"><span>Code</span><span>48%</span></div>
-          <div class="prog-bg">
-            <div class="prog-fill" style="width:48%;background:var(--blue)"></div>
-          </div>
-        </div>
-      </div>
-      <div class="btn-row" style="align-items:flex-start;flex-direction:column;gap:6px">
-        <a class="btn btn-primary" style="width:100%;text-decoration:none;text-align:center"
-          href="/supervisor/feedback">✦ Add new feedback</a>
-        <a class="btn btn-outline" style="width:100%;text-decoration:none;text-align:center"
-          href="/supervisor/progress">◎ Submit Files</a>
-      </div>
-    </div>
-  </div>
 
-  <!-- project 3 - late -->
-  <div
-    style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--r);padding:16px;border-right:3px solid var(--coral)">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
-      <div>
-        <div style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px">Smart food
-          delivery app</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div class="person-avatar"
-            style="background:var(--coral-light);color:var(--coral);width:22px;height:22px;font-size:9px">SFD</div>
-          <span style="font-size:11px;color:var(--color-text-secondary)">Kareem Awda</span>
-          <span style="font-size:10px;padding:2px 7px;background:#FBEAF0;color:#993556;border-radius:20px">Mobile</span>
+{# ── Projects List ─────────────────────────────────────────── #}
+{% if projects %}
+  {% for p in projects %}
+
+  {# ── تحديد CSS class ── #}
+  {% if p.urgency == 'urgent' %}
+    {% set card_class = 'student-card urgent' %}
+  {% elif p.status == 'accepted' %}
+    {% set card_class = 'student-card good' %}
+  {% elif p.status in ['under_review', 'committee_evaluation'] %}
+    {% set card_class = 'student-card good' %}
+  {% else %}
+    {% set card_class = 'student-card normal' %}
+  {% endif %}
+
+  {# ── تحديد pill ── #}
+  {% set status_map = {
+    'draft':                ('p-pending',  'Draft'),
+    'submitted':            ('p-pending',  'Submitted'),
+    'under_review':         ('p-review',   'Under review'),
+    'needs_revision':       ('p-late',     'Needs revision'),
+    'committee_evaluation': ('p-review',   'Committee'),
+    'accepted':             ('p-accepted', 'Accepted'),
+    'rejected':             ('p-late',     'Rejected'),
+    'archived':             ('p-pending',  'Archived'),
+    'solo_pending':         ('p-pending',  'Solo pending')
+  } %}
+  {% set pill_class, pill_text = status_map.get(p.status, ('p-pending', p.status)) %}
+
+  <div class="{{ card_class }}">
+
+    {# ── Header ── #}
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+
+      <div class="person-avatar"
+           style="background:var(--sup-light);color:var(--sup);width:36px;height:36px;font-size:11px;flex-shrink:0">
+        {{ (p.title[:2]) | upper }}
+      </div>
+
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:2px">
+          {{ p.title }}
+        </div>
+        <div style="font-size:11px;color:var(--color-text-secondary)">
+          {% if p.group_name %}
+            <span style="font-weight:500">{{ p.group_name }}</span> ·
+          {% endif %}
+          {{ p.students or 'No students assigned' }}
+          · <span style="text-transform:capitalize">{{ p.course_code }}</span>
+          · {{ p.academic_year }}
         </div>
       </div>
-      <span class="pill p-late">Late</span>
+
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        {% if p.final_score %}
+          <span style="font-size:13px;font-weight:700;color:var(--sup-mid)">
+            {{ p.final_score }}
+          </span>
+        {% endif %}
+        <span class="pill {{ pill_class }}">{{ pill_text }}</span>
+      </div>
     </div>
-    <div
-      style="padding:8px;background:var(--coral-light);border-radius:var(--rm);font-size:12px;color:var(--coral);margin-bottom:10px">
-      ⚑ No files have been uploaded in two weeks — only 31% have progressed and the deadline is in 7 days
+
+    {# ── Progress bars ── #}
+    {% if p.report_progress is not none %}
+    <div class="prog-wrap" style="margin:0 0 4px">
+      <div class="prog-label">
+        <span>Final report</span><span>{{ p.report_progress }}%</span>
+      </div>
+      <div class="prog-bg">
+        <div class="prog-fill" style="width:{{ p.report_progress }}%;background:var(--sup-mid)"></div>
+      </div>
     </div>
-    <div class="btn-row">
-      <button class="btn btn-primary">Send urgent alert to student ↗</button>
-      <a class="btn btn-outline" href="/supervisor/feedback" style="text-decoration:none">Add note</a>
+    {% endif %}
+
+    {% if p.code_progress is not none %}
+    <div class="prog-wrap" style="margin:0 0 4px">
+      <div class="prog-label">
+        <span>Source Code</span><span>{{ p.code_progress }}%</span>
+      </div>
+      <div class="prog-bg">
+        <div class="prog-fill" style="width:{{ p.code_progress }}%;background:var(--blue)"></div>
+      </div>
     </div>
+    {% endif %}
+
+    {% if p.slides_progress is not none %}
+    <div class="prog-wrap" style="margin:0">
+      <div class="prog-label">
+        <span>Slides</span><span>{{ p.slides_progress }}%</span>
+      </div>
+      <div class="prog-bg">
+        <div class="prog-fill" style="width:{{ p.slides_progress }}%;background:var(--green)"></div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Urgent alert ── #}
+    {% if p.urgency == 'urgent' and p.last_note %}
+    <div style="font-size:11px;color:var(--coral);margin-top:8px;
+                background:var(--coral-light);padding:6px 10px;border-radius:5px">
+      &#9873; {{ p.last_note }}
+    </div>
+    {% endif %}
+
+    {# ── Buttons ── #}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <a href="/supervisor/feedback?project_id={{ p.project_id }}"
+         class="btn btn-primary"
+         style="font-size:12px;padding:6px 14px;flex:1;text-align:center">
+         Add new feedback
+      </a>
+      <a href="/supervisor/progress?project_id={{ p.project_id }}"
+         class="btn btn-outline"
+         style="font-size:12px;padding:6px 14px;flex:1;text-align:center">
+        Submit Files
+      </a>
+      {% if p.urgency == 'urgent' %}
+      <a href="/supervisor/alert/{{ p.project_id }}"
+         class="btn btn-outline"
+         style="font-size:12px;padding:6px 12px;color:var(--coral);border-color:var(--coral)">
+        Send urgent alert &#8599;
+      </a>
+      {% endif %}
+    </div>
+
   </div>
-</div>
+  {% endfor %}
+
+{% else %}
+  <div style="text-align:center;padding:60px 20px;color:var(--color-text-secondary)">
+    <div style="font-size:36px;margin-bottom:12px">&#128203;</div>
+    <div style="font-size:14px">No active projects assigned to you this semester.</div>
+  </div>
+{% endif %}
+
 {% endblock %}
+
+

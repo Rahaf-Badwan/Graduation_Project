@@ -5059,13 +5059,9 @@ ORDER BY sec.section_id;
 
 SET SQL_SAFE_UPDATES = 0;
 
-UPDATE users
-SET role = 'supervisor'
-WHERE university_id = '1003';
 
-UPDATE users
-SET role = 'coordinator'
-WHERE university_id = '1002';
+
+
 
 SET SQL_SAFE_UPDATES = 1;
 
@@ -5563,4 +5559,50 @@ WHERE course_code = 'COMP4300'
 ORDER BY is_active DESC, semester_id DESC;
 
 SET SQL_SAFE_UPDATES = 1;
+
+SELECT status, COUNT(*) 
+FROM projects 
+WHERE supervisor_id = (
+    SELECT f.faculty_id FROM faculty f 
+    JOIN users u ON u.user_id = f.user_id 
+    WHERE u.avatar_initials = 'SA' 
+    LIMIT 1
+)
+GROUP BY status;
+
+
+SELECT full_name, COUNT(*) as cnt, 
+       GROUP_CONCAT(user_id) as user_ids,
+       GROUP_CONCAT(university_id) as uni_ids
+FROM users 
+WHERE role = 'supervisor'
+GROUP BY full_name
+HAVING cnt > 1;
+
+SELECT f.faculty_id, u.user_id, u.university_id, u.full_name
+FROM faculty f
+JOIN users u ON u.user_id = f.user_id
+WHERE u.university_id IN ('DOC0001','DOC0002','DOC0003','DOC0004','DOC0005');
+
+
+DELETE FROM faculty
+WHERE user_id IN (
+    SELECT user_id FROM users 
+    WHERE university_id IN ('DOC0001','DOC0002','DOC0003','DOC0004','DOC0005')
+);
+
+DELETE FROM faculty
+WHERE user_id IN (
+    SELECT user_id FROM users 
+    WHERE university_id IN ('DOC0006')
+);
+
+
+DELETE FROM users
+WHERE university_id IN ('DOC0006');
+
+
+
+select * from users;
+ 
 

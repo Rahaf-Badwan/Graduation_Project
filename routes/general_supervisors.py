@@ -15,6 +15,8 @@ from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
 from routes.supervisor_evaluation import supervisor_evaluation_bp
+
+
 general_supervisors_bp = Blueprint(
     "general_supervisors",
     __name__,

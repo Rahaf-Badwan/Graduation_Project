@@ -1,8 +1,7 @@
 {% extends 'coordinator/base.html' %}
-
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}{{ t['coordinator']['dashboard'] }}{% endblock %}
 {% block page_id %}dashboard{% endblock %}
-{% block topbar_title %}Dashboard{% endblock %}
+{% block topbar_title %}{{ t['coordinator']['dashboard'] }}{% endblock %}
 
 {% block content %}
 <div class="page page-single on" id="pg-dashboard">
@@ -14,453 +13,219 @@
     margin: 0 !important; background: var(--color-background-secondary);
     font-family: 'Segoe UI', system-ui, sans-serif;
   }
-
-  /* TOP STAT BAR */
-  #pg-dashboard .top-stat-bar {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    background: var(--color-background-primary); border-bottom: 1.5px solid #e8edea; margin-bottom: 20px;
-  }
-  #pg-dashboard .top-stat-item {
-    padding: 18px 28px 16px; border-right: 1.5px solid #e8edea;
-  }
+  #pg-dashboard .top-stat-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--color-background-primary); border-bottom: 1.5px solid #e8edea; margin-bottom: 20px; }
+  #pg-dashboard .top-stat-item { padding: 18px 28px 16px; border-right: 1.5px solid #e8edea; }
   #pg-dashboard .top-stat-item:last-child { border-right: none; }
-  #pg-dashboard .top-stat-num {
-    font-size: 30px; font-weight: 900; line-height: 1;
-    margin-bottom: 5px; letter-spacing: -0.5px;
-  }
+  #pg-dashboard .top-stat-num { font-size: 30px; font-weight: 900; line-height: 1; margin-bottom: 5px; letter-spacing: -0.5px; }
   #pg-dashboard .top-stat-num.green  { color: var(--accent); }
   #pg-dashboard .top-stat-num.teal   { color: var(--teal); }
   #pg-dashboard .top-stat-num.orange { color: #c2410c; }
   #pg-dashboard .top-stat-num.blue   { color: var(--blue); }
   #pg-dashboard .top-stat-num.loading { color: #d1d5db; font-size: 22px; }
   #pg-dashboard .top-stat-lbl { font-size: 12px; color: #6b7280; font-weight: 500; }
-
-  /* BODY */
-  #pg-dashboard .dash-body {
-    display: grid; grid-template-columns: 1fr 370px;
-    gap: 16px; padding: 0 22px; align-items: start;
-  }
-
-  /* PANELS */
-  #pg-dashboard .panel {
-    background: var(--color-background-primary); border: 1px solid #e8edea;
-    border-radius: 14px; overflow: hidden; margin-bottom: 16px;
-  }
-  #pg-dashboard .panel-hd {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 18px; border-bottom: 1px solid #eef2ef;
-  }
+  #pg-dashboard .dash-body { display: grid; grid-template-columns: 1fr 370px; gap: 16px; padding: 0 22px; align-items: start; }
+  #pg-dashboard .panel { background: var(--color-background-primary); border: 1px solid #e8edea; border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+  #pg-dashboard .panel-hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #eef2ef; }
   #pg-dashboard .panel-hd-left { display: flex; align-items: center; gap: 8px; }
   #pg-dashboard .panel-title { font-size: 14px; font-weight: 800; color: var(--color-text-primary); }
-  #pg-dashboard .panel-badge {
-    font-size: 11px; font-weight: 700; color: #6b7280;
-    background: var(--color-background-tertiary); border-radius: 999px; padding: 2px 8px;
-  }
-  #pg-dashboard .panel-action {
-    font-size: 12.5px; color: var(--accent); font-weight: 700;
-    cursor: pointer; background: none; border: none; padding: 0; text-decoration: none;
-  }
+  #pg-dashboard .panel-badge { font-size: 11px; font-weight: 700; color: #6b7280; background: var(--color-background-tertiary); border-radius: 999px; padding: 2px 8px; }
+  #pg-dashboard .panel-action { font-size: 12.5px; color: var(--accent); font-weight: 700; cursor: pointer; background: none; border: none; padding: 0; text-decoration: none; }
   #pg-dashboard .panel-action:hover { text-decoration: underline; }
-
-  /* QUICK ACTIONS */
-  #pg-dashboard .qa-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 1px; background: var(--color-background-tertiary);
-  }
-  #pg-dashboard .qa-card {
-    display: flex; align-items: center; gap: 12px;
-    padding: 14px 16px; background: var(--color-background-primary);
-    cursor: pointer; transition: background 0.13s; text-decoration: none;
-  }
+  #pg-dashboard .qa-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--color-background-tertiary); }
+  #pg-dashboard .qa-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--color-background-primary); cursor: pointer; transition: background 0.13s; text-decoration: none; }
   #pg-dashboard .qa-card:hover { background: var(--color-background-tertiary); }
-  #pg-dashboard .qa-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  #pg-dashboard .qa-icon .material-symbols-outlined {
-    font-size: 20px;
-    line-height: 1;
-  }
+  #pg-dashboard .qa-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  #pg-dashboard .qa-icon .material-symbols-outlined { font-size: 20px; line-height: 1; }
   #pg-dashboard .qa-label { font-size: 13px; font-weight: 700; color: var(--color-text-primary); }
   #pg-dashboard .qa-sub   { font-size: 11px; color: #9ca3af; margin-top: 1px; }
-
-  /* PROJECT ROWS */
-  #pg-dashboard .proj-row {
-    display: flex; align-items: center; gap: 13px;
-    padding: 12px 18px; border-bottom: 1px solid #f0f4f1;
-    transition: background 0.12s; cursor: pointer;
-  }
-  #pg-dashboard .proj-row:last-child { border-bottom: none; }
-  #pg-dashboard .proj-row:hover { background: var(--color-background-tertiary); }
-  #pg-dashboard .proj-info { flex: 1; min-width: 0; }
-  #pg-dashboard .proj-title {
-    font-size: 13.5px; font-weight: 700; color: var(--color-text-primary);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
-  }
-  #pg-dashboard .proj-meta { font-size: 11.5px; color: #9ca3af; }
-  #pg-dashboard .proj-badge {
-    font-size: 11px; font-weight: 700; padding: 4px 10px;
-    border-radius: 999px; white-space: nowrap; flex-shrink: 0;
-  }
-
-  /* EMPTY STATE */
-  #pg-dashboard .dash-empty {
-    padding: 22px 18px; color: #9ca3af; font-size: 13px; text-align: center;
-  }
-  #pg-dashboard .dash-empty-icon { font-size: 28px; margin-bottom: 6px; }
-  #pg-dashboard .dash-empty-hint { font-size: 12px; color: #c4cdc8; margin-top: 4px; }
-
-  /* BAR CHART */
-  #pg-dashboard .chart-wrap { padding: 16px 18px; height: 220px; position: relative; }
-
-  /* MINI STAT GRID */
   #pg-dashboard .mini-stat-grid { display: grid; grid-template-columns: 1fr 1fr; }
-  #pg-dashboard .mini-stat-cell {
-    padding: 14px 18px;
-    border-right: 1px solid #eef2ef; border-bottom: 1px solid #eef2ef;
-  }
+  #pg-dashboard .mini-stat-cell { padding: 14px 18px; border-right: 1px solid #eef2ef; border-bottom: 1px solid #eef2ef; }
   #pg-dashboard .mini-stat-cell:nth-child(2n)  { border-right: none; }
   #pg-dashboard .mini-stat-cell:nth-child(n+3) { border-bottom: none; }
-  #pg-dashboard .mini-stat-val {
-    font-size: 22px; font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 4px;
-  }
+  #pg-dashboard .mini-stat-val { font-size: 22px; font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 4px; }
   #pg-dashboard .mini-stat-val.blue { color: var(--blue); }
   #pg-dashboard .mini-stat-val.red  { color: #b42318; }
   #pg-dashboard .mini-stat-lbl { font-size: 11.5px; color: #6b7280; font-weight: 500; }
-
-  /* PROGRESS BARS */
   #pg-dashboard .progress-list { padding: 14px 18px; border-top: 1px solid #eef2ef; }
   #pg-dashboard .progress-item { margin-bottom: 12px; }
   #pg-dashboard .progress-item:last-child { margin-bottom: 0; }
-  #pg-dashboard .progress-row {
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;
-  }
+  #pg-dashboard .progress-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
   #pg-dashboard .progress-lbl { font-size: 12.5px; color: var(--color-text-secondary); font-weight: 600; }
   #pg-dashboard .progress-pct { font-size: 12px; color: #6b7280; font-weight: 600; }
   #pg-dashboard .progress-bg { background: var(--color-background-tertiary); border-radius: 999px; height: 6px; overflow: hidden; }
   #pg-dashboard .progress-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; }
-
-  /* SEMESTER CONTROL */
   #pg-dashboard .sem-info { padding: 13px 18px; }
-  #pg-dashboard .sem-row {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
-  }
+  #pg-dashboard .sem-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   #pg-dashboard .sem-row:last-child { margin-bottom: 0; }
   #pg-dashboard .sem-key { font-size: 12.5px; color: #6b7280; }
   #pg-dashboard .sem-val { font-size: 12.5px; font-weight: 700; color: var(--color-text-primary); }
   #pg-dashboard .sem-val.open   { color: var(--accent); }
   #pg-dashboard .sem-val.closed { color: #9ca3af; }
-  #pg-dashboard .sem-actions {
-    display: flex; gap: 8px; padding: 12px 18px;
-    border-top: 1px solid #eef2ef; flex-wrap: wrap;
-  }
-  #pg-dashboard .sem-btn {
-    flex: 1; min-width: 90px; padding: 9px 12px; border-radius: 9px;
-    font-size: 12.5px; font-weight: 700; cursor: pointer; transition: 0.14s ease;
-    border: 1px solid #d1e7d9; background: var(--green-light); color: var(--color-text-primary); text-align: center;
-  }
-  #pg-dashboard .sem-btn:hover { background: var(--green-light); }
+  #pg-dashboard .sem-actions { display: flex; gap: 8px; padding: 12px 18px; border-top: 1px solid #eef2ef; flex-wrap: wrap; }
+  #pg-dashboard .sem-btn { flex: 1; min-width: 90px; padding: 9px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: 0.14s ease; border: 1px solid #d1e7d9; background: var(--green-light); color: var(--color-text-primary); text-align: center; }
   #pg-dashboard .sem-btn.primary { background: #2e7d42; color: #fff; border-color: var(--accent); }
   #pg-dashboard .sem-btn.primary:hover { background: #245c33; }
-
-  /* NOTIFICATIONS */
-  #pg-dashboard .notif-item {
-    display: flex; align-items: flex-start; gap: 10px;
-    padding: 12px 18px; border-bottom: 1px solid #f0f4f1;
-    cursor: pointer; transition: background 0.12s;
-  }
+  #pg-dashboard .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 18px; border-bottom: 1px solid #f0f4f1; cursor: pointer; transition: background 0.12s; }
   #pg-dashboard .notif-item:last-child { border-bottom: none; }
   #pg-dashboard .notif-item:hover { background: var(--color-background-tertiary); }
   #pg-dashboard .notif-item.unread { background: var(--color-background-tertiary); }
-  #pg-dashboard .notif-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #2e7d42; flex-shrink: 0; margin-top: 5px;
-  }
+  #pg-dashboard .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: #2e7d42; flex-shrink: 0; margin-top: 5px; }
   #pg-dashboard .notif-dot.read { background: var(--color-border-tertiary); }
   #pg-dashboard .notif-body { flex: 1; min-width: 0; }
-  #pg-dashboard .notif-title {
-    font-size: 13px; font-weight: 700; color: var(--color-text-primary);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
-  }
+  #pg-dashboard .notif-title { font-size: 13px; font-weight: 700; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
   #pg-dashboard .notif-meta { font-size: 11.5px; color: #9ca3af; }
-  #pg-dashboard .notif-unread-badge {
-    font-size: 11px; font-weight: 800; color: #fff;
-    background: #2e7d42; border-radius: 999px; padding: 2px 7px; margin-left: 4px;
-  }
-
+  #pg-dashboard .notif-unread-badge { font-size: 11px; font-weight: 800; color: #fff; background: #2e7d42; border-radius: 999px; padding: 2px 7px; margin-left: 4px; }
+  #pg-dashboard .chart-wrap { padding: 16px 18px; height: 220px; position: relative; }
   .dashboard-hidden-values { display: none !important; }
-
-  @media (max-width: 1000px) {
-    #pg-dashboard .dash-body { grid-template-columns: 1fr; }
-    #pg-dashboard .qa-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 640px) {
-    #pg-dashboard .top-stat-bar { grid-template-columns: 1fr; }
-    #pg-dashboard .top-stat-item { border-right: none; border-bottom: 1.5px solid #e8edea; }
-    #pg-dashboard .top-stat-item:last-child { border-bottom: none; }
-    #pg-dashboard .top-stat-num { font-size: 24px; }
-    #pg-dashboard .top-stat-item { padding: 14px 16px 12px; }
-    #pg-dashboard .qa-grid { grid-template-columns: 1fr 1fr; }
-  }
+  @media (max-width: 1000px) { #pg-dashboard .dash-body { grid-template-columns: 1fr; } #pg-dashboard .qa-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { #pg-dashboard .top-stat-bar { grid-template-columns: 1fr; } #pg-dashboard .top-stat-item { border-right: none; border-bottom: 1.5px solid #e8edea; } #pg-dashboard .top-stat-item:last-child { border-bottom: none; } #pg-dashboard .top-stat-num { font-size: 24px; } #pg-dashboard .top-stat-item { padding: 14px 16px 12px; } #pg-dashboard .qa-grid { grid-template-columns: 1fr 1fr; } }
 </style>
 
-<!-- legacy compat -->
 <div class="dashboard-hidden-values">
   <div id="dashTotalProjects">0</div>
   <div id="dashUnderEvaluation">0</div><div id="dashAccepted">0</div>
   <div id="dashRejected">0</div>
 </div>
 
-<!-- ════════════════════════════════════════
-     TOP STAT BAR  (plain text — no links)
-═════════════════════════════════════════ -->
 <div class="top-stat-bar">
   <div class="top-stat-item">
     <div class="top-stat-num green loading" id="statTotal">—</div>
-    <div class="top-stat-lbl">Active projects / groups</div>
+    <div class="top-stat-lbl">{{ t['coordinator']['stat_active_projects'] }}</div>
   </div>
   <div class="top-stat-item">
     <div class="top-stat-num orange loading" id="statEvaluation">—</div>
-    <div class="top-stat-lbl">In committee evaluation</div>
+    <div class="top-stat-lbl">{{ t['coordinator']['stat_in_evaluation'] }}</div>
   </div>
   <div class="top-stat-item">
     <div class="top-stat-num blue loading" id="statStudents">—</div>
-    <div class="top-stat-lbl">Active students</div>
+    <div class="top-stat-lbl">{{ t['coordinator']['stat_active_students'] }}</div>
   </div>
 </div>
 
-<!-- ════════════════════════════════════════
-     BODY — 2 COLUMNS
-═════════════════════════════════════════ -->
 <div class="dash-body">
-
-  <!-- ═══ LEFT COLUMN ═══════════════════ -->
   <div>
-
-    <!-- Quick Actions -->
     <div class="panel">
       <div class="panel-hd">
-        <span class="panel-title">Quick actions</span>
+        <span class="panel-title">{{ t['head']['quick_actions'] }}</span>
       </div>
       <div class="qa-grid">
         <a class="qa-card" href="/coordinator/committee">
           <div class="qa-icon" style="background:var(--blue-light);color:var(--blue)"><span class="material-symbols-outlined">gavel</span></div>
-          <div><div class="qa-label">Committees</div><div class="qa-sub">Schedule & manage</div></div>
+          <div><div class="qa-label">{{ t['coordinator']['committee'] }}</div><div class="qa-sub">{{ t['coordinator']['qa_committee_sub'] }}</div></div>
         </a>
         <a class="qa-card" href="/coordinator/registration">
           <div class="qa-icon" style="background:var(--purple-light);color:var(--purple)"><span class="material-symbols-outlined">assignment_ind</span></div>
-          <div><div class="qa-label">Distribution</div><div class="qa-sub">Student registration</div></div>
+          <div><div class="qa-label">{{ t['coordinator']['registration'] }}</div><div class="qa-sub">{{ t['coordinator']['qa_registration_sub'] }}</div></div>
         </a>
-       
         <a class="qa-card" href="/coordinator/lectures">
           <div class="qa-icon" style="background:var(--color-background-tertiary);color:var(--color-text-secondary)"><span class="material-symbols-outlined">menu_book</span></div>
-          <div><div class="qa-label">Lectures</div><div class="qa-sub">Lecture schedule</div></div>
+          <div><div class="qa-label">{{ t['coordinator']['lectures'] }}</div><div class="qa-sub">{{ t['coordinator']['qa_lectures_sub'] }}</div></div>
         </a>
         <a class="qa-card" href="/coordinator/search">
           <div class="qa-icon" style="background:var(--green-light);color:var(--green)"><span class="material-symbols-outlined">folder_open</span></div>
-          <div><div class="qa-label">Archive Search</div><div class="qa-sub">Browse past projects</div></div>
+          <div><div class="qa-label">{{ t['coordinator']['archive_search'] }}</div><div class="qa-sub">{{ t['coordinator']['qa_archive_sub'] }}</div></div>
         </a>
       </div>
     </div>
 
- 
-
-    <!-- Projects by Type — horizontal bar chart from archive -->
     <div class="panel">
       <div class="panel-hd">
         <div class="panel-hd-left">
-          <span class="panel-title">Projects by type</span>
-          <span class="panel-badge" id="archiveTotalBadge">from archive</span>
+          <span class="panel-title">{{ t['coordinator']['projects_by_type'] }}</span>
+          <span class="panel-badge" id="archiveTotalBadge">{{ t['coordinator']['from_archive'] }}</span>
         </div>
-        <a class="panel-action" href="/coordinator/search">Browse archive →</a>
+        <a class="panel-action" href="/coordinator/search">{{ t['head']['view_all'] }} →</a>
       </div>
       <div class="chart-wrap">
         <canvas id="typeBarChart"></canvas>
       </div>
     </div>
-
   </div>
-  <!-- ═══ END LEFT COLUMN ════════════════ -->
 
-  <!-- ═══ RIGHT COLUMN ══════════════════ -->
   <div>
-
-    <!-- Semester at a glance -->
     <div class="panel">
       <div class="panel-hd">
-        <span class="panel-title">Semester at a glance</span>
+        <span class="panel-title">{{ t['coordinator']['semester_glance'] }}</span>
         <span id="semLabel" style="font-size:12px;color:#9ca3af;font-weight:600">—</span>
       </div>
       <div class="mini-stat-grid">
-        <div class="mini-stat-cell">
-          <div class="mini-stat-val" id="miniAccepted">—</div>
-          <div class="mini-stat-lbl">Accepted / Archived</div>
-        </div>
-        <div class="mini-stat-cell">
-          <div class="mini-stat-val blue" id="miniSections">—</div>
-          <div class="mini-stat-lbl">Visible groups</div>
-        </div>
-        <div class="mini-stat-cell">
-          <div class="mini-stat-val red" id="miniRejected">—</div>
-          <div class="mini-stat-lbl">Rejected</div>
-        </div>
-        <div class="mini-stat-cell">
-          <div class="mini-stat-val blue" id="miniCommittees">—</div>
-          <div class="mini-stat-lbl">Committees</div>
-        </div>
+        <div class="mini-stat-cell"><div class="mini-stat-val" id="miniAccepted">—</div><div class="mini-stat-lbl">{{ t['coordinator']['accepted_archived'] }}</div></div>
+        <div class="mini-stat-cell"><div class="mini-stat-val blue" id="miniSections">—</div><div class="mini-stat-lbl">{{ t['coordinator']['visible_groups'] }}</div></div>
+        <div class="mini-stat-cell"><div class="mini-stat-val red" id="miniRejected">—</div><div class="mini-stat-lbl">{{ t['general']['delete'] }}</div></div>
+        <div class="mini-stat-cell"><div class="mini-stat-val blue" id="miniCommittees">—</div><div class="mini-stat-lbl">{{ t['coordinator']['committee'] }}</div></div>
       </div>
       <div class="progress-list" id="workflowBars">
-        <div style="padding:8px 0;color:#9ca3af;font-size:13px;text-align:center">Loading...</div>
+        <div style="padding:8px 0;color:#9ca3af;font-size:13px;text-align:center">{{ t['general']['loading'] }}</div>
       </div>
     </div>
 
-    <!-- Semester Control -->
     <div class="panel">
-      <div class="panel-hd">
-        <span class="panel-title">Semester control</span>
-      </div>
+      <div class="panel-hd"><span class="panel-title">{{ t['coordinator']['semester_control'] }}</span></div>
       <div class="sem-info">
-        <div class="sem-row">
-          <span class="sem-key">Registration window</span>
-          <span class="sem-val" id="regStatus">—</span>
-        </div>
-        <div class="sem-row">
-          <span class="sem-key">Committees scheduled</span>
-          <span class="sem-val" id="semComm">—</span>
-        </div>
-        <div class="sem-row">
-          <span class="sem-key">Active semester</span>
-          <span class="sem-val" id="semName">—</span>
-        </div>
+        <div class="sem-row"><span class="sem-key">{{ t['coordinator']['registration_window'] }}</span><span class="sem-val" id="regStatus">—</span></div>
+        <div class="sem-row"><span class="sem-key">{{ t['coordinator']['committees_scheduled'] }}</span><span class="sem-val" id="semComm">—</span></div>
+        <div class="sem-row"><span class="sem-key">{{ t['coordinator']['active_semester'] }}</span><span class="sem-val" id="semName">—</span></div>
       </div>
       <div class="sem-actions">
-        <button class="sem-btn primary" onclick="window.location.href='/coordinator/registration'">Student Distribution</button>
-        <button class="sem-btn" onclick="window.location.href='/coordinator/committee'">Committees</button>
-        <button class="sem-btn" onclick="window.location.href='/coordinator/sections'">Sections</button>
+        <button class="sem-btn primary" onclick="window.location.href='/coordinator/registration'">{{ t['coordinator']['registration'] }}</button>
+        <button class="sem-btn" onclick="window.location.href='/coordinator/committee'">{{ t['coordinator']['committee'] }}</button>
+        <button class="sem-btn" onclick="window.location.href='/coordinator/sections'">{{ t['coordinator']['sections'] }}</button>
       </div>
     </div>
 
-    <!-- Recent Notifications -->
     <div class="panel">
       <div class="panel-hd">
         <div class="panel-hd-left">
-          <span class="panel-title">Recent notifications</span>
+          <span class="panel-title">{{ t['head']['recent_notifications'] }}</span>
           <span class="notif-unread-badge" id="notifUnreadBadge" style="display:none"></span>
         </div>
-        <a class="panel-action" href="/coordinator/notifs">View all →</a>
+        <a class="panel-action" href="/coordinator/notifs">{{ t['head']['view_all'] }} →</a>
       </div>
       <div id="notifList">
-        <div class="dash-empty" style="padding:16px 18px;font-size:13px">Loading...</div>
+        <div class="dash-empty" style="padding:16px 18px;font-size:13px">{{ t['general']['loading'] }}</div>
       </div>
     </div>
-
   </div>
-  <!-- ═══ END RIGHT COLUMN ══════════════ -->
-
 </div>
-<!-- ═══ END BODY ══════════════════════════ -->
-
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-/* ── helpers ── */
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function setEl(id, val) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.classList.remove('loading');
-  el.textContent = (val !== null && val !== undefined) ? String(val) : '—';
-}
-function timeAgo(str) {
-  if (!str) return '';
-  const d = Math.floor((Date.now() - new Date(str)) / 1000);
-  if (d < 60)    return 'just now';
-  if (d < 3600)  return Math.floor(d/60) + 'm ago';
-  if (d < 86400) return Math.floor(d/3600) + 'h ago';
-  return Math.floor(d/86400) + 'd ago';
-}
-
-function isDark() {
-  return document.documentElement.getAttribute('data-theme') === 'dark';
-}
-
-const STATUS_COLOR = {
-  submitted:'#c58a17', under_review:'#0f766e', needs_revision:'#d97706',
-  committee_evaluation:'#7c3aed', accepted:'#2e7d42', archived:'#6b7280',
-  rejected:'#b42318', draft:'#9ca3af'
-};
-const STATUS_COLOR_DARK = {
-  submitted:'#fbbf24', under_review:'#2dd4bf', needs_revision:'#f59e0b',
-  committee_evaluation:'#a78bfa', accepted:'#4ade80', archived:'#8b949e',
-  rejected:'#f87171', draft:'#8b949e'
-};
-function statusColor(s) {
-  const m = isDark() ? STATUS_COLOR_DARK : STATUS_COLOR;
-  return m[s] || (isDark() ? '#8b949e' : '#9ca3af');
-}
-const STATUS_LABEL = {
-  submitted:'Submitted', under_review:'Under Review', needs_revision:'Needs Revision',
-  committee_evaluation:'In Evaluation', accepted:'Accepted',
-  archived:'Archived', rejected:'Rejected', draft:'Draft'
-};
+function setEl(id, val) { const el = document.getElementById(id); if (!el) return; el.classList.remove('loading'); el.textContent = (val !== null && val !== undefined) ? String(val) : '—'; }
+function timeAgo(str) { if (!str) return ''; const d = Math.floor((Date.now() - new Date(str)) / 1000); if (d < 60) return 'just now'; if (d < 3600) return Math.floor(d/60) + 'm ago'; if (d < 86400) return Math.floor(d/3600) + 'h ago'; return Math.floor(d/86400) + 'd ago'; }
+function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
 const TYPE_ORDER  = ['web','mobile','ai','software_engineering','security','databases','other'];
 const TYPE_LABELS = {web:'Web',mobile:'Mobile',ai:'AI',software_engineering:'Software Eng.',security:'Security',databases:'Databases',other:'Other'};
 const TYPE_COLORS      = {web:'#2e7d42',mobile:'#0f766e',ai:'#7c3aed',software_engineering:'#1d4ed8',security:'#b42318',databases:'#c58a17',other:'#6b7280'};
 const TYPE_COLORS_DARK = {web:'#4ade80',mobile:'#2dd4bf',ai:'#a78bfa',software_engineering:'#60a5fa',security:'#f87171',databases:'#fbbf24',other:'#8b949e'};
 function typeColor(k) { return (isDark() ? TYPE_COLORS_DARK : TYPE_COLORS)[k] || '#8b949e'; }
-
 let _typeChart = null;
 
-/* ── Load dashboard data ── */
 async function loadDashboard() {
   try {
     const r = await fetch('/api/coordinator/dashboard-data');
     const d = await r.json();
     if (d.error) throw new Error(d.error);
-    const s   = d.stats   || {};
-    const sem = d.semester || {};
-    const abt = d.archive_by_type || {};
-
-    setEl('statTotal',      s.total_projects   ?? 0);
+    const s = d.stats || {}, sem = d.semester || {}, abt = d.archive_by_type || {};
+    setEl('statTotal', s.total_projects ?? 0);
     setEl('statEvaluation', s.under_evaluation ?? 0);
-    setEl('statStudents',   s.active_students  ?? 0);
-    setEl('miniAccepted',   s.accepted         ?? 0);
-    setEl('miniSections',   s.total_sections   ?? 0);
-    setEl('miniRejected',   s.rejected         ?? 0);
-    setEl('miniCommittees', s.committees       ?? 0);
-
+    setEl('statStudents', s.active_students ?? 0);
+    setEl('miniAccepted', s.accepted ?? 0);
+    setEl('miniSections', s.total_sections ?? 0);
+    setEl('miniRejected', s.rejected ?? 0);
+    setEl('miniCommittees', s.committees ?? 0);
     const semTxt = sem.academic_year ? sem.academic_year + ' · S' + (sem.semester_number||'') : '—';
-    setEl('semLabel', semTxt);
-    setEl('semName',  semTxt);
-    setEl('semComm',  s.committees ?? 0);
-
+    setEl('semLabel', semTxt); setEl('semName', semTxt); setEl('semComm', s.committees ?? 0);
     const regEl = document.getElementById('regStatus');
-    if (regEl) {
-      regEl.textContent = d.distribution_open ? 'Open' : 'Closed';
-      regEl.className = 'sem-val ' + (d.distribution_open ? 'open' : 'closed');
-    }
-
-    /* legacy */
-    Object.entries({dashTotalProjects:s.total_projects,
-      dashUnderEvaluation:s.under_evaluation, dashAccepted:s.accepted, dashRejected:s.rejected
-    }).forEach(([id,val])=>{ const e=document.getElementById(id); if(e) e.textContent=String(val??0); });
-
-    window._lastAbt = abt;
-    window._lastDashStats = s;
-    renderTypeChart(abt);
-    renderWorkflow(s);
-  } catch(e) {
-    console.error(e);
-
-  }
+    if (regEl) { regEl.textContent = d.distribution_open ? 'Open' : 'Closed'; regEl.className = 'sem-val ' + (d.distribution_open ? 'open' : 'closed'); }
+    window._lastAbt = abt; window._lastDashStats = s;
+    renderTypeChart(abt); renderWorkflow(s);
+  } catch(e) { console.error(e); }
 }
 
-/* ── Projects list removed: dashboard no longer links to Review page ── */
-/* ── Bar chart ── */
 function renderTypeChart(abt) {
   const canvas = document.getElementById('typeBarChart');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -473,111 +238,40 @@ function renderTypeChart(abt) {
   if (_typeChart) { _typeChart.destroy(); _typeChart = null; }
   _typeChart = new Chart(canvas, {
     type: 'bar',
-    data: {
-      labels: display.map(k => TYPE_LABELS[k]),
-      datasets: [{
-        data: display.map(k => abt[k]||0),
-        backgroundColor: display.map(k => typeColor(k)+'cc'),
-        borderColor:     display.map(k => typeColor(k)),
-        borderWidth: 1.5, borderRadius: 6, borderSkipped: false
-      }]
-    },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => {
-          const pct = total > 0 ? Math.round((ctx.raw/total)*100) : 0;
-          return ` ${ctx.raw} projects (${pct}%)`;
-        }}}
-      },
-      scales: {
-        x: { beginAtZero:true, ticks:{precision:0,font:{size:11}}, grid:{color: isDark() ? '#30363d' : '#f0f4f1'} },
-        y: { ticks:{font:{size:12,weight:'600'},color: isDark() ? '#8b949e' : '#374151'}, grid:{display:false} }
-      }
-    }
+    data: { labels: display.map(k => TYPE_LABELS[k]), datasets: [{ data: display.map(k => abt[k]||0), backgroundColor: display.map(k => typeColor(k)+'cc'), borderColor: display.map(k => typeColor(k)), borderWidth: 1.5, borderRadius: 6, borderSkipped: false }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => { const pct = total > 0 ? Math.round((ctx.raw/total)*100) : 0; return ` ${ctx.raw} projects (${pct}%)`; } } } }, scales: { x: { beginAtZero:true, ticks:{precision:0,font:{size:11}}, grid:{color: isDark() ? '#30363d' : '#f0f4f1'} }, y: { ticks:{font:{size:12,weight:'600'},color: isDark() ? '#8b949e' : '#374151'}, grid:{display:false} } } }
   });
 }
 
-/* ── Workflow bars ── */
 function renderWorkflow(s) {
   const el = document.getElementById('workflowBars');
   if (!el) return;
   const total = Math.max(s.total_projects||1, 1);
   const dark = isDark();
   const items = [
-    { label:'Under evaluation',    val:s.under_evaluation||0, color: dark ? '#a78bfa' : '#7c3aed' },
-    { label:'Accepted / Archived', val:s.accepted        ||0, color: dark ? '#4ade80' : '#2e7d42' },
+    { label:'Under evaluation', val:s.under_evaluation||0, color: dark ? '#a78bfa' : '#7c3aed' },
+    { label:'Accepted / Archived', val:s.accepted||0, color: dark ? '#4ade80' : '#2e7d42' },
   ];
-  el.innerHTML = items.map(item => {
-    const pct = Math.round((item.val/total)*100);
-    return `<div class="progress-item">
-      <div class="progress-row">
-        <span class="progress-lbl">${item.label}</span>
-        <span class="progress-pct">${pct}%</span>
-      </div>
-      <div class="progress-bg">
-        <div class="progress-fill" style="width:${pct}%;background:${item.color}"></div>
-      </div>
-    </div>`;
-  }).join('');
+  el.innerHTML = items.map(item => { const pct = Math.round((item.val/total)*100); return `<div class="progress-item"><div class="progress-row"><span class="progress-lbl">${item.label}</span><span class="progress-pct">${pct}%</span></div><div class="progress-bg"><div class="progress-fill" style="width:${pct}%;background:${item.color}"></div></div></div>`; }).join('');
 }
 
-/* ── Notifications ── */
 async function loadNotifications() {
   try {
     const r = await fetch('/api/coordinator/notifications/inbox');
     const d = await r.json();
     if (d.error) throw new Error(d.error);
-    const all    = d.notifications || [];
-    const latest = all.slice(0, 2);
-    const unread = all.filter(n => !n.is_read).length;
-    const badge  = document.getElementById('notifUnreadBadge');
-    if (badge) {
-      badge.textContent = unread + ' new';
-      badge.style.display = unread > 0 ? 'inline' : 'none';
-    }
+    const all = d.notifications || [], latest = all.slice(0, 2), unread = all.filter(n => !n.is_read).length;
+    const badge = document.getElementById('notifUnreadBadge');
+    if (badge) { badge.textContent = unread + ' new'; badge.style.display = unread > 0 ? 'inline' : 'none'; }
     const el = document.getElementById('notifList');
     if (!el) return;
-    if (!latest.length) {
-      el.innerHTML = '<div class="dash-empty" style="padding:16px 18px;font-size:13px">No notifications yet.</div>';
-      return;
-    }
-    el.innerHTML = latest.map(n => {
-      const isUnread = !n.is_read;
-      const from = n.sender_name ? 'From: ' + n.sender_name : '';
-      const when = timeAgo(n.created_at);
-      return `<div class="notif-item${isUnread?' unread':''}" onclick="window.location.href='/coordinator/notifs'">
-        <div class="notif-dot${isUnread?'':' read'}"></div>
-        <div class="notif-body">
-          <div class="notif-title">${esc(n.title||'Notification')}</div>
-          <div class="notif-meta">${esc(from)}${from&&when?' · ':''}${esc(when)}</div>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    const el = document.getElementById('notifList');
-    if (el) el.innerHTML = '<div class="dash-empty" style="padding:16px 18px;font-size:13px">Could not load.</div>';
-  }
+    if (!latest.length) { el.innerHTML = '<div class="dash-empty" style="padding:16px 18px;font-size:13px">No notifications yet.</div>'; return; }
+    el.innerHTML = latest.map(n => { const isUnread = !n.is_read; const from = n.sender_name ? 'From: ' + n.sender_name : ''; const when = timeAgo(n.created_at); return `<div class="notif-item${isUnread?' unread':''}" onclick="window.location.href='/coordinator/notifs'"><div class="notif-dot${isUnread?'':' read'}"></div><div class="notif-body"><div class="notif-title">${esc(n.title||'Notification')}</div><div class="notif-meta">${esc(from)}${from&&when?' · ':''}${esc(when)}</div></div></div>`; }).join('');
+  } catch(e) { const el = document.getElementById('notifList'); if (el) el.innerHTML = '<div class="dash-empty" style="padding:16px 18px;font-size:13px">Could not load.</div>'; }
 }
 
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-document.addEventListener('DOMContentLoaded', () => {
-  loadDashboard();
-  loadNotifications();
-  window.scrollTo(0, 0);
-});
-
-/* Re-render chart and workflow bars when user toggles the theme */
-new MutationObserver(() => {
-  if (window._lastDashStats) {
-    renderWorkflow(window._lastDashStats);
-  }
-  if (window._lastAbt && _typeChart) {
-    renderTypeChart(window._lastAbt);
-  }
-  if (window._lastProjects) {
-  }
-}).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+document.addEventListener('DOMContentLoaded', () => { loadDashboard(); loadNotifications(); window.scrollTo(0, 0); });
+new MutationObserver(() => { if (window._lastDashStats) renderWorkflow(window._lastDashStats); if (window._lastAbt && _typeChart) renderTypeChart(window._lastAbt); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 </script>
 {% endblock %}

@@ -1,4 +1,3 @@
-
 <div class="sidebar collapsed" id="sidebar">
   <div class="sb-top">
     <button class="sb-toggle" onclick="toggleCoordSidebar()" title="Menu">
@@ -10,71 +9,75 @@
     <div class="sb-avatar">{{ session.avatar_initials }}</div>
     <div class="sb-name">{{ session.full_name }}</div>
     <div class="sb-id">{{ session.university_id }}</div>
-    <div class="sb-role">Coordinator</div>
+    <div class="sb-role">{{ t['coordinator']['dashboard_role'] }}</div>
   </div>
 
   <div class="sb-nav coordinator-nav">
     <a class="sb-item {% if request.path in ['/coordinator/', '/coordinator/dashboard'] %}on{% endif %}"
       data-page="dashboard" href="/coordinator/">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
-      <span class="sb-label">Dashboard</span>
+      <span class="sb-label">{{ t['coordinator']['dashboard'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/coordinator/registration' %}on{% endif %}" data-page="registration"
       href="/coordinator/registration">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">group_add</span></span>
-      <span class="sb-label">Student Distribution</span>
+      <span class="sb-label">{{ t['coordinator']['registration'] }}</span>
     </a>
+
     <a class="sb-item {% if request.path == '/coordinator/committee' %}on{% endif %}" data-page="committee"
       href="/coordinator/committee">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">group</span></span>
-      <span class="sb-label">Evaluation Committees</span>
+      <span class="sb-label">{{ t['coordinator']['committee'] }}</span>
     </a>
+
     <a class="sb-item {% if request.path == '/coordinator/evaluation' %}on{% endif %}" data-page="evaluation"
       href="/coordinator/evaluation">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">grading</span></span>
-      <span class="sb-label">Final Evaluation</span>
+      <span class="sb-label">{{ t['coordinator']['evaluation'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/coordinator/lectures' %}on{% endif %}" data-page="lectures"
       href="/coordinator/lectures">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">menu_book</span></span>
-      <span class="sb-label">Lectures</span>
+      <span class="sb-label">{{ t['coordinator']['lectures'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/coordinator/sections' %}on{% endif %}" data-page="sections"
       href="/coordinator/sections">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">verified</span></span>
-      <span class="sb-label">Section Results</span>
+      <span class="sb-label">{{ t['coordinator']['sections'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/coordinator/exams' %}on{% endif %}" data-page="exams"
       href="/coordinator/exams">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">assignment</span></span>
-      <span class="sb-label">Exam Distribution</span>
+      <span class="sb-label">{{ t['coordinator']['exams'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/coordinator/search' %}on{% endif %}" data-page="search"
       href="/coordinator/search">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
-      <span class="sb-label">Search &amp; Filters</span>
+      <span class="sb-label">{{ t['general']['search'] }}</span>
     </a>
+
     <a class="sb-item {% if request.path == '/coordinator/notifs' %}on{% endif %}" data-page="notifs"
       href="/coordinator/notifs">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
-      <span class="sb-label">Notifications</span>
+      <span class="sb-label">{{ t['general']['notifications'] }}</span>
       <span class="sb-badge" id="coordNotifBadge" style="display:none"></span>
     </a>
+
     <a class="sb-item {% if request.path == '/coordinator/ai' %}on{% endif %}" data-page="ai" href="/coordinator/ai">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">smart_toy</span></span>
-      <span class="sb-label">AI Assistant</span>
+      <span class="sb-label">{{ t['general']['ai_assistant'] }}</span>
     </a>
   </div>
 
   <div class="sb-footer">
     <a class="sb-footer-item" href="/logout" style="text-decoration:none;color:inherit">
       <span class="material-symbols-outlined icon-inline">logout</span>
-      <span>&nbsp;Sign Out</span>
+      <span>&nbsp;{{ t['general']['logout'] }}</span>
     </a>
   </div>
 </div>

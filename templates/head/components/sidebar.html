@@ -9,7 +9,7 @@
     <div class="sb-avatar">{{ session.avatar_initials }}</div>
     <div class="sb-name">{{ session.full_name }}</div>
     <div class="sb-id">{{ session.university_id }}</div>
-    <div class="sb-role">Head of Department</div>
+    <div class="sb-role">{{ t['head']['dashboard_role'] }}</div>
   </div>
 
   <div class="sb-nav head-nav">
@@ -20,7 +20,7 @@
       <span class="sb-icon">
         <span class="material-symbols-outlined icon-inline">dashboard</span>
       </span>
-      <span class="sb-label">Dashboard</span>
+      <span class="sb-label">{{ t['head']['dashboard'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/head/assign' %}on{% endif %}"
@@ -30,7 +30,7 @@
       <span class="sb-icon">
         <span class="material-symbols-outlined icon-inline">manage_accounts</span>
       </span>
-      <span class="sb-label">Assign Roles</span>
+      <span class="sb-label">{{ t['head']['assign'] }}</span>
     </a>
 
     
@@ -42,7 +42,7 @@
       <span class="sb-icon">
         <span class="material-symbols-outlined icon-inline">school</span>
       </span>
-      <span class="sb-label">Supervisors</span>
+      <span class="sb-label">{{ t['head']['supervisors'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/head/addStudent' %}on{% endif %}"
@@ -52,7 +52,7 @@
       <span class="sb-icon">
         <span class="material-symbols-outlined icon-inline">person_add</span>
       </span>
-      <span class="sb-label">Add Student</span>
+      <span class="sb-label">{{ t['head']['add_student'] }}</span>
     </a>
     
     <a class="sb-item {% if request.path == '/head/search' %}on{% endif %}"
@@ -62,7 +62,17 @@
       <span class="sb-icon">
         <span class="material-symbols-outlined icon-inline">search</span>
       </span>
-      <span class="sb-label">Search Projects</span>
+      <span class="sb-label">{{ t['head']['search'] }}</span>
+    </a>
+
+   <a class="sb-item {% if request.path == '/head/grades' %}on{% endif %}"
+      data-page="grades"
+      data-tip="Grades"
+      href="/head/grades">
+      <span class="sb-icon">
+        <span class="material-symbols-outlined icon-inline">grade</span>
+      </span>
+      <span class="sb-label">{{ t['general']['Grades'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/head/notifs' %}on{% endif %}"
@@ -72,7 +82,7 @@
       <span class="sb-icon">
         <span class="material-symbols-outlined icon-inline">notifications</span>
       </span>
-      <span class="sb-label">Notifications</span>
+      <span class="sb-label">{{ t['head']['notifications'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/head/ai' %}on{% endif %}"
@@ -82,7 +92,7 @@
       <span class="sb-icon">
         <span class="material-symbols-outlined icon-inline">smart_toy</span>
       </span>
-      <span class="sb-label">AI Assistant</span>
+      <span class="sb-label">{{ t['head']['ai'] }} </span>
     </a>
 
     
@@ -102,7 +112,7 @@
   <div class="sb-footer">
     <a class="sb-footer-item" href="/logout" style="text-decoration:none;color:inherit">
       <span class="material-symbols-outlined icon-inline">logout</span>
-      <span>&nbsp;Sign Out</span>
+      <span>&nbsp;{{  t['general']['logout'] }}</span>
     </a>
   </div>
 </div>

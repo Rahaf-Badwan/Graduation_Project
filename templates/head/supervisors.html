@@ -1,29 +1,25 @@
 {% extends 'head/base.html' %}
-{% block page_title %}Supervisors{% endblock %}
+{% block page_title %}{{ t['head']['supervisors'] }}{% endblock %}
 {% block page_id %}supervisors{% endblock %}
-{% block topbar_title %}Supervisors{% endblock %}
+{% block topbar_title %}{{ t['head']['supervisors'] }}{% endblock %}
 
 {% block content %}
 <div class="page on" id="pg-supervisors">
 
   <div class="two-col" style="align-items:start">
 
-    <!-- ─────────────────────────────────────────
-         LEFT: Active Supervisors List
-    ───────────────────────────────────────────── -->
     <div class="card">
       <div class="card-hd">
-        <span class="card-title">Active Supervisors</span>
+        <span class="card-title">{{ t['head']['active_supervisors'] }}</span>
         <span id="active-count-badge"
               style="background:var(--teal-light);color:var(--teal);
                      font-size:11px;font-weight:700;padding:2px 8px;
                      border-radius:20px;margin-left:8px">—</span>
       </div>
 
-      <!-- Search -->
       <div style="margin-bottom:12px">
         <input id="sup-search" type="text" class="field-input"
-               placeholder="Search by name or specialization…"
+               placeholder="{{ t['head']['search_supervisors_placeholder'] }}"
                oninput="filterSupervisors(this.value)"
                style="width:100%;font-size:12px"/>
       </div>
@@ -31,104 +27,80 @@
       <div id="supervisors-list"
            style="display:flex;flex-direction:column;gap:8px;min-height:60px">
         <div style="color:var(--color-text-secondary);font-size:13px;padding:16px 0">
-          Loading supervisors…
+          {{ t['general']['loading'] }}
         </div>
       </div>
     </div>
 
-
-    <!-- ─────────────────────────────────────────
-         RIGHT COLUMN
-    ───────────────────────────────────────────── -->
     <div style="display:flex;flex-direction:column;gap:16px">
 
-      <!-- ── Stats ── -->
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Statistics</span>
+          <span class="card-title">{{ t['head']['statistics'] }}</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
           <div class="stat">
-            <div class="stat-num" id="stat-total"
-                 style="color:var(--blue);font-size:20px">—</div>
-            <div class="stat-label">Total Supervisors</div>
+            <div class="stat-num" id="stat-total" style="color:var(--blue);font-size:20px">—</div>
+            <div class="stat-label">{{ t['head']['total_supervisors'] }}</div>
           </div>
           <div class="stat">
-            <div class="stat-num" id="stat-active"
-                 style="color:var(--teal);font-size:20px">—</div>
-            <div class="stat-label">Active</div>
+            <div class="stat-num" id="stat-active" style="color:var(--teal);font-size:20px">—</div>
+            <div class="stat-label">{{ t['head']['active'] }}</div>
           </div>
           <div class="stat">
-            <div class="stat-num" id="stat-pending"
-                 style="color:var(--amber);font-size:20px">—</div>
-            <div class="stat-label">Pending Activation</div>
+            <div class="stat-num" id="stat-pending" style="color:var(--amber);font-size:20px">—</div>
+            <div class="stat-label">{{ t['head']['pending_activation'] }}</div>
           </div>
           <div class="stat">
-            <div class="stat-num" id="stat-projects"
-                 style="color:var(--green);font-size:20px">—</div>
-            <div class="stat-label">Total Projects</div>
+            <div class="stat-num" id="stat-projects" style="color:var(--green);font-size:20px">—</div>
+            <div class="stat-label">{{ t['head']['total_projects'] }}</div>
           </div>
         </div>
         <div id="distribution-banner"
              style="padding:10px;background:var(--teal-light);border-radius:var(--rm);
                     font-size:12px;color:var(--teal)">
-          ✓ Loading distribution data…
+          ✓ {{ t['general']['loading'] }}
         </div>
       </div>
 
-
-      <!-- ── Add Supervisor ── -->
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Add New Supervisor</span>
+          <span class="card-title">{{ t['head']['add_new_supervisor'] }}</span>
         </div>
         <p style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">
-          The supervisor will be added as inactive and can activate their account via
-          the <strong>/activate</strong> page.
+          {{ t['head']['supervisor_activate_note'] }}
         </p>
 
         <div class="field-wrap">
-          <div class="field-label">Full Name</div>
+          <div class="field-label">{{ t['head']['full_name'] }}</div>
           <input id="add-name" class="field-input" type="text" placeholder="Dr. …"/>
         </div>
         <div class="field-wrap">
-          <div class="field-label">University ID (4 digits)</div>
-          <input id="add-uid" class="field-input" type="text"
-                 placeholder="1234" maxlength="4"/>
+          <div class="field-label">{{ t['head']['uid_4digits'] }}</div>
+          <input id="add-uid" class="field-input" type="text" placeholder="1234" maxlength="4"/>
         </div>
         <div class="field-wrap">
-          <div class="field-label">Email</div>
-          <input id="add-email" class="field-input" type="email"
-                 placeholder="name@university.edu"/>
+          <div class="field-label">{{ t['head']['email'] }}</div>
+          <input id="add-email" class="field-input" type="email" placeholder="name@university.edu"/>
         </div>
         <div class="field-wrap">
-          <div class="field-label">Specialization</div>
-          <input id="add-spec" class="field-input" type="text"
-                 placeholder="e.g. Software Engineering"/>
+          <div class="field-label">{{ t['head']['specialization'] }}</div>
+          <input id="add-spec" class="field-input" type="text" placeholder="{{ t['head']['specialization_placeholder'] }}"/>
         </div>
 
         <div id="add-error"
              style="font-size:12px;color:var(--red,#dc2626);margin-bottom:8px;min-height:16px"></div>
 
         <div class="btn-row">
-          <button id="add-btn" class="btn btn-primary"
-                  style="width:100%" onclick="addSupervisor()">
-            Add Supervisor ↗
+          <button id="add-btn" class="btn btn-primary" style="width:100%" onclick="addSupervisor()">
+            {{ t['head']['add_supervisor_btn'] }} ↗
           </button>
         </div>
       </div>
 
+    </div>
+  </div>
 
-
-
-    </div><!-- /right col -->
-  </div><!-- /two-col -->
-
-
-  <!-- ══════════════════════════════════════════════
-       ACTIVATE SUPERVISOR MODAL
-       (Head activates on behalf of supervisor)
-  ══════════════════════════════════════════════ -->
   <div id="supervisor-activate-modal"
        style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
               z-index:300;align-items:center;justify-content:center">
@@ -137,42 +109,39 @@
                 box-shadow:0 8px 32px rgba(0,0,0,.18)">
 
       <div style="font-weight:700;font-size:16px;margin-bottom:4px">
-        Activate Supervisor
+        {{ t['head']['activate_supervisor'] }}
       </div>
       <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:18px"
            id="activate-modal-name">—</div>
 
       <div class="field-wrap">
-        <div class="field-label">Graduation Project Hours</div>
-        <input id="activate-hours" class="field-input" type="number"
-               min="0" step="0.5" placeholder="e.g. 6"/>
+        <div class="field-label">{{ t['head']['grad_project_hours'] }}</div>
+        <input id="activate-hours" class="field-input" type="number" min="0" step="0.5" placeholder="e.g. 6"/>
       </div>
       <div class="field-wrap">
-        <div class="field-label">Set Password</div>
+        <div class="field-label">{{ t['head']['set_password'] }}</div>
         <input id="activate-password" class="field-input" type="password"
-               placeholder="At least 8 characters" autocomplete="new-password"/>
+               placeholder="{{ t['head']['password_placeholder'] }}" autocomplete="new-password"/>
       </div>
       <div class="field-wrap">
-        <div class="field-label">Confirm Password</div>
+        <div class="field-label">{{ t['head']['confirm_password'] }}</div>
         <input id="activate-confirm" class="field-input" type="password"
-               placeholder="Repeat password" autocomplete="new-password"/>
+               placeholder="{{ t['head']['repeat_password'] }}" autocomplete="new-password"/>
       </div>
 
       <div id="activate-modal-error"
            style="font-size:12px;color:var(--red,#dc2626);margin-bottom:8px;min-height:18px"></div>
 
       <div class="btn-row" style="gap:8px">
-        <button class="btn btn-secondary"
-                onclick="closeActivateModal()" style="flex:1">Cancel</button>
-        <button class="btn btn-primary"
-                onclick="submitActivateSupervisor()" style="flex:2">
-          Activate ↗
+        <button class="btn btn-secondary" onclick="closeActivateModal()" style="flex:1">{{ t['general']['cancel'] }}</button>
+        <button class="btn btn-primary" onclick="submitActivateSupervisor()" style="flex:2">
+          {{ t['head']['activate_btn'] }} ↗
         </button>
       </div>
     </div>
   </div>
 
-</div><!-- /pg-supervisors -->
+</div>
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='assets/head/supervisors.js') }}"></script>

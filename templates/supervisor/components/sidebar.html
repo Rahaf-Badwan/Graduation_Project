@@ -12,9 +12,11 @@
     <div class="sb-role">Supervisor</div>
   </div>
 
+  
+  
   <div class="sb-nav supervisor-nav">
-    <a class="sb-item {% if request.path in ['/supervisor/', '/supervisor/dashboard'] %}on{% endif %}"
-      href="/supervisor/">
+    <a class="sb-item {% if request.path == '/supervisor/index' %}on{% endif %}"
+      href="/supervisor/index">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">dashboard</span></span>
       <span class="sb-label">Dashboard</span>
     </a>
@@ -49,6 +51,15 @@
       <span class="sb-label">Search &amp; Filtering</span>
     </a>
 
+     <a class="sb-item {% if request.path == '/supervisor/grades' %}on{% endif %}"
+      data-page="grades"
+      data-tip="Grades"
+      href="/supervisor/grades">
+      <span class="sb-icon">
+        <span class="material-symbols-outlined icon-inline">grade</span>
+      </span>
+      <span class="sb-label">{{ t['general']['Grades'] }}</span>
+    </a>
     <a class="sb-item {% if request.path == '/supervisor/notifs' %}on{% endif %}" href="/supervisor/notifs">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
       <span class="sb-label">Notifications</span>

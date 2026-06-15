@@ -1,6 +1,3 @@
-
-let currentCourse = "COMP4200";
-
 const NOTIF_ICONS = {
   urgent_alert:        { icon: "flag",         bg: "var(--amber-light)"        },
   file_uploaded:       { icon: "description",  bg: "var(--teal-light)"         },
@@ -13,24 +10,11 @@ const NOTIF_ICONS = {
   system:              { icon: "info",          bg: "var(--color-surface-alt)"  },
 };
 
-
-
-function selectTab(course, btn){
-  currentCourse = course;
-  document.querySelectorAll('.tab').forEach(function(b){
-    b.classList.remove('active');
-  });
-  btn.classList.add('active');
-  loadDashboard(currentCourse);
-}
-
-
-
-async function loadDashboard(course) {
+async function loadDashboard() {
   setLoadingState();
 
   try {
-    const res = await fetch(`/head/api/dashboard-data?course=${encodeURIComponent(course)}`, {
+    const res = await fetch(`/head/api/dashboard-data`, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
     });
 
@@ -44,7 +28,6 @@ async function loadDashboard(course) {
     showError();
   }
 }
-
 
 function setLoadingState() {
   ["stat-projects", "stat-supervisors", "stat-acceptance", "stat-avg"]
@@ -68,7 +51,6 @@ function loadingHTML() {
             Loading…
           </div>`;
 }
-
 
 function renderDashboard(data) {
 
@@ -109,8 +91,6 @@ function renderDashboard(data) {
   }
 }
 
-
-
 function renderNotif(n) {
   const cfg  = NOTIF_ICONS[n.notification_type] || NOTIF_ICONS["system"];
   const dot  = n.is_read ? "" : `<div class="notif-dot-red"></div>`;
@@ -131,8 +111,6 @@ function renderNotif(n) {
     </div>`;
 }
 
-
-
 function renderSpecBar(s) {
   return `
     <div class="prog-wrap">
@@ -148,8 +126,6 @@ function renderSpecBar(s) {
     </div>`;
 }
 
-
-
 function showError() {
   const msg = `<div style="color:var(--coral);font-size:13px;padding:8px 0">
                  Failed to load data. Please refresh the page.
@@ -159,8 +135,6 @@ function showError() {
   if (notifEl) notifEl.innerHTML = msg;
   if (specEl)  specEl.innerHTML  = msg;
 }
-
-
 
 function setText(id, value) {
   const el = document.getElementById(id);
@@ -183,10 +157,8 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)} days ago`;
 }
 
-
-
 document.addEventListener("DOMContentLoaded", () => {
-  loadDashboard(currentCourse);
+  loadDashboard();
 });
 
 function switchRole() {
