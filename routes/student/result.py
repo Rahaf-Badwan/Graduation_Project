@@ -15,6 +15,31 @@ from db import get_db
 from .blueprint import student_bp
 from .common import *
 
+
+def _student_result_db_column_exists(cursor, table_name, column_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+        """,
+        (table_name, column_name),
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _ensure_student_course_results_score_schema(cursor):
+    if not _student_result_db_column_exists(cursor, "student_course_results", "final_score"):
+        cursor.execute(
+            """
+            ALTER TABLE student_course_results
+            ADD COLUMN final_score DECIMAL(6,2) NULL AFTER status
+            """
+        )
+
+
 @student_bp.route("/result")
 @login_required(role="student")
 def result():
@@ -26,6 +51,7 @@ def result():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_student_course_results_score_schema(cursor)
 
         cursor.execute(
             """
@@ -88,7 +114,7 @@ def result():
                     ORDER BY p2.project_id DESC
                     LIMIT 1
                 ) AS project_status,
-                (
+                COALESCE(scr.final_score, (
                     SELECT COALESCE(fd2.final_score, p2.final_score)
                     FROM project_members pm2
                     JOIN projects p2 ON p2.project_id = pm2.project_id
@@ -97,7 +123,7 @@ def result():
                       AND p2.semester_id = scr.semester_id
                     ORDER BY p2.project_id DESC
                     LIMIT 1
-                ) AS final_score,
+                )) AS final_score,
                 (
                     SELECT fd2.decision
                     FROM project_members pm2
@@ -167,7 +193,7 @@ def result():
                         ORDER BY p2.project_id DESC
                         LIMIT 1
                     ) AS project_title,
-                    (
+                    COALESCE(scr.final_score, (
                         SELECT COALESCE(fd2.final_score, p2.final_score)
                         FROM project_members pm2
                         JOIN projects p2 ON p2.project_id = pm2.project_id
@@ -176,7 +202,7 @@ def result():
                           AND p2.semester_id = scr.semester_id
                         ORDER BY p2.project_id DESC
                         LIMIT 1
-                    ) AS final_score
+                    )) AS final_score
                 FROM student_course_results scr
                 JOIN semesters s ON s.semester_id = scr.semester_id
                 WHERE scr.student_id = %s

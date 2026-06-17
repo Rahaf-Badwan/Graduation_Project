@@ -1542,6 +1542,8 @@ CREATE TABLE IF NOT EXISTS student_course_results (
 
     status                  ENUM('pending','passed','failed')
                                           NOT NULL DEFAULT 'pending',
+    final_score             DECIMAL(6,2)  NULL
+                                          COMMENT 'Final grade out of 100 for this course attempt',
 
     updated_by              INT           NULL
                                           COMMENT 'user_id of the coordinator',
@@ -1578,6 +1580,9 @@ CREATE TABLE IF NOT EXISTS student_course_results (
 -- 2) Indexes
 -- ============================================================
 SET @db := DATABASE();
+
+SET @sql := (SELECT IF(COUNT(*) = 0, 'ALTER TABLE student_course_results ADD COLUMN final_score DECIMAL(6,2) NULL AFTER status', 'SELECT 1') FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='student_course_results' AND COLUMN_NAME='final_score');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql := (SELECT IF(COUNT(*) = 0, 'CREATE INDEX idx_scr_semester ON student_course_results(semester_id, status)', 'SELECT 1') FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='student_course_results' AND INDEX_NAME='idx_scr_semester');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
@@ -3460,6 +3465,19 @@ WHERE semester_id = @target_semester_id
 SET SQL_SAFE_UPDATES = 0;
 
 
+-- ---------------------------------------------------------------------------
+-- LEGACY / DEPRECATED GRADE ENTRY TABLES
+-- ---------------------------------------------------------------------------
+-- These two tables belong to the older session-based grading flow.
+-- They are intentionally kept in the schema for old database compatibility,
+-- but the application code no longer reads from or writes to them.
+--
+-- Current replacements:
+--   grade_entry_sessions -> evaluation_windows
+--   grade_entries        -> evaluation_grade_tasks / evaluation_final_results
+--
+-- Do not use these tables for new code or new features.
+-- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS grade_entry_sessions (
     session_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -3506,6 +3524,21 @@ CREATE TABLE IF NOT EXISTS grade_entries (
 );
 
 
+
+-- ---------------------------------------------------------------------------
+-- LEGACY / DEPRECATED EVALUATION TABLES
+-- ---------------------------------------------------------------------------
+-- These three tables belong to the older project-based grading workflow.
+-- They are intentionally kept in the schema for old database compatibility,
+-- but the application code no longer reads from or writes to them.
+--
+-- Current replacements:
+--   project_evaluation_windows        -> evaluation_windows
+--   project_grade_entries             -> evaluation_grade_tasks
+--   project_final_evaluation_results  -> evaluation_final_results
+--
+-- Do not use these tables for new code or new features.
+-- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS project_evaluation_windows (
     window_id INT PRIMARY KEY AUTO_INCREMENT,
@@ -4490,8 +4523,10 @@ CREATE TABLE IF NOT EXISTS evaluation_final_results (
     FOREIGN KEY (head_published_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Add workflow columns to project_final_evaluation_results too, for older backend code
--- that still reads that table for graduation projects.
+-- Legacy compatibility only:
+-- project_final_evaluation_results is deprecated. Current backend code uses
+-- evaluation_final_results. Keep these guards only so older databases can still
+-- run this script without losing historical compatibility.
 SET @sql := (SELECT IF(COUNT(*) = 0,
     'ALTER TABLE project_final_evaluation_results ADD COLUMN workflow_status ENUM(''draft'',''sent_to_supervisor'',''sent_to_head'',''published_to_students'') NOT NULL DEFAULT ''draft'' AFTER decision',
     'SELECT 1')
@@ -4552,7 +4587,9 @@ DELETE FROM evaluation_grade_tasks
 WHERE course_scope = 'introduction'
   AND component = 'intro_coordinator';
 
--- Remove old Coordinator /10 grades from old project_grade_entries if that table exists.
+-- Legacy cleanup only:
+-- project_grade_entries is deprecated. Current backend code uses
+-- evaluation_grade_tasks / evaluation_final_results.
 DELETE FROM project_grade_entries
 WHERE course_scope = 'introduction'
   AND component = 'intro_coordinator';
@@ -4609,7 +4646,9 @@ JOIN (
     WHERE rn > 2
 ) bad ON bad.grade_id = pge.grade_id;
 
--- Make project_grade_entries enum match the new rule: no intro_coordinator component.
+-- Legacy cleanup only:
+-- keep the deprecated project_grade_entries enum compatible if the table exists
+-- in an older database. Do not use this table in new application code.
 ALTER TABLE project_grade_entries
 MODIFY COLUMN component ENUM(
     'intro_report_reader',

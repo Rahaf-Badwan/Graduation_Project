@@ -5,6 +5,30 @@ from db import get_db
 head_grades_bp = Blueprint("head_grades_bp", __name__)
 
 
+def _head_db_column_exists(cursor, table_name, column_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+          AND COLUMN_NAME = %s
+        """,
+        (table_name, column_name),
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _ensure_student_course_results_score_schema(cursor):
+    if not _head_db_column_exists(cursor, "student_course_results", "final_score"):
+        cursor.execute(
+            """
+            ALTER TABLE student_course_results
+            ADD COLUMN final_score DECIMAL(6,2) NULL AFTER status
+            """
+        )
+
+
 @head_grades_bp.route('/head/grades')
 @login_required(role='head_of_department')
 def head_grades_page():
@@ -86,6 +110,7 @@ def api_publish_grades():
     user_id = session['user_id']
     db = get_db()
     cursor = db.cursor(dictionary=True)
+    _ensure_student_course_results_score_schema(cursor)
 
     cursor.execute("""
         SELECT
@@ -167,18 +192,19 @@ def api_publish_grades():
             cursor.execute(
                 """
                 INSERT INTO student_course_results
-                    (student_id, semester_id, status, updated_by, notes)
-                SELECT DISTINCT ss.student_id, %s, %s, %s,
+                    (student_id, semester_id, status, final_score, updated_by, notes)
+                SELECT DISTINCT ss.student_id, %s, %s, %s, %s,
                        'Final grade published by Head of Department.'
                 FROM section_students ss
                 WHERE ss.section_id = %s
                 ON DUPLICATE KEY UPDATE
                     status = VALUES(status),
+                    final_score = VALUES(final_score),
                     updated_by = VALUES(updated_by),
                     notes = VALUES(notes),
                     updated_at = CURRENT_TIMESTAMP
                 """,
-                (semester_id, course_status, user_id, item.get("section_id")),
+                (semester_id, course_status, final_score, user_id, item.get("section_id")),
             )
 
     cursor.execute("""
@@ -218,13 +244,14 @@ def api_publish_grades():
         cursor.execute(
             """
             INSERT INTO student_course_results
-                (student_id, semester_id, status, updated_by, notes)
-            SELECT DISTINCT pm.student_id, %s, %s, %s,
+                (student_id, semester_id, status, final_score, updated_by, notes)
+            SELECT DISTINCT pm.student_id, %s, %s, %s, %s,
                    'Final grade published by Head of Department.'
             FROM project_members pm
             WHERE pm.project_id = %s
             ON DUPLICATE KEY UPDATE
                 status = VALUES(status),
+                final_score = VALUES(final_score),
                 updated_by = VALUES(updated_by),
                 notes = VALUES(notes),
                 updated_at = CURRENT_TIMESTAMP
@@ -232,6 +259,7 @@ def api_publish_grades():
             (
                 item.get("semester_id"),
                 item.get("course_status"),
+                item.get("final_score"),
                 user_id,
                 item.get("project_id"),
             ),

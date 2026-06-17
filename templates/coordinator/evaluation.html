@@ -175,6 +175,11 @@
       cursor: pointer
     }
 
+    .mini-btn:disabled {
+      opacity: .55;
+      cursor: not-allowed
+    }
+
     .green {
       background: #4a8c5e;
       color: white
@@ -303,6 +308,12 @@
     return data;
   }
   function money(v) { return (v === null || v === undefined || v === '') ? '—' : Number(v).toFixed(2); }
+  function isReadyToSend(p) {
+    return Boolean(p.is_calculated) &&
+      Boolean(p.grades_complete) &&
+      p.calculated_final_score !== null &&
+      p.calculated_final_score !== undefined;
+  }
   function componentName(c) {
     return ({
       intro_report_reader: 'Report reader /40',
@@ -427,8 +438,8 @@
   function renderStats(list) {
     document.getElementById('statTotal').textContent = list.length;
     document.getElementById('statOpen').textContent = list.filter(p => Number(p.is_open)).length;
-    document.getElementById('statReady').textContent = list.filter(p => Number(p.calculated_final_score) >= 0 && !Number.isNaN(Number(p.calculated_final_score))).length;
-    const finals = list.map(p => Number(p.calculated_final_score)).filter(v => !Number.isNaN(v));
+    document.getElementById('statReady').textContent = list.filter(isReadyToSend).length;
+    const finals = list.filter(isReadyToSend).map(p => Number(p.calculated_final_score)).filter(v => !Number.isNaN(v));
     document.getElementById('statAvg').textContent = finals.length ? (finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1) : '—';
   }
   function renderProjects() {
@@ -460,6 +471,7 @@
   }
   function projectCard(p) {
     const grades = p.grades || [];
+    const ready = isReadyToSend(p);
     const rows = grades.length ? grades.map(g => `
     <tr>
       <td>${componentName(g.component)}</td><td>${g.evaluator_name || '—'}</td>
@@ -474,7 +486,7 @@
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
         <span class="pill p-flow">Coordinator → Supervisor → Head → Students</span>
-        ${Number(p.is_open) ? '<span class="pill p-open">Grade Entry Open</span>' : '<span class="pill p-closed">Closed</span>'}
+        ${Number(p.is_open) ? '<span class="pill p-open">Grade Entry Open</span>' : ready ? '<span class="pill p-done">Calculated</span>' : '<span class="pill p-closed">Closed</span>'}
       </div>
     </div>
     <table class="grade-table"><thead><tr><th>Component</th><th>Evaluator</th><th>Mark</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
@@ -482,8 +494,8 @@
     <textarea class="notes-input" id="notes-${p.project_id}" placeholder="Notes to supervisor..."></textarea>
     <div class="btn-row">
       <button class="mini-btn green" onclick="openWindow(${p.project_id})">Open Grade Entry + Notify Doctors</button>
-      <button class="mini-btn gray" onclick="closeWindow(${p.project_id})">Close + Calculate</button>
-      <button class="mini-btn blue" onclick="sendToSupervisor(${p.project_id})">Send Result to Supervisor</button>
+      <button class="mini-btn gray" onclick="closeWindow(${p.project_id})" ${p.grades_complete ? '' : 'disabled'}>Close + Calculate</button>
+      <button class="mini-btn blue" onclick="sendToSupervisor(${p.project_id})" ${ready ? '' : 'disabled'}>Send Result to Supervisor</button>
     </div>
   </div>`;
   }

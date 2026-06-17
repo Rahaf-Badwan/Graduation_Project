@@ -84,6 +84,40 @@ def _ensure_archive_visibility_schema(cursor):
         )
 
 
+def _ensure_archive_course_result_score_schema(cursor):
+    if not _archive_table_exists(cursor, "student_course_results"):
+        return False
+    if not _archive_db_column_exists(cursor, "student_course_results", "final_score"):
+        cursor.execute(
+            """
+            ALTER TABLE student_course_results
+            ADD COLUMN final_score DECIMAL(6,2) NULL AFTER status
+            """
+        )
+    return True
+
+
+def _archive_score_sql(cursor):
+    if not _ensure_archive_course_result_score_schema(cursor):
+        return "", "p.final_score"
+
+    return (
+        """
+        LEFT JOIN (
+            SELECT pm.project_id, MAX(scr.final_score) AS final_score
+            FROM project_members pm
+            JOIN projects p_score ON p_score.project_id = pm.project_id
+            JOIN student_course_results scr
+              ON scr.student_id = pm.student_id
+             AND scr.semester_id = p_score.semester_id
+            WHERE scr.final_score IS NOT NULL
+            GROUP BY pm.project_id
+        ) scr_score ON scr_score.project_id = p.project_id
+        """,
+        "COALESCE(p.final_score, scr_score.final_score)",
+    )
+
+
 def _archive_visibility_condition(alias="p"):
     if _archive_is_logged_in():
         return None
@@ -364,6 +398,7 @@ def api_archived_projects():
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_archive_visibility_schema(cursor)
+        score_join_sql, score_expr = _archive_score_sql(cursor)
 
         where = ["p.status = 'archived'"]
         params = []
@@ -414,13 +449,15 @@ def api_archived_projects():
         offset = (page - 1) * per_page
         cursor.execute(
             f"""
-            SELECT p.project_id, p.title, p.project_type, p.final_score,
+            SELECT p.project_id, p.title, p.project_type,
+                   {score_expr} AS final_score,
                    p.submission_date, {year_expr} AS academic_year,
                    {supervisor_expr} AS supervisor_name
             FROM   projects p
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
             LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+            {score_join_sql}
             WHERE  {where_sql}
             ORDER  BY p.submission_date DESC, p.project_id DESC
             LIMIT  %s OFFSET %s
@@ -440,7 +477,7 @@ def api_archived_projects():
                     "project_type": pt or "",
                     "final_score": (
                         float(r["final_score"])
-                        if can_view_scores and r.get("final_score")
+                        if can_view_scores and r.get("final_score") is not None
                         else None
                     ),
                     "academic_year": r["academic_year"] or None,
@@ -535,13 +572,14 @@ def api_archived_project_detail(project_id):
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_archive_visibility_schema(cursor)
+        score_join_sql, score_expr = _archive_score_sql(cursor)
         visibility_sql = _archive_visibility_condition("p")
         visibility_clause = f" AND {visibility_sql}" if visibility_sql else ""
 
         cursor.execute(
             f"""
             SELECT p.project_id, p.title, p.abstract, p.keywords,
-                   p.project_type, p.final_score, p.submission_date,
+                   p.project_type, {score_expr} AS final_score, p.submission_date,
                    COALESCE(NULLIF(p.year_override, ''), s.academic_year) AS academic_year,
                    COALESCE(NULLIF(p.supervisor_name_override, ''), u_sup.full_name) AS supervisor_name,
                    p.archive_visibility
@@ -549,6 +587,7 @@ def api_archived_project_detail(project_id):
             LEFT JOIN semesters s ON s.semester_id = p.semester_id
             LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
             LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
+            {score_join_sql}
             WHERE  p.project_id = %s AND p.status = 'archived'
               {visibility_clause}
         """,
@@ -566,7 +605,7 @@ def api_archived_project_detail(project_id):
         proj["project_type"] = pt or ""
         if proj.get("submission_date"):
             proj["submission_date"] = str(proj["submission_date"])
-        if can_view_scores and proj.get("final_score"):
+        if can_view_scores and proj.get("final_score") is not None:
             proj["final_score"] = float(proj["final_score"])
         else:
             proj["final_score"] = None

@@ -9512,6 +9512,46 @@ def _ensure_evaluation_schema(cursor):
     """)
 
 
+def _ensure_student_course_results_score_schema(cursor):
+    if not _table_exists(cursor, "student_course_results"):
+        return False
+    if not _db_column_exists(cursor, "student_course_results", "final_score"):
+        cursor.execute(
+            """
+            ALTER TABLE student_course_results
+            ADD COLUMN final_score DECIMAL(6,2) NULL AFTER status
+            """
+        )
+    return True
+
+
+def _sync_comp4300_project_course_results(cursor, project_id, status, final_score, notes, updated_by):
+    if not _ensure_student_course_results_score_schema(cursor):
+        return 0
+
+    cursor.execute(
+        """
+        INSERT INTO student_course_results
+            (student_id, semester_id, status, final_score, updated_by, notes)
+        SELECT DISTINCT pm.student_id, p.semester_id, %s, %s, %s,
+               COALESCE(%s, 'COMP4300 final grade saved.')
+        FROM projects p
+        JOIN project_members pm ON pm.project_id = p.project_id
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE p.project_id = %s
+          AND sem.course_code = 'COMP4300'
+        ON DUPLICATE KEY UPDATE
+            status = VALUES(status),
+            final_score = VALUES(final_score),
+            updated_by = VALUES(updated_by),
+            notes = VALUES(notes),
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (status, final_score, updated_by, notes, project_id),
+    )
+    return cursor.rowcount
+
+
 def _evaluation_component_max_mark(component):
     return {
         "intro_report_reader": 40.0,
@@ -9805,6 +9845,26 @@ def _evaluation_autocreate_tasks(cursor, course_scope, reference_id, created_by=
 
     reference_id = int(reference_id)
 
+    # Once marks exist, never rebuild the task rows from the committee page.
+    # Rebuilding at that point can erase submitted grades.
+    cursor.execute(
+        """
+        SELECT evaluator_faculty_id
+        FROM evaluation_grade_tasks
+        WHERE course_scope = %s
+          AND reference_id = %s
+          AND (is_submitted = TRUE OR mark IS NOT NULL)
+        """,
+        (course_scope, reference_id),
+    )
+    submitted_faculty_ids = {
+        int(row["evaluator_faculty_id"])
+        for row in cursor.fetchall()
+        if row.get("evaluator_faculty_id")
+    }
+    if submitted_faculty_ids:
+        return submitted_faculty_ids
+
     # Critical: remove old/wrong rows first so Evaluation cannot display doctors
     # from an older committee or old reader assignment.
     cursor.execute(
@@ -9998,6 +10058,52 @@ def _evaluation_scores_from_grades(course_scope, grades):
     }
 
 
+def _evaluation_blank_scores():
+    return {
+        "report_score": None,
+        "supervisor_score": None,
+        "coordinator_score": None,
+        "discussion_score": None,
+        "committee_score": None,
+        "calculated_final_score": None,
+        "final_score": None,
+    }
+
+
+def _evaluation_grade_completion(course_scope, grades):
+    required_count = max(_evaluation_default_required_count(course_scope), len(grades))
+    submitted_count = sum(
+        1 for grade in grades if grade.get("is_submitted") and grade.get("mark") is not None
+    )
+    complete = bool(grades) and len(grades) >= required_count and submitted_count >= required_count
+    return {
+        "submitted_count": submitted_count,
+        "required_count": required_count,
+        "grades_complete": complete,
+    }
+
+
+def _evaluation_window_for_item(cursor, course_scope, reference_id):
+    cursor.execute(
+        """
+        SELECT is_open, opened_at, closed_at
+        FROM evaluation_windows
+        WHERE course_scope = %s AND reference_id = %s
+        LIMIT 1
+        """,
+        (course_scope, reference_id),
+    )
+    return cursor.fetchone() or {}
+
+
+def _evaluation_ready_for_calculation(window, completion):
+    return (
+        completion.get("grades_complete")
+        and not bool(window.get("is_open"))
+        and window.get("closed_at") is not None
+    )
+
+
 def _evaluation_save_final_result(cursor, course_scope, reference_id, scores, supervisor_id, sent_by, notes=None):
     cursor.execute(
         """
@@ -10108,21 +10214,13 @@ def _evaluation_project_payload(cursor, course_scope, base_row):
     reference_id = base_row["project_id"]
     _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
     grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
-    scores = _evaluation_scores_from_grades(course_scope, grades)
-
-    cursor.execute(
-        """
-        SELECT is_open, opened_at, closed_at
-        FROM evaluation_windows
-        WHERE course_scope = %s AND reference_id = %s
-        LIMIT 1
-        """,
-        (course_scope, reference_id),
+    window = _evaluation_window_for_item(cursor, course_scope, reference_id)
+    completion = _evaluation_grade_completion(course_scope, grades)
+    scores = (
+        _evaluation_scores_from_grades(course_scope, grades)
+        if _evaluation_ready_for_calculation(window, completion)
+        else _evaluation_blank_scores()
     )
-    window = cursor.fetchone() or {}
-
-    submitted_count = sum(1 for grade in grades if grade.get("is_submitted"))
-    required_count = max(_evaluation_default_required_count(course_scope), len(grades))
 
     payload = dict(base_row)
     payload.update(scores)
@@ -10132,8 +10230,10 @@ def _evaluation_project_payload(cursor, course_scope, base_row):
             "opened_at": str(window.get("opened_at") or ""),
             "closed_at": str(window.get("closed_at") or ""),
             "grades": grades,
-            "submitted_count": submitted_count,
-            "required_count": required_count,
+            "submitted_count": completion["submitted_count"],
+            "required_count": completion["required_count"],
+            "grades_complete": completion["grades_complete"],
+            "is_calculated": _evaluation_ready_for_calculation(window, completion),
         }
     )
     return payload
@@ -10651,7 +10751,22 @@ def api_coordinator_evaluation_close():
         _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
 
         grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+        completion = _evaluation_grade_completion(course_scope, grades)
+        if not completion["grades_complete"]:
+            cursor.close()
+            db.close()
+            return jsonify({
+                "error": (
+                    "Cannot close and calculate yet. "
+                    f"{completion['submitted_count']}/{completion['required_count']} grade marks are submitted."
+                )
+            }), 400
+
         scores = _evaluation_scores_from_grades(course_scope, grades)
+        if scores.get("final_score") is None:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Cannot calculate the final score until all required marks are submitted."}), 400
 
         cursor.execute(
             """
@@ -10719,11 +10834,20 @@ def api_coordinator_evaluation_close_all():
 
         reference_ids = [int(row["reference_id"]) for row in cursor.fetchall() if row.get("reference_id")]
         closed_count = 0
+        skipped_count = 0
 
         for reference_id in reference_ids:
             _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
             grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+            completion = _evaluation_grade_completion(course_scope, grades)
+            if not completion["grades_complete"]:
+                skipped_count += 1
+                continue
+
             scores = _evaluation_scores_from_grades(course_scope, grades)
+            if scores.get("final_score") is None:
+                skipped_count += 1
+                continue
 
             cursor.execute(
                 """
@@ -10748,7 +10872,10 @@ def api_coordinator_evaluation_close_all():
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": f"Evaluation closed for {closed_count} item(s).", "closed_count": closed_count})
+        message = f"Evaluation closed for {closed_count} item(s)."
+        if skipped_count:
+            message += f" Skipped {skipped_count} item(s) with missing marks."
+        return jsonify({"message": message, "closed_count": closed_count, "skipped_count": skipped_count})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -10793,8 +10920,29 @@ def api_coordinator_evaluation_send_to_supervisor():
 
         _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
         grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+        completion = _evaluation_grade_completion(course_scope, grades)
+        window = _evaluation_window_for_item(cursor, course_scope, reference_id)
+        if not completion["grades_complete"]:
+            cursor.close()
+            db.close()
+            return jsonify({
+                "error": (
+                    "Cannot send the result yet. "
+                    f"{completion['submitted_count']}/{completion['required_count']} grade marks are submitted."
+                )
+            }), 400
+        if not _evaluation_ready_for_calculation(window, completion):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Close + Calculate this item before sending the result."}), 400
+
         scores = _evaluation_scores_from_grades(course_scope, grades)
         final_score = scores.get("final_score")
+        if final_score is None:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Cannot send the result until the final score is calculated."}), 400
+
         label = "COMP4200" if course_scope == "introduction" else "COMP4300"
         score_text = f" Final score: {final_score}/100." if final_score is not None else " Final score is not complete yet."
         notes_text = f" Coordinator notes: {notes}" if notes else ""
@@ -10874,6 +11022,7 @@ def api_coordinator_evaluation_finalize():
 
         if course_scope == "graduation_project":
             new_status = "archived" if decision == "archived" else decision
+            course_status = "passed" if decision in {"accepted", "archived"} else "failed"
             if _db_column_exists(cursor, "projects", "final_score"):
                 cursor.execute(
                     """
@@ -10890,6 +11039,14 @@ def api_coordinator_evaluation_finalize():
                     "UPDATE projects SET status = %s, coordinator_notes = COALESCE(%s, coordinator_notes) WHERE project_id = %s",
                     (new_status, notes, reference_id),
                 )
+            _sync_comp4300_project_course_results(
+                cursor,
+                reference_id,
+                course_status,
+                final_score,
+                notes,
+                session.get("user_id"),
+            )
         else:
             _ensure_section_results_schema(cursor)
             status_value = "succeeded" if decision in {"accepted", "archived"} else "not_succeeded"

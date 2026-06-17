@@ -668,7 +668,7 @@ request.path.startswith('/head') else 'student/base.html') %}
       type: '',
       supervisor: '',
       page: 1,
-      showScores: false,
+      showScores: CAN_VIEW_SCORES,
       total: 0,
       perPage: 20
     };
@@ -753,6 +753,9 @@ request.path.startswith('/head') else 'student/base.html') %}
 
         if (!CAN_VIEW_SCORES) {
           $('apScoreBtn').style.display = 'none';
+        } else if (state.showScores) {
+          $('apScoreBtn').classList.add('on');
+          $('apScoreBtn').innerHTML = '<span class="material-symbols-outlined icon-inline" style="font-size:14px">visibility</span> Hide Scores';
         }
 
         fillYears(data.years || [], data.has_unknown_year || false);

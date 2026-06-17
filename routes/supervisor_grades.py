@@ -1,6 +1,13 @@
 from flask import Blueprint, render_template, jsonify, session
 from auth import login_required
 from db import get_db
+from routes.appCoordinator import (
+    _ensure_evaluation_schema,
+    _evaluation_fetch_grade_rows,
+    _evaluation_grade_completion,
+    _evaluation_ready_for_calculation,
+    _evaluation_window_for_item,
+)
 
 supervisor_grades_bp = Blueprint("supervisor_grades_bp", __name__)
 
@@ -99,7 +106,7 @@ def api_send_grades_to_head():
     faculty_id = faculty['faculty_id']
 
     cursor.execute("""
-        SELECT COUNT(*) AS cnt
+        SELECT efr.result_id, efr.course_scope, efr.reference_id, efr.final_score
         FROM evaluation_final_results efr
         WHERE efr.workflow_status = 'sent_to_supervisor'
           AND (
@@ -119,12 +126,31 @@ def api_send_grades_to_head():
               )
           )
     """, (faculty_id, faculty_id))
-    count = (cursor.fetchone() or {}).get('cnt', 0)
+    ready_rows = cursor.fetchall()
 
-    if not count:
+    if not ready_rows:
         cursor.close()
         db.close()
         return jsonify({"success": False, "message": "No grades ready to send."})
+
+    _ensure_evaluation_schema(cursor)
+    for row in ready_rows:
+        course_scope = row.get("course_scope")
+        reference_id = row.get("reference_id")
+        grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+        completion = _evaluation_grade_completion(course_scope, grades)
+        window = _evaluation_window_for_item(cursor, course_scope, reference_id)
+        if (
+            row.get("final_score") is None
+            or not completion["grades_complete"]
+            or not _evaluation_ready_for_calculation(window, completion)
+        ):
+            cursor.close()
+            db.close()
+            return jsonify({
+                "success": False,
+                "message": "All marks must be submitted and closed/calculated before sending to Head."
+            })
 
     cursor.execute("""
         UPDATE evaluation_final_results efr
