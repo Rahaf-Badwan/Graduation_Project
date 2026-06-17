@@ -4790,6 +4790,233 @@ def _copy_project_optional_rows_to_promoted_project(cursor, source_project_id, p
         )
 
 
+
+def _ensure_committee_continuation_schema(cursor):
+    """Allow a promoted COMP4300 project to keep the same committee used in COMP4200."""
+    if not _table_exists(cursor, "committee_plans"):
+        return False
+
+    if not _db_column_exists(cursor, "committee_plans", "source_intro_plan_id"):
+        cursor.execute(
+            "ALTER TABLE committee_plans ADD COLUMN source_intro_plan_id INT NULL AFTER course_scope"
+        )
+
+    if not _table_exists(cursor, "committee_plan_projects"):
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS committee_plan_projects (
+                cpp_id INT PRIMARY KEY AUTO_INCREMENT,
+                plan_id INT NOT NULL,
+                project_id INT NOT NULL,
+                slot_order INT NOT NULL,
+                slot_start TIME NOT NULL,
+                slot_end TIME NOT NULL,
+                UNIQUE KEY uq_plan_project (plan_id, project_id),
+                FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+                FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """
+        )
+
+    if not _table_exists(cursor, "committee_plan_members"):
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS committee_plan_members (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                plan_id INT NOT NULL,
+                faculty_id INT NOT NULL,
+                role ENUM('member','supervisor','responsible') NOT NULL DEFAULT 'member',
+                UNIQUE KEY uq_plan_faculty (plan_id, faculty_id),
+                FOREIGN KEY (plan_id) REFERENCES committee_plans(plan_id) ON DELETE CASCADE,
+                FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """
+        )
+
+    if not _table_exists(cursor, "project_report_readers"):
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS project_report_readers (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                project_id INT NOT NULL,
+                faculty_id INT NOT NULL,
+                reader_order TINYINT NOT NULL,
+                UNIQUE KEY uq_project_reader_order (project_id, reader_order),
+                UNIQUE KEY uq_project_reader_faculty (project_id, faculty_id),
+                FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
+                FOREIGN KEY (faculty_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """
+        )
+    return True
+
+
+def _copy_intro_committee_to_comp4300(cursor, source_project_id, promoted_project_id, promoted_by=None):
+    """
+    Keep the same discussion committee when a COMP4200 group becomes a COMP4300 project.
+
+    COMP4200 committees are linked through comp4200_project_sections -> committee_plan_sections.
+    COMP4300 committees are linked through committee_plan_projects. This function creates/reuses
+    a COMP4300 committee plan copied from the original COMP4200 committee and links the promoted
+    project to it, with the same doctors, responsible doctor, room, date, and time slot.
+    """
+    if not _ensure_committee_continuation_schema(cursor):
+        return {"copied": False, "reason": "committee tables do not exist"}
+
+    required_tables = [
+        "comp4200_project_sections",
+        "committee_plan_sections",
+        "committee_plans",
+        "committee_plan_members",
+        "committee_plan_projects",
+    ]
+    if any(not _table_exists(cursor, table) for table in required_tables):
+        return {"copied": False, "reason": "missing committee link tables"}
+
+    cursor.execute(
+        """
+        SELECT
+            cp.*,
+            cps.slot_order,
+            cps.slot_start,
+            cps.slot_end
+        FROM comp4200_project_sections cps_link
+        JOIN committee_plan_sections cps ON cps.section_id = cps_link.section_id
+        JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+        WHERE cps_link.project_id = %s
+          AND COALESCE(cp.course_scope, 'introduction') = 'introduction'
+          AND cp.status <> 'cancelled'
+        ORDER BY cp.plan_id DESC
+        LIMIT 1
+        """,
+        (source_project_id,),
+    )
+    intro_plan = cursor.fetchone()
+    if not intro_plan:
+        return {"copied": False, "reason": "source COMP4200 group has no committee"}
+
+    cursor.execute(
+        """
+        SELECT cp.plan_id
+        FROM committee_plan_projects cpp
+        JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+        WHERE cpp.project_id = %s
+          AND COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+          AND cp.status <> 'cancelled'
+        LIMIT 1
+        """,
+        (promoted_project_id,),
+    )
+    existing_link = cursor.fetchone()
+    if existing_link:
+        return {"copied": False, "plan_id": existing_link["plan_id"], "reason": "promoted project already has committee"}
+
+    cursor.execute(
+        """
+        SELECT plan_id
+        FROM committee_plans
+        WHERE source_intro_plan_id = %s
+          AND COALESCE(course_scope, 'graduation_project') = 'graduation_project'
+          AND status <> 'cancelled'
+        ORDER BY plan_id DESC
+        LIMIT 1
+        """,
+        (intro_plan["plan_id"],),
+    )
+    target = cursor.fetchone()
+    target_plan_id = target.get("plan_id") if target else None
+
+    if not target_plan_id:
+        target_name = intro_plan.get("committee_name") or f"Committee {intro_plan['plan_id']}"
+        if "COMP4200" in target_name:
+            target_name = target_name.replace("COMP4200", "COMP4300")
+        elif "Introduction" in target_name:
+            target_name = target_name.replace("Introduction", "Graduation")
+        else:
+            target_name = f"{target_name} — COMP4300"
+
+        columns = [
+            "committee_name",
+            "course_scope",
+            "source_intro_plan_id",
+            "discussion_date",
+            "start_time",
+            "end_time",
+            "room_id",
+            "responsible_faculty_id",
+            "status",
+            "created_by",
+        ]
+        values = [
+            target_name,
+            "graduation_project",
+            intro_plan["plan_id"],
+            intro_plan.get("discussion_date"),
+            intro_plan.get("start_time"),
+            intro_plan.get("end_time"),
+            intro_plan.get("room_id"),
+            intro_plan.get("responsible_faculty_id"),
+            "scheduled",
+            promoted_by or intro_plan.get("created_by"),
+        ]
+        if _db_column_exists(cursor, "committee_plans", "academic_year"):
+            columns.insert(3, "academic_year")
+            values.insert(3, intro_plan.get("academic_year"))
+
+        placeholders = ", ".join(["%s"] * len(values))
+        cursor.execute(
+            f"INSERT INTO committee_plans ({', '.join(columns)}) VALUES ({placeholders})",
+            tuple(values),
+        )
+        target_plan_id = cursor.lastrowid
+
+        cursor.execute(
+            """
+            INSERT IGNORE INTO committee_plan_members (plan_id, faculty_id, role)
+            SELECT %s, faculty_id, role
+            FROM committee_plan_members
+            WHERE plan_id = %s
+            """,
+            (target_plan_id, intro_plan["plan_id"]),
+        )
+
+    cursor.execute(
+        """
+        INSERT IGNORE INTO committee_plan_projects
+            (plan_id, project_id, slot_order, slot_start, slot_end)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        (
+            target_plan_id,
+            promoted_project_id,
+            intro_plan.get("slot_order") or 1,
+            intro_plan.get("slot_start") or intro_plan.get("start_time"),
+            intro_plan.get("slot_end") or intro_plan.get("end_time"),
+        ),
+    )
+
+    cursor.execute(
+        "UPDATE projects SET status = 'committee_evaluation' WHERE project_id = %s",
+        (promoted_project_id,),
+    )
+
+    # Keep the same two report readers if COMP4200 readers were already assigned for the section.
+    if _table_exists(cursor, "section_report_readers") and _table_exists(cursor, "comp4200_project_sections"):
+        cursor.execute(
+            """
+            INSERT INTO project_report_readers (project_id, faculty_id, reader_order)
+            SELECT %s, srr.faculty_id, srr.reader_order
+            FROM comp4200_project_sections cps_link
+            JOIN section_report_readers srr ON srr.section_id = cps_link.section_id
+            WHERE cps_link.project_id = %s
+            ON DUPLICATE KEY UPDATE faculty_id = VALUES(faculty_id)
+            """,
+            (promoted_project_id, source_project_id),
+        )
+
+    return {"copied": True, "plan_id": target_plan_id, "source_intro_plan_id": intro_plan["plan_id"]}
+
+
 def _promote_comp4200_group_to_comp4300(cursor, source_project_id, promoted_by=None):
     """
     When a COMP4200 group succeeds, create its continuation in COMP4300.
@@ -4888,6 +5115,9 @@ def _promote_comp4200_group_to_comp4300(cursor, source_project_id, promoted_by=N
     _copy_project_optional_rows_to_promoted_project(
         cursor, source_project_id, promoted_project_id
     )
+    committee_continuation = _copy_intro_committee_to_comp4300(
+        cursor, source_project_id, promoted_project_id, promoted_by
+    )
 
     cursor.execute(
         """
@@ -4981,6 +5211,7 @@ def _promote_comp4200_group_to_comp4300(cursor, source_project_id, promoted_by=N
         "promoted_project_id": promoted_project_id,
         "created": True,
         "students_copied": students_copied,
+        "committee_continuation": committee_continuation,
     }
 
 

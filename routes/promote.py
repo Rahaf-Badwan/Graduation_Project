@@ -283,6 +283,237 @@ def _copy_optional_project_rows(cursor, source_project_id, promoted_project_id):
         )
 
 
+def _safe_alter_nullable(cursor, table_name, column_name, column_definition):
+    """Best-effort migration: allow promoted COMP4300 committee templates to be unscheduled."""
+    if not _table_exists(cursor, table_name) or not _db_column_exists(cursor, table_name, column_name):
+        return
+    try:
+        cursor.execute(f"ALTER TABLE `{table_name}` MODIFY COLUMN `{column_name}` {column_definition} NULL")
+    except Exception:
+        # Keep old databases running even if the column is already compatible or constrained differently.
+        pass
+
+
+def _ensure_promoted_committee_template_schema(cursor):
+    """
+    A COMP4300 committee copied from COMP4200 keeps the same members/readers,
+    but it must NOT keep the old discussion date, time, or room.
+
+    Therefore the promoted committee is stored as an unscheduled template:
+    discussion_date/start_time/end_time/room_id and project slot times are NULL.
+    """
+    if not _table_exists(cursor, "committee_plans"):
+        return
+
+    _safe_alter_nullable(cursor, "committee_plans", "discussion_date", "DATE")
+    _safe_alter_nullable(cursor, "committee_plans", "start_time", "TIME")
+    _safe_alter_nullable(cursor, "committee_plans", "end_time", "TIME")
+    _safe_alter_nullable(cursor, "committee_plans", "room_id", "INT")
+
+    if _table_exists(cursor, "committee_plan_projects"):
+        _safe_alter_nullable(cursor, "committee_plan_projects", "slot_start", "TIME")
+        _safe_alter_nullable(cursor, "committee_plan_projects", "slot_end", "TIME")
+
+    if _table_exists(cursor, "committee_plan_sections"):
+        _safe_alter_nullable(cursor, "committee_plan_sections", "slot_start", "TIME")
+        _safe_alter_nullable(cursor, "committee_plan_sections", "slot_end", "TIME")
+
+
+def _source_intro_committee_plan(cursor, source_project_id):
+    """Return the COMP4200 committee plan linked to the source project/group."""
+    if not (
+        _table_exists(cursor, "committee_plans")
+        and _table_exists(cursor, "committee_plan_sections")
+        and _table_exists(cursor, "comp4200_project_sections")
+    ):
+        return None
+
+    cursor.execute(
+        """
+        SELECT cp.*, cps.section_id, cps.slot_order
+        FROM comp4200_project_sections cps_link
+        JOIN committee_plan_sections cps ON cps.section_id = cps_link.section_id
+        JOIN committee_plans cp ON cp.plan_id = cps.plan_id
+        WHERE cps_link.project_id = %s
+          AND (
+              cp.course_scope = 'introduction'
+              OR cp.course_scope IS NULL
+          )
+        ORDER BY cp.plan_id DESC
+        LIMIT 1
+        """,
+        (source_project_id,),
+    )
+    plan = cursor.fetchone()
+    if plan:
+        return plan
+
+    # Compatibility fallback: some old data may link COMP4200 projects directly.
+    if _table_exists(cursor, "committee_plan_projects"):
+        cursor.execute(
+            """
+            SELECT cp.*, cpp.slot_order
+            FROM committee_plan_projects cpp
+            JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
+            WHERE cpp.project_id = %s
+              AND (
+                  cp.course_scope = 'introduction'
+                  OR cp.course_scope IS NULL
+              )
+            ORDER BY cp.plan_id DESC
+            LIMIT 1
+            """,
+            (source_project_id,),
+        )
+        return cursor.fetchone()
+
+    return None
+
+
+def _promoted_project_already_has_committee(cursor, promoted_project_id):
+    if not _table_exists(cursor, "committee_plan_projects"):
+        return True
+    cursor.execute(
+        """
+        SELECT 1
+        FROM committee_plan_projects
+        WHERE project_id = %s
+        LIMIT 1
+        """,
+        (promoted_project_id,),
+    )
+    return cursor.fetchone() is not None
+
+
+def _copy_report_readers_to_promoted_project(cursor, source_project_id, promoted_project_id):
+    """Keep the same report readers when COMP4200 becomes COMP4300, if the table exists."""
+    if not _table_exists(cursor, "project_report_readers"):
+        return 0
+    cursor.execute(
+        """
+        INSERT IGNORE INTO project_report_readers
+            (project_id, faculty_id, reader_order)
+        SELECT %s, faculty_id, reader_order
+        FROM project_report_readers
+        WHERE project_id = %s
+        """,
+        (promoted_project_id, source_project_id),
+    )
+    return cursor.rowcount
+
+
+def _copy_intro_committee_to_promoted_project(cursor, source_project_id, promoted_project_id, promoted_by):
+    """
+    Copy the COMP4200 committee structure to the promoted COMP4300 project.
+
+    Copied:
+      - same committee members
+      - same responsible faculty
+      - same readers
+
+    Not copied:
+      - discussion_date
+      - start_time/end_time
+      - room_id
+      - old slot_start/slot_end
+
+    The coordinator must schedule the COMP4300 discussion later from the Committee page.
+    """
+    if not (
+        _table_exists(cursor, "committee_plans")
+        and _table_exists(cursor, "committee_plan_members")
+        and _table_exists(cursor, "committee_plan_projects")
+    ):
+        return {"copied": False, "reason": "Committee tables are missing."}
+
+    _ensure_promoted_committee_template_schema(cursor)
+
+    if _promoted_project_already_has_committee(cursor, promoted_project_id):
+        _copy_report_readers_to_promoted_project(cursor, source_project_id, promoted_project_id)
+        return {"copied": False, "reason": "Promoted project already has a committee."}
+
+    source_plan = _source_intro_committee_plan(cursor, source_project_id)
+    if not source_plan:
+        _copy_report_readers_to_promoted_project(cursor, source_project_id, promoted_project_id)
+        return {"copied": False, "reason": "No COMP4200 committee found for this group."}
+
+    source_plan_id = source_plan["plan_id"]
+    base_name = source_plan.get("committee_name") or f"Committee {source_plan_id}"
+    committee_name = f"{base_name} — COMP4300"
+
+    columns = ["committee_name"]
+    values = [committee_name]
+
+    if _db_column_exists(cursor, "committee_plans", "course_scope"):
+        columns.append("course_scope")
+        values.append("graduation_project")
+    if _db_column_exists(cursor, "committee_plans", "academic_year"):
+        columns.append("academic_year")
+        values.append(source_plan.get("academic_year"))
+    if _db_column_exists(cursor, "committee_plans", "discussion_date"):
+        columns.append("discussion_date")
+        values.append(None)
+    if _db_column_exists(cursor, "committee_plans", "start_time"):
+        columns.append("start_time")
+        values.append(None)
+    if _db_column_exists(cursor, "committee_plans", "end_time"):
+        columns.append("end_time")
+        values.append(None)
+    if _db_column_exists(cursor, "committee_plans", "room_id"):
+        columns.append("room_id")
+        values.append(None)
+    if _db_column_exists(cursor, "committee_plans", "responsible_faculty_id"):
+        columns.append("responsible_faculty_id")
+        values.append(source_plan.get("responsible_faculty_id"))
+    if _db_column_exists(cursor, "committee_plans", "status"):
+        columns.append("status")
+        values.append("scheduled")
+    if _db_column_exists(cursor, "committee_plans", "created_by"):
+        columns.append("created_by")
+        values.append(promoted_by)
+
+    placeholders = ", ".join(["%s"] * len(values))
+    cursor.execute(
+        f"INSERT INTO committee_plans ({', '.join(columns)}) VALUES ({placeholders})",
+        tuple(values),
+    )
+    promoted_plan_id = cursor.lastrowid
+
+    cursor.execute(
+        """
+        INSERT IGNORE INTO committee_plan_members (plan_id, faculty_id, role)
+        SELECT %s, faculty_id, role
+        FROM committee_plan_members
+        WHERE plan_id = %s
+        """,
+        (promoted_plan_id, source_plan_id),
+    )
+    members_copied = cursor.rowcount
+
+    slot_order = int(source_plan.get("slot_order") or 1)
+    cursor.execute(
+        """
+        INSERT IGNORE INTO committee_plan_projects
+            (plan_id, project_id, slot_order, slot_start, slot_end)
+        VALUES (%s, %s, %s, NULL, NULL)
+        """,
+        (promoted_plan_id, promoted_project_id, slot_order),
+    )
+
+    readers_copied = _copy_report_readers_to_promoted_project(
+        cursor, source_project_id, promoted_project_id
+    )
+
+    return {
+        "copied": True,
+        "source_plan_id": source_plan_id,
+        "promoted_plan_id": promoted_plan_id,
+        "members_copied": members_copied,
+        "readers_copied": readers_copied,
+        "schedule_reset": True,
+    }
+
+
 def _clear_comp4200_student_state(cursor, source_project_id):
     """Remove coordinator-facing COMP4200 timeline submissions for promoted groups only."""
     if _table_exists(cursor, "milestone_submissions"):
@@ -415,6 +646,10 @@ def _copy_project_to_comp4300(cursor, source_project_id, comp4300_semester_id, p
         (source_project_id, promoted_project_id, comp4300_semester_id, promoted_by),
     )
 
+    committee_copy_result = _copy_intro_committee_to_promoted_project(
+        cursor, source_project_id, promoted_project_id, promoted_by
+    )
+
     if _table_exists(cursor, "student_course_results"):
         cursor.execute(
             """
@@ -488,6 +723,7 @@ def _copy_project_to_comp4300(cursor, source_project_id, comp4300_semester_id, p
         "source_project_id": source_project_id,
         "promoted_project_id": promoted_project_id,
         "created": True,
+        "committee_copy": committee_copy_result,
     }
 
 
