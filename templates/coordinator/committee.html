@@ -328,7 +328,7 @@
               <div class="card-hd"><span class="card-title">COMP4200 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Project Introduction — COMP4200</b> sections.
-                It creates 4-group-supervisor committees. Sections may have different supervisors, and every section supervisor is included in the same committee. It chooses 2 report readers excluding each section supervisor, chooses a room, and creates 30-minute slots with 10-minute breaks.
+                It creates 4-doctor committees. Projects/sections are grouped by supervisor, so all items for the same supervisor stay in one committee. A committee may include multiple items for the same supervisor, and empty seats are filled with other available doctors. It chooses 2 report readers excluding each item supervisor, chooses a room, and creates 30-minute slots with 10-minute breaks.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -360,10 +360,12 @@
               <div class="card-hd"><span class="card-title">COMP4200 Rules</span></div>
               <div class="committee-rule-box">
                 ✓ Uses <b>student_distribution_sections</b><br>
-                ✓ Each committee has <b>4 group supervisors</b><br>
-                ✓ Sections in the same committee may have <b>different supervisors</b><br>
-                ✓ Every section supervisor is included in the same discussion committee<br>
-                ✓ The <b>2 report readers</b> are chosen from committee supervisors excluding that section supervisor<br>
+                ✓ Each committee has <b>exactly 4 doctors</b><br>
+                ✓ All sections/projects for the same supervisor stay in <b>one committee</b><br>
+                ✓ The same supervisor is <b>not repeated</b> in another committee<br>
+                ✓ A committee may include <b>more than one section/project</b> for the same supervisor<br>
+                ✓ Empty committee seats may be filled by doctors without a project in that committee<br>
+                ✓ The <b>2 report readers</b> are chosen from committee members excluding that item supervisor<br>
                 ✓ Each discussion is <b>30 minutes</b><br>
                 ✓ There is a <b>10 minute break</b> between discussions<br>
                 ✓ The same doctor cannot be scheduled in two committees at overlapping times
@@ -429,7 +431,7 @@
               <div class="card-hd"><span class="card-title">COMP4300 Committee Generator</span></div>
               <div class="committee-info-box" style="margin-bottom:12px">
                 ◈ This generator creates evaluation committees for <b>Graduation Project — COMP4300</b> projects.
-                It creates 4-group-supervisor committees. Projects may have different supervisors, and every project supervisor is included in the same committee. It assigns room, time slots, and 2 report readers excluding each project supervisor.
+                It creates 4-doctor committees. Projects are grouped by supervisor, so all projects for the same supervisor stay in one committee. A committee may include multiple projects for the same supervisor, and empty seats are filled with other available doctors. It assigns room, time slots, and 2 report readers excluding each project supervisor.
               </div>
               <div class="form-grid">
                 <div class="field-wrap">
@@ -461,10 +463,12 @@
               <div class="card-hd"><span class="card-title">COMP4300 Rules</span></div>
               <div class="committee-rule-box">
                 ✓ Uses <b>projects</b> table with COMP4300 semester<br>
-                ✓ Each committee has <b>4 group supervisors</b><br>
-                ✓ Projects in the same committee may have <b>different supervisors</b><br>
-                ✓ Every project supervisor is included in the same committee<br>
-                ✓ The <b>2 report readers</b> are chosen from committee supervisors excluding that project supervisor<br>
+                ✓ Each committee has <b>exactly 4 doctors</b><br>
+                ✓ All projects for the same supervisor stay in <b>one committee</b><br>
+                ✓ The same supervisor is <b>not repeated</b> in another committee<br>
+                ✓ A committee may include <b>more than one project</b> for the same supervisor<br>
+                ✓ Empty committee seats may be filled by doctors without a project in that committee<br>
+                ✓ The <b>2 report readers</b> are chosen from committee members excluding that project supervisor<br>
                 ✓ Each discussion is <b>30 minutes</b><br>
                 ✓ The same doctor cannot be scheduled in two committees at overlapping times
               </div>
@@ -911,7 +915,7 @@
             Time: ${safeText(plan.start_time || '')} - ${safeText(plan.end_time || '')}<br>
             Room: ${safeText(plan.room_name || '—')}<br>
             Status: ${safeText(plan.status || 'scheduled')}<br>
-            Project/section supervisors are included as committee members<br>
+            Each supervisor's items stay in this committee; fillers may have no item here<br>
             Responsible Supervisor: ${safeText(plan.responsible_name || 'Not selected yet')}
           </div>
 
@@ -942,7 +946,7 @@
           </div>
 
           <div class="project-list">
-            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — multiple supervisors allowed</b>
+            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — supervisor items are kept together</b>
             ${projects.length ? projects.map(project => {
               const isSection = courseScope === 'introduction' || project.section_id;
               const itemId = project.section_id || project.project_id;
@@ -1010,7 +1014,7 @@
             Start: ${safeText(item.start_time || '')}${item.end_time ? ` - ${safeText(item.end_time)}` : ''}<br>
             Room: ${safeText(item.room_name || '—')}<br>
             Projects/Sections: ${safeText(item.projects_count || projects.length || 0)}<br>
-            Project/section supervisors are included as committee members<br>
+            Each supervisor's items stay in this committee; fillers may have no item here<br>
             Responsible Supervisor: ${safeText(item.responsible_name || 'Not selected yet')}<br>
             Status: ${safeText(item.status || 'scheduled')}
           </div>
@@ -1026,7 +1030,7 @@
           </div>
 
           <div class="project-list">
-            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — multiple supervisors allowed</b>
+            <b>${courseScope === 'introduction' ? 'Sections' : 'Projects'} — supervisor items are kept together</b>
             ${projects.length ? projects.map(project => `
               <div class="project-item">
                 <div class="project-title">${safeText(project.title || project.section_name || 'Untitled')}</div>

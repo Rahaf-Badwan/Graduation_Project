@@ -6657,15 +6657,19 @@ def _committee_fetch_supervising_faculty_ids(cursor, semester_id=None, course_sc
 
 
 def _committee_fetch_faculty_pool(cursor, supervisor_faculty_ids=None):
-    # Do NOT filter by active_committee_count = 0.
-    # Include only faculty who actually supervise groups/projects. Coordinator
-    # or head accounts are allowed when they are assigned as a group supervisor.
-    # _committee_pick_members_for_supervisor already prefers less-loaded supervisors.
-    supervisor_faculty_ids = {int(fid) for fid in (supervisor_faculty_ids or []) if fid}
-    if not supervisor_faculty_ids:
-        return defaultdict(list)
+    """Return active faculty available for committee generation.
 
-    placeholders = ",".join(["%s"] * len(supervisor_faculty_ids))
+    Important for the requested committee rule:
+    - Projects are grouped by their own supervisors and a supervisor
+      bucket is never split across two committees.
+    - A committee still has exactly 4 doctors.
+    - The remaining seats may be filled by active doctors even if they do
+      not supervise a project in that committee.
+
+    Therefore this function intentionally loads all active faculty accounts
+    that can serve on committees. The optional supervisor_faculty_ids is kept
+    only for backward compatibility with older calls.
+    """
     cursor.execute("""
         SELECT
             f.faculty_id,
@@ -6681,19 +6685,21 @@ def _committee_fetch_faculty_pool(cursor, supervisor_faculty_ids=None):
             ) AS active_committee_count
         FROM faculty f
         JOIN users u ON u.user_id = f.user_id
-        WHERE f.faculty_id IN ({placeholders})
-          AND u.role IN ('supervisor', 'coordinator', 'head_of_department')
+        WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
           AND u.is_active = TRUE
         ORDER BY f.specialization, u.full_name
-        """.format(placeholders=placeholders), tuple(sorted(supervisor_faculty_ids)))
+        """)
     rows = cursor.fetchall()
     groups = defaultdict(list)
     for row in rows:
+        row["faculty_id"] = int(row["faculty_id"])
+        row["specialization"] = row.get("specialization") or "General"
         groups[row["specialization"]].append(row)
 
     for spec in groups:
         groups[spec].sort(
             key=lambda r: (
+                int(r.get("active_committee_count") or 0),
                 -int(r.get("years_experience") or 0),
                 r.get("full_name") or "",
             )
@@ -6872,20 +6878,21 @@ def _committee_pick_members_for_supervisors(
     reserved_supervisor_ids=None,
     unavailable_faculty_ids=None,
 ):
-    """
-    Build one discussion committee that can contain projects from multiple supervisors.
+    """Pick exactly 4 doctors for one committee.
 
-    Rule:
-    - The committee has exactly 4 doctors.
-    - Every supervisor of every project/section in this committee must be a committee member.
-    - Remaining seats are filled with other doctors, preferring unused doctors and different majors.
+    Final committee rule requested by the user:
+    - A committee has exactly 4 doctors.
+    - A committee may contain more than one project/section for the same doctor.
+    - All projects/sections supervised by a doctor must stay in the same committee.
+    - The same doctor must not appear in another generated committee.
+    - A doctor may be a committee member even if they do not have a project in
+      that committee, but we must not use another eligible project supervisor as
+      a filler because that would put the doctor in committee A while their
+      projects are assigned to committee B.
     """
-    if used_faculty_ids is None:
-        used_faculty_ids = set()
-
-    used_faculty_ids = {int(x) for x in used_faculty_ids if x is not None}
-    reserved_supervisor_ids = {int(x) for x in (reserved_supervisor_ids or set()) if x is not None}
+    used_faculty_ids = {int(x) for x in (used_faculty_ids or set()) if x is not None}
     unavailable_faculty_ids = {int(x) for x in (unavailable_faculty_ids or set()) if x is not None}
+    reserved_supervisor_ids = {int(x) for x in (reserved_supervisor_ids or set()) if x is not None}
 
     clean_supervisor_ids = []
     for sid in supervisor_ids or []:
@@ -6900,8 +6907,8 @@ def _committee_pick_members_for_supervisors(
 
     if len(clean_supervisor_ids) > 4:
         raise ValueError(
-            "One committee cannot contain projects/sections from more than 4 different supervisors, "
-            "because every supervisor must be inside the same 4-supervisor committee."
+            "One committee cannot contain items from more than 4 different supervisors "
+            "because the committee has exactly 4 doctors."
         )
 
     all_faculty = _committee_flat_faculty_pool(groups)
@@ -6909,9 +6916,14 @@ def _committee_pick_members_for_supervisors(
 
     chosen_members = []
     chosen_ids = set()
-    chosen_specs = set()
 
+    # Required members: supervisors of the projects/sections in this committee.
     for supervisor_id in clean_supervisor_ids:
+        if supervisor_id in used_faculty_ids:
+            raise ValueError(
+                "A project/section supervisor is already used in another generated committee. "
+                "All projects for the same supervisor must stay in one committee."
+            )
         if supervisor_id in unavailable_faculty_ids:
             raise ValueError(
                 "A project/section supervisor already has another committee at this time. "
@@ -6922,77 +6934,177 @@ def _committee_pick_members_for_supervisors(
         if not supervisor:
             raise ValueError(
                 "A project/section supervisor is not available for committee generation. "
-                "Check that every supervisor has a faculty record, an active user account, and a group/project assignment."
+                "Check that every supervisor has a faculty record and an active user account."
             )
-        supervisor_member = dict(supervisor)
-        supervisor_member["role"] = "supervisor"
-        chosen_members.append(supervisor_member)
+
+        item = dict(supervisor)
+        item["faculty_id"] = int(item["faculty_id"])
+        item["specialization"] = item.get("specialization") or "General"
+        item["role"] = "supervisor"
+        chosen_members.append(item)
         chosen_ids.add(supervisor_id)
-        chosen_specs.add(supervisor_member.get("specialization") or "General")
 
-    if len(all_faculty) < 4:
-        raise ValueError("At least 4 active group supervisors are required to generate committees.")
+    if len(chosen_members) == 4:
+        return chosen_members
 
-    def sort_key(member):
+    # Fill the remaining seats. A filler doctor must not be:
+    # - already chosen,
+    # - used in another generated committee,
+    # - unavailable at the same time,
+    # - a supervisor whose eligible projects are reserved for another committee.
+    filler_candidates = []
+    chosen_specs = {m.get("specialization") or "General" for m in chosen_members}
+    for member in all_faculty:
         fid = int(member["faculty_id"])
+        if fid in chosen_ids:
+            continue
+        if fid in used_faculty_ids:
+            continue
+        if fid in unavailable_faculty_ids:
+            continue
+        if fid in reserved_supervisor_ids and fid not in clean_supervisor_ids:
+            continue
+        item = dict(member)
+        item["faculty_id"] = fid
+        item["specialization"] = item.get("specialization") or "General"
+        item["role"] = "member"
+        filler_candidates.append(item)
+
+    def filler_sort_key(member):
         spec = member.get("specialization") or "General"
         return (
-            fid in used_faculty_ids,                 # unused first
-            spec in chosen_specs,                    # different major first
+            spec in chosen_specs,
             int(member.get("active_committee_count") or 0),
             -int(member.get("years_experience") or 0),
             member.get("full_name") or "",
         )
 
-    def add_candidates(candidates, allow_reserved_supervisors=False, require_new_major=False):
-        nonlocal chosen_members, chosen_ids, chosen_specs
-        for member in sorted(candidates, key=sort_key):
-            fid = int(member["faculty_id"])
-            spec = member.get("specialization") or "General"
-            if fid in chosen_ids:
-                continue
-            if fid in unavailable_faculty_ids:
-                continue
-            # Do not pull another project's supervisor as a filler doctor unless strict options fail.
-            if not allow_reserved_supervisors and fid in reserved_supervisor_ids:
-                continue
-            if require_new_major and spec in chosen_specs:
-                continue
-            item = dict(member)
-            item["role"] = "member"
-            chosen_members.append(item)
-            chosen_ids.add(fid)
-            chosen_specs.add(spec)
-            used_faculty_ids.add(fid)
-            if len(chosen_members) == 4:
-                return True
-        return len(chosen_members) == 4
-
-    candidates = [member for member in all_faculty if int(member["faculty_id"]) not in chosen_ids]
-    unused_candidates = [member for member in candidates if int(member["faculty_id"]) not in used_faculty_ids]
-
-    # 1) Best: unused, not another reserved supervisor, and new major.
-    add_candidates(unused_candidates, allow_reserved_supervisors=False, require_new_major=True)
-
-    # 2) Then unused, not another reserved supervisor, even if major repeats.
-    if len(chosen_members) < 4:
-        add_candidates(unused_candidates, allow_reserved_supervisors=False, require_new_major=False)
-
-    # 3) Then any non-reserved doctor.
-    if len(chosen_members) < 4:
-        add_candidates(candidates, allow_reserved_supervisors=False, require_new_major=False)
-
-    # 4) Last fallback: allow reserved supervisors as fillers so generation does not get blocked.
-    if len(chosen_members) < 4:
-        add_candidates(candidates, allow_reserved_supervisors=True, require_new_major=False)
+    for member in sorted(filler_candidates, key=filler_sort_key):
+        if len(chosen_members) == 4:
+            break
+        chosen_members.append(member)
+        chosen_ids.add(int(member["faculty_id"]))
+        chosen_specs.add(member.get("specialization") or "General")
 
     if len(chosen_members) < 4:
         raise ValueError(
-            "Could not create a complete 4-group-supervisor committee without time conflicts. "
-            "Try a later start time or add more available supervisors."
+            "Could not create a 4-doctor committee without repeating doctors or splitting a supervisor's projects. "
+            "Add more active doctors, reduce simultaneous committees, or use fewer committees."
         )
 
     return chosen_members
+
+
+def _committee_build_supervisor_project_groups(eligible_projects, projects_per_committee, max_committees=None):
+    """Group eligible items by supervisor without splitting any supervisor.
+
+    Final requested behavior:
+    - Distribution is supervisor-bucket based, not project-by-project.
+    - If Dr. X has several eligible projects/sections, all of them are placed
+      in the same committee.
+    - A committee may include multiple projects for the same supervisor.
+    - A committee may include doctors as members even if they have no item
+      inside it.
+    - A doctor must not appear in more than one generated committee.
+    - projects_per_committee is a preferred target, not a reason to split a
+      supervisor bucket or create more committees than the available doctors can
+      support. If needed, the function merges supervisor buckets and allows a
+      committee to exceed the preferred project count so generation does not
+      fail with Committee 5/6 simply because filler doctors ran out.
+    """
+    preferred_limit = max(1, int(projects_per_committee or 1))
+    max_project_supervisors_per_committee = 4
+
+    buckets = defaultdict(list)
+    for project in eligible_projects:
+        supervisor_id = project.get("supervisor_id")
+        if supervisor_id is None:
+            continue
+        item = dict(project)
+        item["supervisor_id"] = int(supervisor_id)
+        buckets[int(supervisor_id)].append(item)
+
+    supervisor_ids = sorted(
+        buckets.keys(),
+        key=lambda sid: (-len(buckets[sid]), str(sid)),
+    )
+
+    if not supervisor_ids:
+        return []
+
+    min_required_committees = math.ceil(len(supervisor_ids) / max_project_supervisors_per_committee)
+    if max_committees is not None and int(max_committees) < min_required_committees:
+        raise ValueError(
+            f"Not enough active doctors to generate valid committees. "
+            f"There are {len(supervisor_ids)} different project supervisors, so at least "
+            f"{min_required_committees} committee(s) are required, but the available doctors can "
+            f"support only {int(max_committees)} committee(s) with 4 doctors each."
+        )
+
+    target_group_count = None
+    if max_committees is not None:
+        target_group_count = max(min_required_committees, min(int(max_committees), len(supervisor_ids)))
+
+    groups = []
+    used_supervisors = set()
+
+    for sid in supervisor_ids:
+        if sid in used_supervisors:
+            continue
+
+        current_supervisors = [sid]
+        current_projects = list(buckets[sid])
+        used_supervisors.add(sid)
+
+        for other_sid in supervisor_ids:
+            if other_sid in used_supervisors:
+                continue
+            if len(current_supervisors) >= max_project_supervisors_per_committee:
+                break
+
+            remaining_supervisors_after_skip = len([x for x in supervisor_ids if x not in used_supervisors and x != other_sid])
+            groups_after_current = len(groups) + 1
+            minimum_groups_needed_after_current = math.ceil(remaining_supervisors_after_skip / max_project_supervisors_per_committee)
+            must_pack_to_fit_available_doctors = (
+                target_group_count is not None
+                and groups_after_current + minimum_groups_needed_after_current > target_group_count
+            )
+
+            other_bucket = buckets[other_sid]
+            would_exceed_limit = len(current_projects) + len(other_bucket) > preferred_limit
+
+            if would_exceed_limit and not must_pack_to_fit_available_doctors:
+                continue
+
+            current_supervisors.append(other_sid)
+            current_projects.extend(other_bucket)
+            used_supervisors.add(other_sid)
+
+        groups.append({
+            "supervisor_ids": sorted(current_supervisors),
+            "projects": current_projects,
+        })
+
+    # Final safety pass: if the preferred project limit created too many groups
+    # for the number of available doctors, merge later groups into earlier groups
+    # while keeping at most 4 different project supervisors per committee.
+    if target_group_count is not None:
+        changed = True
+        while len(groups) > target_group_count and changed:
+            changed = False
+            for i in range(len(groups)):
+                if changed:
+                    break
+                for j in range(len(groups) - 1, i, -1):
+                    merged_supervisors = sorted(set(groups[i]["supervisor_ids"]) | set(groups[j]["supervisor_ids"]))
+                    if len(merged_supervisors) <= max_project_supervisors_per_committee:
+                        groups[i]["supervisor_ids"] = merged_supervisors
+                        groups[i]["projects"].extend(groups[j]["projects"])
+                        del groups[j]
+                        changed = True
+                        break
+
+    return groups
 
 def _committee_ensure_course_schema(cursor):
     """Keep committee tables compatible with both COMP4200 and COMP4300."""
@@ -8109,45 +8221,15 @@ def _committee_generate_internal(
             "Assign a supervisor before generating committees."
         )
 
-    # New rule:
-    # A committee may contain projects/sections from different supervisors.
-    # Every supervisor represented in a committee is inserted as a committee member.
-    # Since a committee has 4 doctors, a single committee cannot contain more than
-    # 4 different supervisors.
-    random.shuffle(eligible_with_supervisors)
-    committee_groups = []
-    current_chunk = []
-    current_supervisor_ids = set()
-
-    for project in eligible_with_supervisors:
-        supervisor_id = int(project["supervisor_id"])
-        would_add_new_supervisor = supervisor_id not in current_supervisor_ids
-        must_start_new_group = (
-            current_chunk
-            and (
-                len(current_chunk) >= projects_per_committee
-                or (would_add_new_supervisor and len(current_supervisor_ids) >= 4)
-            )
-        )
-
-        if must_start_new_group:
-            committee_groups.append({
-                "supervisor_ids": sorted(current_supervisor_ids),
-                "projects": current_chunk,
-            })
-            current_chunk = []
-            current_supervisor_ids = set()
-
-        current_chunk.append(project)
-        current_supervisor_ids.add(supervisor_id)
-
-    if current_chunk:
-        committee_groups.append({
-            "supervisor_ids": sorted(current_supervisor_ids),
-            "projects": current_chunk,
-        })
-
-    random.shuffle(committee_groups)
+    # Build committees so each committee can include projects/sections from
+    # multiple supervisors, and every supervisor in the committee has their own
+    # item inside that same committee.
+    max_committees_supported_by_doctors = total_active_doctors // 4
+    committee_groups = _committee_build_supervisor_project_groups(
+        eligible_with_supervisors,
+        projects_per_committee,
+        max_committees=max_committees_supported_by_doctors,
+    )
     committee_count = len(committee_groups)
 
     if len(rooms) < committee_count:
@@ -8239,8 +8321,10 @@ def _committee_generate_internal(
 
         if members is None or committee_start_time is None or last_slot_end is None:
             raise ValueError(
-                f"Could not schedule {course_label} Committee {idx + 1} without supervisor time conflicts. "
-                "Try an earlier/later start time or add more available supervisors."
+                f"Could not schedule {course_label} Committee {idx + 1}. "
+                "This usually means the selected date/time already has active committees for one of the required doctors, "
+                "or there are not enough unused active doctors to keep every committee at exactly 4 members. "
+                "Try Reset & Redistribute, choose another date/time, or increase Projects Per Committee so fewer committees are needed."
             )
 
         room = rooms[idx]
@@ -8323,7 +8407,8 @@ def _committee_generate_internal(
                 )
 
         # Both COMP4200 and COMP4300 have two report readers.
-        # Readers are selected from the 3 non-supervisor committee members.
+        # Readers are selected from the other supervisors in the same committee,
+        # excluding the project/section supervisor.
         if '_committee_auto_assign_readers' in globals():
             _committee_auto_assign_readers(cursor, plan_id, chunk, members, course_scope)
         if '_committee_send_notifications' in globals():
@@ -9490,6 +9575,7 @@ def _ensure_evaluation_schema(cursor):
             reference_id INT NOT NULL,
             report_score DECIMAL(6,2) NULL,
             supervisor_score DECIMAL(6,2) NULL,
+            coordinator_score DECIMAL(6,2) NULL,
             discussion_score DECIMAL(6,2) NULL,
             committee_score DECIMAL(6,2) NULL,
             final_score DECIMAL(6,2) NULL,
@@ -9510,6 +9596,14 @@ def _ensure_evaluation_schema(cursor):
             INDEX idx_eval_final_supervisor (supervisor_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
+
+    if not _db_column_exists(cursor, "evaluation_final_results", "coordinator_score"):
+        cursor.execute(
+            """
+            ALTER TABLE evaluation_final_results
+            ADD COLUMN coordinator_score DECIMAL(6,2) NULL AFTER supervisor_score
+            """
+        )
 
 
 def _ensure_student_course_results_score_schema(cursor):
@@ -9565,10 +9659,9 @@ def _evaluation_component_max_mark(component):
 
 
 def _evaluation_default_required_count(course_scope):
-    # COMP4200: two report readers + supervisor + four discussion members.
-    # Coordinator does not read/evaluate the report from this page.
+    # COMP4200: two report readers + coordinator + supervisor + four discussion members.
     # COMP4300: two report readers + supervisor + four committee members.
-    return 7 if course_scope == "introduction" else 7
+    return 8 if course_scope == "introduction" else 7
 
 
 def _evaluation_faculty_user_ids(cursor, faculty_ids):
@@ -9588,6 +9681,27 @@ def _evaluation_faculty_user_ids(cursor, faculty_ids):
     )
     return {int(row["faculty_id"]): row["user_id"] for row in cursor.fetchall()}
 
+
+
+def _evaluation_current_coordinator_faculty_id(cursor):
+    """Return faculty_id for the logged-in coordinator so they can enter /10 coordinator mark."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    cursor.execute(
+        """
+        SELECT f.faculty_id
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE u.user_id = %s
+          AND u.role IN ('coordinator', 'supervisor', 'head_of_department')
+          AND u.is_active = TRUE
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    row = cursor.fetchone() or {}
+    return row.get("faculty_id")
 
 def _evaluation_section_student_user_ids(cursor, section_id):
     if not (_table_exists(cursor, "section_students") and _table_exists(cursor, "student_distribution_sections")):
@@ -9885,6 +9999,13 @@ def _evaluation_autocreate_tasks(cursor, course_scope, reference_id, created_by=
     _evaluation_insert_task(cursor, course_scope, reference_id, setup["supervisor_component"], setup["supervisor_id"], created_by)
     created_faculty_ids.add(int(setup["supervisor_id"]))
 
+    if course_scope == "introduction":
+        coordinator_faculty_id = _evaluation_current_coordinator_faculty_id(cursor)
+        if not coordinator_faculty_id:
+            raise ValueError("The logged-in coordinator is not linked to a faculty record, so the /10 coordinator mark cannot be created.")
+        _evaluation_insert_task(cursor, course_scope, reference_id, "intro_coordinator", coordinator_faculty_id, created_by)
+        created_faculty_ids.add(int(coordinator_faculty_id))
+
     # The discussion/committee supervisors are exactly the committee members saved
     # for the current plan. No random doctors, no old tasks, no fallback.
     for fid in setup["member_ids"]:
@@ -9897,22 +10018,11 @@ def _evaluation_cleanup_tasks(cursor, course_scope, reference_id):
     """
     Remove old/wrong evaluation rows created by earlier versions.
     Important fixes:
-    - COMP4200 has no coordinator grade task on this coordinator page.
+    - COMP4200 keeps exactly one coordinator /10 grade task.
     - The real section supervisor must only have the supervisor component.
     - Keep only 2 report readers and 4 discussion/committee members.
     """
     reference_id = int(reference_id)
-
-    # Coordinator task was an old mistake because it was often assigned to the supervisor.
-    cursor.execute(
-        """
-        DELETE FROM evaluation_grade_tasks
-        WHERE course_scope = %s
-          AND reference_id = %s
-          AND component = 'intro_coordinator'
-        """,
-        (course_scope, reference_id),
-    )
 
     supervisor_id = None
     supervisor = _evaluation_reference_supervisor(cursor, course_scope, reference_id)
@@ -9940,6 +10050,7 @@ def _evaluation_cleanup_tasks(cursor, course_scope, reference_id):
 
     limits = {
         "intro_report_reader": 2,
+        "intro_coordinator": 1,
         "intro_supervisor": 1,
         "intro_discussion_member": 4,
         "grad_report_reader": 2,
@@ -10036,21 +10147,25 @@ def _evaluation_scores_from_grades(course_scope, grades):
 
     report_avg_40 = avg(submitted_marks("intro_report_reader"))
     supervisor_avg_10 = avg(submitted_marks("intro_supervisor"))
+    coordinator_avg_10 = avg(submitted_marks("intro_coordinator"))
     discussion_sum_40_values = submitted_marks("intro_discussion_member")
     discussion_sum_40 = sum(discussion_sum_40_values) if discussion_sum_40_values else None
 
-    # The coordinator is not the supervisor and should not be auto-assigned
-    # a report/evaluation task. COMP4200 is calculated from the available
-    # report + supervisor + discussion components (/90) and normalized to /100.
+    # COMP4200 distribution stays the same and adds Coordinator /10:
+    # Report /40 + Supervisor /10 + Coordinator /10 + Discussion /40 = Final /100.
     final_score = None
-    if report_avg_40 is not None and supervisor_avg_10 is not None and discussion_sum_40 is not None:
-        raw_score_90 = report_avg_40 + supervisor_avg_10 + discussion_sum_40
-        final_score = (raw_score_90 / 90.0) * 100.0
+    if (
+        report_avg_40 is not None
+        and supervisor_avg_10 is not None
+        and coordinator_avg_10 is not None
+        and discussion_sum_40 is not None
+    ):
+        final_score = report_avg_40 + supervisor_avg_10 + coordinator_avg_10 + discussion_sum_40
 
     return {
         "report_score": round(report_avg_40, 2) if report_avg_40 is not None else None,
         "supervisor_score": round(supervisor_avg_10, 2) if supervisor_avg_10 is not None else None,
-        "coordinator_score": None,
+        "coordinator_score": round(coordinator_avg_10, 2) if coordinator_avg_10 is not None else None,
         "discussion_score": round(discussion_sum_40, 2) if discussion_sum_40 is not None else None,
         "committee_score": None,
         "calculated_final_score": round(final_score, 2) if final_score is not None else None,
@@ -10118,6 +10233,7 @@ def _evaluation_save_final_result(cursor, course_scope, reference_id, scores, su
     values = (
         scores.get("report_score"),
         scores.get("supervisor_score"),
+        scores.get("coordinator_score"),
         scores.get("discussion_score"),
         scores.get("committee_score"),
         scores.get("final_score"),
@@ -10131,6 +10247,7 @@ def _evaluation_save_final_result(cursor, course_scope, reference_id, scores, su
             UPDATE evaluation_final_results
             SET report_score = %s,
                 supervisor_score = %s,
+                coordinator_score = %s,
                 discussion_score = %s,
                 committee_score = %s,
                 final_score = %s,
@@ -10149,9 +10266,9 @@ def _evaluation_save_final_result(cursor, course_scope, reference_id, scores, su
         """
         INSERT INTO evaluation_final_results
             (course_scope, reference_id, report_score, supervisor_score,
-             discussion_score, committee_score, final_score, notes,
+             coordinator_score, discussion_score, committee_score, final_score, notes,
              workflow_status, sent_by_coordinator, sent_to_supervisor_at, supervisor_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s,
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s,
                 'sent_to_supervisor', %s, NOW(), %s)
         """,
         (course_scope, reference_id, *values),
@@ -10728,6 +10845,106 @@ def api_coordinator_evaluation_assign():
         db.close()
         return jsonify({"message": "Evaluator assignment saved successfully.", "notifications_sent": notifications_sent})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/coordinator-mark", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_coordinator_mark():
+    """Save the logged-in coordinator's COMP4200 /10 mark from the Evaluation page."""
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "introduction").strip()
+    reference_id = data.get("project_id") or data.get("reference_id")
+    raw_mark = data.get("mark")
+
+    if course_scope != "introduction":
+        return jsonify({"error": "Coordinator mark is only for Project Introduction — COMP4200."}), 400
+    if not reference_id:
+        return jsonify({"error": "project_id is required."}), 400
+
+    try:
+        mark = float(raw_mark)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Coordinator mark must be a number."}), 400
+
+    if mark < 0 or mark > 10:
+        return jsonify({"error": "Coordinator mark must be between 0 and 10."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+
+        coordinator_faculty_id = _evaluation_current_coordinator_faculty_id(cursor)
+        if not coordinator_faculty_id:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Your coordinator account is not linked to a faculty record."}), 400
+
+        cursor.execute(
+            """
+            SELECT is_open
+            FROM evaluation_windows
+            WHERE course_scope = 'introduction'
+              AND reference_id = %s
+            LIMIT 1
+            """,
+            (reference_id,),
+        )
+        window = cursor.fetchone() or {}
+        if not bool(window.get("is_open")):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Open grade entry first, then enter the coordinator mark."}), 400
+
+        _evaluation_insert_task(
+            cursor,
+            "introduction",
+            int(reference_id),
+            "intro_coordinator",
+            coordinator_faculty_id,
+            session.get("user_id"),
+        )
+
+        cursor.execute(
+            """
+            UPDATE evaluation_grade_tasks
+            SET mark = %s,
+                is_submitted = TRUE,
+                submitted_at = NOW()
+            WHERE course_scope = 'introduction'
+              AND reference_id = %s
+              AND component = 'intro_coordinator'
+              AND evaluator_faculty_id = %s
+            """,
+            (mark, reference_id, coordinator_faculty_id),
+        )
+
+        _evaluation_cleanup_tasks(cursor, "introduction", int(reference_id))
+        grades = _evaluation_fetch_grade_rows(cursor, "introduction", int(reference_id))
+        completion = _evaluation_grade_completion("introduction", grades)
+        scores = _evaluation_scores_from_grades("introduction", grades) if completion.get("grades_complete") else _evaluation_blank_scores()
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify(
+            _json_safe_value(
+                {
+                    "message": "Coordinator mark saved successfully.",
+                    "scores": scores,
+                    "grades_complete": completion.get("grades_complete"),
+                    "submitted_count": completion.get("submitted_count"),
+                    "required_count": completion.get("required_count"),
+                }
+            )
+        )
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         return jsonify({"error": str(e)}), 500
 
 

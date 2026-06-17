@@ -6,6 +6,7 @@
 
 {% block content %}
 <div class="page page-single on" id="pg-evaluation">
+  <div id="evalToast" class="eval-toast" role="status" aria-live="polite"></div>
   <style>
     #pg-evaluation {
       display: block !important;
@@ -240,6 +241,81 @@
       color: var(--accent)
     }
 
+    .eval-toast {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      z-index: 9999;
+      min-width: 280px;
+      max-width: 720px;
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 800;
+      box-shadow: 0 14px 32px rgba(16, 24, 40, .18);
+      opacity: 0;
+      pointer-events: none;
+      transition: .22s ease;
+      border: 1px solid #d7e3dc;
+      background: var(--color-background-primary);
+      color: var(--color-text-primary);
+    }
+
+    .eval-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .eval-toast.ok { border-color: #abefc6; background: var(--green-light); color: var(--green); }
+    .eval-toast.error { border-color: #fecdca; background: var(--coral-light); color: #b42318; }
+
+
+    .coord-mark-box {
+      border: 1px solid #d7e3dc;
+      background: var(--color-background-tertiary);
+      border-radius: 14px;
+      padding: 12px;
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .coord-mark-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 180px;
+    }
+
+    .coord-mark-field label {
+      font-size: 12px;
+      color: var(--color-text-primary);
+      font-weight: 900;
+    }
+
+    .coord-mark-field input {
+      border: 1px solid #d7e3dc;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: var(--color-background-primary);
+      font-size: 14px;
+      outline: none;
+      width: 170px;
+    }
+
+    .coord-mark-field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, .12);
+    }
+
+    .coord-mark-help {
+      font-size: 12px;
+      color: #667085;
+      line-height: 1.5;
+      flex: 1;
+      min-width: 220px;
+    }
+
     @media(max-width:800px) {
       .eval-grid {
         grid-template-columns: 1fr 1fr
@@ -297,9 +373,17 @@
   let loadSeq = 0;
 
   function toastMsg(msg, ok = true) {
-    const t = document.getElementById('toast');
-    if (t) { t.textContent = msg; t.className = 'toast show'; setTimeout(() => t.className = 'toast', 2200); }
-    else alert(msg);
+    const t = document.getElementById('evalToast') || document.getElementById('toast');
+    if (t) {
+      t.textContent = msg;
+      t.className = (t.id === 'evalToast') ? `eval-toast show ${ok ? 'ok' : 'error'}` : 'toast show';
+      clearTimeout(window.__evalToastTimer);
+      window.__evalToastTimer = setTimeout(() => {
+        t.className = (t.id === 'evalToast') ? 'eval-toast' : 'toast';
+      }, 3200);
+    } else {
+      alert(msg);
+    }
   }
   async function api(url, options = {}) {
     const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
@@ -332,7 +416,7 @@
     document.getElementById('tabGrad').classList.toggle('on', scope === 'graduation_project');
     document.getElementById('scopeBadge').textContent = scope === 'introduction' ? '◑ Project Introduction — COMP4200' : '◆ Graduation Projects — COMP4300';
     document.getElementById('formulaText').innerHTML = scope === 'introduction'
-      ? 'This page reads COMP4200 sections from created committees only. Readers and discussion doctors come from Committee page.'
+      ? 'COMP4200 = Report /40 + Supervisor /10 + Coordinator /10 + Discussion /40 = Final /100. Readers and discussion doctors come from Committee page.'
       : 'This page reads COMP4300 projects from created committees only. Readers and committee doctors come from Committee page.';
     loadProjects();
   }
@@ -460,6 +544,7 @@
       return `
       <div class="eval-stat"><b>${money(p.report_score)}</b><span>Report /40</span></div>
       <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Supervisor /10</span></div>
+      <div class="eval-stat"><b>${money(p.coordinator_score)}</b><span>Coordinator /10</span></div>
       <div class="eval-stat"><b>${money(p.discussion_score)}</b><span>Discussion /40</span></div>
       <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
     }
@@ -472,6 +557,28 @@
   function projectCard(p) {
     const grades = p.grades || [];
     const ready = isReadyToSend(p);
+    const coordGrade = grades.find(g => g.component === 'intro_coordinator') || {};
+    const coordValue = coordGrade.mark === null || coordGrade.mark === undefined ? '' : coordGrade.mark;
+    const coordinatorMarkBox = currentScope === 'introduction' ? `
+      <div class="coord-mark-box">
+        <div class="coord-mark-field">
+          <label for="coord-mark-${p.project_id}">Coordinator Mark /10</label>
+          <input
+            id="coord-mark-${p.project_id}"
+            type="number"
+            min="0"
+            max="10"
+            step="0.5"
+            value="${coordValue}"
+            ${Number(p.is_open) ? '' : 'disabled'}>
+        </div>
+        <div class="coord-mark-help">
+          Enter the coordinator mark here after opening grade entry. It is required before Close + Calculate.
+        </div>
+        <button class="mini-btn green" type="button" onclick="saveCoordinatorMark(${p.project_id})" ${Number(p.is_open) ? '' : 'disabled'}>
+          Save Coordinator Mark
+        </button>
+      </div>` : '';
     const rows = grades.length ? grades.map(g => `
     <tr>
       <td>${componentName(g.component)}</td><td>${g.evaluator_name || '—'}</td>
@@ -491,6 +598,7 @@
     </div>
     <table class="grade-table"><thead><tr><th>Component</th><th>Evaluator</th><th>Mark</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="eval-grid">${scoreCards(p)}</div>
+    ${coordinatorMarkBox}
     <textarea class="notes-input" id="notes-${p.project_id}" placeholder="Notes to supervisor..."></textarea>
     <div class="btn-row">
       <button class="mini-btn green" onclick="openWindow(${p.project_id})">Open Grade Entry + Notify Doctors</button>
@@ -499,6 +607,43 @@
     </div>
   </div>`;
   }
+  async function saveCoordinatorMark(projectId) {
+    const input = document.getElementById(`coord-mark-${projectId}`);
+    if (!input) {
+      toastMsg('Coordinator mark input was not found.', false);
+      return;
+    }
+
+    const rawValue = String(input.value || '').trim();
+    if (rawValue === '') {
+      toastMsg('Please enter the coordinator mark first.', false);
+      input.focus();
+      return;
+    }
+
+    const mark = Number(rawValue);
+    if (Number.isNaN(mark) || mark < 0 || mark > 10) {
+      toastMsg('Coordinator mark must be between 0 and 10.', false);
+      input.focus();
+      return;
+    }
+
+    try {
+      const d = await api('/api/coordinator/evaluation/coordinator-mark', {
+        method: 'POST',
+        body: JSON.stringify({
+          project_id: projectId,
+          course_scope: currentScope,
+          mark: mark
+        })
+      });
+      toastMsg(d.message || 'Coordinator mark saved successfully.');
+      await loadProjects();
+    } catch (e) {
+      toastMsg(e.message, false);
+    }
+  }
+
   async function openWindow(projectId) {
     try {
       const d = await api('/api/coordinator/evaluation/open', { method: 'POST', body: JSON.stringify({ project_id: projectId, course_scope: currentScope }) });
