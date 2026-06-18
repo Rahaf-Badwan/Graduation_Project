@@ -5642,6 +5642,5 @@ WHERE university_id IN ('DOC0006');
 
 
 
-select * from users;
- 
+select * from coordinator_assignments; 
 

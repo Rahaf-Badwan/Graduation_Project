@@ -227,7 +227,8 @@
     "optional": "optional",
     "send_reply": "Send Reply",
     "replies_disabled": "Replies are disabled for this message.",
-    "Write Announcement": "Write Announcement"
+    "Write Announcement": "Write Announcement",
+    "switch_supervisor":"Switch to Supervisor"
   },
 
   "shared": {

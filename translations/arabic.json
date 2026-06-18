@@ -226,7 +226,8 @@
     "optional": "اختياري",
     "send_reply": "إرسال الرد",
     "replies_disabled": ".الردود معطلة لهذه الرسالة",
-    "Write Announcement": "إنشاء إعلان"
+    "Write Announcement": "إنشاء إعلان",
+    "switch_supervisor": "التبديل لمشرف"
   },
 
   "shared": {

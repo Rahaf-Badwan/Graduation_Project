@@ -25,14 +25,28 @@
         </span>
       </div>
     </div>
-    {% if session.get('is_switched_to_supervisor') and session.get('original_role') == 'coordinator' %}
-    <form action="{{ url_for('coordinator_bp.switch_back_to_coordinator') }}" method="post">
-      <button class="btn btn-outline" type="submit">
+    {% if session.get('is_switched_to_supervisor') and 
+      (session.get('original_role') == 'coordinator' or 
+       session.get('original_role') == 'head_of_department') %}
+    <form action="{% if session.get('original_role') == 'coordinator' %}
+                {{ url_for('coordinator_bp.switch_back_to_coordinator') }}
+              {% else %}
+                {{ url_for('head.switch_back_to_head') }}
+              {% endif %}" method="post">
+
+    <button class="btn btn-outline" type="submit">
         <span class="material-symbols-outlined icon-inline">swap_horiz</span>
-        Switch to Coordinator
-      </button>
-    </form>
-    {% endif %}
+
+        {% if session.get('original_role') == 'coordinator' %}
+            Switch to Coordinator
+        {% else %}
+            Switch to Head
+        {% endif %}
+
+    </button>
+</form>
+
+{% endif %}
   </div>
 
   <div class="two-col">

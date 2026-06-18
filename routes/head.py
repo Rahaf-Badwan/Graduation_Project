@@ -1235,3 +1235,66 @@ def api_head_important_notice_save():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@head_bp.route("/head/switch-to-supervisor", methods=["POST", "GET"])
+@login_required(role="head_of_department")
+def switch_to_supervisor():
+    """
+    Allow a head who also exists in faculty table to view the system as supervisor.
+    
+    """
+    user_id = session.get("user_id")
+
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute(
+        """
+        SELECT f.faculty_id, u.full_name
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE f.user_id = %s
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+
+    faculty = cursor.fetchone()
+    cursor.close()
+    db.close()
+
+    if not faculty:
+        return redirect(url_for("head.dashboard"))
+
+    session["original_role"] = session.get("role")
+    session["original_user_id"] = session.get("user_id")
+    session["original_full_name"] = session.get("full_name")
+    session["is_switched_to_supervisor"] = True
+
+    session["role"] = "supervisor"
+    session["faculty_id"] = faculty["faculty_id"]
+
+    return redirect(url_for("supervisor_dashboard.supervisor_dashboard"))
+
+
+@head_bp.route("/supervisor/switch-to-head", methods=["POST", "GET"])
+@login_required(role="supervisor")
+def switch_back_to_head():
+    if session.get("original_role") != "head_of_department":
+        return redirect(url_for("supervisor_dashboard.supervisor_dashboard"))
+
+    original_user_id = session.get("original_user_id")
+    original_full_name = session.get("original_full_name")
+
+    session["role"] = "head_of_department"
+    if original_user_id:
+        session["user_id"] = original_user_id
+    if original_full_name:
+        session["full_name"] = original_full_name
+
+    session.pop("original_role", None)
+    session.pop("original_user_id", None)
+    session.pop("original_full_name", None)
+    session.pop("is_switched_to_supervisor", None)
+    session.pop("faculty_id", None)
+
+    return redirect(url_for("head.dashboard"))
