@@ -232,7 +232,7 @@
   <div class="eval-banner">
     <div style="font-size:13px;font-weight:700;color:var(--sup)">Your evaluation tasks</div>
     <div style="font-size:12px;color:var(--sup-dark);margin-top:3px">
-      When the coordinator opens grade entry, the project/section appears here. Enter a separate mark for every student.
+      When the coordinator opens grade entry, the project/section appears here. Report mark is shared; the other marks are entered separately for every student.
     </div>
   </div>
 
@@ -323,6 +323,7 @@
   }
 
   function isTaskDone(task) {
+    if (Number(task.shared_mark)) return Number(task.is_submitted);
     const rows = task.student_marks || [];
     return rows.length > 0 && rows.every(row => Number(row.is_submitted));
   }
@@ -343,6 +344,48 @@
       : item.is_open
         ? '<span class="waiting-sign">Open</span>'
         : '<span class="closed-sign">Closed</span>';
+
+    if (Number(task.shared_mark)) {
+      const sharedMark = task.mark === null || task.mark === undefined ? '' : Number(task.mark).toFixed(2);
+      return `
+        <div class="eval-task ${isTaskDone(task) ? 'done' : ''}" id="task-${task.task_id}">
+          <div class="task-head">
+            <div>
+              <div class="task-title">${safeEval(item.item_title || 'Evaluation item')}</div>
+              <div class="task-meta">
+                ${safeEval(item.course_code || '')} · ${safeEval(task.component_label || task.component || '')}<br>
+                This is a shared report mark for the whole group/project.
+              </div>
+            </div>
+            ${status}
+          </div>
+
+          <div class="field-wrap">
+            <div class="field-label">Shared report mark <span class="req">*</span></div>
+            <input
+              class="field-input"
+              id="shared-mark-${task.task_id}"
+              type="number"
+              min="0"
+              max="${safeEval(task.max_mark || 0)}"
+              step="0.01"
+              value="${safeEval(sharedMark)}"
+              placeholder="0 - ${safeEval(task.max_mark || 0)}"
+              ${disabled}>
+          </div>
+
+          <div class="field-wrap" style="margin-bottom:8px">
+            <div class="field-label">Comments</div>
+            <textarea class="field-textarea" id="shared-note-${task.task_id}" style="min-height:60px" placeholder="Your comments..." ${disabled}>${safeEval(task.notes || '')}</textarea>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" type="button" onclick="submitSharedMark(${task.task_id})" ${disabled}>
+              Save shared report mark ↗
+            </button>
+          </div>
+        </div>`;
+    }
 
     const bodyRows = rows.map(row => {
       const mark = row.mark === null || row.mark === undefined ? '' : Number(row.mark).toFixed(2);
@@ -460,6 +503,28 @@
       renderSupervisorEvaluationTasks();
     } catch (err) {
       document.getElementById('pendingEvalTasks').innerHTML = `<div class="empty-box">Evaluation error: ${safeEval(err.message)}</div>`;
+    }
+  }
+
+  async function submitSharedMark(taskId) {
+    const markInput = document.getElementById(`shared-mark-${taskId}`);
+    const noteInput = document.getElementById(`shared-note-${taskId}`);
+    const rawValue = String(markInput ? markInput.value : '').trim();
+    if (rawValue === '') {
+      toastEval('Please enter the shared report mark.', false);
+      if (markInput) markInput.focus();
+      return;
+    }
+
+    try {
+      const data = await supervisorEvalFetch(`/api/supervisor/evaluation/tasks/${taskId}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ mark: Number(rawValue), notes: noteInput ? noteInput.value.trim() : '' })
+      });
+      toastEval(data.message || 'Shared report mark saved successfully.');
+      await loadSupervisorEvaluationTasks();
+    } catch (err) {
+      toastEval('Submit error: ' + err.message, false);
     }
   }
 

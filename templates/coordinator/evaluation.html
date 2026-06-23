@@ -453,7 +453,7 @@
 
   <div class="workflow-box">
     <b>Committee-based evaluation:</b> Nothing appears here until a committee is created in the Committee page.
-    Doctors/readers are taken from the committee setup only. Each doctor enters a separate mark for every student, then the coordinator closes/calculates and sends the individual results to Supervisor → Head → Students.
+    Doctors/readers are taken from the committee setup only. Report readers enter one shared report mark for the group; supervisor, coordinator, and discussion/committee marks are entered per student.
   </div>
 
   <div class="eval-grid">
@@ -527,7 +527,7 @@
     document.getElementById('tabGrad').classList.toggle('on', scope === 'graduation_project');
     document.getElementById('scopeBadge').textContent = scope === 'introduction' ? '◑ Project Introduction — COMP4200' : '◆ Graduation Projects — COMP4300';
     document.getElementById('formulaText').innerHTML = scope === 'introduction'
-      ? 'COMP4200 = Report /40 + Supervisor /10 + Coordinator /10 + Discussion /40 = Final /100. Readers and discussion doctors come from Committee page.'
+      ? 'COMP4200 = Report /40 shared for the group + Supervisor /10 per student + Coordinator /10 per student + Discussion /40 per student = Final /100.'
       : 'This page reads COMP4300 projects from created committees only. Readers and committee doctors come from Committee page.';
     loadProjects();
   }
@@ -656,24 +656,85 @@
   function scoreCards(p) {
     if (currentScope === 'introduction') {
       return `
-      <div class="eval-stat"><b>${money(p.report_score)}</b><span>Report /40</span></div>
-      <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Supervisor /10</span></div>
-      <div class="eval-stat"><b>${money(p.coordinator_score)}</b><span>Coordinator /10</span></div>
-      <div class="eval-stat"><b>${money(p.discussion_score)}</b><span>Discussion /40</span></div>
-      <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
+      <div class="eval-stat"><b>${money(p.report_score)}</b><span>Avg Report /40</span></div>
+      <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Avg Supervisor /10</span></div>
+      <div class="eval-stat"><b>${money(p.coordinator_score)}</b><span>Avg Coordinator /10</span></div>
+      <div class="eval-stat"><b>${money(p.discussion_score)}</b><span>Avg Discussion /40</span></div>
+      <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Avg Final /100</span></div>`;
     }
     return `
-    <div class="eval-stat"><b>${money(p.report_score)}</b><span>Report Avg /30</span></div>
-    <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Supervisor /20</span></div>
-    <div class="eval-stat"><b>${money(p.committee_score)}</b><span>Committee /50</span></div>
-    <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
+    <div class="eval-stat"><b>${money(p.report_score)}</b><span>Avg Report /30</span></div>
+    <div class="eval-stat"><b>${money(p.supervisor_score)}</b><span>Avg Supervisor /20</span></div>
+    <div class="eval-stat"><b>${money(p.committee_score)}</b><span>Avg Committee /50</span></div>
+    <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Avg Final /100</span></div>`;
   }
+  function componentCell(value) {
+    return (value === null || value === undefined || value === '') ? '—' : Number(value).toFixed(2);
+  }
+
+  function coordinatorStudentMarkBox(p) {
+    if (currentScope !== 'introduction') return '';
+    const rows = p.student_scores || [];
+    const disabled = Number(p.is_open) ? '' : 'disabled';
+
+    if (!rows.length) {
+      return `
+        <div class="student-score-box">
+          <div class="student-score-head">
+            <span>Coordinator marks /10 per student</span>
+            <span class="student-muted">No students found for this item.</span>
+          </div>
+        </div>`;
+    }
+
+    const body = rows.map(s => {
+      const studentId = Number(s.student_id);
+      const value = s.coordinator_score === null || s.coordinator_score === undefined ? '' : Number(s.coordinator_score).toFixed(2);
+      return `
+        <tr>
+          <td>
+            <b>${escapeHtml(s.student_name || 'Student')}</b>
+            <div class="student-muted">${escapeHtml(s.university_id || s.email || '')}</div>
+          </td>
+          <td>
+            <input
+              class="student-score-input coord-student-input"
+              id="coord-student-${p.project_id}-${studentId}"
+              type="number"
+              min="0"
+              max="10"
+              step="0.01"
+              value="${escapeHtml(value)}"
+              placeholder="0 - 10"
+              ${disabled}>
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <div class="student-score-box">
+        <div class="student-score-head">
+          <span>Coordinator marks /10 per student</span>
+          <span class="student-muted">Coordinator mark is individual. Report mark only is shared by the group.</span>
+        </div>
+        <table class="student-score-table">
+          <thead><tr><th>Student</th><th>Coordinator /10</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+        <div class="btn-row" style="padding:12px">
+          <button class="mini-btn green" type="button" onclick="saveCoordinatorStudentMarks(${p.project_id})" ${disabled}>
+            Save Coordinator Marks
+          </button>
+        </div>
+      </div>`;
+  }
+
   function studentScoreTable(p, ready) {
     const rows = p.student_scores || [];
     const disabled = ready ? '' : 'disabled';
     const hint = ready
-      ? 'You can keep the calculated final mark or override each student manually before sending.'
-      : 'Student rows appear here, but individual overrides are enabled only after Close + Calculate.';
+      ? 'These are individual final scores. Report is shared, while the other components come from each student’s marks.'
+      : 'Component rows appear while entry is open. Final override is enabled only after Close + Calculate.';
 
     if (!rows.length) {
       return `
@@ -685,19 +746,31 @@
         </div>`;
     }
 
+    const isIntro = currentScope === 'introduction';
     const body = rows.map(s => {
       const studentId = Number(s.student_id);
       const finalValue = s.final_score === null || s.final_score === undefined ? '' : Number(s.final_score).toFixed(2);
       const calculated = s.calculated_final_score === null || s.calculated_final_score === undefined ? '—' : Number(s.calculated_final_score).toFixed(2);
       const overridePill = Number(s.manual_override)
         ? '<span class="pill p-override">Manual override</span>'
-        : '<span class="pill p-pending">Shared score</span>';
+        : '<span class="pill p-done">Individual score</span>';
+      const midCells = isIntro
+        ? `
+          <td>${componentCell(s.report_score)}</td>
+          <td>${componentCell(s.supervisor_score)}</td>
+          <td>${componentCell(s.coordinator_score)}</td>
+          <td>${componentCell(s.discussion_score)}</td>`
+        : `
+          <td>${componentCell(s.report_score)}</td>
+          <td>${componentCell(s.supervisor_score)}</td>
+          <td>${componentCell(s.committee_score)}</td>`;
       return `
         <tr>
           <td>
             <b>${escapeHtml(s.student_name || 'Student')}</b>
             <div class="student-muted">${escapeHtml(s.university_id || s.email || '')}</div>
           </td>
+          ${midCells}
           <td>${calculated}</td>
           <td>
             <input
@@ -727,6 +800,10 @@
         </tr>`;
     }).join('');
 
+    const componentHeaders = isIntro
+      ? '<th>Report /40<br><span class="student-muted">shared</span></th><th>Supervisor /10</th><th>Coordinator /10</th><th>Discussion /40</th>'
+      : '<th>Report /30<br><span class="student-muted">shared</span></th><th>Supervisor /20</th><th>Committee /50</th>';
+
     return `
       <div class="student-score-box">
         <div class="student-score-head">
@@ -737,6 +814,7 @@
           <thead>
             <tr>
               <th>Student</th>
+              ${componentHeaders}
               <th>Calculated /100</th>
               <th>Final /100</th>
               <th>Note</th>
@@ -751,9 +829,16 @@
 
 
   function taskStudentMarksCell(g) {
+    if (Number(g.shared_mark)) {
+      if (Number(g.is_submitted) && g.mark !== null && g.mark !== undefined) {
+        return `<span class="pill p-done">Shared report mark: ${money(g.mark)} / ${money(g.max_mark)}</span>`;
+      }
+      return '<span class="student-muted">Shared report mark, one mark for the whole group.</span>';
+    }
+
     const marks = g.student_marks || [];
     if (!marks.length) {
-      return '<span class="student-muted">Open grade entry to create student rows.</span>';
+      return '<span class="student-muted">Waiting for per-student marks.</span>';
     }
     return `<div class="task-student-list">${marks.map(m => {
       const status = Number(m.is_submitted)
@@ -766,37 +851,28 @@
     }).join('')}</div>`;
   }
 
+  function gradeStatusPill(g) {
+    if (Number(g.shared_mark)) {
+      return g.is_submitted
+        ? '<span class="pill p-done">Shared report submitted</span>'
+        : '<span class="pill p-pending">Waiting report</span>';
+    }
+    return g.is_submitted
+      ? '<span class="pill p-done">All students submitted</span>'
+      : '<span class="pill p-pending">Waiting students</span>';
+  }
+
+
   function projectCard(p) {
     const grades = p.grades || [];
     const ready = isReadyToSend(p);
-    const coordGrade = grades.find(g => g.component === 'intro_coordinator') || {};
-    const coordValue = coordGrade.mark === null || coordGrade.mark === undefined ? '' : coordGrade.mark;
-    const coordinatorMarkBox = currentScope === 'introduction' ? `
-      <div class="coord-mark-box">
-        <div class="coord-mark-field">
-          <label for="coord-mark-${p.project_id}">Coordinator Mark /10</label>
-          <input
-            id="coord-mark-${p.project_id}"
-            type="number"
-            min="0"
-            max="10"
-            step="0.5"
-            value="${coordValue}"
-            ${Number(p.is_open) ? '' : 'disabled'}>
-        </div>
-        <div class="coord-mark-help">
-          Enter the coordinator mark here after opening grade entry. It is required before Close + Calculate.
-        </div>
-        <button class="mini-btn green" type="button" onclick="saveCoordinatorMark(${p.project_id})" ${Number(p.is_open) ? '' : 'disabled'}>
-          Save Coordinator Mark
-        </button>
-      </div>` : '';
+    const coordinatorMarkBox = currentScope === 'introduction' ? coordinatorStudentMarkBox(p) : '';
     const rows = grades.length ? grades.map(g => `
     <tr>
       <td>${escapeHtml(componentName(g.component))}</td>
       <td>${escapeHtml(g.evaluator_name || '—')}</td>
       <td>${money(g.mark)} / ${money(g.max_mark)}</td>
-      <td>${g.is_submitted ? '<span class="pill p-done">All students submitted</span>' : '<span class="pill p-pending">Waiting students</span>'}</td>
+      <td>${gradeStatusPill(g)}</td>
       <td>${taskStudentMarksCell(g)}</td>
     </tr>`).join('') : `<tr><td colspan="5">No grade tasks yet. Open grade entry to notify the assigned doctors.</td></tr>`;
     return `<div class="eval-card" id="project-${p.project_id}">
@@ -856,6 +932,48 @@
         })
       });
       toastMsg(d.message || 'Student score saved successfully.');
+      await loadProjects();
+    } catch (e) {
+      toastMsg(e.message, false);
+    }
+  }
+
+  async function saveCoordinatorStudentMarks(projectId) {
+    const project = allProjects.find(p => Number(p.project_id) === Number(projectId));
+    const rows = project ? (project.student_scores || []) : [];
+    if (!rows.length) {
+      toastMsg('No students found for this item.', false);
+      return;
+    }
+
+    const marks = [];
+    for (const student of rows) {
+      const input = document.getElementById(`coord-student-${projectId}-${student.student_id}`);
+      const rawValue = String(input ? input.value : '').trim();
+      if (rawValue === '') {
+        toastMsg('Please enter a coordinator mark for every student.', false);
+        if (input) input.focus();
+        return;
+      }
+      const mark = Number(rawValue);
+      if (Number.isNaN(mark) || mark < 0 || mark > 10) {
+        toastMsg('Coordinator marks must be between 0 and 10.', false);
+        if (input) input.focus();
+        return;
+      }
+      marks.push({ student_id: student.student_id, mark });
+    }
+
+    try {
+      const d = await api('/api/coordinator/evaluation/coordinator-student-marks', {
+        method: 'POST',
+        body: JSON.stringify({
+          project_id: projectId,
+          course_scope: currentScope,
+          marks
+        })
+      });
+      toastMsg(d.message || 'Coordinator marks saved successfully.');
       await loadProjects();
     } catch (e) {
       toastMsg(e.message, false);
