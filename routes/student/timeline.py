@@ -61,7 +61,7 @@ def _comp4300_timeline_payload(cursor, semester):
                 else ""
             ),
             "milestone_label": "Graduation Project",
-            "submitted_to": "coordinator",
+            "submitted_to": "both",
             "is_deadline": True,
             "submit_url": "/student/submit",
         }
@@ -92,6 +92,10 @@ def api_student_intro_timeline():
                     "message": "The coordinator has not published the timeline yet.",
                 }
             )
+        # Apply the owner-scope migration before reading coordinator and
+        # supervisor timelines from older databases.
+        from routes.appCoordinator import _ensure_intro_timeline_tables
+        _ensure_intro_timeline_tables(cursor)
         cursor.execute(
             "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
             (session["user_id"],),
@@ -110,6 +114,63 @@ def api_student_intro_timeline():
         if target_course == "COMP4300":
             db.commit()
             payload = _comp4300_timeline_payload(cursor, target_semester)
+            cursor.execute(
+                """
+                SELECT sup_f.user_id AS supervisor_user_id
+                FROM project_members pm
+                JOIN projects p ON p.project_id = pm.project_id
+                LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
+                WHERE pm.student_id = %s AND p.semester_id = %s
+                LIMIT 1
+                """,
+                (student_row["student_id"], (target_semester or {}).get("semester_id")),
+            )
+            grad_project = cursor.fetchone() or {}
+            supervisor_user_id = grad_project.get("supervisor_user_id")
+            if supervisor_user_id and target_semester:
+                cursor.execute(
+                    """
+                    SELECT timeline_id, title, note, published_at
+                    FROM comp4200_timelines
+                    WHERE semester_id=%s AND owner_role='supervisor'
+                      AND created_by=%s AND is_published=TRUE
+                    ORDER BY timeline_id DESC LIMIT 1
+                    """,
+                    (target_semester["semester_id"], supervisor_user_id),
+                )
+                supervisor_timeline = cursor.fetchone()
+                if supervisor_timeline:
+                    cursor.execute(
+                        """
+                        SELECT item_id,item_order,title,description,start_date,start_time,
+                               due_date,due_time,milestone_label,submitted_to,is_deadline
+                        FROM comp4200_timeline_items
+                        WHERE timeline_id=%s AND COALESCE(is_archived,FALSE)=FALSE
+                          AND is_deadline=TRUE
+                          AND (due_date IS NULL OR DATE_ADD(
+                                TIMESTAMP(due_date,COALESCE(NULLIF(TRIM(due_time),''),'23:59:59')),
+                                INTERVAL 2 DAY) >= NOW())
+                        ORDER BY item_order,due_date,item_id
+                        """,
+                        (supervisor_timeline["timeline_id"],),
+                    )
+                    supervisor_items = cursor.fetchall()
+                    for item in supervisor_items:
+                        item["is_deadline"] = bool(item.get("is_deadline"))
+                        item["timeline_owner"] = "supervisor"
+                        start_date = str(item.get("start_date") or "")
+                        start_time = (item.get("start_time") or "").strip()
+                        item["start_date"] = f"{start_date}T{start_time}" if start_date and start_time else start_date
+                        due_date = str(item.get("due_date") or "")
+                        due_time = (item.get("due_time") or "").strip()
+                        item["due_date"] = f"{due_date}T{due_time}" if due_date and due_time else due_date
+                    payload["items"].extend(supervisor_items)
+                    payload["items"].sort(key=lambda row: (str(row.get("due_date") or "9999-12-31"), int(row.get("item_order") or 0)))
+                    payload["timeline"]["is_published"] = True
+                    payload["timeline"]["published_at"] = supervisor_timeline.get("published_at") or payload["timeline"].get("published_at")
+                    payload["timeline"]["title"] = supervisor_timeline.get("title") or payload["timeline"]["title"]
+                    payload["timeline"]["note"] = supervisor_timeline.get("note") or payload["timeline"]["note"]
+                    payload["message"] = ""
             cursor.close()
             db.close()
             return jsonify(_json_safe(payload))
@@ -122,16 +183,18 @@ def api_student_intro_timeline():
             )
         cursor.execute(
             """
-            SELECT 1
+            SELECT sup_f.user_id AS supervisor_user_id
             FROM project_members pm
             JOIN projects p ON p.project_id = pm.project_id
+            LEFT JOIN faculty sup_f ON sup_f.faculty_id = p.supervisor_id
             WHERE pm.student_id = %s
               AND p.semester_id = %s
             LIMIT 1
             """,
             (student_row["student_id"], semester["semester_id"]),
         )
-        if not cursor.fetchone():
+        project_row = cursor.fetchone()
+        if not project_row:
             cursor.close()
             db.close()
             return jsonify(
@@ -142,22 +205,47 @@ def api_student_intro_timeline():
                     "registration_required": True,
                 }
             )
-        timeline = _student_published_intro_timeline(cursor)
-        if not timeline:
+        # Merge the department-wide coordinator timeline with the private
+        # timeline published by this student's assigned supervisor.
+        cursor.execute(
+            """
+            SELECT timeline_id, semester_id, title, note, is_published,
+                   published_at, updated_at, owner_role
+            FROM comp4200_timelines
+            WHERE semester_id = %s
+              AND is_published = TRUE
+              AND (
+                    owner_role = 'coordinator'
+                 OR (owner_role = 'supervisor' AND created_by = %s)
+              )
+            ORDER BY CASE WHEN owner_role = 'coordinator' THEN 0 ELSE 1 END,
+                     timeline_id ASC
+            """,
+            (semester["semester_id"], project_row.get("supervisor_user_id")),
+        )
+        timelines = cursor.fetchall()
+        if not timelines:
             cursor.close()
             db.close()
             return jsonify(
                 {
                     "timeline": None,
                     "items": [],
-                    "message": "The coordinator has not published the timeline yet.",
+                    "message": "Neither the coordinator nor your supervisor has published a timeline yet.",
                 }
             )
+        timeline = timelines[0]
+        timeline_ids = [row["timeline_id"] for row in timelines]
+        placeholders = ",".join(["%s"] * len(timeline_ids))
         cursor.execute(
-            """
-            SELECT item_id, item_order, title, description, start_date, start_time, due_date, due_time, milestone_label, submitted_to, is_deadline
-            FROM comp4200_timeline_items
-            WHERE timeline_id = %s
+            f"""
+            SELECT ti.item_id, ti.item_order, ti.title, ti.description,
+                   ti.start_date, ti.start_time, ti.due_date, ti.due_time,
+                   ti.milestone_label, ti.submitted_to, ti.is_deadline,
+                   tl.owner_role AS timeline_owner
+            FROM comp4200_timeline_items ti
+            JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
+            WHERE ti.timeline_id IN ({placeholders})
               AND COALESCE(is_archived, FALSE) = FALSE
               AND is_deadline = TRUE
               AND (
@@ -170,9 +258,9 @@ def api_student_intro_timeline():
                         INTERVAL 2 DAY
                     ) >= NOW()
               )
-            ORDER BY item_order ASC, due_date ASC, item_id ASC
+            ORDER BY due_date ASC, tl.owner_role ASC, item_order ASC, item_id ASC
             """,
-            (timeline["timeline_id"],),
+            tuple(timeline_ids),
         )
         items = cursor.fetchall()
         for item in items:

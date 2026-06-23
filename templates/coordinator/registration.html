@@ -313,7 +313,7 @@
           <div id="windowStatusMeta" style="font-size:12px;color:var(--color-text-secondary);margin-top:4px"></div>
         </div>
 
-        <button id="toggleWindowBtn" class="btn btn-primary" type="button" onclick="toggleDistributionWindow()">
+        <button id="toggleWindowBtn" class="btn btn-primary" type="button" onclick="toggleRegistrationWindowControl()">
           Loading...
         </button>
       </div>
@@ -761,6 +761,13 @@
 
     if (!statusText || !statusMeta || !toggleBtn) return;
 
+    if (closeInput) {
+      const minDate = new Date(Date.now() + 60000);
+      closeInput.min = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+    }
+
     try {
       const data = await apiJson('/api/coordinator/distribution-window');
 
@@ -799,7 +806,7 @@
     }
   }
 
-  async function toggleDistributionWindow() {
+  async function toggleRegistrationWindowControl() {
     const toggleBtn = document.getElementById('toggleWindowBtn');
     const closeInput = document.getElementById('registrationCloseAt');
 
@@ -818,7 +825,13 @@
         return;
       }
 
-      payload.close_at = closeAt;
+      const closeDate = new Date(closeAt);
+      if (Number.isNaN(closeDate.getTime()) || closeDate.getTime() <= Date.now()) {
+        setWindowMessage('Close date must be in the future.', 'error');
+        return;
+      }
+
+      payload.close_at = closeDate.toISOString();
     }
 
     setWindowMessage(isCurrentlyOpen ? 'Closing COMP4200 registration...' : 'Opening COMP4200 registration...', 'loading');

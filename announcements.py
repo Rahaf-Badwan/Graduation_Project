@@ -45,7 +45,7 @@ def api_create_announcement():
             'message': 'Announcement created successfully.',
             'expires_at': expires_at,
             'days': days
-        }), 201
+        }), 200
     
     except Exception as e:
         current_app.logger.error('Error in api_create_announcement: %s', e)

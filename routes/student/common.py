@@ -385,6 +385,65 @@ def _notify_project_team(
             )
 
 
+def _notify_comp4300_submission_staff(
+    cursor,
+    project_id,
+    sender_id,
+    title,
+    message,
+):
+    """Notify the assigned supervisor and all active course coordinators."""
+    cursor.execute(
+        """
+        SELECT DISTINCT recipient_id
+        FROM (
+            SELECT u_sup.user_id AS recipient_id
+            FROM projects p
+            JOIN faculty f ON f.faculty_id = p.supervisor_id
+            JOIN users u_sup ON u_sup.user_id = f.user_id
+            WHERE p.project_id = %s AND u_sup.is_active = TRUE
+
+            UNION
+
+            SELECT u_coord.user_id AS recipient_id
+            FROM users u_coord
+            WHERE u_coord.role = 'coordinator' AND u_coord.is_active = TRUE
+        ) recipients
+        WHERE recipient_id IS NOT NULL AND recipient_id <> %s
+        """,
+        (project_id, sender_id),
+    )
+    recipient_ids = sorted(
+        {int(row["recipient_id"]) for row in cursor.fetchall() if row.get("recipient_id")}
+    )
+    include_course_scope = _db_column_exists_student(
+        cursor, "notifications", "course_scope"
+    )
+    for recipient_id in recipient_ids:
+        if include_course_scope:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     course_scope, related_project_id, is_read)
+                VALUES (%s, %s, 'file_uploaded', %s, %s,
+                        'graduation_project', %s, FALSE)
+                """,
+                (recipient_id, sender_id, title, message, project_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     related_project_id, is_read)
+                VALUES (%s, %s, 'file_uploaded', %s, %s, %s, FALSE)
+                """,
+                (recipient_id, sender_id, title, message, project_id),
+            )
+    return len(recipient_ids)
+
+
 def _student_intro_section(cursor, student_id):
     """Return the current COMP4200 section for a student, if assigned."""
     if (
@@ -1492,6 +1551,7 @@ __all__ = [
     "_student_visible_project_ids",
     "_cleanup_comp4200_state_for_promoted_student",
     "_notify_project_team",
+    "_notify_comp4300_submission_staff",
     "_student_intro_section",
     "_notify_intro_section_team",
     "_student_intro_timeline_tables_ready",

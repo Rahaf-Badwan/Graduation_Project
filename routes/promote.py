@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request, session
 from auth import login_required
 from ai_pdf_indexer import index_archived_project_reports
 from db import get_db
+from routes.project_cleanup import clear_supervisor_project_workspace
 
 
 promote_bp = Blueprint("promote", __name__)
@@ -267,20 +268,9 @@ def _find_matching_comp4300_project(cursor, semester_id, member_ids):
 
 
 def _copy_optional_project_rows(cursor, source_project_id, promoted_project_id):
-    # COMP4300 must start with a clean submission workspace. Keep notes only;
-    # do not carry COMP4200 files/progress/lifecycle into the graduation project.
-
-    if _table_exists(cursor, "supervisor_notes"):
-        cursor.execute(
-            """
-            INSERT INTO supervisor_notes
-                (project_id, supervisor_id, note_text, urgency)
-            SELECT %s, supervisor_id, note_text, urgency
-            FROM supervisor_notes
-            WHERE project_id = %s
-            """,
-            (promoted_project_id, source_project_id),
-        )
+    # COMP4300 is intentionally a fresh workspace. Only the project identity,
+    # team and supervisor are copied by the caller.
+    return None
 
 
 def _safe_alter_nullable(cursor, table_name, column_name, column_definition):
@@ -515,20 +505,20 @@ def _copy_intro_committee_to_promoted_project(cursor, source_project_id, promote
 
 
 def _clear_comp4200_student_state(cursor, source_project_id):
-    """Remove coordinator-facing COMP4200 timeline submissions for promoted groups only."""
-    if _table_exists(cursor, "milestone_submissions"):
-        cursor.execute(
-            """
-            DELETE ms
-            FROM milestone_submissions ms
-            LEFT JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
-            LEFT JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
-            LEFT JOIN semesters sem ON sem.semester_id = tl.semester_id
-            WHERE ms.project_id = %s
-              AND (sem.course_code = 'COMP4200' OR sem.course_code IS NULL)
-            """,
-            (source_project_id,),
-        )
+    """Retire the COMP4200 workspace after its clean COMP4300 copy exists."""
+    clear_supervisor_project_workspace(
+        cursor,
+        source_project_id,
+        promoted_from_comp4200=True,
+    )
+    cursor.execute(
+        """
+        UPDATE projects
+        SET supervisor_id = NULL
+        WHERE project_id = %s
+        """,
+        (source_project_id,),
+    )
 
 
 def _copy_project_to_comp4300(cursor, source_project_id, comp4300_semester_id, promoted_by):
@@ -646,9 +636,10 @@ def _copy_project_to_comp4300(cursor, source_project_id, comp4300_semester_id, p
         (source_project_id, promoted_project_id, comp4300_semester_id, promoted_by),
     )
 
-    committee_copy_result = _copy_intro_committee_to_promoted_project(
-        cursor, source_project_id, promoted_project_id, promoted_by
-    )
+    committee_copy_result = {
+        "copied": False,
+        "reason": "COMP4300 starts with a fresh committee and supervisor workspace.",
+    }
 
     if _table_exists(cursor, "student_course_results"):
         cursor.execute(
@@ -991,6 +982,8 @@ def api_archive_all():
                     """,
                     (visibility, project_id),
                 )
+
+                clear_supervisor_project_workspace(cursor, project_id)
 
             for project_id in project_ids:
                 for student in _project_student_user_ids(cursor, project_id):

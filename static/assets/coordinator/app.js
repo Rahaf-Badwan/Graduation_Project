@@ -160,6 +160,14 @@ function updateSelectedStudentsCount() {
   updateSectionSupervisorAvailability(selectedCount);
 }
 
+function setDistributionCloseAtMinimum(input) {
+  if (!input) return;
+  const minDate = new Date(Date.now() + 60000);
+  input.min = new Date(minDate.getTime() - minDate.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+
 function getSelectedStudentIds() {
   return Array.from(document.querySelectorAll('.unassigned-student-checkbox:checked'))
     .map(el => parseInt(el.value, 10))
@@ -182,6 +190,7 @@ async function loadDistributionWindow() {
   const msg = document.getElementById('windowMsg');
   const closeInput = document.getElementById('registrationCloseAt');
   if (!statusText || !statusMeta || !btn) return;
+  setDistributionCloseAtMinimum(closeInput);
 
   try {
     const res = await fetch('/api/coordinator/distribution-window', { credentials: 'same-origin' });
@@ -229,6 +238,19 @@ async function toggleDistributionWindow() {
     return;
   }
 
+  let closeAtIso = '';
+  if (opening) {
+    const closeDate = new Date(closeAt);
+    if (Number.isNaN(closeDate.getTime()) || closeDate.getTime() <= Date.now()) {
+      if (msg) {
+        msg.style.color = '#c62828';
+        msg.textContent = 'Close date must be in the future.';
+      }
+      return;
+    }
+    closeAtIso = closeDate.toISOString();
+  }
+
   try {
     btn.disabled = true;
     if (msg) {
@@ -239,7 +261,7 @@ async function toggleDistributionWindow() {
     const res = await fetch('/api/coordinator/distribution-window', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_open: opening, close_at: closeAt })
+      body: JSON.stringify({ is_open: opening, close_at: closeAtIso })
     });
 
     const data = await readApiJson(res);

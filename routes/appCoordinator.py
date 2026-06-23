@@ -24,6 +24,7 @@ from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
 from ai_engine import search_uploaded_semantic
+from routes.project_cleanup import clear_supervisor_project_workspace
 
 coordinator_bp = Blueprint("coordinator_bp", __name__)
 
@@ -58,6 +59,23 @@ def _json_safe_value(value):
 
 def _json_safe_rows(rows):
     return [_json_safe_value(row) for row in rows]
+
+
+def _parse_client_datetime(value):
+    """Parse datetime-local and ISO-8601 values into server-local naive time."""
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("Missing date/time")
+
+    normalized = raw[:-1] + "+00:00" if raw.endswith(("Z", "z")) else raw
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError("Invalid date/time format") from exc
+
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
 
 
 def _get_active_semester(cursor):
@@ -928,6 +946,7 @@ def _ensure_lecture_tables(cursor):
             title VARCHAR(200) NOT NULL,
             description TEXT,
             lecture_date DATE NULL,
+            lecture_time TIME NULL,
             week_label VARCHAR(80),
             status ENUM('scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
             created_by INT NULL,
@@ -938,6 +957,33 @@ def _ensure_lecture_tables(cursor):
                 FOREIGN KEY (semester_id) REFERENCES semesters(semester_id)
                 ON DELETE SET NULL
         )
+    """)
+    if not _db_column_exists(cursor, "coordinator_lectures", "lecture_time"):
+        cursor.execute(
+            "ALTER TABLE coordinator_lectures ADD COLUMN lecture_time TIME NULL AFTER lecture_date"
+        )
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coordinator_lecture_recipients (
+            lecture_id INT NOT NULL,
+            student_id INT NOT NULL,
+            notified_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (lecture_id, student_id),
+            FOREIGN KEY (lecture_id) REFERENCES coordinator_lectures(lecture_id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coordinator_lecture_attendance (
+            lecture_id INT NOT NULL,
+            student_id INT NOT NULL,
+            attendance_status ENUM('present','absent') NOT NULL,
+            marked_by INT NULL,
+            marked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (lecture_id, student_id),
+            FOREIGN KEY (lecture_id) REFERENCES coordinator_lectures(lecture_id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+            FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS coordinator_deliverables (
@@ -1041,11 +1087,56 @@ def _date_to_iso(row):
     if not row:
         return row
     for key, value in list(row.items()):
-        if hasattr(value, "isoformat"):
+        if key == "lecture_time" and value is not None:
+            row[key] = str(value)[:5]
+        elif hasattr(value, "isoformat"):
             row[key] = value.isoformat()
         elif isinstance(value, float):
             row[key] = round(value, 2)
     return row
+
+
+def _required_coordinator_lecture_schedule(data):
+    lecture_date = (data.get("lecture_date") or "").strip()
+    lecture_time = (data.get("lecture_time") or "").strip()
+    if not lecture_date:
+        raise ValueError("Lecture date is required before sending the lecture.")
+    if not lecture_time:
+        raise ValueError("Lecture time is required before sending the lecture.")
+    try:
+        datetime.strptime(lecture_date, "%Y-%m-%d")
+        datetime.strptime(lecture_time, "%H:%M")
+    except ValueError as exc:
+        raise ValueError("Lecture date or time is invalid.") from exc
+    return lecture_date, lecture_time
+
+
+def _snapshot_coordinator_lecture_recipients(cursor, lecture_id, user_ids):
+    cursor.execute(
+        "DELETE FROM coordinator_lecture_recipients WHERE lecture_id = %s",
+        (lecture_id,),
+    )
+    if user_ids:
+        placeholders = ",".join(["%s"] * len(user_ids))
+        cursor.execute(
+            f"""
+            INSERT IGNORE INTO coordinator_lecture_recipients (lecture_id, student_id)
+            SELECT %s, st.student_id
+            FROM students st
+            WHERE st.user_id IN ({placeholders})
+            """,
+            (lecture_id, *user_ids),
+        )
+    cursor.execute(
+        """
+        DELETE cla
+        FROM coordinator_lecture_attendance cla
+        LEFT JOIN coordinator_lecture_recipients clr
+          ON clr.lecture_id = cla.lecture_id AND clr.student_id = cla.student_id
+        WHERE cla.lecture_id = %s AND clr.student_id IS NULL
+        """,
+        (lecture_id,),
+    )
 
 
 @coordinator_bp.route("/api/coordinator/lectures-data", methods=["GET"])
@@ -1075,7 +1166,7 @@ def api_coordinator_lectures_data():
             cursor.execute(
                 f"""
                 SELECT lecture_id, semester_id, course_scope, title, description,
-                       lecture_date, week_label, status, created_at, updated_at
+                       lecture_date, lecture_time, week_label, status, created_at, updated_at
                 FROM coordinator_lectures
                 WHERE semester_id IN ({placeholders})
                 ORDER BY course_scope, COALESCE(lecture_date, '9999-12-31'), lecture_id
@@ -1085,7 +1176,7 @@ def api_coordinator_lectures_data():
         else:
             cursor.execute("""
                 SELECT lecture_id, semester_id, course_scope, title, description,
-                       lecture_date, week_label, status, created_at, updated_at
+                       lecture_date, lecture_time, week_label, status, created_at, updated_at
                 FROM coordinator_lectures
                 ORDER BY course_scope, COALESCE(lecture_date, '9999-12-31'), lecture_id
             """)
@@ -1145,7 +1236,10 @@ def api_coordinator_create_lecture():
             if data.get("status") in ("scheduled", "completed", "cancelled")
             else "scheduled"
         )
-        lecture_date = data.get("lecture_date") or None
+        try:
+            lecture_date, lecture_time = _required_coordinator_lecture_schedule(data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -1156,8 +1250,8 @@ def api_coordinator_create_lecture():
         cursor.execute(
             """
             INSERT INTO coordinator_lectures
-                (semester_id, course_scope, title, description, lecture_date, week_label, status, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (semester_id, course_scope, title, description, lecture_date, lecture_time, week_label, status, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
             (
                 semester_id,
@@ -1165,6 +1259,7 @@ def api_coordinator_create_lecture():
                 title,
                 data.get("description") or None,
                 lecture_date,
+                lecture_time,
                 data.get("week_label") or None,
                 status,
                 session.get("user_id"),
@@ -1176,13 +1271,18 @@ def api_coordinator_create_lecture():
         sent_count = 0
         if semester_id:
             recipients = sorted(set(_deliverable_student_user_ids(cursor, semester_id, course_scope)))
+            _snapshot_coordinator_lecture_recipients(cursor, lecture_id, recipients)
             scope_label = "Project Introduction" if course_scope == "introduction" else "Graduation Project"
-            date_text = f" Date: {lecture_date}." if lecture_date else ""
             details = (data.get("description") or "").strip()
-            link_text = "Open from your student timeline: /student/timeline"
-            message = f"A new lecture has been posted for {scope_label}: {title}.{date_text} {link_text}"
-            if details:
-                message += f" Details: {details}"
+            message = "\n".join((
+                f"Lecture: {title}",
+                f"Course: {scope_label}",
+                f"Date: {lecture_date}",
+                f"Time: {lecture_time}",
+                f"Week: {(data.get('week_label') or '').strip() or 'Not specified'}",
+                f"Status: {status.replace('_', ' ').title()}",
+                f"Details: {details or 'No additional details.'}",
+            ))
 
             for recipient_id in recipients:
                 _insert_notification(
@@ -1218,13 +1318,16 @@ def api_coordinator_create_lecture():
 def api_coordinator_update_lecture_date(lecture_id):
     try:
         data = request.get_json(silent=True) or {}
-        lecture_date = data.get("lecture_date") or None
+        try:
+            lecture_date, lecture_time = _required_coordinator_lecture_schedule(data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         db = get_db()
         cursor = db.cursor(dictionary=True)
         _ensure_lecture_tables(cursor)
         cursor.execute(
             """
-            SELECT lecture_id, semester_id, course_scope, title, lecture_date
+            SELECT lecture_id, semester_id, course_scope, title, lecture_date, lecture_time
             FROM coordinator_lectures
             WHERE lecture_id = %s
             """,
@@ -1237,21 +1340,26 @@ def api_coordinator_update_lecture_date(lecture_id):
             return jsonify({"error": "Lecture not found."}), 404
 
         old_lecture_date = lecture.get("lecture_date")
+        old_lecture_time = lecture.get("lecture_time")
         cursor.execute(
             """
             UPDATE coordinator_lectures
             SET lecture_date = %s,
-                status = CASE WHEN %s IS NULL THEN status ELSE 'scheduled' END
+                lecture_time = %s,
+                status = 'scheduled'
             WHERE lecture_id = %s
             """,
-            (lecture_date, lecture_date, lecture_id),
+            (lecture_date, lecture_time, lecture_id),
         )
 
         sent_count = 0
         if (
             lecture.get("semester_id")
             and lecture_date
-            and str(old_lecture_date or "") != str(lecture_date)
+            and (
+                str(old_lecture_date or "") != str(lecture_date)
+                or str(old_lecture_time or "")[:5] != str(lecture_time)
+            )
         ):
             recipients = sorted(
                 set(
@@ -1262,17 +1370,26 @@ def api_coordinator_update_lecture_date(lecture_id):
                     )
                 )
             )
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM coordinator_lecture_recipients WHERE lecture_id = %s",
+                (lecture_id,),
+            )
+            if int((cursor.fetchone() or {}).get("total") or 0) == 0:
+                _snapshot_coordinator_lecture_recipients(cursor, lecture_id, recipients)
             course_scope = lecture.get("course_scope") or "introduction"
             scope_label = (
                 "Project Introduction"
                 if course_scope == "introduction"
                 else "Graduation Project"
             )
-            message = (
-                f'The lecture date for "{lecture.get("title")}" in {scope_label} '
-                f"has been confirmed for {lecture_date}. "
-                "Open from your student timeline: /student/timeline"
-            )
+            message = "\n".join((
+                f"Lecture: {lecture.get('title')}",
+                f"Course: {scope_label}",
+                f"Date: {lecture_date}",
+                f"Time: {lecture_time}",
+                "Status: Scheduled",
+                "Details: The lecture date and time were confirmed by the course coordinator.",
+            ))
             for recipient_id in recipients:
                 _insert_notification(
                     cursor,
@@ -1291,7 +1408,7 @@ def api_coordinator_update_lecture_date(lecture_id):
         db.close()
         return jsonify(
             {
-                "message": f"Lecture date updated. {sent_count} student notification(s) sent.",
+                "message": f"Lecture date and time updated. {sent_count} student notification(s) sent.",
                 "notifications_sent": sent_count,
             }
         )
@@ -1314,7 +1431,10 @@ def api_coordinator_update_lecture(lecture_id):
             else "scheduled"
         )
         description = (data.get("description") or "").strip() or None
-        lecture_date = data.get("lecture_date") or None
+        try:
+            lecture_date, lecture_time = _required_coordinator_lecture_schedule(data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         week_label = (data.get("week_label") or "").strip() or None
 
         db = get_db()
@@ -1323,7 +1443,7 @@ def api_coordinator_update_lecture(lecture_id):
         cursor.execute(
             """
             SELECT lecture_id, semester_id, course_scope, title, description,
-                   lecture_date, week_label, status
+                   lecture_date, lecture_time, week_label, status
             FROM coordinator_lectures
             WHERE lecture_id = %s
             """,
@@ -1340,6 +1460,7 @@ def api_coordinator_update_lecture(lecture_id):
                 str(lecture.get("title") or "") != title,
                 str(lecture.get("description") or "") != str(description or ""),
                 str(lecture.get("lecture_date") or "") != str(lecture_date or ""),
+                str(lecture.get("lecture_time") or "")[:5] != str(lecture_time),
                 str(lecture.get("week_label") or "") != str(week_label or ""),
                 str(lecture.get("status") or "") != status,
             )
@@ -1351,11 +1472,12 @@ def api_coordinator_update_lecture(lecture_id):
             SET title = %s,
                 description = %s,
                 lecture_date = %s,
+                lecture_time = %s,
                 week_label = %s,
                 status = %s
             WHERE lecture_id = %s
             """,
-            (title, description, lecture_date, week_label, status, lecture_id),
+            (title, description, lecture_date, lecture_time, week_label, status, lecture_id),
         )
 
         sent_count = 0
@@ -1368,19 +1490,21 @@ def api_coordinator_update_lecture(lecture_id):
                     )
                 )
             )
+            _snapshot_coordinator_lecture_recipients(cursor, lecture_id, recipients)
             scope_label = (
                 "Project Introduction"
                 if course_scope == "introduction"
                 else "Graduation Project"
             )
-            date_text = f" Date: {lecture_date}." if lecture_date else ""
-            week_text = f" {week_label}." if week_label else ""
-            details_text = f" Details: {description}" if description else ""
-            message = (
-                f'The lecture "{title}" for {scope_label} has been updated.'
-                f"{date_text}{week_text} Status: {status.replace('_', ' ').title()}."
-                f"{details_text} Open from your student timeline: /student/timeline"
-            )
+            message = "\n".join((
+                f"Lecture: {title}",
+                f"Course: {scope_label}",
+                f"Date: {lecture_date}",
+                f"Time: {lecture_time}",
+                f"Week: {week_label or 'Not specified'}",
+                f"Status: {status.replace('_', ' ').title()}",
+                f"Details: {description or 'No additional details.'}",
+            ))
             for recipient_id in recipients:
                 _insert_notification(
                     cursor,
@@ -1409,6 +1533,130 @@ def api_coordinator_update_lecture(lecture_id):
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _coordinator_attendance_lecture(cursor, lecture_id):
+    cursor.execute(
+        """
+        SELECT lecture_id, semester_id, course_scope, title, lecture_date, lecture_time,
+               CASE
+                   WHEN lecture_time IS NULL THEN lecture_date < CURDATE()
+                   ELSE TIMESTAMP(lecture_date, lecture_time) <= NOW()
+               END AS has_started
+        FROM coordinator_lectures
+        WHERE lecture_id = %s
+        LIMIT 1
+        """,
+        (lecture_id,),
+    )
+    return cursor.fetchone()
+
+
+def _ensure_coordinator_lecture_recipient_snapshot(cursor, lecture):
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM coordinator_lecture_recipients WHERE lecture_id = %s",
+        (lecture["lecture_id"],),
+    )
+    if int((cursor.fetchone() or {}).get("total") or 0) > 0:
+        return
+    recipients = _deliverable_student_user_ids(
+        cursor,
+        lecture.get("semester_id"),
+        lecture.get("course_scope") or "introduction",
+    )
+    _snapshot_coordinator_lecture_recipients(
+        cursor, lecture["lecture_id"], sorted(set(recipients))
+    )
+
+
+@coordinator_bp.route("/api/coordinator/lectures/<int:lecture_id>/attendance", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_lecture_attendance(lecture_id):
+    db = get_db(); cursor = db.cursor(dictionary=True)
+    try:
+        _ensure_lecture_tables(cursor)
+        lecture = _coordinator_attendance_lecture(cursor, lecture_id)
+        if not lecture:
+            return jsonify({"error": "Lecture not found."}), 404
+        if not lecture.get("has_started"):
+            return jsonify({"error": "Attendance opens after the lecture date and time."}), 400
+        _ensure_coordinator_lecture_recipient_snapshot(cursor, lecture)
+        cursor.execute(
+            """
+            SELECT st.student_id, u.full_name, u.university_id,
+                   cla.attendance_status
+            FROM coordinator_lecture_recipients clr
+            JOIN students st ON st.student_id = clr.student_id
+            JOIN users u ON u.user_id = st.user_id
+            LEFT JOIN coordinator_lecture_attendance cla
+              ON cla.lecture_id = clr.lecture_id
+             AND cla.student_id = clr.student_id
+            WHERE clr.lecture_id = %s
+            ORDER BY u.full_name
+            """,
+            (lecture_id,),
+        )
+        students = cursor.fetchall()
+        db.commit()
+        return jsonify({"lecture_id": lecture_id, "title": lecture["title"], "students": students})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close(); db.close()
+
+
+@coordinator_bp.route("/api/coordinator/lectures/<int:lecture_id>/attendance", methods=["POST"])
+@login_required(role="coordinator")
+def api_save_coordinator_lecture_attendance(lecture_id):
+    data = request.get_json(silent=True) or {}
+    attendance = data.get("attendance") or []
+    db = get_db(); cursor = db.cursor(dictionary=True)
+    try:
+        _ensure_lecture_tables(cursor)
+        lecture = _coordinator_attendance_lecture(cursor, lecture_id)
+        if not lecture:
+            return jsonify({"error": "Lecture not found."}), 404
+        if not lecture.get("has_started"):
+            return jsonify({"error": "Attendance opens after the lecture date and time."}), 400
+        _ensure_coordinator_lecture_recipient_snapshot(cursor, lecture)
+        cursor.execute(
+            "SELECT student_id FROM coordinator_lecture_recipients WHERE lecture_id = %s",
+            (lecture_id,),
+        )
+        allowed_ids = {int(row["student_id"]) for row in cursor.fetchall()}
+        cleaned = []
+        for row in attendance:
+            try:
+                student_id = int(row.get("student_id"))
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid student in attendance list."}), 400
+            status = (row.get("status") or "").strip().lower()
+            if student_id not in allowed_ids or status not in {"present", "absent"}:
+                return jsonify({"error": "Attendance can only be recorded for notified students."}), 400
+            cleaned.append((student_id, status))
+        if allowed_ids and {student_id for student_id, _ in cleaned} != allowed_ids:
+            return jsonify({"error": "Mark every notified student as present or absent."}), 400
+        for student_id, status in cleaned:
+            cursor.execute(
+                """
+                INSERT INTO coordinator_lecture_attendance
+                    (lecture_id, student_id, attendance_status, marked_by, marked_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON DUPLICATE KEY UPDATE
+                    attendance_status = VALUES(attendance_status),
+                    marked_by = VALUES(marked_by),
+                    marked_at = NOW()
+                """,
+                (lecture_id, student_id, status, session.get("user_id")),
+            )
+        db.commit()
+        return jsonify({"message": f"Attendance saved for {len(cleaned)} student(s)."})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close(); db.close()
 
 
 
@@ -3259,15 +3507,17 @@ def _ensure_intro_timeline_tables(cursor):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS comp4200_timelines (
             timeline_id INT PRIMARY KEY AUTO_INCREMENT,
-            semester_id INT NOT NULL UNIQUE,
+            semester_id INT NOT NULL,
             title VARCHAR(180) NOT NULL DEFAULT 'Project Introduction Timeline',
             note TEXT NULL,
             is_published BOOLEAN NOT NULL DEFAULT FALSE,
             published_at DATETIME NULL,
             created_by INT NULL,
+            owner_role VARCHAR(20) NOT NULL DEFAULT 'coordinator',
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE CASCADE,
-            FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
+            FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+            INDEX idx_comp4200_timeline_owner (semester_id, owner_role, created_by)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
     cursor.execute("""
@@ -3319,27 +3569,80 @@ def _ensure_intro_timeline_tables(cursor):
             "ALTER TABLE comp4200_timeline_items ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE AFTER is_deadline"
         )
 
+    # Timelines used to be globally unique per semester. Supervisors now own an
+    # independent timeline, while the coordinator timeline remains department-wide.
+    if not _db_column_exists(cursor, "comp4200_timelines", "owner_role"):
+        cursor.execute(
+            "ALTER TABLE comp4200_timelines ADD COLUMN owner_role VARCHAR(20) NOT NULL DEFAULT 'coordinator' AFTER created_by"
+        )
+    # MySQL may use the old UNIQUE(semester_id) index to enforce the semester
+    # foreign key. Create a non-unique replacement before dropping that unique
+    # index, otherwise MySQL raises error 1553.
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'comp4200_timelines'
+          AND INDEX_NAME = 'idx_comp4200_timelines_semester_fk'
+        """
+    )
+    if int((cursor.fetchone() or {}).get("cnt") or 0) == 0:
+        cursor.execute(
+            "CREATE INDEX idx_comp4200_timelines_semester_fk ON comp4200_timelines (semester_id)"
+        )
+    cursor.execute(
+        """
+        SELECT INDEX_NAME
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'comp4200_timelines'
+          AND COLUMN_NAME = 'semester_id'
+          AND NON_UNIQUE = 0
+          AND INDEX_NAME <> 'PRIMARY'
+        """
+    )
+    for row in cursor.fetchall():
+        index_name = row.get("INDEX_NAME") or row.get("index_name")
+        if index_name and str(index_name).replace("_", "").isalnum():
+            cursor.execute(f"ALTER TABLE comp4200_timelines DROP INDEX `{index_name}`")
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'comp4200_timelines'
+          AND INDEX_NAME = 'idx_comp4200_timeline_owner'
+        """
+    )
+    if int((cursor.fetchone() or {}).get("cnt") or 0) == 0:
+        cursor.execute(
+            "CREATE INDEX idx_comp4200_timeline_owner ON comp4200_timelines (semester_id, owner_role, created_by)"
+        )
 
-def _get_or_create_intro_timeline(cursor, semester_id, user_id=None):
+
+def _get_or_create_intro_timeline(cursor, semester_id, user_id=None, owner_role="coordinator"):
     _ensure_intro_timeline_tables(cursor)
     cursor.execute(
         """
         SELECT timeline_id, semester_id, title, note, is_published, published_at, updated_at
         FROM comp4200_timelines
         WHERE semester_id = %s
+          AND owner_role = %s
+          AND (%s = 'coordinator' OR created_by = %s)
         LIMIT 1
         """,
-        (semester_id,),
+        (semester_id, owner_role, owner_role, user_id),
     )
     timeline = cursor.fetchone()
     if timeline:
         return timeline
     cursor.execute(
         """
-        INSERT INTO comp4200_timelines (semester_id, title, note, created_by)
-        VALUES (%s, 'Project Introduction Timeline', 'Timeline for COMP4200 students.', %s)
+        INSERT INTO comp4200_timelines (semester_id, title, note, created_by, owner_role)
+        VALUES (%s, 'Project Introduction Timeline', 'Timeline for COMP4200 students.', %s, %s)
         """,
-        (semester_id, user_id),
+        (semester_id, user_id, owner_role),
     )
     timeline_id = cursor.lastrowid
     return {
@@ -3350,6 +3653,7 @@ def _get_or_create_intro_timeline(cursor, semester_id, user_id=None):
         "is_published": False,
         "published_at": None,
         "updated_at": None,
+        "owner_role": owner_role,
     }
 
 
@@ -3456,9 +3760,9 @@ def api_coordinator_intro_timeline_save():
                 ),
                 400,
             )
-        submitted_to = (item.get("submitted_to") or "supervisor").strip().lower()
-        if submitted_to not in ("supervisor", "coordinator", "both"):
-            submitted_to = "supervisor"
+        submitted_to = (item.get("submitted_to") or "coordinator").strip().lower()
+        if submitted_to not in ("coordinator", "both"):
+            submitted_to = "coordinator"
 
         clean_items.append(
             {
@@ -3555,7 +3859,7 @@ def api_coordinator_intro_timeline_save():
                         item["due_date"],
                         item.get("due_time"),
                         item["milestone_label"],
-                        item.get("submitted_to", "supervisor"),
+                        item.get("submitted_to", "coordinator"),
                         item["is_deadline"],
                         existing[item["order"]],
                     ),
@@ -3579,7 +3883,7 @@ def api_coordinator_intro_timeline_save():
                         item["due_date"],
                         item.get("due_time"),
                         item["milestone_label"],
-                        item.get("submitted_to", "supervisor"),
+                        item.get("submitted_to", "coordinator"),
                         item["is_deadline"],
                     ),
                 )
@@ -3818,14 +4122,12 @@ def api_coordinator_distribution_window_update():
                 )
 
             try:
-                close_at = datetime.strptime(
-                    close_at_raw.replace("T", " "), "%Y-%m-%d %H:%M"
-                )
+                close_at = _parse_client_datetime(close_at_raw)
             except ValueError:
                 cursor.close()
                 db.close()
                 return (
-                    jsonify({"error": "Close date format must be YYYY-MM-DD HH:MM."}),
+                    jsonify({"error": "Please enter a valid close date and time."}),
                     400,
                 )
 
@@ -11524,6 +11826,9 @@ def api_coordinator_evaluation_finalize():
             """,
             (course_scope, reference_id, session.get("user_id")),
         )
+
+        if course_scope == "graduation_project" and decision == "archived":
+            clear_supervisor_project_workspace(cursor, reference_id)
 
         db.commit()
         cursor.close()

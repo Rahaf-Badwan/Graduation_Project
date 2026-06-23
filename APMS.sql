@@ -656,7 +656,6 @@ GROUP BY c.committee_id;
 --  SAMPLE DATA  (all text in English)
 --  ID scheme:
 --    Students    → 7-digit IDs starting from 1220000
---                  Email: {university_id}@students.birzeit.edu
 --    Faculty     → 4-digit IDs starting from 1001
 --                  Email: {university_id}@birzeit.edu
 -- ============================================================

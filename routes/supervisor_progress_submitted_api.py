@@ -198,6 +198,23 @@ def _project_access_filter(cursor):
         "p.semester_id IS NOT NULL",
     ]
 
+    if _table_exists(cursor, "project_course_promotions"):
+        filters.append(
+            "NOT EXISTS (SELECT 1 FROM project_course_promotions pcp_live WHERE pcp_live.source_project_id = p.project_id)"
+        )
+
+    if _table_exists(cursor, "section_completion_status"):
+        filters.append(
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM section_completion_status scs_done
+                WHERE scs_done.reference_id = p.project_id
+                  AND LOWER(COALESCE(scs_done.status, '')) = 'succeeded'
+            )
+            """
+        )
+
     if _table_exists(cursor, "semesters") and _column_exists(cursor, "semesters", "is_active"):
         filters.append("COALESCE(s.is_active, 0) = TRUE")
 
@@ -232,11 +249,29 @@ def _project_access_params(cursor, faculty_id):
 
 
 def _submission_access_filter(cursor):
-    """Allow assigned live-semester submissions, including archived final work."""
+    """Allow submissions only while the project is active with the supervisor."""
     filters = [
         "p.supervisor_id = %s",
+        "LOWER(COALESCE(p.status, '')) NOT IN ('archived', 'archive', 'search', 'search_only', 'imported_archive')",
         "p.semester_id IS NOT NULL",
     ]
+
+    if _table_exists(cursor, "project_course_promotions"):
+        filters.append(
+            "NOT EXISTS (SELECT 1 FROM project_course_promotions pcp_done WHERE pcp_done.source_project_id = p.project_id)"
+        )
+
+    if _table_exists(cursor, "section_completion_status"):
+        filters.append(
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM section_completion_status scs_done
+                WHERE scs_done.reference_id = p.project_id
+                  AND LOWER(COALESCE(scs_done.status, '')) = 'succeeded'
+            )
+            """
+        )
 
     if _table_exists(cursor, "semesters") and _column_exists(cursor, "semesters", "is_active"):
         filters.append("COALESCE(s.is_active, 0) = TRUE")

@@ -616,9 +616,9 @@
     line-height: 1.65;
     color: var(--color-text-primary);
     white-space: pre-wrap;
-    background: var(--color-background-tertiary);
-    border-radius: 14px;
-    padding: 13px 15px;
+    background: linear-gradient(145deg, #f5fbf7, #f8faf9);
+    border-radius: 18px;
+    padding: 14px;
     margin-bottom: 13px;
     border: 1px solid #e6ece8
   }
@@ -638,7 +638,30 @@
   }
 
   .sn-lecture-hero {
-    padding: 12px 13px
+    padding: 18px;
+    border: 0;
+    color: #fff;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(135deg, #145a2b, #238447)
+  }
+
+  .sn-lecture-hero::after {
+    content: 'L';
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+    color: #145a2b;
+    background: rgba(255,255,255,.92);
+    font-size: 17px;
+    font-weight: 950;
+    box-shadow: 0 8px 24px rgba(8,58,27,.18)
   }
 
   .sn-lecture-kicker,
@@ -652,10 +675,21 @@
     text-transform: uppercase
   }
 
+  .sn-lecture-hero .sn-lecture-kicker {
+    color: rgba(255,255,255,.75);
+    margin-bottom: 6px
+  }
+
   .sn-lecture-name {
     color: var(--color-text-primary);
     font-size: 15px;
     font-weight: 900
+  }
+
+  .sn-lecture-hero .sn-lecture-name {
+    color: #fff;
+    font-size: 19px;
+    max-width: calc(100% - 58px)
   }
 
   .sn-lecture-grid {
@@ -666,7 +700,8 @@
 
   .sn-lecture-detail {
     min-width: 0;
-    padding: 9px 10px
+    padding: 12px;
+    box-shadow: 0 4px 13px rgba(16,24,40,.035)
   }
 
   .sn-lecture-value {
@@ -679,7 +714,8 @@
     color: var(--color-text-primary);
     font-size: 12px;
     line-height: 1.65;
-    padding: 10px 11px
+    padding: 13px 14px;
+    border-left: 4px solid var(--sn-green)
   }
 
   .sn-lecture-link {
@@ -1034,7 +1070,8 @@
     }
 
     function parseLectureMessage(msgData) {
-      const titleMatch = String(msgData.title || '').match(/^(New Lecture|Lecture Date Confirmed|Lecture Updated):\s*(.+)$/i);
+      const rawTitle = String(msgData.title || '');
+      const titleMatch = rawTitle.match(/^(New Lecture|Lecture Date Confirmed|Lecture Updated|Supervisor Lecture Posted|Supervisor Lecture Updated):\s*(.+)$/i);
       if (!titleMatch) return null;
 
       const raw = String(msgData.message || '').trim();
@@ -1044,17 +1081,30 @@
         if (match) fields[match[1].trim().toLowerCase()] = match[2].trim();
       });
 
-      const courseMatch = raw.match(/\b(?:for|in)\s+(Project Introduction|Graduation Project)\b/i);
+      const courseMatch = raw.match(/\b(COMP4200|COMP4300)(?:\s*[—-]\s*(Project Introduction|Graduation Project))?/i)
+        || raw.match(/\b(?:for|in)\s+(Project Introduction|Graduation Project)\b/i);
       const dateMatch = raw.match(/\bDate:\s*([^.]+)/i) || raw.match(/\bconfirmed for\s+([^.]+)/i);
       const weekMatch = raw.match(/\bWeek\s*:?\s*([^.]+)/i);
       const statusMatch = raw.match(/\bStatus:\s*([^.]+)/i);
-      const detailsMatch = raw.match(/\bDetails:\s*(.*?)(?=\s+Open from your student timeline:|$)/i);
+      const detailsMatch = raw.match(/\bDetails:\s*(.*?)(?=\s+(?:Open from your student timeline:|Check your notifications for updates\.)|$)/i);
+
+      const actionText = /^Supervisor Lecture Posted$/i.test(titleMatch[1])
+        ? 'New lecture from your supervisor'
+        : /^Supervisor Lecture Updated$/i.test(titleMatch[1])
+          ? 'Lecture updated by your supervisor'
+          : titleMatch[1];
+
+      let courseText = fields.course || '';
+      if (!courseText && courseMatch) {
+        courseText = [courseMatch[1], courseMatch[2]].filter(Boolean).join(' — ');
+      }
 
       return {
-        action: titleMatch[1],
+        action: actionText,
         lecture: fields.lecture || titleMatch[2],
-        course: fields.course || (courseMatch ? courseMatch[1] : ''),
+        course: courseText,
         date: fields.date || (dateMatch ? dateMatch[1].trim() : ''),
+        time: fields.time || '',
         week: fields.week || (weekMatch ? weekMatch[1].trim() : ''),
         status: fields.status || (statusMatch ? statusMatch[1].trim() : ''),
         details: fields.details || (detailsMatch ? detailsMatch[1].trim() : '')
@@ -1064,7 +1114,7 @@
     function lecturePreview(msgData) {
       const lecture = parseLectureMessage(msgData);
       if (!lecture) return msgData.message || '';
-      return [lecture.course, lecture.date, lecture.week, lecture.status].filter(Boolean).join(' \u00b7 ');
+      return [lecture.course, lecture.date, lecture.time, lecture.week, lecture.status].filter(Boolean).join(' \u00b7 ');
     }
 
     function lectureDetail(label, value) {
@@ -1086,6 +1136,7 @@
         '<div class="sn-lecture-grid">' +
         lectureDetail('Course', lecture.course) +
         lectureDetail('Date', lecture.date) +
+        lectureDetail('Time', lecture.time) +
         lectureDetail('Week', lecture.week) +
         lectureDetail('Status', lecture.status) +
         '</div>' +
@@ -1190,7 +1241,7 @@
         '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
         '<div class="sn-msg-preview">' + esc(lecturePreview(r)) + '</div>' +
         (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
-        (r.can_reply === false ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
+        (r.can_reply === false && !parseLectureMessage(r) ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
         '</div>' +
         '</article>'
       ).join('');
@@ -1210,7 +1261,7 @@
         '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
         '<div class="sn-msg-preview">' + esc(lecturePreview(r)) + '</div>' +
         (r.has_attachment ? '<div class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</div>' : '') +
-        (r.can_reply === false ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
+        (r.can_reply === false && !parseLectureMessage(r) ? '<div class="sn-att-badge">🚫 Replies disabled</div>' : '') +
         '</div>' +
         '</article>'
       ).join('');
@@ -1239,7 +1290,8 @@
     // ── Open message modal ───────────────────────────────────────
     function openModal(msgData, tab) {
       state.currentMsg = msgData;
-      $('modalTitle').textContent = msgData.title;
+      const parsedLecture = parseLectureMessage(msgData);
+      $('modalTitle').textContent = parsedLecture ? 'Lecture announcement' : msgData.title;
       const isInbox = tab === 'inbox';
       const from = isInbox
         ? 'From: ' + (msgData.sender_name || 'System') + ' · ' + roleLabel(msgData.sender_role) + ' · ' + (msgData.created_at || '')
@@ -1278,7 +1330,7 @@
       } else {
         replySection.style.display = 'none';
         if (noReplyNotice) {
-          noReplyNotice.style.display = (isInbox && msgData.sender_user_id && !repliesAllowed) ? 'block' : 'none';
+          noReplyNotice.style.display = (!parsedLecture && isInbox && msgData.sender_user_id && !repliesAllowed) ? 'block' : 'none';
         }
       }
 

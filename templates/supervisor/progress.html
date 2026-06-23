@@ -1,7 +1,7 @@
 {% extends 'supervisor/base.html' %}
-{% block page_title %}Submit Files{% endblock %}
+{% block page_title %}Exam Distribution{% endblock %}
 {% block page_id %}progress{% endblock %}
-{% block topbar_title %}Submit Files{% endblock %}
+{% block topbar_title %}Exam Distribution{% endblock %}
 
 {% block content %}
 <div class="page page-single on" id="pg-supervisor-submissions">
@@ -205,7 +205,27 @@
       font-size: 13px;
     }
 
+    #pg-supervisor-submissions .timeline-grid { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:12px; }
+    #pg-supervisor-submissions .timeline-field { display:grid; gap:6px; }
+    #pg-supervisor-submissions .timeline-field label { font-size:12px; font-weight:850; color:var(--color-text-secondary); }
+    #pg-supervisor-submissions .timeline-input { width:100%; border:1px solid #d8e2dc; border-radius:10px; padding:9px 10px; background:var(--color-background-primary); color:var(--color-text-primary); box-sizing:border-box; }
+    #pg-supervisor-submissions .timeline-wrap { overflow-x:auto; margin-top:14px; }
+    #pg-supervisor-submissions .timeline-table { width:100%; min-width:1050px; border-collapse:collapse; }
+    #pg-supervisor-submissions .timeline-table th, #pg-supervisor-submissions .timeline-table td { border-bottom:1px solid #e7eee9; padding:8px; vertical-align:top; text-align:left; }
+    #pg-supervisor-submissions .timeline-table th { font-size:11px; color:var(--color-text-secondary); }
+    #pg-supervisor-submissions .timeline-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+    #pg-supervisor-submissions .timeline-message { margin-top:10px; font-size:13px; font-weight:750; color:var(--color-text-secondary); }
+    #pg-supervisor-submissions .recipient-lock { font-size:12px; font-weight:800; color:var(--accent); padding:9px 4px; white-space:nowrap; }
+    #pg-supervisor-submissions .exam-tabs { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 14px; padding:0; }
+    #pg-supervisor-submissions .exam-tab { border:1px solid #d7e3dc; background:var(--color-background-primary); color:var(--color-text-primary); border-radius:999px; padding:9px 14px; font-size:13px; font-weight:850; cursor:pointer; transition:.18s ease; }
+    #pg-supervisor-submissions .exam-tab:hover { background:var(--color-background-tertiary); }
+    #pg-supervisor-submissions .exam-tab.on { background:#2e7d42; border-color:#2e7d42; color:#fff; box-shadow:0 8px 18px rgba(46,125,66,.18); }
+    #pg-supervisor-submissions .exam-section { display:none; }
+    #pg-supervisor-submissions .exam-section.active { display:block; }
+
     @media (max-width: 760px) {
+      #pg-supervisor-submissions .timeline-grid { grid-template-columns:1fr; }
+      #pg-supervisor-submissions .exam-tab { width:100%; text-align:center; }
       #pg-supervisor-submissions .submission-grid {
         grid-template-columns: 1fr;
       }
@@ -219,11 +239,91 @@
     }
   </style>
 
+  <div class="exam-tabs" role="tablist" aria-label="Supervisor timeline tabs">
+    <button class="exam-tab on" type="button" role="tab" aria-selected="true"
+      onclick="showSupervisorExamSection('intro', this)">
+      Project Introduction — COMP4200 Timeline
+    </button>
+    <button class="exam-tab" type="button" role="tab" aria-selected="false"
+      onclick="showSupervisorExamSection('graduation', this)">
+      Graduation Project — COMP4300 Timeline
+    </button>
+    <button class="exam-tab" type="button" role="tab" aria-selected="false"
+      onclick="showSupervisorExamSection('submissions', this)">
+      Student Submissions
+    </button>
+  </div>
+
+  <section id="supervisorIntroTimeline" class="exam-section active" role="tabpanel">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <span class="card-title">My COMP4200 Timeline</span>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+          Build a timeline for students assigned to you. Every submission is sent only to you as their supervisor.
+        </div>
+      </div>
+      <span class="submission-badge" id="supervisorTimelineState">Draft</span>
+    </div>
+    <div class="info-box">This timeline is separate from the coordinator timeline and is visible only to your assigned COMP4200 groups.</div>
+    <div class="timeline-grid">
+      <div class="timeline-field"><label for="supervisorTimelineTitle">Timeline title</label><input id="supervisorTimelineTitle" class="timeline-input" value="My Students Timeline"></div>
+      <div class="timeline-field"><label>Status</label><div id="supervisorTimelineMeta" class="timeline-input">Loading...</div></div>
+    </div>
+    <div class="timeline-field" style="margin-top:12px"><label for="supervisorTimelineNote">Note to students</label><textarea id="supervisorTimelineNote" class="timeline-input" rows="3"></textarea></div>
+    <div class="timeline-actions">
+      <button class="btn btn-outline" type="button" onclick="addSupervisorTimelineRow('introduction')">+ Add Milestone</button>
+      <button class="btn btn-primary" type="button" onclick="saveSupervisorTimeline('introduction', false)">Save Draft</button>
+      <button class="btn btn-primary" type="button" onclick="saveSupervisorTimeline('introduction', true)">Save &amp; Publish</button>
+    </div>
+    <div id="supervisorTimelineMessage" class="timeline-message"></div>
+    <div class="timeline-wrap">
+      <table class="timeline-table">
+        <thead><tr><th>#</th><th>Title</th><th>Description</th><th>Open submission</th><th>Close / Deadline</th><th>Label</th><th>Recipient</th><th>Deadline?</th><th>Action</th></tr></thead>
+        <tbody id="supervisorTimelineRows"></tbody>
+      </table>
+    </div>
+  </div>
+  </section>
+
+  <section id="supervisorGradTimeline" class="exam-section" role="tabpanel">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div>
+        <span class="card-title">My COMP4300 Timeline</span>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+          Build the graduation-project timeline for COMP4300 groups assigned to you. Every submission is sent only to you.
+        </div>
+      </div>
+      <span class="submission-badge" id="gradSupervisorTimelineState">Draft</span>
+    </div>
+    <div class="info-box">This timeline has the same controls as COMP4200, but it is visible only to your assigned COMP4300 graduation-project groups.</div>
+    <div class="timeline-grid">
+      <div class="timeline-field"><label for="gradSupervisorTimelineTitle">Timeline title</label><input id="gradSupervisorTimelineTitle" class="timeline-input" value="Graduation Project Timeline"></div>
+      <div class="timeline-field"><label>Status</label><div id="gradSupervisorTimelineMeta" class="timeline-input">Loading...</div></div>
+    </div>
+    <div class="timeline-field" style="margin-top:12px"><label for="gradSupervisorTimelineNote">Note to students</label><textarea id="gradSupervisorTimelineNote" class="timeline-input" rows="3"></textarea></div>
+    <div class="timeline-actions">
+      <button class="btn btn-outline" type="button" onclick="addSupervisorTimelineRow('graduation_project')">+ Add Milestone</button>
+      <button class="btn btn-primary" type="button" onclick="saveSupervisorTimeline('graduation_project', false)">Save Draft</button>
+      <button class="btn btn-primary" type="button" onclick="saveSupervisorTimeline('graduation_project', true)">Save &amp; Publish</button>
+    </div>
+    <div id="gradSupervisorTimelineMessage" class="timeline-message"></div>
+    <div class="timeline-wrap">
+      <table class="timeline-table">
+        <thead><tr><th>#</th><th>Title</th><th>Description</th><th>Open submission</th><th>Close / Deadline</th><th>Label</th><th>Recipient</th><th>Deadline?</th><th>Action</th></tr></thead>
+        <tbody id="gradSupervisorTimelineRows"></tbody>
+      </table>
+    </div>
+  </div>
+  </section>
+
+  <section id="supervisorStudentSubmissions" class="exam-section" role="tabpanel">
   <div class="card">
     <div class="card-hd" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
       <div>
-        <span class="card-title">Submit Files</span>
-        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
+        <span class="card-title" id="supervisorSubmissionCardTitle">Student Submitted Files</span>
+        <div id="supervisorSubmissionCardSubtitle" style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5">
           Review student submissions assigned to you as supervisor.
         </div>
       </div>
@@ -231,7 +331,7 @@
       <button class="btn btn-outline" type="button" onclick="loadSupervisorSubmissionFiles()">Refresh</button>
     </div>
 
-    <div class="info-box">
+    <div class="info-box" id="supervisorSubmissionInfo">
       COMP4200 timeline submissions and project files appear here for your assigned students. COMP4300 project files for your assigned graduation projects also appear here.
     </div>
 
@@ -261,11 +361,145 @@
       <div class="empty">Loading student submissions...</div>
     </div>
   </div>
+  </section>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+function showSupervisorExamSection(mode, button) {
+  document.querySelectorAll('#pg-supervisor-submissions .exam-section').forEach(section => section.classList.remove('active'));
+  const sectionId = mode === 'intro'
+    ? 'supervisorIntroTimeline'
+    : mode === 'graduation'
+      ? 'supervisorGradTimeline'
+      : 'supervisorStudentSubmissions';
+  document.getElementById(sectionId).classList.add('active');
+  document.querySelectorAll('#pg-supervisor-submissions .exam-tab').forEach(tab => {
+    const active = tab === button;
+    tab.classList.toggle('on', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  if (mode === 'submissions') {
+    const filter = document.getElementById('submissionCourseFilter');
+    if (filter) filter.value = 'all';
+    if (window.renderSupervisorSubmissionFiles) window.renderSupervisorSubmissionFiles();
+  }
+  window.scrollTo(0, 0);
+}
+
+(function () {
+  const esc = value => String(value || '').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+  const localDate = value => value && String(value).includes('T') ? String(value).slice(0, 16) : '';
+
+  function timelineUi(scope) {
+    const graduation = scope === 'graduation_project';
+    return {
+      rowsId: graduation ? 'gradSupervisorTimelineRows' : 'supervisorTimelineRows',
+      titleId: graduation ? 'gradSupervisorTimelineTitle' : 'supervisorTimelineTitle',
+      noteId: graduation ? 'gradSupervisorTimelineNote' : 'supervisorTimelineNote',
+      stateId: graduation ? 'gradSupervisorTimelineState' : 'supervisorTimelineState',
+      metaId: graduation ? 'gradSupervisorTimelineMeta' : 'supervisorTimelineMeta',
+      messageId: graduation ? 'gradSupervisorTimelineMessage' : 'supervisorTimelineMessage',
+      endpoint: graduation ? '/api/supervisor/grad-timeline' : '/api/supervisor/intro-timeline',
+      defaultTitle: graduation ? 'Graduation Project Timeline' : 'My Students Timeline'
+    };
+  }
+
+  function rowTemplate(item, index) {
+    const data = item || {};
+    return `<tr>
+      <td><input class="timeline-input tl-order" type="number" min="1" value="${esc(data.item_order || index + 1)}"></td>
+      <td><input class="timeline-input tl-title" value="${esc(data.title)}" placeholder="Milestone title"></td>
+      <td><textarea class="timeline-input tl-description" rows="2">${esc(data.description)}</textarea></td>
+      <td><input class="timeline-input tl-start" type="datetime-local" value="${esc(localDate(data.start_date))}"></td>
+      <td><input class="timeline-input tl-due" type="datetime-local" value="${esc(localDate(data.due_date))}"></td>
+      <td><input class="timeline-input tl-label" value="${esc(data.milestone_label)}" placeholder="Optional label"></td>
+      <td><div class="recipient-lock">→ Supervisor only</div></td>
+      <td style="text-align:center"><input class="tl-deadline" type="checkbox" ${data.is_deadline === false ? '' : 'checked'}></td>
+      <td><button class="btn btn-outline" type="button" onclick="this.closest('tr').remove()">Delete</button></td>
+    </tr>`;
+  }
+
+  function renderRows(scope, items) {
+    document.getElementById(timelineUi(scope).rowsId).innerHTML = (items || []).map(rowTemplate).join('');
+  }
+
+  function collectRows(scope) {
+    return Array.from(document.querySelectorAll(`#${timelineUi(scope).rowsId} tr`)).map((row, index) => ({
+      item_order: Number(row.querySelector('.tl-order').value || index + 1),
+      title: row.querySelector('.tl-title').value.trim(),
+      description: row.querySelector('.tl-description').value.trim(),
+      start_date: row.querySelector('.tl-start').value,
+      due_date: row.querySelector('.tl-due').value,
+      milestone_label: row.querySelector('.tl-label').value.trim(),
+      submitted_to: 'supervisor',
+      is_deadline: row.querySelector('.tl-deadline').checked
+    }));
+  }
+
+  function setMeta(scope, timeline) {
+    const ui = timelineUi(scope);
+    const published = Boolean(timeline && timeline.is_published);
+    document.getElementById(ui.stateId).textContent = published ? 'Published' : 'Draft';
+    document.getElementById(ui.metaId).textContent = published
+      ? `Published at ${timeline.published_at || '—'}` : 'Draft — visible only after publishing';
+  }
+
+  async function request(url, options) {
+    const response = await fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, options || {}));
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.error) throw new Error(data.error || 'Timeline request failed.');
+    return data;
+  }
+
+  async function loadTimeline(scope) {
+    const ui = timelineUi(scope);
+    try {
+      const data = await request(ui.endpoint);
+      document.getElementById(ui.titleId).value = data.timeline?.title || ui.defaultTitle;
+      document.getElementById(ui.noteId).value = data.timeline?.note || '';
+      renderRows(scope, data.items || []);
+      setMeta(scope, data.timeline);
+    } catch (error) {
+      document.getElementById(ui.metaId).textContent = error.message;
+    }
+  }
+
+  window.addSupervisorTimelineRow = function (scope) {
+    const body = document.getElementById(timelineUi(scope).rowsId);
+    body.insertAdjacentHTML('beforeend', rowTemplate({is_deadline:true}, body.children.length));
+  };
+
+  window.saveSupervisorTimeline = async function (scope, publishAfter) {
+    const ui = timelineUi(scope);
+    const message = document.getElementById(ui.messageId);
+    const items = collectRows(scope);
+    if (!items.length) { message.textContent = 'Add at least one milestone.'; return; }
+    if (publishAfter && items.some(item => item.is_deadline && !item.due_date)) {
+      message.textContent = 'Set a close/deadline date for every checked milestone.'; return;
+    }
+    message.textContent = publishAfter ? 'Publishing timeline...' : 'Saving draft...';
+    try {
+      const saved = await request(ui.endpoint, {
+        method:'POST', body:JSON.stringify({
+          title:document.getElementById(ui.titleId).value.trim(),
+          note:document.getElementById(ui.noteId).value.trim(), items
+        })
+      });
+      let result = saved;
+      if (publishAfter) result = await request(`${ui.endpoint}/publish`, {method:'POST', body:'{}'});
+      setMeta(scope, result.timeline);
+      message.textContent = result.message || 'Timeline saved.';
+    } catch (error) { message.textContent = error.message; }
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadTimeline('introduction');
+    loadTimeline('graduation_project');
+  });
+})();
+
 (function () {
   let submissionFilesState = [];
 

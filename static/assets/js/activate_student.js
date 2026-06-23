@@ -59,9 +59,7 @@ function activationColor(token, fallback) {
 
 function clearActivationFields() {
   [
-    'fullName',
     'universityId',
-    'email',
     'password',
     'confirmPassword',
     'supervisor-id',
@@ -76,7 +74,7 @@ function clearActivationFields() {
     el.value = '';
     el.defaultValue = '';
     el.setAttribute('autocomplete', 'new-password');
-    if (['fullName', 'universityId', 'email', 'supervisor-id', 'supervisor-email'].indexOf(id) !== -1) {
+    if (['universityId', 'supervisor-id', 'supervisor-email'].indexOf(id) !== -1) {
       el.setAttribute('readonly', 'readonly');
     }
   });
@@ -138,12 +136,10 @@ function updateStrength() {
 
 async function verifyStudent() {
   hideFeedback('verify-feedback');
-  var name  = document.getElementById('fullName').value.trim();
   var uid   = document.getElementById('universityId').value.trim();
-  var email = document.getElementById('email').value.trim();
 
-  if (!name || !uid || !email) {
-    showFeedback('verify-feedback', 'Please fill in all fields.', 'warn');
+  if (!uid) {
+    showFeedback('verify-feedback', 'Please enter your university ID.', 'warn');
     return;
   }
   if (!/^\d{7}$/.test(uid)) {
@@ -158,7 +154,7 @@ async function verifyStudent() {
     var res  = await fetch('/api/activate/verify', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ full_name: name, university_id: uid, email: email })
+      body: JSON.stringify({ university_id: uid })
     });
     var data = await res.json();
 

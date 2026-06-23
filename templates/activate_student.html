@@ -139,9 +139,7 @@
       color: var(--activate-muted) !important;
     }
 
-    #fullName,
     #universityId,
-    #email,
     #password,
     #confirmPassword,
     #supervisor-id,
@@ -156,9 +154,7 @@
       box-shadow: none !important;
     }
 
-    #fullName:focus,
     #universityId:focus,
-    #email:focus,
     #password:focus,
     #confirmPassword:focus,
     #supervisor-id:focus,
@@ -285,18 +281,8 @@
           <!-- Phase 1 -->
           <div id="phase-verify">
             <div style="margin-bottom:14px;">
-              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Full Name</div>
-              <input id="fullName" type="text" autocomplete="new-password" name="apms_activation_name" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="e.g. Taima Abed"
-                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
-            </div>
-            <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">University ID</div>
               <input id="universityId" type="text" maxlength="7" inputmode="numeric" autocomplete="new-password" name="apms_activation_uid" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="7-digit student ID"
-                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
-            </div>
-            <div style="margin-bottom:14px;">
-              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
-              <input id="email" type="email" name="apms_activation_mail" autocomplete="new-password" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="student@students.birzeit.edu"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-top:18px;">
@@ -399,7 +385,7 @@
             </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Email</div>
-              <input id="supervisor-email" type="email" autocomplete="new-password" name="apms_supervisor_activation_mail" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="supervisor@birzeit.edu"
+              <input id="supervisor-email" type="email" autocomplete="new-password" name="apms_supervisor_activation_mail" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" placeholder="xxxx@birzeit.edu"
                 style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
             </div>
             <div style="margin-top:18px;">

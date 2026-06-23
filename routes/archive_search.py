@@ -16,6 +16,8 @@ from db import get_db
 
 archive_bp = Blueprint("archive", __name__)
 
+ARCHIVE_UNKNOWN_YEAR = "__unknown__"
+
 
 ROLE_BASE_TEMPLATES = {
     "student": "student/base.html",
@@ -122,6 +124,15 @@ def _archive_visibility_condition(alias="p"):
     if _archive_is_logged_in():
         return None
     return f"COALESCE({alias}.archive_visibility, 'public') = 'public'"
+
+
+def _archive_year_sql(project_alias="p", semester_alias="s"):
+    """Resolve an audited year while preserving an explicit unknown value."""
+    return (
+        f"CASE WHEN {project_alias}.year_override = '{ARCHIVE_UNKNOWN_YEAR}' "
+        f"THEN NULL ELSE COALESCE(NULLIF({project_alias}.year_override, ''), "
+        f"{semester_alias}.academic_year) END"
+    )
 
 
 @archive_bp.route("/api/archive/public/verify", methods=["POST"])
@@ -410,7 +421,7 @@ def api_archived_projects():
 
         # Use the manually stored DB values first, then fall back to the real
         # relational data already saved in projects/semesters/faculty/users.
-        year_expr = "COALESCE(NULLIF(p.year_override, ''), s.academic_year)"
+        year_expr = _archive_year_sql()
         supervisor_expr = "COALESCE(NULLIF(p.supervisor_name_override, ''), u_sup.full_name)"
 
         if q:
@@ -580,7 +591,7 @@ def api_archived_project_detail(project_id):
             f"""
             SELECT p.project_id, p.title, p.abstract, p.keywords,
                    p.project_type, {score_expr} AS final_score, p.submission_date,
-                   COALESCE(NULLIF(p.year_override, ''), s.academic_year) AS academic_year,
+                   {_archive_year_sql()} AS academic_year,
                    COALESCE(NULLIF(p.supervisor_name_override, ''), u_sup.full_name) AS supervisor_name,
                    p.archive_visibility
             FROM   projects p

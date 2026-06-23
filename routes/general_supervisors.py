@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from datetime import datetime
 from flask import (
     Blueprint,
     jsonify,
@@ -15,6 +16,13 @@ from werkzeug.utils import secure_filename
 from db import get_db
 from auth import login_required
 from routes.supervisor_evaluation import supervisor_evaluation_bp
+from routes.appCoordinator import (
+    _get_or_create_intro_timeline,
+    _insert_notification,
+    _json_safe_value,
+    _semester_for_course_scope,
+    _table_exists,
+)
 
 
 general_supervisors_bp = Blueprint(
@@ -27,6 +35,855 @@ general_supervisors_bp = Blueprint(
 # Routes that must stay without the /supervisor prefix.
 supervisor_api_bp = Blueprint("supervisor_api", __name__)
 supervisor_api_bp.register_blueprint(supervisor_evaluation_bp)
+
+
+def _clean_supervisor_timeline_items(items):
+    clean = []
+    for index, item in enumerate(items or [], start=1):
+        title = (item.get("title") or "").strip()
+        if not title:
+            raise ValueError(f"Item #{index} must have a title.")
+        start_date = (item.get("start_date") or "").strip() or None
+        due_date = (item.get("due_date") or "").strip() or None
+        start_time = due_time = None
+        if start_date and "T" in start_date:
+            start_date, start_time = start_date.split("T", 1)
+            start_time = start_time[:5]
+        if due_date and "T" in due_date:
+            due_date, due_time = due_date.split("T", 1)
+            due_time = due_time[:5]
+        try:
+            if start_date:
+                datetime.strptime(start_date, "%Y-%m-%d")
+            if due_date:
+                datetime.strptime(due_date, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError(f"Item #{index} has an invalid date.") from exc
+        clean.append(
+            {
+                "order": int(item.get("item_order") or index),
+                "title": title,
+                "description": (item.get("description") or "").strip() or None,
+                "start_date": start_date,
+                "start_time": start_time,
+                "due_date": due_date,
+                "due_time": due_time,
+                "milestone_label": (item.get("milestone_label") or "").strip() or None,
+                "submitted_to": "supervisor",
+                "is_deadline": bool(item.get("is_deadline", True)),
+            }
+        )
+    return clean
+
+
+def _save_supervisor_timeline_items(cursor, timeline_id, items):
+    cursor.execute(
+        """SELECT item_id, item_order FROM comp4200_timeline_items
+           WHERE timeline_id = %s AND COALESCE(is_archived, FALSE) = FALSE""",
+        (timeline_id,),
+    )
+    existing = {row["item_order"]: row["item_id"] for row in cursor.fetchall()}
+    new_orders = {item["order"] for item in items}
+    for old_order, old_id in existing.items():
+        if old_order in new_orders:
+            continue
+        has_submissions = False
+        if _table_exists(cursor, "milestone_submissions"):
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM milestone_submissions WHERE item_id = %s",
+                (old_id,),
+            )
+            has_submissions = int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+        if has_submissions:
+            cursor.execute(
+                "UPDATE comp4200_timeline_items SET is_archived = TRUE WHERE item_id = %s",
+                (old_id,),
+            )
+        else:
+            cursor.execute(
+                "DELETE FROM comp4200_timeline_items WHERE item_id = %s", (old_id,)
+            )
+
+    for item in items:
+        values = (
+            item["order"], item["title"], item["description"], item["start_date"],
+            item["start_time"], item["due_date"], item["due_time"],
+            item["milestone_label"], item["is_deadline"],
+        )
+        if item["order"] in existing:
+            cursor.execute(
+                """UPDATE comp4200_timeline_items
+                   SET item_order=%s, title=%s, description=%s, start_date=%s,
+                       start_time=%s, due_date=%s, due_time=%s, milestone_label=%s,
+                       submitted_to='supervisor', is_deadline=%s, is_archived=FALSE
+                   WHERE item_id=%s""",
+                values + (existing[item["order"]],),
+            )
+        else:
+            cursor.execute(
+                """INSERT INTO comp4200_timeline_items
+                   (timeline_id,item_order,title,description,start_date,start_time,
+                    due_date,due_time,milestone_label,submitted_to,is_deadline,is_archived)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'supervisor',%s,FALSE)""",
+                (timeline_id,) + values,
+            )
+
+
+@supervisor_api_bp.route("/api/supervisor/intro-timeline", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_intro_timeline_get():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        semester = _semester_for_course_scope(cursor, "introduction")
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active COMP4200 semester found."}), 400
+        payload = _intro_timeline_payload_for_supervisor(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        db.commit()
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value(payload))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+def _intro_timeline_payload_for_supervisor(cursor, semester_id, user_id):
+    timeline = _get_or_create_intro_timeline(
+        cursor, semester_id, user_id, owner_role="supervisor"
+    )
+    cursor.execute(
+        """SELECT item_id,item_order,title,description,start_date,start_time,due_date,
+                  due_time,milestone_label,submitted_to,is_deadline
+           FROM comp4200_timeline_items WHERE timeline_id=%s
+           ORDER BY item_order,due_date,item_id""",
+        (timeline["timeline_id"],),
+    )
+    items = cursor.fetchall()
+    for item in items:
+        item["is_deadline"] = bool(item.get("is_deadline"))
+        for field, time_field in (("start_date", "start_time"), ("due_date", "due_time")):
+            date_value = str(item.get(field) or "")
+            time_value = (item.get(time_field) or "").strip()
+            item[field] = f"{date_value}T{time_value}" if date_value and time_value else date_value
+    timeline["is_published"] = bool(timeline.get("is_published"))
+    return {"timeline": timeline, "items": items}
+
+
+@supervisor_api_bp.route("/api/supervisor/intro-timeline", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_intro_timeline_save():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "My Students Timeline").strip()
+    try:
+        items = _clean_supervisor_timeline_items(data.get("items") or [])
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not title or not items:
+        return jsonify({"error": "Add a title and at least one timeline item."}), 400
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        semester = _semester_for_course_scope(cursor, "introduction")
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active COMP4200 semester found."}), 400
+        timeline = _get_or_create_intro_timeline(
+            cursor, semester["semester_id"], session.get("user_id"), "supervisor"
+        )
+        cursor.execute(
+            "UPDATE comp4200_timelines SET title=%s,note=%s WHERE timeline_id=%s",
+            (title, (data.get("note") or "").strip() or None, timeline["timeline_id"]),
+        )
+        _save_supervisor_timeline_items(cursor, timeline["timeline_id"], items)
+        db.commit()
+        payload = _intro_timeline_payload_for_supervisor(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value({"message": "Timeline saved successfully.", **payload}))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@supervisor_api_bp.route("/api/supervisor/intro-timeline/publish", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_intro_timeline_publish():
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        semester = _semester_for_course_scope(cursor, "introduction")
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active COMP4200 semester found."}), 400
+        timeline = _get_or_create_intro_timeline(
+            cursor, semester["semester_id"], session.get("user_id"), "supervisor"
+        )
+        cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM comp4200_timeline_items WHERE timeline_id=%s AND is_deadline=TRUE",
+            (timeline["timeline_id"],),
+        )
+        if int((cursor.fetchone() or {}).get("cnt") or 0) == 0:
+            cursor.close(); db.close()
+            return jsonify({"error": "Save at least one deadline before publishing."}), 400
+        cursor.execute(
+            "UPDATE comp4200_timelines SET is_published=TRUE,published_at=NOW() WHERE timeline_id=%s",
+            (timeline["timeline_id"],),
+        )
+        faculty_id = session.get("faculty_id")
+        if not faculty_id:
+            cursor.execute("SELECT faculty_id FROM faculty WHERE user_id=%s LIMIT 1", (session.get("user_id"),))
+            faculty_id = (cursor.fetchone() or {}).get("faculty_id")
+        recipients = []
+        if faculty_id:
+            cursor.execute(
+                """SELECT DISTINCT u.user_id FROM projects p
+                   JOIN project_members pm ON pm.project_id=p.project_id
+                   JOIN students s ON s.student_id=pm.student_id
+                   JOIN users u ON u.user_id=s.user_id
+                   WHERE p.semester_id=%s AND p.supervisor_id=%s AND u.is_active=TRUE""",
+                (semester["semester_id"], faculty_id),
+            )
+            recipients = [row["user_id"] for row in cursor.fetchall()]
+        for user_id in recipients:
+            _insert_notification(
+                cursor, user_id, session.get("user_id"), "deadline_reminder",
+                "Supervisor Timeline Published",
+                "Your supervisor published an updated COMP4200 timeline. Open Student Timeline to view it.",
+                None, "introduction",
+            )
+        db.commit()
+        payload = _intro_timeline_payload_for_supervisor(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value({
+            "message": f"Timeline published to your students. Notifications sent: {len(recipients)}.",
+            **payload,
+        }))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@supervisor_api_bp.route("/api/supervisor/grad-timeline", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_grad_timeline_get():
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        semester = _semester_for_course_scope(cursor, "graduation_project")
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active COMP4300 semester found."}), 400
+        payload = _intro_timeline_payload_for_supervisor(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        db.commit(); cursor.close(); db.close()
+        return jsonify(_json_safe_value(payload))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@supervisor_api_bp.route("/api/supervisor/grad-timeline", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_grad_timeline_save():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "Graduation Project Timeline").strip()
+    try:
+        items = _clean_supervisor_timeline_items(data.get("items") or [])
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if not title or not items:
+        return jsonify({"error": "Add a title and at least one timeline item."}), 400
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        semester = _semester_for_course_scope(cursor, "graduation_project")
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active COMP4300 semester found."}), 400
+        timeline = _get_or_create_intro_timeline(
+            cursor, semester["semester_id"], session.get("user_id"), "supervisor"
+        )
+        cursor.execute(
+            "UPDATE comp4200_timelines SET title=%s,note=%s WHERE timeline_id=%s",
+            (title, (data.get("note") or "").strip() or None, timeline["timeline_id"]),
+        )
+        _save_supervisor_timeline_items(cursor, timeline["timeline_id"], items)
+        db.commit()
+        payload = _intro_timeline_payload_for_supervisor(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value({"message": "COMP4300 timeline saved successfully.", **payload}))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@supervisor_api_bp.route("/api/supervisor/grad-timeline/publish", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_grad_timeline_publish():
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        semester = _semester_for_course_scope(cursor, "graduation_project")
+        if not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "No active COMP4300 semester found."}), 400
+        timeline = _get_or_create_intro_timeline(
+            cursor, semester["semester_id"], session.get("user_id"), "supervisor"
+        )
+        cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM comp4200_timeline_items WHERE timeline_id=%s AND is_deadline=TRUE",
+            (timeline["timeline_id"],),
+        )
+        if int((cursor.fetchone() or {}).get("cnt") or 0) == 0:
+            cursor.close(); db.close()
+            return jsonify({"error": "Save at least one deadline before publishing."}), 400
+        cursor.execute(
+            "UPDATE comp4200_timelines SET is_published=TRUE,published_at=NOW() WHERE timeline_id=%s",
+            (timeline["timeline_id"],),
+        )
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        recipients = []
+        if faculty_id:
+            cursor.execute(
+                """SELECT DISTINCT u.user_id FROM projects p
+                   JOIN project_members pm ON pm.project_id=p.project_id
+                   JOIN students st ON st.student_id=pm.student_id
+                   JOIN users u ON u.user_id=st.user_id
+                   WHERE p.semester_id=%s AND p.supervisor_id=%s AND u.is_active=TRUE""",
+                (semester["semester_id"], faculty_id),
+            )
+            recipients = [row["user_id"] for row in cursor.fetchall()]
+        for user_id in recipients:
+            _insert_notification(
+                cursor, user_id, session.get("user_id"), "deadline_reminder",
+                "Supervisor COMP4300 Timeline Published",
+                "Your supervisor published an updated COMP4300 timeline. Open Student Timeline to view it.",
+                None, "graduation_project",
+            )
+        db.commit()
+        payload = _intro_timeline_payload_for_supervisor(
+            cursor, semester["semester_id"], session.get("user_id")
+        )
+        cursor.close(); db.close()
+        return jsonify(_json_safe_value({
+            "message": f"COMP4300 timeline published. Notifications sent: {len(recipients)}.",
+            **payload,
+        }))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+# ============================================================
+# Supervisor lectures (scoped to the supervisor's own groups)
+# ============================================================
+
+def _ensure_supervisor_lecture_tables(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS supervisor_lectures (
+            lecture_id INT PRIMARY KEY AUTO_INCREMENT,
+            semester_id INT NULL,
+            supervisor_id INT NOT NULL,
+            course_scope ENUM('introduction','graduation_project') NOT NULL DEFAULT 'introduction',
+            target_kind ENUM('all','section','project') NOT NULL DEFAULT 'all',
+            target_id INT NULL,
+            title VARCHAR(200) NOT NULL,
+            description TEXT NULL,
+            lecture_date DATE NULL,
+            lecture_time TIME NULL,
+            week_label VARCHAR(80) NULL,
+            status ENUM('scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+            created_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_supervisor_lectures_owner (supervisor_id, semester_id, course_scope),
+            FOREIGN KEY (semester_id) REFERENCES semesters(semester_id) ON DELETE SET NULL,
+            FOREIGN KEY (supervisor_id) REFERENCES faculty(faculty_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+    if not _supervisor_db_column_exists(cursor, "supervisor_lectures", "lecture_time"):
+        cursor.execute(
+            "ALTER TABLE supervisor_lectures ADD COLUMN lecture_time TIME NULL AFTER lecture_date"
+        )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS supervisor_lecture_recipients (
+            lecture_id INT NOT NULL,
+            student_id INT NOT NULL,
+            notified_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (lecture_id, student_id),
+            FOREIGN KEY (lecture_id) REFERENCES supervisor_lectures(lecture_id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS supervisor_lecture_attendance (
+            lecture_id INT NOT NULL,
+            student_id INT NOT NULL,
+            attendance_status ENUM('present','absent') NOT NULL,
+            marked_by INT NULL,
+            marked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (lecture_id, student_id),
+            FOREIGN KEY (lecture_id) REFERENCES supervisor_lectures(lecture_id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+            FOREIGN KEY (marked_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+    )
+
+
+def _supervisor_lecture_targets(cursor, faculty_id):
+    targets = {"introduction": [], "graduation_project": []}
+    if _supervisor_table_exists(cursor, "student_distribution_sections"):
+        cursor.execute(
+            """
+            SELECT CONCAT('s:', sec.section_id) AS target_key,
+                   sec.section_id AS target_id,
+                   sec.section_name AS target_name,
+                   COUNT(DISTINCT ss.student_id) AS students_count
+            FROM student_distribution_sections sec
+            LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+            WHERE sec.supervisor_id = %s
+            GROUP BY sec.section_id, sec.section_name
+            ORDER BY sec.section_name, sec.section_id
+            """,
+            (faculty_id,),
+        )
+        targets["introduction"] = cursor.fetchall()
+    cursor.execute(
+        """
+        SELECT CONCAT('p:', p.project_id) AS target_key,
+               p.project_id AS target_id,
+               COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id)) AS target_name,
+               COUNT(DISTINCT pm.student_id) AS students_count
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        LEFT JOIN project_members pm ON pm.project_id = p.project_id
+        WHERE p.supervisor_id = %s AND sem.course_code = 'COMP4300'
+        GROUP BY p.project_id, p.title
+        ORDER BY p.title, p.project_id
+        """,
+        (faculty_id,),
+    )
+    targets["graduation_project"] = cursor.fetchall()
+    return targets
+
+
+def _supervisor_lecture_recipients(cursor, faculty_id, course_scope, target_kind, target_id, semester_id):
+    if course_scope == "graduation_project":
+        params = [faculty_id, semester_id]
+        target_sql = ""
+        if target_kind == "project":
+            target_sql = "AND p.project_id = %s"
+            params.append(target_id)
+        cursor.execute(
+            f"""
+            SELECT DISTINCT u.user_id
+            FROM projects p
+            JOIN project_members pm ON pm.project_id = p.project_id
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE p.supervisor_id = %s AND p.semester_id = %s
+              AND u.is_active = TRUE {target_sql}
+            """,
+            tuple(params),
+        )
+    else:
+        params = [faculty_id]
+        target_sql = ""
+        if target_kind == "section":
+            target_sql = "AND sec.section_id = %s"
+            params.append(target_id)
+        cursor.execute(
+            f"""
+            SELECT DISTINCT u.user_id
+            FROM student_distribution_sections sec
+            JOIN section_students ss ON ss.section_id = sec.section_id
+            JOIN students st ON st.student_id = ss.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE sec.supervisor_id = %s AND u.is_active = TRUE {target_sql}
+            """,
+            tuple(params),
+        )
+    return [row["user_id"] for row in cursor.fetchall()]
+
+
+def _parse_supervisor_lecture_payload(data, course_scope):
+    title = (data.get("title") or "").strip()
+    if not title:
+        raise ValueError("Lecture title is required.")
+    status = data.get("status") if data.get("status") in {"scheduled", "completed", "cancelled"} else "scheduled"
+    lecture_date = (data.get("lecture_date") or "").strip() or None
+    if not lecture_date:
+        raise ValueError("Lecture date is required before sending the lecture.")
+    try:
+        datetime.strptime(lecture_date, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError("Lecture date is invalid.") from exc
+    lecture_time = (data.get("lecture_time") or "").strip()
+    if not lecture_time:
+        raise ValueError("Lecture time is required before sending the lecture.")
+    try:
+        datetime.strptime(lecture_time, "%H:%M")
+    except ValueError as exc:
+        raise ValueError("Lecture time is invalid.") from exc
+    target_key = (data.get("target_key") or "all").strip().lower()
+    target_kind, target_id = "all", None
+    if target_key != "all":
+        expected_prefix = "p:" if course_scope == "graduation_project" else "s:"
+        if not target_key.startswith(expected_prefix):
+            raise ValueError("Choose a valid section or All Sections.")
+        try:
+            target_id = int(target_key.split(":", 1)[1])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Choose a valid section.") from exc
+        target_kind = "project" if course_scope == "graduation_project" else "section"
+    return {
+        "title": title,
+        "description": (data.get("description") or "").strip() or None,
+        "lecture_date": lecture_date,
+        "lecture_time": lecture_time,
+        "week_label": (data.get("week_label") or "").strip() or None,
+        "status": status,
+        "target_kind": target_kind,
+        "target_id": target_id,
+    }
+
+
+def _validate_supervisor_lecture_target(cursor, faculty_id, course_scope, target_kind, target_id):
+    if target_kind == "all":
+        return True
+    if course_scope == "graduation_project":
+        cursor.execute("SELECT 1 FROM projects WHERE project_id=%s AND supervisor_id=%s", (target_id, faculty_id))
+    else:
+        cursor.execute("SELECT 1 FROM student_distribution_sections WHERE section_id=%s AND supervisor_id=%s", (target_id, faculty_id))
+    return bool(cursor.fetchone())
+
+
+def _snapshot_supervisor_lecture_recipients(cursor, lecture_id, user_ids):
+    """Keep the exact student audience that received this lecture."""
+    cursor.execute(
+        "DELETE FROM supervisor_lecture_recipients WHERE lecture_id = %s",
+        (lecture_id,),
+    )
+    if not user_ids:
+        return
+    placeholders = ",".join(["%s"] * len(user_ids))
+    cursor.execute(
+        f"""
+        INSERT IGNORE INTO supervisor_lecture_recipients (lecture_id, student_id)
+        SELECT %s, st.student_id
+        FROM students st
+        WHERE st.user_id IN ({placeholders})
+        """,
+        (lecture_id, *user_ids),
+    )
+    cursor.execute(
+        """
+        DELETE sla
+        FROM supervisor_lecture_attendance sla
+        LEFT JOIN supervisor_lecture_recipients slr
+          ON slr.lecture_id = sla.lecture_id AND slr.student_id = sla.student_id
+        WHERE sla.lecture_id = %s AND slr.student_id IS NULL
+        """,
+        (lecture_id,),
+    )
+
+
+def _notify_supervisor_lecture(cursor, faculty_id, semester_id, scope, lecture, action, lecture_id):
+    recipients = _supervisor_lecture_recipients(
+        cursor, faculty_id, scope, lecture["target_kind"], lecture.get("target_id"), semester_id
+    )
+    course_label = "COMP4300" if scope == "graduation_project" else "COMP4200"
+    course_name = "Graduation Project" if scope == "graduation_project" else "Project Introduction"
+    _snapshot_supervisor_lecture_recipients(cursor, lecture_id, recipients)
+    status_label = str(lecture.get("status") or "scheduled").replace("_", " ").title()
+    message = "\n".join(
+        (
+            f"Lecture: {lecture['title']}",
+            f"Course: {course_label} — {course_name}",
+            f"Date: {lecture.get('lecture_date') or 'To be announced'}",
+            f"Time: {lecture.get('lecture_time') or 'To be announced'}",
+            f"Week: {lecture.get('week_label') or 'Not specified'}",
+            f"Status: {status_label}",
+            f"Details: {lecture.get('description') or 'No additional details.'}",
+        )
+    )
+    for user_id in recipients:
+        _insert_notification(
+            cursor, user_id, session.get("user_id"), "system",
+            f"Supervisor Lecture {action.title()}: {lecture['title']}",
+            message, None, scope,
+        )
+    return len(recipients)
+
+
+@supervisor_api_bp.route("/api/supervisor/lectures-data", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_lectures_data():
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        _ensure_supervisor_lecture_tables(cursor)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id:
+            cursor.close(); db.close()
+            return jsonify({"error": "Supervisor faculty profile was not found."}), 404
+        targets = _supervisor_lecture_targets(cursor, faculty_id)
+        cursor.execute(
+            """
+            SELECT sl.*,
+                   CASE
+                     WHEN sl.target_kind='all' THEN 'All Sections'
+                     WHEN sl.target_kind='section' THEN COALESCE(sec.section_name, 'Section')
+                     ELSE COALESCE(p.title, 'Project')
+                   END AS target_name
+            FROM supervisor_lectures sl
+            LEFT JOIN student_distribution_sections sec
+              ON sl.target_kind='section' AND sec.section_id=sl.target_id
+            LEFT JOIN projects p
+              ON sl.target_kind='project' AND p.project_id=sl.target_id
+            WHERE sl.supervisor_id=%s
+            ORDER BY sl.course_scope, COALESCE(sl.lecture_date, '9999-12-31'), sl.lecture_id
+            """,
+            (faculty_id,),
+        )
+        lectures = {"introduction": [], "graduation_project": []}
+        for row in cursor.fetchall():
+            for key, value in list(row.items()):
+                if key == "lecture_time" and value is not None:
+                    row[key] = str(value)[:5]
+                elif hasattr(value, "isoformat"):
+                    row[key] = value.isoformat()
+            row["target_key"] = "all" if row["target_kind"] == "all" else f"{'p' if row['target_kind']=='project' else 's'}:{row['target_id']}"
+            lectures[row["course_scope"]].append(row)
+        db.commit(); cursor.close(); db.close()
+        return jsonify({"lectures": lectures, "targets": targets})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@supervisor_api_bp.route("/api/supervisor/lectures", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_create_lecture():
+    data = request.get_json(silent=True) or {}
+    scope = data.get("course_scope") if data.get("course_scope") in {"introduction", "graduation_project"} else "introduction"
+    try:
+        lecture = _parse_supervisor_lecture_payload(data, scope)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        _ensure_supervisor_lecture_tables(cursor)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        semester = _supervisor_active_semester_by_course(cursor, "COMP4300" if scope == "graduation_project" else "COMP4200")
+        if not faculty_id or not semester:
+            cursor.close(); db.close()
+            return jsonify({"error": "Supervisor profile or active semester was not found."}), 400
+        if not _validate_supervisor_lecture_target(cursor, faculty_id, scope, lecture["target_kind"], lecture["target_id"]):
+            cursor.close(); db.close()
+            return jsonify({"error": "You can only select sections assigned to you."}), 403
+        cursor.execute(
+            """INSERT INTO supervisor_lectures
+               (semester_id,supervisor_id,course_scope,target_kind,target_id,title,description,
+                lecture_date,lecture_time,week_label,status,created_by)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (semester["semester_id"], faculty_id, scope, lecture["target_kind"], lecture["target_id"],
+             lecture["title"], lecture["description"], lecture["lecture_date"], lecture["lecture_time"], lecture["week_label"],
+             lecture["status"], session.get("user_id")),
+        )
+        lecture_id = cursor.lastrowid
+        sent = _notify_supervisor_lecture(cursor, faculty_id, semester["semester_id"], scope, lecture, "posted", lecture_id)
+        db.commit(); cursor.close(); db.close()
+        return jsonify({"message": f"Lecture saved. {sent} student notification(s) sent."})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@supervisor_api_bp.route("/api/supervisor/lectures/<int:lecture_id>", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_update_lecture(lecture_id):
+    data = request.get_json(silent=True) or {}
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        _ensure_supervisor_lecture_tables(cursor)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        cursor.execute("SELECT * FROM supervisor_lectures WHERE lecture_id=%s AND supervisor_id=%s", (lecture_id, faculty_id))
+        current = cursor.fetchone()
+        if not current:
+            cursor.close(); db.close()
+            return jsonify({"error": "Lecture not found."}), 404
+        scope = current["course_scope"]
+        try:
+            lecture = _parse_supervisor_lecture_payload(data, scope)
+        except ValueError as exc:
+            cursor.close(); db.close()
+            return jsonify({"error": str(exc)}), 400
+        if not _validate_supervisor_lecture_target(cursor, faculty_id, scope, lecture["target_kind"], lecture["target_id"]):
+            cursor.close(); db.close()
+            return jsonify({"error": "You can only select sections assigned to you."}), 403
+        cursor.execute(
+            """UPDATE supervisor_lectures SET target_kind=%s,target_id=%s,title=%s,description=%s,
+                      lecture_date=%s,lecture_time=%s,week_label=%s,status=%s WHERE lecture_id=%s AND supervisor_id=%s""",
+            (lecture["target_kind"], lecture["target_id"], lecture["title"], lecture["description"],
+             lecture["lecture_date"], lecture["lecture_time"], lecture["week_label"], lecture["status"], lecture_id, faculty_id),
+        )
+        sent = _notify_supervisor_lecture(cursor, faculty_id, current["semester_id"], scope, lecture, "updated", lecture_id)
+        db.commit(); cursor.close(); db.close()
+        return jsonify({"message": f"Lecture updated. {sent} student notification(s) sent."})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+def _attendance_lecture(cursor, lecture_id, faculty_id):
+    cursor.execute(
+        """
+        SELECT lecture_id, semester_id, supervisor_id, course_scope,
+               target_kind, target_id, title, lecture_date, lecture_time,
+               CASE
+                   WHEN lecture_time IS NULL THEN lecture_date < CURDATE()
+                   ELSE TIMESTAMP(lecture_date, lecture_time) <= NOW()
+               END AS has_started
+        FROM supervisor_lectures
+        WHERE lecture_id = %s AND supervisor_id = %s
+        LIMIT 1
+        """,
+        (lecture_id, faculty_id),
+    )
+    return cursor.fetchone()
+
+
+def _ensure_lecture_recipient_snapshot(cursor, lecture):
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM supervisor_lecture_recipients WHERE lecture_id = %s",
+        (lecture["lecture_id"],),
+    )
+    if int((cursor.fetchone() or {}).get("total") or 0) > 0:
+        return
+    recipients = _supervisor_lecture_recipients(
+        cursor,
+        lecture["supervisor_id"],
+        lecture["course_scope"],
+        lecture["target_kind"],
+        lecture.get("target_id"),
+        lecture["semester_id"],
+    )
+    _snapshot_supervisor_lecture_recipients(
+        cursor, lecture["lecture_id"], recipients
+    )
+
+
+@supervisor_api_bp.route("/api/supervisor/lectures/<int:lecture_id>/attendance", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_lecture_attendance(lecture_id):
+    db = get_db(); cursor = db.cursor(dictionary=True)
+    try:
+        _ensure_supervisor_lecture_tables(cursor)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        lecture = _attendance_lecture(cursor, lecture_id, faculty_id)
+        if not lecture:
+            return jsonify({"error": "Lecture not found."}), 404
+        if not lecture.get("has_started"):
+            return jsonify({"error": "Attendance opens after the lecture date and time."}), 400
+        _ensure_lecture_recipient_snapshot(cursor, lecture)
+        cursor.execute(
+            """
+            SELECT st.student_id, u.full_name, u.university_id,
+                   sla.attendance_status
+            FROM supervisor_lecture_recipients slr
+            JOIN students st ON st.student_id = slr.student_id
+            JOIN users u ON u.user_id = st.user_id
+            LEFT JOIN supervisor_lecture_attendance sla
+              ON sla.lecture_id = slr.lecture_id
+             AND sla.student_id = slr.student_id
+            WHERE slr.lecture_id = %s
+            ORDER BY u.full_name
+            """,
+            (lecture_id,),
+        )
+        students = cursor.fetchall()
+        db.commit()
+        return jsonify({"lecture_id": lecture_id, "title": lecture["title"], "students": students})
+    except Exception as exc:
+        db.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        cursor.close(); db.close()
+
+
+@supervisor_api_bp.route("/api/supervisor/lectures/<int:lecture_id>/attendance", methods=["POST"])
+@login_required(role="supervisor")
+def api_save_supervisor_lecture_attendance(lecture_id):
+    data = request.get_json(silent=True) or {}
+    attendance = data.get("attendance") or []
+    db = get_db(); cursor = db.cursor(dictionary=True)
+    try:
+        _ensure_supervisor_lecture_tables(cursor)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        lecture = _attendance_lecture(cursor, lecture_id, faculty_id)
+        if not lecture:
+            return jsonify({"error": "Lecture not found."}), 404
+        if not lecture.get("has_started"):
+            return jsonify({"error": "Attendance opens after the lecture date and time."}), 400
+        _ensure_lecture_recipient_snapshot(cursor, lecture)
+        cursor.execute(
+            "SELECT student_id FROM supervisor_lecture_recipients WHERE lecture_id = %s",
+            (lecture_id,),
+        )
+        allowed_ids = {int(row["student_id"]) for row in cursor.fetchall()}
+        cleaned = []
+        for row in attendance:
+            try:
+                student_id = int(row.get("student_id"))
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid student in attendance list."}), 400
+            status = (row.get("status") or "").strip().lower()
+            if student_id not in allowed_ids or status not in {"present", "absent"}:
+                return jsonify({"error": "Attendance can only be recorded for notified students."}), 400
+            cleaned.append((student_id, status))
+        if allowed_ids and {student_id for student_id, _ in cleaned} != allowed_ids:
+            return jsonify({"error": "Mark every notified student as present or absent."}), 400
+        for student_id, status in cleaned:
+            cursor.execute(
+                """
+                INSERT INTO supervisor_lecture_attendance
+                    (lecture_id, student_id, attendance_status, marked_by, marked_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON DUPLICATE KEY UPDATE
+                    attendance_status = VALUES(attendance_status),
+                    marked_by = VALUES(marked_by),
+                    marked_at = NOW()
+                """,
+                (lecture_id, student_id, status, session.get("user_id")),
+            )
+        db.commit()
+        return jsonify({"message": f"Attendance saved for {len(cleaned)} student(s)."})
+    except Exception as exc:
+        db.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        cursor.close(); db.close()
+
+
+@supervisor_api_bp.route("/api/supervisor/lectures/reset-scheduled", methods=["POST"])
+@login_required(role="supervisor")
+def api_supervisor_reset_scheduled_lectures():
+    data = request.get_json(silent=True) or {}
+    scope = data.get("course_scope") if data.get("course_scope") in {"introduction", "graduation_project"} else "introduction"
+    try:
+        db = get_db(); cursor = db.cursor(dictionary=True)
+        _ensure_supervisor_lecture_tables(cursor)
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        cursor.execute(
+            "DELETE FROM supervisor_lectures WHERE supervisor_id=%s AND course_scope=%s AND status='scheduled'",
+            (faculty_id, scope),
+        )
+        deleted = cursor.rowcount
+        db.commit(); cursor.close(); db.close()
+        return jsonify({"message": f"{deleted} scheduled lecture(s) removed."})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 
@@ -42,6 +899,8 @@ SUPERVISOR_PAGES = {
     "dashboard": "supervisor/index.html",
     "mystudents": "supervisor/mystudents.html",
     "progress": "supervisor/progress.html",
+    "timeline": "supervisor/progress.html",
+    "lectures": "supervisor/lectures.html",
     "feedback": "supervisor/feedback.html",
     "evaluation": "supervisor/evaluation.html",
     "hours": "supervisor/hours.html",
@@ -1405,6 +2264,10 @@ def _fetch_supervisor_projects(cursor, faculty_id):
               'rejected',
               'cancelled'
           )
+          AND NOT EXISTS (
+              SELECT 1 FROM project_course_promotions pcp
+              WHERE pcp.source_project_id = p.project_id
+          )
         GROUP BY
             p.project_id,
             p.title,
@@ -1453,6 +2316,10 @@ def _get_project_for_supervisor(cursor, project_id, faculty_id):
               'rejected',
               'cancelled'
           )
+          AND NOT EXISTS (
+              SELECT 1 FROM project_course_promotions pcp
+              WHERE pcp.source_project_id = p.project_id
+          )
         GROUP BY p.project_id
         HAVING COUNT(DISTINCT st.student_id) > 0
         LIMIT 1
@@ -1465,6 +2332,96 @@ def _get_project_for_supervisor(cursor, project_id, faculty_id):
 # ============================================================
 # Supervisor feedback APIs moved from app.py
 # ============================================================
+
+def _ensure_feedback_target_schema(cursor):
+    additions = {
+        "target_scope": "ALTER TABLE feedback ADD COLUMN target_scope VARCHAR(20) NOT NULL DEFAULT 'group' AFTER is_draft",
+        "target_student_id": "ALTER TABLE feedback ADD COLUMN target_student_id INT NULL AFTER target_scope",
+        "target_label": "ALTER TABLE feedback ADD COLUMN target_label VARCHAR(220) NULL AFTER target_student_id",
+    }
+    for column, ddl in additions.items():
+        if not _supervisor_db_column_exists(cursor, "feedback", column):
+            cursor.execute(ddl)
+
+
+def _supervisor_feedback_groups(cursor, faculty_id):
+    groups = {}
+    if _supervisor_table_exists(cursor, "comp4200_project_sections"):
+        cursor.execute(
+            """
+            SELECT CONCAT('s:', sec.section_id) AS target_key,
+                   sec.section_name AS group_name, cps.project_id,
+                   COALESCE(NULLIF(p.title,''),sec.section_name) AS project_title,
+                   'COMP4200' AS course_code,
+                   st.student_id, u.user_id, u.full_name, u.university_id
+            FROM student_distribution_sections sec
+            JOIN comp4200_project_sections cps ON cps.section_id=sec.section_id
+            JOIN projects p ON p.project_id=cps.project_id
+            LEFT JOIN section_students ss ON ss.section_id=sec.section_id
+            LEFT JOIN students st ON st.student_id=ss.student_id
+            LEFT JOIN users u ON u.user_id=st.user_id
+            WHERE sec.supervisor_id=%s
+              AND LOWER(COALESCE(p.status,'')) NOT IN ('archived','promoted','cancelled','rejected')
+              AND NOT EXISTS (
+                  SELECT 1 FROM project_course_promotions pcp
+                  WHERE pcp.source_project_id=p.project_id
+              )
+            ORDER BY sec.section_name,u.full_name
+            """,
+            (faculty_id,),
+        )
+        intro_rows = cursor.fetchall()
+    else:
+        intro_rows = []
+    cursor.execute(
+        """
+        SELECT CONCAT('p:',p.project_id) AS target_key,
+               COALESCE(NULLIF(p.title,''),CONCAT('Project ',p.project_id)) AS group_name,
+               p.project_id, p.title AS project_title, 'COMP4300' AS course_code,
+               st.student_id, u.user_id, u.full_name, u.university_id
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id=p.semester_id AND sem.course_code='COMP4300'
+        LEFT JOIN project_members pm ON pm.project_id=p.project_id
+        LEFT JOIN students st ON st.student_id=pm.student_id
+        LEFT JOIN users u ON u.user_id=st.user_id
+        WHERE p.supervisor_id=%s
+          AND LOWER(COALESCE(p.status,'')) NOT IN ('archived','promoted','cancelled','rejected')
+        ORDER BY p.title,u.full_name
+        """,
+        (faculty_id,),
+    )
+    for row in intro_rows + cursor.fetchall():
+        key = row["target_key"]
+        group = groups.setdefault(key, {
+            "target_key": key,
+            "group_name": row.get("group_name") or row.get("project_title") or "Group",
+            "project_id": row["project_id"],
+            "course_code": row["course_code"],
+            "students": [],
+        })
+        if row.get("student_id"):
+            group["students"].append({
+                "student_id": row["student_id"],
+                "user_id": row.get("user_id"),
+                "full_name": row.get("full_name") or "Student",
+                "university_id": row.get("university_id") or "",
+            })
+    return list(groups.values())
+
+
+@supervisor_api_bp.route("/api/supervisor/feedback-targets", methods=["GET"])
+@login_required(role="supervisor")
+def api_supervisor_feedback_targets():
+    db = get_db(); cursor = db.cursor(dictionary=True)
+    try:
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id:
+            return jsonify({"error": "Supervisor faculty profile was not found."}), 404
+        return jsonify({"groups": _json_safe(_supervisor_feedback_groups(cursor, faculty_id))})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        cursor.close(); db.close()
 
 @supervisor_api_bp.route("/api/supervisor/my-projects", methods=["GET"])
 @login_required(role="supervisor")
@@ -1488,38 +2445,89 @@ def api_supervisor_submit_feedback():
     user_id = session["user_id"]
     data = request.get_json(force=True)
     project_id = data.get("project_id")
+    target_scope = (data.get("target_scope") or "group").strip().lower()
+    target_key = (data.get("target_key") or "").strip()
+    target_student_id = data.get("target_student_id")
     feedback_type = data.get("feedback_type", "general_performance")
     feedback_text = (data.get("feedback_text") or "").strip()
     priority = data.get("priority", "normal")
     is_draft = bool(data.get("is_draft", False))
     points = data.get("improvement_points", [])
-    if not project_id or not feedback_text:
-        return jsonify({"error": "project_id and feedback_text are required"}), 400
+    if target_scope not in {"all", "group", "student"}:
+        return jsonify({"error": "Invalid feedback audience."}), 400
+    if not feedback_text:
+        return jsonify({"error": "Feedback text is required"}), 400
     if priority not in {"normal", "important", "urgent"}:
         return jsonify({"error": "Invalid feedback priority"}), 400
     db = get_db()
     cursor = db.cursor(dictionary=True)
     try:
         faculty_id = _current_supervisor_faculty_id(cursor)
-        if not faculty_id or not _get_project_for_supervisor(cursor, project_id, faculty_id):
-            return jsonify({"error": "You are not assigned to this project"}), 403
-        cursor.execute(
-            """
-            INSERT INTO feedback (project_id, reviewer_id, feedback_type, feedback_text, priority, is_draft)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """,
-            (project_id, user_id, feedback_type, feedback_text, priority, is_draft),
-        )
-        feedback_id = cursor.lastrowid
-        for pt in points:
-            pt = str(pt).strip()
-            if pt:
-                cursor.execute(
-                    "INSERT INTO feedback_improvement_points (feedback_id, point_text) VALUES (%s, %s)",
-                    (feedback_id, pt),
-                )
+        if not faculty_id:
+            return jsonify({"error": "Supervisor faculty profile was not found."}), 403
+        _ensure_feedback_target_schema(cursor)
+        groups = _supervisor_feedback_groups(cursor, faculty_id)
+        by_key = {group["target_key"]: group for group in groups}
+        targets = []
+        if target_scope == "all":
+            targets = [(group, None) for group in groups]
+        else:
+            group = by_key.get(target_key)
+            if not group:
+                return jsonify({"error": "Choose one of your assigned sections."}), 403
+            if target_scope == "student":
+                try:
+                    target_student_id = int(target_student_id)
+                except (TypeError, ValueError):
+                    return jsonify({"error": "Choose a student from the selected section."}), 400
+                student = next((row for row in group["students"] if int(row["student_id"]) == target_student_id), None)
+                if not student:
+                    return jsonify({"error": "The selected student is not in this section."}), 403
+                targets = [(group, student)]
+            else:
+                targets = [(group, None)]
+        if not targets:
+            return jsonify({"error": "No assigned students were found."}), 404
+
+        feedback_ids = []
+        notified_users = set()
+        for group, student in targets:
+            label = student["full_name"] if student else group["group_name"]
+            cursor.execute(
+                """
+                INSERT INTO feedback
+                    (project_id,reviewer_id,feedback_type,feedback_text,priority,is_draft,
+                     target_scope,target_student_id,target_label)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (group["project_id"], user_id, feedback_type, feedback_text, priority,
+                 is_draft, target_scope, student["student_id"] if student else None, label),
+            )
+            feedback_id = cursor.lastrowid
+            feedback_ids.append(feedback_id)
+            for pt in points:
+                pt = str(pt).strip()
+                if pt:
+                    cursor.execute(
+                        "INSERT INTO feedback_improvement_points (feedback_id, point_text) VALUES (%s, %s)",
+                        (feedback_id, pt),
+                    )
+            recipients = [student] if student else group["students"]
+            if not is_draft:
+                for recipient in recipients:
+                    recipient_user_id = recipient.get("user_id")
+                    if not recipient_user_id or recipient_user_id in notified_users:
+                        continue
+                    _insert_notification(
+                        cursor, recipient_user_id, user_id, "feedback_received",
+                        "New Supervisor Feedback",
+                        f'Your supervisor posted feedback for {label}. Open the Feedback page to review it.',
+                        group["project_id"],
+                        "graduation_project" if group["course_code"] == "COMP4300" else "introduction",
+                    )
+                    notified_users.add(recipient_user_id)
         db.commit()
-        return jsonify({"success": True, "feedback_id": feedback_id})
+        return jsonify({"success": True, "feedback_ids": feedback_ids, "sent_count": len(notified_users)})
     except Exception as e:
         db.rollback()
         return jsonify({"error": str(e)}), 500
@@ -1536,10 +2544,11 @@ def api_supervisor_my_feedback():
     db = get_db()
     cursor = db.cursor(dictionary=True)
     try:
+        _ensure_feedback_target_schema(cursor)
         sql = """
             SELECT f.feedback_id, f.project_id, p.title AS project_title,
                    f.feedback_type, f.feedback_text, f.priority,
-                   f.is_draft, f.created_at
+                   f.is_draft, f.created_at, f.target_scope, f.target_label
             FROM   feedback f
             JOIN   projects p ON p.project_id = f.project_id
             WHERE  f.reviewer_id = %s

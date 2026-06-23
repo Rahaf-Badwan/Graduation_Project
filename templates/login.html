@@ -62,6 +62,26 @@
       background: #eee;
       margin: 4px 0;
     }
+
+    .help-overlay { display:none; position:fixed; inset:0; z-index:1000; padding:20px; background:rgba(10,18,14,.68); backdrop-filter:blur(5px); align-items:center; justify-content:center; }
+    .help-overlay.open { display:flex; }
+    .help-dialog { width:min(560px,100%); max-height:88vh; overflow-y:auto; background:var(--color-background-primary,#fff); color:var(--color-text-primary,#172b1d); border:1px solid rgba(31,122,59,.28); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.3); }
+    .help-dialog-head { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:17px 20px; border-bottom:1px solid rgba(31,122,59,.18); }
+    .help-dialog-title { font-size:18px; font-weight:900; }
+    .help-dialog-close { border:0; background:transparent; color:inherit; font-size:25px; cursor:pointer; line-height:1; }
+    .help-panel { display:none; padding:20px; }
+    .help-panel.active { display:block; }
+    .help-panel p { margin:0 0 14px; font-size:14px; line-height:1.65; }
+    .help-steps { margin:0; padding-left:22px; }
+    .help-steps li { margin:0 0 10px; font-size:14px; line-height:1.5; }
+    .help-role { padding:10px 12px; margin-bottom:9px; border-radius:10px; background:rgba(31,122,59,.08); font-size:13px; line-height:1.5; }
+    .help-role strong { color:#1f7a3b; }
+    .help-action { display:flex; justify-content:flex-end; margin-top:18px; }
+    .help-action button { border:0; border-radius:9px; padding:9px 15px; background:#1f7a3b; color:#fff; font-weight:800; cursor:pointer; }
+    html[data-theme="dark"] .help-dialog { background:#1e2128; color:#e2e4e9; border-color:#356447; }
+    html[data-theme="dark"] .help-dialog-head { border-bottom-color:#30363d; }
+    html[data-theme="dark"] .help-role { background:#1a2d24; }
+    html[data-theme="dark"] .help-role strong { color:#75d394; }
   </style>
 </head>
 
@@ -137,12 +157,9 @@
         {% endif %}
 
         <div class="notice-btns">
-          <button type="button">{{ public_notice.button1_text if public_notice and public_notice.button1_text else 'ⓘ
-            How does the system work?' }}</button>
-          <button type="button">{{ public_notice.button2_text if public_notice and public_notice.button2_text else '⬆
-            Project Upload Guide' }}</button>
-          <button type="button">{{ public_notice.button3_text if public_notice and public_notice.button3_text else '⚙
-            Roles & Permissions' }}</button>
+          <button type="button" data-help-panel="system" aria-haspopup="dialog">{{ public_notice.button1_text if public_notice and public_notice.button1_text else 'ⓘ How APMS Works' }}</button>
+          <button type="button" data-help-panel="upload" aria-haspopup="dialog">{{ public_notice.button2_text if public_notice and public_notice.button2_text else '⬆ Submit a Project' }}</button>
+          <button type="button" data-help-panel="roles" aria-haspopup="dialog">{{ public_notice.button3_text if public_notice and public_notice.button3_text else '⚙ User Roles' }}</button>
         </div>
 
         <div id="activation-banner" style="display:none; margin-top:16px;">
@@ -236,6 +253,47 @@
       </div>
     </div>
 
+    <div class="help-overlay" id="helpOverlay" role="presentation">
+      <div class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="helpDialogTitle">
+        <div class="help-dialog-head">
+          <div class="help-dialog-title" id="helpDialogTitle">APMS Help</div>
+          <button class="help-dialog-close" id="helpDialogClose" type="button" aria-label="Close">×</button>
+        </div>
+
+        <section class="help-panel" data-help-content="system" data-title="How APMS Works">
+          <p>APMS manages graduation projects from registration through supervision, evaluation, and final archiving.</p>
+          <ol class="help-steps">
+            <li>Activate your university account and sign in.</li>
+            <li>Students register their project and team information.</li>
+            <li>Supervisors review progress, feedback, and submissions.</li>
+            <li>Coordinators organize sections and evaluation committees.</li>
+            <li>The Head of Department reviews final results and archived projects.</li>
+          </ol>
+          <div class="help-action"><button type="button" data-focus-login>Sign in to APMS</button></div>
+        </section>
+
+        <section class="help-panel" data-help-content="upload" data-title="Submit a Project">
+          <p>Project files are submitted from the student dashboard after signing in.</p>
+          <ol class="help-steps">
+            <li>Open your project page and confirm the project and team details.</li>
+            <li>Choose the required submission stage or milestone.</li>
+            <li>Upload the requested report or supporting files.</li>
+            <li>Review the file name and details, then submit before the deadline.</li>
+            <li>Check notifications for supervisor feedback or required changes.</li>
+          </ol>
+          <div class="help-action"><button type="button" data-focus-login>Sign in to submit</button></div>
+        </section>
+
+        <section class="help-panel" data-help-content="roles" data-title="APMS User Roles">
+          <div class="help-role"><strong>Student:</strong> registers the project, follows milestones, uploads files, and receives feedback.</div>
+          <div class="help-role"><strong>Supervisor:</strong> supervises teams, reviews progress, provides feedback, and submits evaluations.</div>
+          <div class="help-role"><strong>Coordinator:</strong> manages sections, registrations, schedules, committees, and course workflows.</div>
+          <div class="help-role"><strong>Head of Department:</strong> assigns supervisors, reviews grades, manages users, and accesses the archive.</div>
+          <div class="help-action"><button type="button" data-focus-login>Continue to sign in</button></div>
+        </section>
+      </div>
+    </div>
+
     <footer>
       © 2026 <strong>Birzeit University</strong> — Department of Computer Science · All Rights Reserved.
     </footer>
@@ -264,6 +322,48 @@
       input.type = isHidden ? 'text' : 'password';
       btn.textContent = isHidden ? '\uD83D\uDE48' : '\uD83D\uDC41';
     }
+
+    (function setupHelpButtons() {
+      var overlay = document.getElementById('helpOverlay');
+      var title = document.getElementById('helpDialogTitle');
+      var closeButton = document.getElementById('helpDialogClose');
+      var lastTrigger = null;
+
+      function closeHelp() {
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+        if (lastTrigger) lastTrigger.focus();
+      }
+
+      function openHelp(panelName, trigger) {
+        var selectedPanel = document.querySelector('[data-help-content="' + panelName + '"]');
+        if (!selectedPanel) return;
+        lastTrigger = trigger;
+        document.querySelectorAll('[data-help-content]').forEach(function(panel) {
+          panel.classList.toggle('active', panel === selectedPanel);
+        });
+        title.textContent = selectedPanel.dataset.title || 'APMS Help';
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        closeButton.focus();
+      }
+
+      document.querySelectorAll('[data-help-panel]').forEach(function(button) {
+        button.addEventListener('click', function() { openHelp(button.dataset.helpPanel, button); });
+      });
+      document.querySelectorAll('[data-focus-login]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          closeHelp();
+          var universityId = document.getElementById('university_id');
+          if (universityId) universityId.focus();
+        });
+      });
+      closeButton.addEventListener('click', closeHelp);
+      overlay.addEventListener('click', function(event) { if (event.target === overlay) closeHelp(); });
+      document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && overlay.classList.contains('open')) closeHelp();
+      });
+    })();
 
     (async function() {
       try{

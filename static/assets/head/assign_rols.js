@@ -45,7 +45,7 @@ function loadCourse(courseCode){
           let doctorSelect = document.getElementById("doctorSelect");
 
           doctorList.innerHTML = "";
-          doctorSelect.innerHTML = "";
+          doctorSelect.innerHTML = '<option value="" disabled selected>Select Coordinator</option>';
 
           data.doctors.forEach(d => {
             if(d.role === "head_of_department") return;
@@ -135,6 +135,8 @@ function loadCourse(courseCode){
         });
         if (data.coordinator && data.coordinator.faculty_id) {
           doctorSelect.value = String(data.coordinator.faculty_id);
+        } else {
+          doctorSelect.value = "";
         }
 
       })
@@ -146,6 +148,11 @@ function loadCourse(courseCode){
 
 // assign coordinator
 function assignCoordinator(facultyId){
+  if (!facultyId) {
+    showToast("Please select a supervisor.", "error");
+    return;
+  }
+
   let semesterId = document.getElementById("semesterSelect").value;
   let btn = document.querySelector(".btn-primary");
 

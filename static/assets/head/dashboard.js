@@ -60,7 +60,7 @@ function renderDashboard(data) {
   setText("stat-acceptance",
     data.acceptance_rate != null ? `${data.acceptance_rate}%` : "—");
   setText("stat-avg",
-    data.avg_grade ? data.avg_grade : "—");
+    data.avg_grade != null ? data.avg_grade : "—");
 
   // ── Coordinator ──────────────────────────────────────────
   const coord = data.coordinator || {};

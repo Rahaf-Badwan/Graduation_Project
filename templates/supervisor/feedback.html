@@ -12,10 +12,22 @@
       <div class="card-hd"><span class="card-title">Add new feedback</span></div>
 
       <div class="field-wrap">
-        <div class="field-label">Project <span class="req">*</span></div>
-        <select class="field-select" id="sup-fb-project">
-          <option value="">Loading your projects…</option>
+        <div class="field-label">Send feedback to <span class="req">*</span></div>
+        <select class="field-select" id="sup-fb-audience">
+          <option value="all">All my sections and students</option>
+          <option value="group">One entire section / project group</option>
+          <option value="student">One student from a section</option>
         </select>
+      </div>
+
+      <div class="field-wrap" id="sup-fb-group-wrap" style="display:none">
+        <div class="field-label">Section / Project Group <span class="req">*</span></div>
+        <select class="field-select" id="sup-fb-group"><option value="">Loading your sections…</option></select>
+      </div>
+
+      <div class="field-wrap" id="sup-fb-student-wrap" style="display:none">
+        <div class="field-label">Student <span class="req">*</span></div>
+        <select class="field-select" id="sup-fb-student"><option value="">Choose a section first</option></select>
       </div>
 
       <div class="field-wrap">
@@ -82,7 +94,7 @@
 {% block extra_scripts %}
 <script>
   (function () {
-    var projects = [];
+    var feedbackGroups = [];
     var COLORS = ["var(--sup-light)", "var(--blue-light)", "var(--amber-light)"];
     var FG = ["var(--sup)", "var(--blue)", "var(--amber)"];
 
@@ -99,20 +111,38 @@
       }[t] || t;
     }
 
-    // Load my projects
-    fetch("/api/supervisor/my-projects")
+    function updateStudents() {
+      var groupKey = document.getElementById("sup-fb-group").value;
+      var group = feedbackGroups.find(g => g.target_key === groupKey);
+      var students = group ? (group.students || []) : [];
+      document.getElementById("sup-fb-student").innerHTML = '<option value="">-- Select student --</option>' +
+        students.map(s => `<option value="${s.student_id}">${esc(s.full_name)}${s.university_id ? " — " + esc(s.university_id) : ""}</option>`).join("");
+    }
+
+    function updateAudienceFields() {
+      var audience = document.getElementById("sup-fb-audience").value;
+      document.getElementById("sup-fb-group-wrap").style.display = audience === "all" ? "none" : "";
+      document.getElementById("sup-fb-student-wrap").style.display = audience === "student" ? "" : "none";
+      if (audience === "student") updateStudents();
+    }
+
+    fetch("/api/supervisor/feedback-targets")
       .then(r => r.json()).then(d => {
-        projects = d.projects || [];
-        var sel = document.getElementById("sup-fb-project");
-        if (!projects.length) {
-          sel.innerHTML = '<option value="">No projects assigned</option>';
+        feedbackGroups = d.groups || [];
+        var sel = document.getElementById("sup-fb-group");
+        if (!feedbackGroups.length) {
+          sel.innerHTML = '<option value="">No sections assigned</option>';
           return;
         }
-        sel.innerHTML = '<option value="">-- Select project --</option>' +
-          projects.map(p => `<option value="${p.project_id}">${esc(p.title)}${p.members ? " — " + esc(p.members) : ""}</option>`).join("");
+        sel.innerHTML = '<option value="">-- Select section / group --</option>' +
+          feedbackGroups.map(g => `<option value="${esc(g.target_key)}">${esc(g.course_code)} — ${esc(g.group_name)} (${(g.students || []).length} students)</option>`).join("");
       }).catch(() => {
-        document.getElementById("sup-fb-project").innerHTML = '<option value="">Could not load projects</option>';
+        document.getElementById("sup-fb-group").innerHTML = '<option value="">Could not load sections</option>';
       });
+
+    document.getElementById("sup-fb-audience").addEventListener("change", updateAudienceFields);
+    document.getElementById("sup-fb-group").addEventListener("change", updateStudents);
+    updateAudienceFields();
 
     // Load history
     function loadHistory() {
@@ -129,7 +159,7 @@
             return `<div class="fb-item" ${isLast ? 'style="border:none;margin-bottom:0;padding-bottom:0"' : ""}>
             <div class="fb-head">
               <div class="person-avatar" style="background:${COLORS[i % 3]};color:${FG[i % 3]};width:30px;height:30px">${ini(fb.project_title)}</div>
-              <div><div class="fb-name">${esc(fb.project_title)}</div><div class="fb-role">${esc(typeLabel(fb.feedback_type))}${fb.is_draft ? ' · <em>draft</em>' : ""}</div></div>
+              <div><div class="fb-name">${esc(fb.target_label || fb.project_title)}</div><div class="fb-role">${esc(fb.project_title)} · ${esc(typeLabel(fb.feedback_type))}${fb.is_draft ? ' · <em>draft</em>' : ""}</div></div>
               <div class="fb-date">${esc(fb.created_at)}</div>
             </div>
             <div class="fb-text">${esc(fb.feedback_text)}</div></div>`;
@@ -144,14 +174,17 @@
     function submitFeedback(isDraft) {
       var err = document.getElementById("sup-fb-error");
       err.style.display = "none";
-      var projectId = document.getElementById("sup-fb-project").value;
+      var audience = document.getElementById("sup-fb-audience").value;
+      var groupKey = document.getElementById("sup-fb-group").value;
+      var studentId = document.getElementById("sup-fb-student").value;
       var fbType = document.getElementById("sup-fb-type").value;
       var fbText = document.getElementById("sup-fb-text").value.trim();
       var priority = document.getElementById("sup-fb-priority").value;
       var pointsRaw = document.getElementById("sup-fb-points").value;
       var points = pointsRaw.split("\n").map(s => s.trim()).filter(Boolean);
 
-      if (!projectId) { err.textContent = "Please select a project."; err.style.display = ""; return; }
+      if (audience !== "all" && !groupKey) { err.textContent = "Please select a section or project group."; err.style.display = ""; return; }
+      if (audience === "student" && !studentId) { err.textContent = "Please select a student."; err.style.display = ""; return; }
       if (!fbText) { err.textContent = "Feedback text is required."; err.style.display = ""; return; }
 
       var btn = document.getElementById(isDraft ? "sup-fb-draft" : "sup-fb-send");
@@ -160,7 +193,9 @@
       fetch("/api/supervisor/submit-feedback", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_id: parseInt(projectId), feedback_type: fbType,
+          target_scope: audience, target_key: groupKey,
+          target_student_id: studentId ? parseInt(studentId) : null,
+          feedback_type: fbType,
           feedback_text: fbText, priority: priority,
           is_draft: isDraft, improvement_points: points
         })

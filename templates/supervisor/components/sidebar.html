@@ -26,15 +26,21 @@
       <span class="sb-label">Students &amp; Projects</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/supervisor/progress' %}on{% endif %}" href="/supervisor/progress">
-      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">upload_file</span></span>
-      <span class="sb-label">Submitted Files</span>
-    </a>
-
-    <a class="sb-item {% if request.path == '/supervisor/hours' %}on{% endif %}" href="/supervisor/hours">
+     <a class="sb-item {% if request.path == '/supervisor/hours' %}on{% endif %}" href="/supervisor/hours">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">schedule</span></span>
       <span class="sb-label">Project Hours</span>
     </a>
+
+    <a class="sb-item {% if request.path in ['/supervisor/progress', '/supervisor/timeline'] %}on{% endif %}" href="/supervisor/timeline">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">assignment</span></span>
+      <span class="sb-label">Exam</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/supervisor/lectures' %}on{% endif %}" href="/supervisor/lectures">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">co_present</span></span>
+      <span class="sb-label">Lectures</span>
+    </a>
+
 
     <a class="sb-item {% if request.path == '/supervisor/feedback' %}on{% endif %}" href="/supervisor/feedback">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">rate_review</span></span>
@@ -43,15 +49,10 @@
 
     <a class="sb-item {% if request.path == '/supervisor/evaluation' %}on{% endif %}" href="/supervisor/evaluation">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">grading</span></span>
-      <span class="sb-label">Evaluation Projects</span>
+      <span class="sb-label">Evaluation</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/supervisor/search' %}on{% endif %}" href="/supervisor/search">
-      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
-      <span class="sb-label">Search &amp; Filtering</span>
-    </a>
-
-     <a class="sb-item {% if request.path == '/supervisor/grades' %}on{% endif %}"
+    <a class="sb-item {% if request.path == '/supervisor/grades' %}on{% endif %}"
       data-page="grades"
       data-tip="Grades"
       href="/supervisor/grades">
@@ -60,6 +61,13 @@
       </span>
       <span class="sb-label">{{ t['general']['Grades'] }}</span>
     </a>
+
+    <a class="sb-item {% if request.path == '/supervisor/search' %}on{% endif %}" href="/supervisor/search">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
+      <span class="sb-label">{{ t['general']['archived_projects'] }}</span>
+    </a>
+
+     
     <a class="sb-item {% if request.path == '/supervisor/notifs' %}on{% endif %}" href="/supervisor/notifs">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
       <span class="sb-label">Notifications</span>

@@ -59,6 +59,37 @@ app.config["MAIL_DEFAULT_SENDER"] = (
 mail = Mail(app)
 
 
+def _load_translations(lang):
+    if lang not in {"en", "ar"}:
+        lang = "en"
+
+    filename = "arabic.json" if lang == "ar" else "english.json"
+    path = os.path.join(app.root_path, "translations", filename)
+    fallback_path = os.path.join(app.root_path, "translations", "english.json")
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        with open(fallback_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+
+@app.context_processor
+def inject_translations():
+    current_lang = session.get("lang", "en")
+    if current_lang not in {"en", "ar"}:
+        current_lang = "en"
+    return {"t": _load_translations(current_lang), "current_lang": current_lang}
+
+
+@app.route("/set_lang/<lang>")
+def set_lang(lang):
+    if lang in {"en", "ar"}:
+        session["lang"] = lang
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 @app.route("/favicon.ico")
 def favicon():
     return redirect(url_for("static", filename="favicon.png"))
@@ -230,7 +261,15 @@ def forgot_password():
             db.close()
             return render_template(
                 "forgot_password.html",
-                success="If that account exists, a reset link has been sent to its email.",
+                error="No active account was found for this University ID or email.",
+            )
+
+        if not app.config.get("MAIL_PASSWORD"):
+            cursor.close()
+            db.close()
+            return render_template(
+                "forgot_password.html",
+                error="Email service is not configured. Please set MAIL_PASSWORD and try again.",
             )
 
         token = secrets.token_urlsafe(48)
@@ -252,10 +291,14 @@ def forgot_password():
 
         return render_template(
             "forgot_password.html",
-            success="If that account exists, a reset link has been sent to its email.",
+            success=f"The reset email was accepted by the mail service for {user['email']}. Please check inbox, spam, or quarantine.",
         )
     except Exception as e:
-        return render_template("forgot_password.html", error=f"An error occurred: {e}")
+        app.logger.error("Password reset email failed: %s", e)
+        return render_template(
+            "forgot_password.html",
+            error="The reset email could not be sent. Please check the mail settings and try again.",
+        )
 
 
 def send_reset_email(to_email, full_name, reset_link):
@@ -823,24 +866,6 @@ def api_assign_student():
         return jsonify({"error": str(e)}), 500
 
 
-#change the language
-def get_translations():
-    lang = request.cookies.get('lang', 'en')  # ← cookie بدل session
-    mapping = {'en': 'english', 'ar': 'arabic'}
-    path = os.path.join('translations', f'{mapping[lang]}.json')
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-@app.context_processor
-def inject_translations():
-    return dict(t=get_translations())
-
-@app.route('/set_lang/<lang>')
-def set_lang(lang):
-    response = redirect(request.referrer or '/')
-    if lang in ['ar', 'en']:
-        response.set_cookie('lang', lang, max_age=60*60*24*365)  
-    return response
 # ─── Run ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

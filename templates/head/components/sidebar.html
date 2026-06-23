@@ -54,18 +54,8 @@
       </span>
       <span class="sb-label">{{ t['head']['add_student'] }}</span>
     </a>
-    
-    <a class="sb-item {% if request.path == '/head/search' %}on{% endif %}"
-      data-page="search"
-      data-tip="Search Projects"
-      href="/head/search">
-      <span class="sb-icon">
-        <span class="material-symbols-outlined icon-inline">search</span>
-      </span>
-      <span class="sb-label">{{ t['head']['search'] }}</span>
-    </a>
 
-   <a class="sb-item {% if request.path == '/head/grades' %}on{% endif %}"
+    <a class="sb-item {% if request.path == '/head/grades' %}on{% endif %}"
       data-page="grades"
       data-tip="Grades"
       href="/head/grades">
@@ -74,6 +64,18 @@
       </span>
       <span class="sb-label">{{ t['general']['Grades'] }}</span>
     </a>
+    
+    <a class="sb-item {% if request.path == '/head/search' %}on{% endif %}"
+      data-page="search"
+      data-tip="{{ t['general']['archived_projects'] }}"
+      href="/head/search">
+      <span class="sb-icon">
+        <span class="material-symbols-outlined icon-inline">search</span>
+      </span>
+      <span class="sb-label">{{ t['general']['archived_projects'] }}</span>
+    </a>
+
+   
 
     <a class="sb-item {% if request.path == '/head/notifs' %}on{% endif %}"
       data-page="notifs"

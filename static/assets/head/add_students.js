@@ -91,12 +91,11 @@ function renderStudents(students){
 async function addStudent(){
   var name = document.getElementById('fullName').value.trim();
   var uid = document.getElementById('universityId').value.trim();
-  var email = document.getElementById('email').value.trim();
 
    hideFeedback();
 
-  if(!name || !uid || !email){
-    showFeedback('Please fill in Name, University ID, and Email.', 'warn');
+  if(!name || !uid){
+    showFeedback('Please fill in Name and University ID.', 'warn');
     return;
   }
 
@@ -108,7 +107,7 @@ async function addStudent(){
     var res = await fetch(API_BASE + '/api/students/add', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({full_name: name, university_id: uid, email: email})
+      body: JSON.stringify({full_name: name, university_id: uid})
     });
     var data = await res.json();
 
@@ -129,7 +128,7 @@ async function addStudent(){
 
 /*clear the form */
 function clearForm(){
-  ['fullName', 'universityId', 'email'].forEach(function(id){
+  ['fullName', 'universityId'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.value = '';
   });

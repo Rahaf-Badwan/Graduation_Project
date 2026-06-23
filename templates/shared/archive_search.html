@@ -769,7 +769,7 @@ request.path.startswith('/head') else 'student/base.html') %}
       }
     }
 
-    function fillYears(years, hasUnknown) {
+    function fillYears(years, _hasUnknown) {
       const yearSelect = $('apYear');
       if (yearSelect.options.length > 1) return;
 
@@ -780,12 +780,10 @@ request.path.startswith('/head') else 'student/base.html') %}
         yearSelect.appendChild(option);
       });
 
-      if (hasUnknown) {
-        const opt = document.createElement('option');
-        opt.value = '__unknown__';
-        opt.textContent = 'Unknown';
-        yearSelect.appendChild(opt);
-      }
+      const opt = document.createElement('option');
+      opt.value = '__unknown__';
+      opt.textContent = 'None';
+      yearSelect.appendChild(opt);
 
       yearSelect.value = state.year;
     }

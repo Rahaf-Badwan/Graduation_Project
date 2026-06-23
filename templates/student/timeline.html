@@ -683,7 +683,9 @@
 
         /* Detect final report milestones → redirect to Submit Project page */
         const titleLower = (item.title || '').toLowerCase();
-        const isFinalReport = titleLower.includes('final report') || titleLower.includes('final submission');
+        const isSupervisorMilestone = item.timeline_owner === 'supervisor';
+        const isFinalReport = !isSupervisorMilestone &&
+          (titleLower.includes('final report') || titleLower.includes('final submission'));
 
         /* منطق الزر:
              - ما في تسليم + مفتوح          → Upload

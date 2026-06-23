@@ -585,9 +585,9 @@
   }
 
   const defaultIntroTimeline = [
-    { title: 'Project idea and scope', description: 'Agree on the project idea and initial scope.', start_date: '', due_date: '', milestone_label: 'Milestone 1', submitted_to: 'supervisor' },
+    { title: 'Project idea and scope', description: 'Agree on the project idea and initial scope.', start_date: '', due_date: '', milestone_label: 'Milestone 1', submitted_to: 'coordinator' },
     { title: 'Detailed proposal submission', description: 'Submit the project proposal to the coordinator.', start_date: '', due_date: '', milestone_label: 'Detailed Proposal', submitted_to: 'coordinator' },
-    { title: 'System requirements', description: 'Submit functional and non-functional requirements.', start_date: '', due_date: '', milestone_label: 'Requirements', submitted_to: 'supervisor' },
+    { title: 'System requirements', description: 'Submit functional and non-functional requirements.', start_date: '', due_date: '', milestone_label: 'Requirements', submitted_to: 'coordinator' },
     { title: 'Final report submission', description: 'Submit the final COMP4200 report.', start_date: '', due_date: '', milestone_label: 'Graduation Report', submitted_to: 'coordinator' }
   ];
 
@@ -618,8 +618,7 @@
         <td>
           <input class="tl-label timeline-small-input" value="${escAttr(rowItem.milestone_label)}" placeholder="Label (optional)" style="margin-bottom:4px">
           <select class="tl-submitted-to timeline-small-input" style="font-size:12px">
-            <option value="supervisor" ${(rowItem.submitted_to || 'supervisor') === 'supervisor' ? 'selected' : ''}>→ Supervisor</option>
-            <option value="coordinator" ${(rowItem.submitted_to || '') === 'coordinator' ? 'selected' : ''}>→ Course Coordinator</option>
+            <option value="coordinator" ${(rowItem.submitted_to || 'coordinator') === 'coordinator' ? 'selected' : ''}>→ Course Coordinator</option>
             <option value="both" ${(rowItem.submitted_to || '') === 'both' ? 'selected' : ''}>→ Supervisor & Course Coordinator</option>
           </select>
         </td>

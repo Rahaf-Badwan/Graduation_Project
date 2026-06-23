@@ -11,24 +11,38 @@ def api_dashboard_data():
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    # Total projects (all courses, all semesters, all statuses)
-    cursor.execute("SELECT COUNT(*) AS total_projects FROM projects")
+    # Dashboard statistics describe the current cycle only. Historical and
+    # archived projects must not leak into the "this semester" cards.
+    active_semester_join = """
+        FROM projects p
+        JOIN semesters s ON s.semester_id = p.semester_id
+        WHERE s.is_active = TRUE
+          AND p.status <> 'archived'
+    """
+
+    cursor.execute(f"""
+        SELECT COUNT(*) AS total_projects
+        {active_semester_join}
+    """)
     total_projects = (cursor.fetchone() or {}).get("total_projects", 0)
 
-    # Active supervisors
+    # Active supervisor accounts are independent of whether projects have
+    # already been created in the current cycle.
     cursor.execute("""
-        SELECT COUNT(DISTINCT supervisor_id) AS active_supervisors
-        FROM projects
-        WHERE supervisor_id IS NOT NULL
+        SELECT COUNT(DISTINCT f.faculty_id) AS active_supervisors
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE u.is_active = TRUE
+          AND u.role = 'supervisor'
     """)
     active_supervisors = (cursor.fetchone() or {}).get("active_supervisors", 0)
 
     # Acceptance rate
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT
-            SUM(status = 'accepted') AS accepted_count,
-            SUM(status = 'rejected') AS rejected_count
-        FROM projects
+            SUM(p.status = 'accepted') AS accepted_count,
+            SUM(p.status = 'rejected') AS rejected_count
+        {active_semester_join}
     """)
     row = cursor.fetchone() or {}
     accepted = row.get("accepted_count") or 0
@@ -37,10 +51,10 @@ def api_dashboard_data():
     acceptance_rate = round((accepted / total_decided * 100), 1) if total_decided else 0
 
     # Average grade
-    cursor.execute("""
-        SELECT ROUND(AVG(final_score), 1) AS avg_grade
-        FROM projects
-        WHERE final_score IS NOT NULL
+    cursor.execute(f"""
+        SELECT ROUND(AVG(p.final_score), 1) AS avg_grade
+        {active_semester_join}
+          AND p.final_score IS NOT NULL
     """)
     avg_grade = (cursor.fetchone() or {}).get("avg_grade") or 0
 
@@ -68,8 +82,11 @@ def api_dashboard_data():
             ROUND(AVG(p.final_score), 1) AS avg_score,
             COUNT(p.project_id) AS project_count
         FROM projects p
+        JOIN semesters s ON s.semester_id = p.semester_id
         JOIN faculty f ON f.faculty_id = p.supervisor_id
-        WHERE p.final_score IS NOT NULL
+        WHERE s.is_active = TRUE
+          AND p.status <> 'archived'
+          AND p.final_score IS NOT NULL
         GROUP BY f.specialization
         ORDER BY avg_score DESC
     """)

@@ -1027,6 +1027,22 @@ def api_upload_file():
                 course_scope="graduation_project" if is_comp4300 else "introduction",
             )
 
+        if file_type == "final_report" and target_course == "COMP4300":
+            actor_name = session.get("full_name") or "A student"
+            submission_action = "updated" if had_final_submission else "submitted"
+            _notify_comp4300_submission_staff(
+                cursor,
+                project_id,
+                user_id,
+                (
+                    "COMP4300 Final Submission Updated"
+                    if had_final_submission
+                    else "New COMP4300 Final Submission"
+                ),
+                f'{actor_name} {submission_action} the final submission for "{project_title}". '
+                "It is now available to the course coordinator and project supervisor.",
+            )
+
         # ── Sync lifecycle after file upload ──
         _sync_lifecycle(cursor, project_id)
 
@@ -1040,6 +1056,7 @@ def api_upload_file():
                 "file_type": file_type,
                 "file_name": safe_name,
                 "size_mb": size_mb,
+                "submitted_to": "both" if target_course == "COMP4300" else "supervisor",
             }
         )
     except PermissionError as e:
@@ -1296,9 +1313,16 @@ def api_milestone_submit():
         # ── جيب بيانات الـ milestone item ─────────────────────────
         cursor.execute(
             """
-            SELECT item_id, title, milestone_label, submitted_to, start_date, start_time, due_date, due_time, is_archived
-            FROM comp4200_timeline_items
-            WHERE item_id = %s
+            SELECT ti.item_id, ti.title, ti.milestone_label, ti.submitted_to,
+                   ti.start_date, ti.start_time, ti.due_date, ti.due_time,
+                   ti.is_archived, sem.course_code AS timeline_course_code,
+                   tl.owner_role AS timeline_owner_role,
+                   tl.created_by AS timeline_created_by,
+                   tl.semester_id AS timeline_semester_id
+            FROM comp4200_timeline_items ti
+            JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
+            JOIN semesters sem ON sem.semester_id = tl.semester_id
+            WHERE ti.item_id = %s
             """,
             (int(item_id),),
         )
@@ -1307,6 +1331,35 @@ def api_milestone_submit():
             cursor.close()
             db.close()
             return jsonify({"error": "Timeline item not found."}), 404
+
+        if item.get("timeline_owner_role") == "supervisor":
+            if item.get("timeline_course_code") == "COMP4300":
+                cursor.execute(
+                    """
+                    SELECT 1
+                    FROM project_members pm
+                    JOIN projects p ON p.project_id=pm.project_id
+                    JOIN faculty f ON f.faculty_id=p.supervisor_id
+                    WHERE pm.student_id=%s AND p.semester_id=%s AND f.user_id=%s
+                    LIMIT 1
+                    """,
+                    (student_id, item.get("timeline_semester_id"), item.get("timeline_created_by")),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT 1
+                    FROM section_students ss
+                    JOIN student_distribution_sections sec ON sec.section_id=ss.section_id
+                    JOIN faculty f ON f.faculty_id=sec.supervisor_id
+                    WHERE ss.student_id=%s AND f.user_id=%s
+                    LIMIT 1
+                    """,
+                    (student_id, item.get("timeline_created_by")),
+                )
+            if not cursor.fetchone():
+                cursor.close(); db.close()
+                return jsonify({"error": "This timeline milestone is not assigned to your group."}), 403
 
         from datetime import date as _date, datetime as _datetime
 
@@ -1389,7 +1442,11 @@ def api_milestone_submit():
         proj_row = cursor.fetchone()
         project_id = proj_row["project_id"] if proj_row else None
         project_title = (proj_row or {}).get("title") or "your team project"
-        intro_section = _student_intro_section(cursor, student_id)
+        intro_section = (
+            _student_intro_section(cursor, student_id)
+            if item.get("timeline_course_code") == "COMP4200"
+            else None
+        )
         section_id = (intro_section or {}).get("section_id")
         if section_id:
             project_title = intro_section.get("section_name") or "your section"

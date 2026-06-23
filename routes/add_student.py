@@ -15,14 +15,15 @@ def api_add_student():
 
     full_name = (data.get("full_name") or "").strip()
     university_id = (data.get("university_id") or "").strip()
-    email = (data.get("email") or "").strip()
 
     # check validation
-    if not full_name or not university_id or not email:
-        return jsonify({"error": "All fields are requires."}), 400
+    if not full_name or not university_id:
+        return jsonify({"error": "Name and University ID are required."}), 400
 
     if not re.match(r"^\d{7}$", university_id):
         return jsonify({"error": "University ID must be exactly 7 digits."}), 400
+
+    email = f"{university_id}@student.birzeit.edu"
 
     # Avater initials
     parts = full_name.split()
@@ -83,7 +84,7 @@ def api_add_student():
                     "statues": "pending",
                 }
             ),
-            201,
+            200,
         )
 
     except Exception as e:
@@ -91,7 +92,9 @@ def api_add_student():
         return jsonify({"error": f"Database error: {e}"}), 500
 
 
-# return the students that is_active = TRUE based ON course
+# Return active students based on their real course/project lifecycle.
+# A succeeded COMP4200 group moves to the COMP4300 tab immediately, while
+# students whose COMP4300 project is archived disappear from the active list.
 @add_student_bp.route("/api/students/active", methods=["GET"])
 @login_required(role="head_of_department")
 def api_active_students():
@@ -122,6 +125,20 @@ def api_active_students():
                   AND s.course_code = 'COMP4200'
                   AND scr.promoted_at IS NULL
                   AND scr.promoted_to_semester_id IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM project_members completed_pm
+                      JOIN projects completed_project
+                        ON completed_project.project_id = completed_pm.project_id
+                      JOIN semesters completed_semester
+                        ON completed_semester.semester_id = completed_project.semester_id
+                      JOIN section_completion_status completed_status
+                        ON completed_status.course_scope = 'introduction'
+                       AND completed_status.reference_id = completed_project.project_id
+                       AND completed_status.status = 'succeeded'
+                      WHERE completed_pm.student_id = st.student_id
+                        AND completed_semester.course_code = 'COMP4200'
+                  )
                 ORDER BY u.full_name
                 """
             )
@@ -136,13 +153,46 @@ def api_active_students():
                        u.avatar_initials
                 FROM users u
                 JOIN students st ON st.user_id = u.user_id
-                JOIN student_course_results scr ON scr.student_id = st.student_id
-                JOIN semesters promoted_sem
-                  ON promoted_sem.semester_id = scr.promoted_to_semester_id
                 WHERE u.role = 'student'
                   AND u.is_active = TRUE
-                  AND promoted_sem.course_code = 'COMP4300'
-                  AND scr.promoted_at IS NOT NULL
+                  AND (
+                      EXISTS (
+                          SELECT 1
+                          FROM project_members passed_pm
+                          JOIN projects passed_project
+                            ON passed_project.project_id = passed_pm.project_id
+                          JOIN semesters passed_semester
+                            ON passed_semester.semester_id = passed_project.semester_id
+                          JOIN section_completion_status passed_status
+                            ON passed_status.course_scope = 'introduction'
+                           AND passed_status.reference_id = passed_project.project_id
+                           AND passed_status.status = 'succeeded'
+                          WHERE passed_pm.student_id = st.student_id
+                            AND passed_semester.course_code = 'COMP4200'
+                      )
+                      OR EXISTS (
+                          SELECT 1
+                          FROM project_members active_pm
+                          JOIN projects active_project
+                            ON active_project.project_id = active_pm.project_id
+                          JOIN semesters active_semester
+                            ON active_semester.semester_id = active_project.semester_id
+                          WHERE active_pm.student_id = st.student_id
+                            AND active_semester.course_code = 'COMP4300'
+                            AND LOWER(COALESCE(active_project.status, '')) NOT IN ('archived', 'archive')
+                      )
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM project_members archived_pm
+                      JOIN projects archived_project
+                        ON archived_project.project_id = archived_pm.project_id
+                      JOIN semesters archived_semester
+                        ON archived_semester.semester_id = archived_project.semester_id
+                      WHERE archived_pm.student_id = st.student_id
+                        AND archived_semester.course_code = 'COMP4300'
+                        AND LOWER(COALESCE(archived_project.status, '')) IN ('archived', 'archive')
+                  )
                 ORDER BY u.full_name
                 """
             )

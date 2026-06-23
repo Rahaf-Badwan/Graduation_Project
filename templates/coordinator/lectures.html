@@ -5,20 +5,20 @@
 {% block topbar_title %}Lectures{% endblock %}
 
 {% block content %}
+
 <style>
   html, body { scroll-behavior: auto !important; }
 
   #pg-lectures {
+    display: block !important;
     padding: 20px 22px 90px !important;
     margin: 0 !important;
     min-height: auto !important;
-    display: block !important;
   }
 
   #pg-lectures .lecture-tabs {
     display: flex;
     gap: 8px;
-    align-items: center;
     flex-wrap: wrap;
     margin: 0 0 16px 0;
     padding: 0;
@@ -30,42 +30,19 @@
     color: var(--color-text-primary);
     border-radius: 999px;
     padding: 9px 14px;
+    font-size: 13px;
     font-weight: 800;
     cursor: pointer;
-    transition: 0.18s ease;
   }
-
-  #pg-lectures .lecture-tab:hover { background: var(--color-background-tertiary); }
 
   #pg-lectures .lecture-tab.on {
     background: #2e7d42;
-    border-color: var(--accent);
+    border-color: #2e7d42;
     color: #fff;
-    box-shadow: 0 8px 18px rgba(46, 125, 66, 0.18);
   }
 
   #pg-lectures .lecture-section { display: none; }
   #pg-lectures .lecture-section.active { display: block; }
-
-  #pg-lectures .course-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-  }
-
-  #pg-lectures .course-badge {
-    background: #2e7d42;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 800;
-    padding: 5px 12px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
 
   #pg-lectures .lecture-grid {
     display: grid;
@@ -79,21 +56,23 @@
     background: var(--color-background-primary);
     border: 1px solid #e6ece8;
     border-radius: 18px;
-    box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
     overflow: hidden;
+    box-shadow: 0 10px 28px rgba(16, 24, 40, .06);
   }
 
   #pg-lectures .card-hd {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     gap: 12px;
     flex-wrap: wrap;
     padding: 16px 18px;
     border-bottom: 1px solid #edf2ef;
+    background: var(--color-background-primary);
   }
 
   #pg-lectures .card-title {
+    margin: 0;
     font-size: 16px;
     font-weight: 900;
     color: var(--color-text-primary);
@@ -106,45 +85,23 @@
     align-items: center;
   }
 
-  #pg-lectures .card-action {
-    border: 1px solid #d7e3dc;
-    background: var(--color-background-tertiary);
-    color: var(--green);
-    border-radius: 12px;
-    padding: 8px 12px;
-    font-weight: 800;
-    cursor: pointer;
-    transition: 0.18s ease;
-  }
-
-  #pg-lectures .card-action:hover {
-    background: var(--green-light);
-    border-color: #b9d7c2;
-  }
-
-  #pg-lectures .card-action.danger {
-    color: #b42318;
-    border-color: #fecdca;
-    background: #fff7f6;
-  }
-
   #pg-lectures .lecture-note {
-    border-left: 5px solid #2e7d42;
-    background: var(--color-background-tertiary);
-    border-radius: 14px;
-    padding: 13px 14px;
-    color: var(--color-text-primary);
-    line-height: 1.55;
-    font-size: 13px;
     margin: 14px 18px;
+    padding: 13px 14px;
+    border-left: 5px solid #2e7d42;
+    border-radius: 14px;
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    line-height: 1.55;
   }
 
   #pg-lectures .mini-form {
     display: none;
+    margin: 0 18px 14px;
+    padding: 14px;
     border: 1px solid #e7eee9;
     border-radius: 14px;
-    padding: 14px;
-    margin: 0 18px 14px 18px;
     background: var(--color-background-tertiary);
   }
 
@@ -157,21 +114,23 @@
   }
 
   #pg-lectures label {
+    display: block;
+    margin-bottom: 5px;
     font-size: 12px;
     font-weight: 800;
     color: var(--color-text-primary);
-    display: block;
-    margin-bottom: 5px;
   }
 
   #pg-lectures input,
   #pg-lectures select,
   #pg-lectures textarea {
     width: 100%;
+    box-sizing: border-box;
     padding: 10px 12px;
     border: 1px solid #d8e2dc;
     border-radius: 12px;
     background: var(--color-background-primary);
+    color: var(--color-text-primary);
     font: inherit;
     outline: none;
   }
@@ -179,108 +138,279 @@
   #pg-lectures input:focus,
   #pg-lectures select:focus,
   #pg-lectures textarea:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(46, 125, 66, 0.12);
+    border-color: #2e7d42;
+    box-shadow: 0 0 0 3px rgba(46, 125, 66, .12);
   }
 
   #pg-lectures textarea { resize: vertical; }
 
+  #pg-lectures #lectureList-introduction,
+  #pg-lectures #lectureList-graduation_project {
+    display: grid;
+    gap: 10px;
+    padding: 0 18px 18px;
+  }
+
   #pg-lectures .empty-box {
+    padding: 18px;
     border: 1px dashed #cddbd2;
     border-radius: 14px;
-    padding: 18px;
-    color: #667085;
     background: var(--color-background-tertiary);
-    font-size: 13px;
+    color: #667085;
     text-align: center;
-    margin: 0 18px 18px 18px;
+    font-size: 13px;
   }
 
   #pg-lectures .lec-card {
     display: grid;
-    grid-template-columns: 42px 1fr;
+    grid-template-columns: 42px minmax(0, 1fr);
     gap: 12px;
     align-items: flex-start;
     border: 1px solid #e7eee9;
-    background: var(--color-background-primary);
     border-radius: 16px;
     padding: 13px 14px;
-    margin: 0 18px 12px 18px;
+    background: var(--color-background-primary);
+  }
+
+  #pg-lectures .lec-body {
+    min-width: 0;
+  }
+
+  #pg-lectures .lec-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+  }
+
+  #pg-lectures .lec-title-area {
+    min-width: 0;
+  }
+
+  #pg-lectures .attendance-summary-top {
+    margin-top: 0;
+    margin-left: auto;
+    justify-content: flex-end;
+    flex-shrink: 0;
   }
 
   #pg-lectures .lec-num {
     width: 42px;
     height: 42px;
-    border-radius: 14px;
-    background: var(--green-light);
-    color: var(--accent);
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 14px;
+    background: var(--green-light);
+    color: var(--accent);
     font-weight: 900;
   }
 
   #pg-lectures .lecture-item-title {
-    font-weight: 900;
+    margin-bottom: 5px;
     color: var(--color-text-primary);
-    margin-bottom: 4px;
+    font-size: 15px;
+    font-weight: 900;
   }
 
   #pg-lectures .lecture-item-meta {
-    font-size: 12px;
     color: #667085;
-    line-height: 1.5;
+    font-size: 12px;
+    line-height: 1.6;
   }
 
-  #pg-lectures .lecture-actions {
+  #pg-lectures .target-pill {
+    display: inline-block;
+    margin-top: 7px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--green-light);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  #pg-lectures .lecture-actions,
+  #pg-lectures .btn-row {
     display: flex;
     gap: 8px;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     margin-top: 10px;
   }
 
-  #pg-lectures .lecture-date-input {
-    max-width: 160px;
-    padding: 8px 10px;
-  }
-
   #pg-lectures .lecture-small-btn {
-    padding: 8px 10px;
+    padding: 8px 12px;
     border-radius: 10px;
+    font-size: 12px;
+    font-weight: 800;
   }
 
-  #pg-lectures .pill {
-    border-radius: 999px;
-    font-weight: 800;
-    white-space: nowrap;
+  #pg-lectures .attendance-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
   }
+
+  #pg-lectures .attendance-summary:empty { display: none; }
+
+  #pg-lectures .attendance-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border-radius: 999px;
+    padding: 3px 8px;
+    background: #eaf7ef;
+    color: #16743a;
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 900;
+    white-space: nowrap;
+    border: 1px solid #d5ecdd;
+  }
+
+  #pg-lectures .attendance-count.absent {
+    background: #fff4f2;
+    color: #b42318;
+    border-color: #ffd9d4;
+  }
+
+  #pg-lectures .attendance-panel {
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid #dce9e0;
+    border-radius: 14px;
+    background: #f8fbf9;
+  }
+
+  #pg-lectures .attendance-title {
+    margin-bottom: 10px;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  #pg-lectures .attendance-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  #pg-lectures .attendance-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 160px 240px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e7eee9;
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  #pg-lectures .attendance-name {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  #pg-lectures .attendance-id {
+    color: #667085;
+    font-size: 12px;
+  }
+
+  #pg-lectures .attendance-status-options {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  #pg-lectures .attendance-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  #pg-lectures .attendance-radio input { width: auto; }
 
   .lecture-toast {
+    display: none;
     position: fixed;
     top: 88px;
     left: 50%;
+    transform: translateX(-50%);
     z-index: 10000;
     width: min(620px, calc(100vw - 32px));
-    transform: translateX(-50%);
+    padding: 15px 20px;
+    border-radius: 15px;
     background: #166534;
     color: #fff;
-    padding: 16px 20px;
-    border-radius: 16px;
-    box-shadow: 0 18px 42px rgba(0, 0, 0, .24);
-    display: none;
+    text-align: center;
     font-size: 15px;
     font-weight: 800;
-    line-height: 1.5;
-    text-align: center;
+    box-shadow: 0 18px 42px rgba(0,0,0,.24);
   }
 
   @media(max-width:900px) {
     #pg-lectures .form-grid { grid-template-columns: 1fr; }
     #pg-lectures .lecture-tab { width: 100%; text-align: center; }
     #pg-lectures .lec-card { grid-template-columns: 1fr; }
+    #pg-lectures .lec-top { flex-direction: column; gap: 8px; }
+    #pg-lectures .attendance-summary-top { margin-left: 0; justify-content: flex-start; }
+    #pg-lectures .attendance-row { grid-template-columns: 1fr; }
   }
+
+
+  /* Force coordinator lecture buttons to match the supervisor page style */
+  #pg-lectures .btn.btn-primary,
+  #pg-lectures button.btn.btn-primary,
+  #pg-lectures .card-actions .btn.btn-primary,
+  #pg-lectures .lecture-actions .btn.btn-primary,
+  #pg-lectures .btn-row .btn.btn-primary {
+    background: #16743a !important;
+    border: 1px solid #16743a !important;
+    color: #fff !important;
+    box-shadow: none !important;
+  }
+
+  #pg-lectures .btn.btn-primary:hover,
+  #pg-lectures button.btn.btn-primary:hover,
+  #pg-lectures .card-actions .btn.btn-primary:hover,
+  #pg-lectures .lecture-actions .btn.btn-primary:hover,
+  #pg-lectures .btn-row .btn.btn-primary:hover {
+    background: #0f5f2e !important;
+    border-color: #0f5f2e !important;
+    color: #fff !important;
+  }
+
+  #pg-lectures .btn.btn-outline,
+  #pg-lectures button.btn.btn-outline,
+  #pg-lectures .card-actions .btn.btn-outline,
+  #pg-lectures .lecture-actions .btn.btn-outline,
+  #pg-lectures .btn-row .btn.btn-outline {
+    background: #fff !important;
+    border: 1px solid #d7e3dc !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+  }
+
+  #pg-lectures .btn.btn-outline:hover,
+  #pg-lectures button.btn.btn-outline:hover,
+  #pg-lectures .card-actions .btn.btn-outline:hover,
+  #pg-lectures .lecture-actions .btn.btn-outline:hover,
+  #pg-lectures .btn-row .btn.btn-outline:hover {
+    background: #f3faf6 !important;
+    border-color: #b9d7c2 !important;
+    color: #16743a !important;
+  }
+
 </style>
+
 
 <div class="page page-single on" id="pg-lectures">
   <div class="lecture-tabs" role="tablist" aria-label="Lectures tabs">
@@ -296,17 +426,13 @@
   </div>
 
   <div id="introLectures" class="lecture-section active" data-scope="introduction">
-    <div class="course-head">
-      <span class="course-badge">◑ Project Introduction — COMP4200</span>
-    </div>
-
     <div class="lecture-grid">
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Coordinator Lectures</span>
+          <h3 class="card-title">COMP4200 Lectures</h3>
           <div class="card-actions">
-            <button class="card-action" type="button" onclick="toggleLectureForm('introduction')">+ Add Lecture</button>
-            <button class="card-action danger" type="button" onclick="restartScheduledLectures('introduction')">Restart Scheduled</button>
+            <button class="btn btn-primary" type="button" onclick="toggleLectureForm('introduction')">+ Add Lecture</button>
+            <button class="btn btn-outline" type="button" onclick="restartScheduledLectures('introduction')">Restart Scheduled</button>
           </div>
         </div>
 
@@ -321,17 +447,13 @@
   </div>
 
   <div id="gradLectures" class="lecture-section" data-scope="graduation_project">
-    <div class="course-head">
-      <span class="course-badge">✦ Graduation Projects — COMP4300</span>
-    </div>
-
     <div class="lecture-grid">
       <div class="card">
         <div class="card-hd">
-          <span class="card-title">Coordinator Lectures</span>
+          <h3 class="card-title">COMP4300 Lectures</h3>
           <div class="card-actions">
-            <button class="card-action" type="button" onclick="toggleLectureForm('graduation_project')">+ Add Lecture</button>
-            <button class="card-action danger" type="button" onclick="restartScheduledLectures('graduation_project')">Restart Scheduled</button>
+            <button class="btn btn-primary" type="button" onclick="toggleLectureForm('graduation_project')">+ Add Lecture</button>
+            <button class="btn btn-outline" type="button" onclick="restartScheduledLectures('graduation_project')">Restart Scheduled</button>
           </div>
         </div>
 
@@ -355,7 +477,8 @@
     lectures: {
       introduction: [],
       graduation_project: []
-    }
+    },
+    attendanceSummary: {}
   };
 
   let lectureToastTimer = null;
@@ -432,8 +555,13 @@
         </div>
 
         <div>
-          <label>Lecture Date</label>
-          <input id="lecDate-${scope}" type="date">
+          <label>Lecture Date <span style="color:#b42318">*</span></label>
+          <input id="lecDate-${scope}" type="date" required>
+        </div>
+
+        <div>
+          <label>Lecture Time <span style="color:#b42318">*</span></label>
+          <input id="lecTime-${scope}" type="time" required>
         </div>
 
         <div>
@@ -483,8 +611,13 @@
         </div>
 
         <div>
-          <label>Lecture Date</label>
-          <input id="lecEditDate-${lecture.lecture_id}" type="date" value="${safe(lecture.lecture_date || '')}">
+          <label>Lecture Date <span style="color:#b42318">*</span></label>
+          <input id="lecEditDate-${lecture.lecture_id}" type="date" value="${safe(lecture.lecture_date || '')}" required>
+        </div>
+
+        <div>
+          <label>Lecture Time <span style="color:#b42318">*</span></label>
+          <input id="lecEditTime-${lecture.lecture_id}" type="time" value="${safe(lecture.lecture_time || '')}" required>
         </div>
 
         <div>
@@ -527,6 +660,181 @@
     box.classList.toggle('on');
   }
 
+
+  function isCoordinatorLectureStarted(lecture) {
+    if (!lecture || !lecture.lecture_date) return false;
+
+    const timeValue = (lecture.lecture_time || '00:00').toString().slice(0, 5);
+    const start = new Date(`${lecture.lecture_date}T${timeValue || '00:00'}`);
+
+    if (Number.isNaN(start.getTime())) return false;
+    return start.getTime() <= Date.now();
+  }
+
+  function attendanceRadioHtml(lectureId, student, status, label) {
+    const studentId = Number(student.student_id);
+    const checked = student.attendance_status === status ? 'checked' : '';
+    return `
+      <label class="attendance-radio">
+        <input type="radio" name="attend-${lectureId}-${studentId}" value="${status}" ${checked}>
+        ${label}
+      </label>
+    `;
+  }
+
+  function attendanceSummaryFromStudents(students) {
+    return (students || []).reduce((summary, student) => {
+      if (student.attendance_status === 'present') summary.present += 1;
+      if (student.attendance_status === 'absent') summary.absent += 1;
+      return summary;
+    }, { present: 0, absent: 0 });
+  }
+
+  function attendanceSummaryFromPanel(lectureId) {
+    const box = document.getElementById(`lectureAttendance-${lectureId}`);
+    if (!box) return null;
+
+    const rows = Array.from(box.querySelectorAll('.attendance-row'));
+    if (!rows.length) return null;
+
+    return rows.reduce((summary, row) => {
+      const studentId = Number(row.dataset.studentId);
+      const selected = row.querySelector(`input[name="attend-${lectureId}-${studentId}"]:checked`);
+      if (selected && selected.value === 'present') summary.present += 1;
+      if (selected && selected.value === 'absent') summary.absent += 1;
+      return summary;
+    }, { present: 0, absent: 0 });
+  }
+
+  function attendanceSummaryHtml(lectureId) {
+    const summary = lecturesState.attendanceSummary[String(lectureId)];
+    const inner = summary
+      ? `<span class="attendance-count">Present: <strong>${Number(summary.present || 0)}</strong></span><span class="attendance-count absent">Absent: <strong>${Number(summary.absent || 0)}</strong></span>`
+      : '';
+
+    return `<span id="lectureAttendanceSummary-${lectureId}" class="attendance-summary attendance-summary-top">${inner}</span>`;
+  }
+
+  function updateLectureAttendanceSummary(lectureId, summary) {
+    if (!summary) return;
+
+    const cleanSummary = {
+      present: Number(summary.present || 0),
+      absent: Number(summary.absent || 0)
+    };
+
+    lecturesState.attendanceSummary[String(lectureId)] = cleanSummary;
+
+    const holder = document.getElementById(`lectureAttendanceSummary-${lectureId}`);
+    if (holder) {
+      holder.innerHTML = `
+        <span class="attendance-count">Present: <strong>${cleanSummary.present}</strong></span>
+        <span class="attendance-count absent">Absent: <strong>${cleanSummary.absent}</strong></span>
+      `;
+    }
+  }
+
+  function renderCoordinatorLectureAttendance(lectureId, data) {
+    const box = document.getElementById(`lectureAttendance-${lectureId}`);
+    if (!box) return;
+
+    const students = data.students || [];
+    updateLectureAttendanceSummary(lectureId, attendanceSummaryFromStudents(students));
+
+    if (!students.length) {
+      box.innerHTML = `
+        <div class="attendance-panel">
+          <div class="attendance-title">Attendance — ${safe(data.title || 'Lecture')}</div>
+          <div class="empty-box" style="margin:0">No notified students were found for this lecture.</div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn btn-outline lecture-small-btn" type="button" onclick="closeCoordinatorLectureAttendance(${lectureId})">Close</button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="attendance-panel">
+        <div class="attendance-title">Attendance — ${safe(data.title || 'Lecture')}</div>
+        <div class="attendance-list">
+          ${students.map(student => `
+            <div class="attendance-row" data-student-id="${Number(student.student_id)}">
+              <div>
+                <div class="attendance-name">${safe(student.full_name || '')}</div>
+              </div>
+              <div class="attendance-id">${safe(student.university_id || '')}</div>
+              <div class="attendance-status-options">
+                ${attendanceRadioHtml(lectureId, student, 'present', 'Present')}
+                ${attendanceRadioHtml(lectureId, student, 'absent', 'Absent')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-primary lecture-small-btn" type="button" onclick="saveCoordinatorLectureAttendance(${lectureId})">Save Attendance</button>
+          <button class="btn btn-outline lecture-small-btn" type="button" onclick="closeCoordinatorLectureAttendance(${lectureId})">Close</button>
+        </div>
+      </div>
+    `;
+  }
+
+  async function openCoordinatorLectureAttendance(lectureId) {
+    try {
+      const data = await apiFetch(`/api/coordinator/lectures/${lectureId}/attendance`);
+      renderCoordinatorLectureAttendance(lectureId, data);
+    } catch (err) {
+      showLectureToast(err.message || 'Could not open attendance.', true);
+    }
+  }
+
+  function closeCoordinatorLectureAttendance(lectureId) {
+    const summary = attendanceSummaryFromPanel(lectureId);
+    if (summary) updateLectureAttendanceSummary(lectureId, summary);
+
+    const box = document.getElementById(`lectureAttendance-${lectureId}`);
+    if (box) box.innerHTML = '';
+  }
+
+  async function saveCoordinatorLectureAttendance(lectureId) {
+    const box = document.getElementById(`lectureAttendance-${lectureId}`);
+    if (!box) return;
+
+    const rows = Array.from(box.querySelectorAll('.attendance-row'));
+    const attendance = [];
+
+    for (const row of rows) {
+      const studentId = Number(row.dataset.studentId);
+      const selected = row.querySelector(`input[name="attend-${lectureId}-${studentId}"]:checked`);
+
+      if (!selected) {
+        showLectureToast('Mark every student as Present or Absent before saving.', true);
+        return;
+      }
+
+      attendance.push({ student_id: studentId, status: selected.value });
+    }
+
+    try {
+      const result = await apiFetch(`/api/coordinator/lectures/${lectureId}/attendance`, {
+        method: 'POST',
+        body: JSON.stringify({ attendance })
+      });
+      updateLectureAttendanceSummary(
+        lectureId,
+        attendance.reduce((summary, item) => {
+          if (item.status === 'present') summary.present += 1;
+          if (item.status === 'absent') summary.absent += 1;
+          return summary;
+        }, { present: 0, absent: 0 })
+      );
+      showLectureToast(result.message || 'Attendance saved.');
+      await openCoordinatorLectureAttendance(lectureId);
+    } catch (err) {
+      showLectureToast(err.message || 'Could not save attendance.', true);
+    }
+  }
+
   function renderLectures(scope) {
     const list = document.getElementById(`lectureList-${scope}`);
     const rows = (lecturesState.lectures && lecturesState.lectures[scope]) || [];
@@ -538,47 +846,44 @@
       return;
     }
 
-    list.innerHTML = rows.map((lecture, index) => `
-      <div class="lec-card">
-        <div class="lec-num">${index + 1}</div>
+    list.innerHTML = rows.map((lecture, index) => {
+      const metaParts = [];
+      if (lecture.description) metaParts.push(safe(lecture.description));
+      if (lecture.week_label) metaParts.push(safe(lecture.week_label));
+      if (lecture.lecture_date) metaParts.push(safe(lecture.lecture_date));
+      if (lecture.lecture_time) metaParts.push(safe(lecture.lecture_time));
+      metaParts.push(safe(lecture.status || 'scheduled'));
 
-        <div>
-          <div class="lecture-item-title">${safe(lecture.title)}</div>
+      return `
+        <article class="lec-card">
+          <div class="lec-num">${index + 1}</div>
 
-          <div class="lecture-item-meta">
-            ${safe(lecture.description || '')}
-            ${lecture.week_label ? ' · ' + safe(lecture.week_label) : ''}
-            ${lecture.lecture_date ? ' · ' + safe(lecture.lecture_date) : ''}
+          <div class="lec-body">
+            <div class="lec-top">
+              <div class="lec-title-area">
+                <div class="lecture-item-title">${safe(lecture.title)}</div>
+                <div class="lecture-item-meta">${metaParts.join(' · ')}</div>
+                <span class="target-pill">${niceStatus(lecture.status)}</span>
+              </div>
+              ${isCoordinatorLectureStarted(lecture) ? attendanceSummaryHtml(lecture.lecture_id) : ''}
+            </div>
+
+            <div class="lecture-actions">
+              <button
+                class="btn btn-outline lecture-small-btn"
+                type="button"
+                onclick="toggleLectureEdit(${lecture.lecture_id})">
+                Edit Lecture
+              </button>
+              ${isCoordinatorLectureStarted(lecture) ? `<button class="btn btn-primary lecture-small-btn" type="button" onclick="openCoordinatorLectureAttendance(${lecture.lecture_id})">Attendance</button>` : ''}
+            </div>
+
+            <div id="lectureEdit-${lecture.lecture_id}" class="mini-form" style="margin:12px 0 0"></div>
+            <div id="lectureAttendance-${lecture.lecture_id}"></div>
           </div>
-
-          <div class="lecture-actions">
-            <span class="pill ${pillClass(lecture.status)}">${niceStatus(lecture.status)}</span>
-
-            <input
-              class="field-input lecture-date-input"
-              type="date"
-              value="${safe(lecture.lecture_date || '')}"
-              id="lecDateUpdate-${lecture.lecture_id}">
-
-            <button
-              class="btn btn-primary lecture-small-btn"
-              type="button"
-              onclick="updateLectureDate(${lecture.lecture_id})">
-              Confirm Date
-            </button>
-
-            <button
-              class="btn btn-outline lecture-small-btn"
-              type="button"
-              onclick="toggleLectureEdit(${lecture.lecture_id})">
-              Edit Lecture
-            </button>
-          </div>
-
-          <div id="lectureEdit-${lecture.lecture_id}" class="mini-form" style="margin-top:12px"></div>
-        </div>
-      </div>
-    `).join('');
+        </article>
+      `;
+    }).join('');
   }
 
   function renderAll() {
@@ -614,7 +919,9 @@
         lectures: {
           introduction: (data.lectures && data.lectures.introduction) || [],
           graduation_project: (data.lectures && data.lectures.graduation_project) || []
-        }
+        },
+        // Keep saved attendance counts when the page re-renders.
+        attendanceSummary: (lecturesState && lecturesState.attendanceSummary) || {}
       };
       renderAll();
     } catch (err) {
@@ -631,12 +938,21 @@
       title: document.getElementById(`lecTitle-${scope}`).value.trim(),
       description: document.getElementById(`lecDesc-${scope}`).value.trim(),
       lecture_date: document.getElementById(`lecDate-${scope}`).value,
+      lecture_time: document.getElementById(`lecTime-${scope}`).value,
       week_label: document.getElementById(`lecWeek-${scope}`).value.trim(),
       status: document.getElementById(`lecStatus-${scope}`).value
     };
 
     if (!payload.title) {
       showLectureToast('Lecture title is required.', true);
+      return;
+    }
+    if (!payload.lecture_date || !payload.lecture_time) {
+      showLectureToast('Lecture date and time are required.', true);
+      const missing = !payload.lecture_date
+        ? document.getElementById(`lecDate-${scope}`)
+        : document.getElementById(`lecTime-${scope}`);
+      if (missing) { missing.focus(); missing.reportValidity(); }
       return;
     }
 
@@ -661,12 +977,19 @@
 
   async function updateLectureDate(lectureId) {
     const dateInput = document.getElementById(`lecDateUpdate-${lectureId}`);
-    if (!dateInput) return;
+    const timeInput = document.getElementById(`lecTimeUpdate-${lectureId}`);
+    if (!dateInput || !timeInput) return;
+    if (!dateInput.value || !timeInput.value) {
+      showLectureToast('Lecture date and time are required.', true);
+      const missing = !dateInput.value ? dateInput : timeInput;
+      missing.focus(); missing.reportValidity();
+      return;
+    }
 
     try {
       const result = await apiFetch(`/api/coordinator/lectures/${lectureId}/date`, {
         method: 'POST',
-        body: JSON.stringify({ lecture_date: dateInput.value })
+        body: JSON.stringify({ lecture_date: dateInput.value, lecture_time: timeInput.value })
       });
 
       await loadLecturesData();
@@ -681,12 +1004,21 @@
       title: document.getElementById(`lecEditTitle-${lectureId}`).value.trim(),
       description: document.getElementById(`lecEditDesc-${lectureId}`).value.trim(),
       lecture_date: document.getElementById(`lecEditDate-${lectureId}`).value,
+      lecture_time: document.getElementById(`lecEditTime-${lectureId}`).value,
       week_label: document.getElementById(`lecEditWeek-${lectureId}`).value.trim(),
       status: document.getElementById(`lecEditStatus-${lectureId}`).value
     };
 
     if (!payload.title) {
       showLectureToast('Lecture title is required.', true);
+      return;
+    }
+    if (!payload.lecture_date || !payload.lecture_time) {
+      showLectureToast('Lecture date and time are required.', true);
+      const missing = !payload.lecture_date
+        ? document.getElementById(`lecEditDate-${lectureId}`)
+        : document.getElementById(`lecEditTime-${lectureId}`);
+      if (missing) { missing.focus(); missing.reportValidity(); }
       return;
     }
 

@@ -18,12 +18,10 @@ def activate_page():
 def api_verify_student():
     data = request.get_json(silent=True) or {}
 
-    full_name     = (data.get('full_name')     or '').strip()
     university_id = (data.get('university_id') or '').strip()
-    email         = (data.get('email')         or '').strip()
 
-    if not full_name or not university_id or not email:
-        return jsonify({'error': 'Please fill in all fields.'}), 400
+    if not university_id:
+        return jsonify({'error': 'Please enter your university ID.'}), 400
 
     if not re.match(r'^\d{7}$', university_id):
         return jsonify({'error': 'The university ID number must be 7 digits.'}), 400
@@ -50,7 +48,8 @@ def api_verify_student():
 
         return jsonify({
             'message': 'Your information has been verified. Please create a password.',
-            'user_id': student['user_id']
+            'user_id': student['user_id'],
+            'full_name': student['full_name'],
         }), 200
 
     except Exception as e:

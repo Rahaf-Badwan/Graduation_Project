@@ -47,8 +47,10 @@
   .sn-btn.small { padding:7px 11px; font-size:12px; border-radius:11px }
   .sn-tabs { display:flex; gap:8px; padding:16px 22px 0; background:var(--color-background-primary) }
   .sn-tab { border:1px solid #d7e3dc; background:var(--color-background-primary); color:var(--color-text-primary); padding:9px 17px; border-radius:999px; font-weight:900; font-size:13px; cursor:pointer; transition:background .15s,color .15s,border-color .15s,box-shadow .15s }
-  .sn-tab:hover { box-shadow:0 5px 14px rgba(16,24,40,.06) }
-  .sn-tab.on { background:var(--sn-green); color:#fff; border-color:var(--sn-green) }
+  .sn-tab::before, .main-notif-tab::before { content:'✓'; display:inline-grid; place-items:center; width:0; opacity:0; overflow:hidden; margin-right:0; transition:width .15s,opacity .15s,margin-right .15s }
+  .sn-tab:hover:not(.on) { background:var(--green-light); color:var(--sn-green); border-color:var(--sn-green); box-shadow:0 5px 14px rgba(31,122,59,.12) }
+  .sn-tab.on { background:var(--sn-green); color:#fff; border:2px solid #62c983; padding:8px 16px; box-shadow:0 0 0 3px rgba(31,122,59,.16),0 6px 16px rgba(31,122,59,.24) }
+  .sn-tab.on::before, .main-notif-tab.on::before { width:14px; opacity:1; margin-right:5px }
   .sn-list { display:flex; flex-direction:column; gap:12px; min-height:calc(100vh - 310px) }
   .sn-msg { border:1px solid #e5eee8; background:var(--color-background-primary); border-radius:18px; padding:15px 16px; display:grid; grid-template-columns:42px 1fr; gap:14px; align-items:start; cursor:pointer; transition:box-shadow .15s,transform .15s,border-color .15s,background .15s }
   .sn-msg:hover { box-shadow:0 10px 24px rgba(31,122,59,.10); transform:translateY(-1px); border-color:#c9decf }
@@ -91,8 +93,8 @@
   .sn-specific-wrap { display:none }
   .main-notif-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px; }
   .main-notif-tab { border:1px solid #d7e3dc; background:var(--color-background-primary); color:var(--color-text-primary); padding:10px 14px; border-radius:999px; font-weight:900; cursor:pointer; transition:background .15s,color .15s,border-color .15s,box-shadow .15s; }
-  .main-notif-tab:hover { box-shadow:0 5px 14px rgba(16,24,40,.06); }
-  .main-notif-tab.on { background:var(--sn-green); color:#fff; border-color:var(--sn-green); }
+  .main-notif-tab:hover:not(.on) { background:var(--green-light); color:var(--sn-green); border-color:var(--sn-green); box-shadow:0 5px 14px rgba(31,122,59,.12); }
+  .main-notif-tab.on { background:var(--sn-green); color:#fff; border:2px solid #62c983; padding:9px 13px; box-shadow:0 0 0 3px rgba(31,122,59,.16),0 6px 16px rgba(31,122,59,.24); }
   .notif-tab-pane { display:none; }
   .notif-tab-pane.active { display:block; }
   .course-pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:var(--green); background:var(--green-light); border-radius:999px; padding:4px 9px; margin-top:6px; margin-right:6px; }
@@ -103,13 +105,70 @@
   .notice-preview-title { font-weight:900; color:var(--color-text-primary); margin-bottom:8px; }
   .notice-preview-body { font-size:13px; color:var(--color-text-primary); line-height:1.55; white-space:pre-wrap; }
   .notice-preview-hl { color:#b42318; font-weight:900; margin-top:8px; }
+
+  html[data-theme="dark"] {
+    --sn-border: var(--color-border-tertiary);
+    --sn-muted: #a3acb9;
+    --sn-text: var(--color-text-primary);
+    --sn-bg: var(--color-background-secondary);
+  }
+  html[data-theme="dark"] .sn-card-hd {
+    background:linear-gradient(180deg,#20242d,#1e2128);
+    border-bottom-color:var(--color-border-tertiary);
+  }
+  html[data-theme="dark"] .sn-msg.unread {
+    background:linear-gradient(90deg,#182b22,#20252d);
+    border-color:#2f6543;
+  }
+  html[data-theme="dark"] .sn-msg,
+  html[data-theme="dark"] .sn-tab,
+  html[data-theme="dark"] .main-notif-tab,
+  html[data-theme="dark"] .sn-field input,
+  html[data-theme="dark"] .sn-field select,
+  html[data-theme="dark"] .sn-field textarea {
+    border-color:var(--color-border-tertiary);
+  }
+  html[data-theme="dark"] .sn-msg:hover {
+    background:#242a34;
+    border-color:#3b7650;
+    box-shadow:0 10px 24px rgba(0,0,0,.22);
+  }
+  html[data-theme="dark"] .sn-tab:hover:not(.on),
+  html[data-theme="dark"] .main-notif-tab:hover:not(.on) {
+    background:#21372a;
+    color:#75d394;
+    border-color:#3f9d61;
+    box-shadow:0 0 0 3px rgba(42,153,85,.14);
+  }
+  html[data-theme="dark"] .sn-tab.on,
+  html[data-theme="dark"] .main-notif-tab.on {
+    background:#2a9955;
+    color:#fff;
+    border-color:#54bd78;
+    box-shadow:0 0 0 3px rgba(42,153,85,.20),0 7px 18px rgba(0,0,0,.22);
+  }
+  html[data-theme="dark"] .sn-msg-title,
+  html[data-theme="dark"] .sn-card-title {
+    color:var(--color-text-primary);
+  }
+  html[data-theme="dark"] .sn-pill.unread-pill {
+    color:#fbbf24;
+  }
+  html[data-theme="dark"] .sn-btn.secondary,
+  html[data-theme="dark"] .sn-drawer-close {
+    border-color:var(--color-border-tertiary);
+  }
+  html[data-theme="dark"] .sn-modal-hd,
+  html[data-theme="dark"] .sn-modal-msg-body {
+    border-color:var(--color-border-tertiary);
+  }
 </style>
 
 <div class="page page-single on" id="pg-notifs">
   <div class="sn-shell">
     <div class="main-notif-tabs">
-      <button class="main-notif-tab on" type="button" data-main-tab="messages">{{ t['head']['messages'] }}</button>
-      <button class="main-notif-tab" type="button" data-main-tab="notice">{{ t['head']['important_notice'] }}</button>
+      <button class="main-notif-tab on" type="button" data-main-tab="messages" aria-selected="true">{{ t['head']['messages'] }}</button>
+      <button class="main-notif-tab" type="button" data-main-tab="notice" aria-selected="false">{{ t['head']['important_notice'] }}</button>
     </div>
 
     <section class="sn-card sn-messages-card notif-tab-pane active" id="tab-messages">
@@ -123,8 +182,8 @@
         </div>
       </div>
       <div class="sn-tabs">
-        <button class="sn-tab on" type="button" data-tab="inbox">{{ t['head']['inbox'] }}</button>
-        <button class="sn-tab" type="button" data-tab="sent">{{ t['head']['sent'] }}</button>
+        <button class="sn-tab on" type="button" data-tab="inbox" aria-selected="true">{{ t['head']['inbox'] }}</button>
+        <button class="sn-tab" type="button" data-tab="sent" aria-selected="false">{{ t['head']['sent'] }}</button>
       </div>
       <div class="sn-body">
         <div id="snList" class="sn-list">
@@ -315,7 +374,11 @@
     const composeOverlay = $('snComposeOverlay');
 
     function showMainTab(tabName) {
-      document.querySelectorAll('.main-notif-tab').forEach(btn => btn.classList.toggle('on', btn.dataset.mainTab === tabName));
+      document.querySelectorAll('.main-notif-tab').forEach(btn => {
+        const selected = btn.dataset.mainTab === tabName;
+        btn.classList.toggle('on', selected);
+        btn.setAttribute('aria-selected', selected ? 'true' : 'false');
+      });
       document.querySelectorAll('.notif-tab-pane').forEach(pane => pane.classList.remove('active'));
       const pane = $('tab-' + tabName);
       if (pane) pane.classList.add('active');
@@ -462,16 +525,16 @@
     $('modalCancelBtn').addEventListener('click', closeModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
-    $('modalReplyForm').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData($('modalReplyForm')); try { const data = await postForm('/head/api/notifications/send', fd); showToast(data.message || 'Reply sent!'); closeModal(); state.tab = 'sent'; document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent')); showMainTab('messages'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
+    $('modalReplyForm').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData($('modalReplyForm')); try { const data = await postForm('/head/api/notifications/send', fd); showToast(data.message || 'Reply sent!'); closeModal(); state.tab = 'sent'; document.querySelectorAll('.sn-tab').forEach(b => { const selected = b.dataset.tab === 'sent'; b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected ? 'true' : 'false'); }); showMainTab('messages'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
 
-    $('snSendForm').addEventListener('submit', async e => { e.preventDefault(); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value) && !$('snSpecific').value) { showToast('Please choose a specific receiver.', true); return; } const fd = new FormData($('snSendForm')); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value); if (!$('snUrgent').checked) fd.delete('urgent'); fd.set('can_reply', $('snCanReply') && $('snCanReply').checked ? '1' : '0'); try { const data = await postForm('/head/api/notifications/send', fd); showToast(data.message || 'Message sent successfully.'); $('snSendForm').reset(); $('snFile').value = ''; $('snFileChosen').style.display = 'none'; $('snFileZone').style.display = 'block'; updateSpecificWrap(); closeCompose(); state.tab = 'sent'; document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === 'sent')); showMainTab('messages'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
+    $('snSendForm').addEventListener('submit', async e => { e.preventDefault(); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value) && !$('snSpecific').value) { showToast('Please choose a specific receiver.', true); return; } const fd = new FormData($('snSendForm')); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value); if (!$('snUrgent').checked) fd.delete('urgent'); fd.set('can_reply', $('snCanReply') && $('snCanReply').checked ? '1' : '0'); try { const data = await postForm('/head/api/notifications/send', fd); showToast(data.message || 'Message sent successfully.'); $('snSendForm').reset(); $('snFile').value = ''; $('snFileChosen').style.display = 'none'; $('snFileZone').style.display = 'block'; updateSpecificWrap(); closeCompose(); state.tab = 'sent'; document.querySelectorAll('.sn-tab').forEach(b => { const selected = b.dataset.tab === 'sent'; b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected ? 'true' : 'false'); }); showMainTab('messages'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
 
     $('snClearBtn').addEventListener('click', () => { $('snSendForm').reset(); $('snFile').value = ''; $('snFileChosen').style.display = 'none'; $('snFileZone').style.display = 'block'; setTimeout(updateSpecificWrap, 0); });
 
     $('snScope').addEventListener('change', updateSpecificWrap);
     $('snCourseScope').addEventListener('change', updateSpecificWrap);
 
-    document.querySelectorAll('.sn-tab').forEach(btn => { btn.addEventListener('click', () => { state.tab = btn.dataset.tab; document.querySelectorAll('.sn-tab').forEach(b => b.classList.toggle('on', b === btn)); loadMessages(); }); });
+    document.querySelectorAll('.sn-tab').forEach(btn => { btn.addEventListener('click', () => { state.tab = btn.dataset.tab; document.querySelectorAll('.sn-tab').forEach(b => { const selected = b === btn; b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected ? 'true' : 'false'); }); loadMessages(); }); });
 
     $('snMarkAllBtn').addEventListener('click', async () => { try { await fetchJSON('/head/api/notifications/read-all', { method: 'POST' }); showToast('All messages marked as read.'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
 
