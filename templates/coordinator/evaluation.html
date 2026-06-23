@@ -316,6 +316,109 @@
       min-width: 220px;
     }
 
+    .student-score-box {
+      border: 1px solid #d7e3dc;
+      border-radius: 14px;
+      margin-top: 12px;
+      overflow: hidden;
+      background: var(--color-background-primary);
+    }
+
+    .student-score-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 11px 12px;
+      background: var(--color-background-tertiary);
+      border-bottom: 1px solid #edf2ef;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .student-score-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .student-score-table th,
+    .student-score-table td {
+      padding: 9px;
+      border-bottom: 1px solid #edf2ef;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .student-score-table th {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      background: var(--color-background-primary);
+    }
+
+    .student-score-input {
+      width: 92px;
+      border: 1px solid #d7e3dc;
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: var(--color-background-primary);
+      outline: none;
+    }
+
+    .student-score-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, .12);
+    }
+
+    .student-score-note {
+      width: 160px;
+      border: 1px solid #d7e3dc;
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: var(--color-background-primary);
+      outline: none;
+    }
+
+    .student-muted {
+      color: #667085;
+      font-size: 12px;
+    }
+
+    .p-override {
+      background: #eef4ff;
+      color: #3538cd;
+    }
+
+
+    .task-student-list {
+      display: grid;
+      gap: 6px;
+      min-width: 230px;
+    }
+
+    .task-student-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border: 1px solid #edf2ef;
+      border-radius: 10px;
+      background: var(--color-background-primary);
+    }
+
+    .task-student-row b {
+      font-size: 12px;
+      color: var(--color-text-primary);
+    }
+
+    .task-student-row span {
+      font-size: 12px;
+      color: #667085;
+      white-space: nowrap;
+    }
+
     @media(max-width:800px) {
       .eval-grid {
         grid-template-columns: 1fr 1fr
@@ -350,7 +453,7 @@
 
   <div class="workflow-box">
     <b>Committee-based evaluation:</b> Nothing appears here until a committee is created in the Committee page.
-    Doctors/readers are taken from the committee setup only. Coordinator opens/closes grade entry here, then sends the calculated result to Supervisor → Head → Students.
+    Doctors/readers are taken from the committee setup only. Each doctor enters a separate mark for every student, then the coordinator closes/calculates and sends the individual results to Supervisor → Head → Students.
   </div>
 
   <div class="eval-grid">
@@ -392,6 +495,14 @@
     return data;
   }
   function money(v) { return (v === null || v === undefined || v === '') ? '—' : Number(v).toFixed(2); }
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
   function isReadyToSend(p) {
     return Boolean(p.is_calculated) &&
       Boolean(p.grades_complete) &&
@@ -528,7 +639,10 @@
   }
   function renderProjects() {
     const q = (document.getElementById('searchBox').value || '').toLowerCase();
-    const list = allProjects.filter(p => `${p.title || ''} ${p.students || ''} ${p.supervisor_name || ''}`.toLowerCase().includes(q));
+    const list = allProjects.filter(p => {
+      const studentText = (p.student_scores || []).map(s => `${s.student_name || ''} ${s.university_id || ''}`).join(' ');
+      return `${p.title || ''} ${p.students || ''} ${p.supervisor_name || ''} ${studentText}`.toLowerCase().includes(q);
+    });
     renderStats(list);
     if (!list.length) {
       const label = currentScope === 'introduction'
@@ -554,6 +668,104 @@
     <div class="eval-stat"><b>${money(p.committee_score)}</b><span>Committee /50</span></div>
     <div class="eval-stat"><b>${money(p.calculated_final_score)}</b><span>Final /100</span></div>`;
   }
+  function studentScoreTable(p, ready) {
+    const rows = p.student_scores || [];
+    const disabled = ready ? '' : 'disabled';
+    const hint = ready
+      ? 'You can keep the calculated final mark or override each student manually before sending.'
+      : 'Student rows appear here, but individual overrides are enabled only after Close + Calculate.';
+
+    if (!rows.length) {
+      return `
+        <div class="student-score-box">
+          <div class="student-score-head">
+            <span>Per-student final marks</span>
+            <span class="student-muted">No students found for this item.</span>
+          </div>
+        </div>`;
+    }
+
+    const body = rows.map(s => {
+      const studentId = Number(s.student_id);
+      const finalValue = s.final_score === null || s.final_score === undefined ? '' : Number(s.final_score).toFixed(2);
+      const calculated = s.calculated_final_score === null || s.calculated_final_score === undefined ? '—' : Number(s.calculated_final_score).toFixed(2);
+      const overridePill = Number(s.manual_override)
+        ? '<span class="pill p-override">Manual override</span>'
+        : '<span class="pill p-pending">Shared score</span>';
+      return `
+        <tr>
+          <td>
+            <b>${escapeHtml(s.student_name || 'Student')}</b>
+            <div class="student-muted">${escapeHtml(s.university_id || s.email || '')}</div>
+          </td>
+          <td>${calculated}</td>
+          <td>
+            <input
+              class="student-score-input"
+              id="student-score-${p.project_id}-${studentId}"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value="${escapeHtml(finalValue)}"
+              ${disabled}>
+          </td>
+          <td>
+            <input
+              class="student-score-note"
+              id="student-note-${p.project_id}-${studentId}"
+              placeholder="Optional note"
+              value="${escapeHtml(s.notes || '')}"
+              ${disabled}>
+          </td>
+          <td>${overridePill}</td>
+          <td>
+            <button class="mini-btn green" type="button" onclick="saveStudentScore(${p.project_id}, ${studentId})" ${disabled}>
+              Save
+            </button>
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <div class="student-score-box">
+        <div class="student-score-head">
+          <span>Per-student final marks</span>
+          <span class="student-muted">${hint}</span>
+        </div>
+        <table class="student-score-table">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Calculated /100</th>
+              <th>Final /100</th>
+              <th>Note</th>
+              <th>Mode</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>`;
+  }
+
+
+  function taskStudentMarksCell(g) {
+    const marks = g.student_marks || [];
+    if (!marks.length) {
+      return '<span class="student-muted">Open grade entry to create student rows.</span>';
+    }
+    return `<div class="task-student-list">${marks.map(m => {
+      const status = Number(m.is_submitted)
+        ? `<span>${money(m.mark)} / ${money(m.max_mark)}</span>`
+        : '<span>Waiting</span>';
+      return `<div class="task-student-row">
+        <b>${escapeHtml(m.student_name || 'Student')}</b>
+        ${status}
+      </div>`;
+    }).join('')}</div>`;
+  }
+
   function projectCard(p) {
     const grades = p.grades || [];
     const ready = isReadyToSend(p);
@@ -581,24 +793,27 @@
       </div>` : '';
     const rows = grades.length ? grades.map(g => `
     <tr>
-      <td>${componentName(g.component)}</td><td>${g.evaluator_name || '—'}</td>
+      <td>${escapeHtml(componentName(g.component))}</td>
+      <td>${escapeHtml(g.evaluator_name || '—')}</td>
       <td>${money(g.mark)} / ${money(g.max_mark)}</td>
-      <td>${g.is_submitted ? '<span class="pill p-done">Submitted</span>' : '<span class="pill p-pending">Waiting</span>'}</td>
-    </tr>`).join('') : `<tr><td colspan="4">No grade tasks yet. Open grade entry to notify the assigned doctors.</td></tr>`;
+      <td>${g.is_submitted ? '<span class="pill p-done">All students submitted</span>' : '<span class="pill p-pending">Waiting students</span>'}</td>
+      <td>${taskStudentMarksCell(g)}</td>
+    </tr>`).join('') : `<tr><td colspan="5">No grade tasks yet. Open grade entry to notify the assigned doctors.</td></tr>`;
     return `<div class="eval-card" id="project-${p.project_id}">
     <div class="eval-card-head">
       <div>
-        <div class="eval-title">${p.title}</div>
-        <div class="eval-sub">Committee: ${p.committee_name || '—'} · Students: ${p.students || '—'} · Supervisor: ${p.supervisor_name || '—'} · Status: ${p.status || p.committee_status || 'scheduled'}</div>
+        <div class="eval-title">${escapeHtml(p.title)}</div>
+        <div class="eval-sub">Committee: ${escapeHtml(p.committee_name || '—')} · Students: ${escapeHtml(p.students || '—')} · Supervisor: ${escapeHtml(p.supervisor_name || '—')} · Status: ${escapeHtml(p.status || p.committee_status || 'scheduled')}</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
         <span class="pill p-flow">Coordinator → Supervisor → Head → Students</span>
         ${Number(p.is_open) ? '<span class="pill p-open">Grade Entry Open</span>' : ready ? '<span class="pill p-done">Calculated</span>' : '<span class="pill p-closed">Closed</span>'}
       </div>
     </div>
-    <table class="grade-table"><thead><tr><th>Component</th><th>Evaluator</th><th>Mark</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="grade-table"><thead><tr><th>Component</th><th>Evaluator</th><th>Average Mark</th><th>Status</th><th>Per-student marks</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="eval-grid">${scoreCards(p)}</div>
     ${coordinatorMarkBox}
+    ${studentScoreTable(p, ready)}
     <textarea class="notes-input" id="notes-${p.project_id}" placeholder="Notes to supervisor..."></textarea>
     <div class="btn-row">
       <button class="mini-btn green" onclick="openWindow(${p.project_id})">Open Grade Entry + Notify Doctors</button>
@@ -607,6 +822,46 @@
     </div>
   </div>`;
   }
+  async function saveStudentScore(projectId, studentId) {
+    const input = document.getElementById(`student-score-${projectId}-${studentId}`);
+    const noteInput = document.getElementById(`student-note-${projectId}-${studentId}`);
+    if (!input) {
+      toastMsg('Student score input was not found.', false);
+      return;
+    }
+
+    const rawValue = String(input.value || '').trim();
+    if (rawValue === '') {
+      toastMsg('Please enter the student final score first.', false);
+      input.focus();
+      return;
+    }
+
+    const finalScore = Number(rawValue);
+    if (Number.isNaN(finalScore) || finalScore < 0 || finalScore > 100) {
+      toastMsg('Student final score must be between 0 and 100.', false);
+      input.focus();
+      return;
+    }
+
+    try {
+      const d = await api('/api/coordinator/evaluation/student-score', {
+        method: 'POST',
+        body: JSON.stringify({
+          project_id: projectId,
+          course_scope: currentScope,
+          student_id: studentId,
+          final_score: finalScore,
+          notes: noteInput ? noteInput.value : ''
+        })
+      });
+      toastMsg(d.message || 'Student score saved successfully.');
+      await loadProjects();
+    } catch (e) {
+      toastMsg(e.message, false);
+    }
+  }
+
   async function saveCoordinatorMark(projectId) {
     const input = document.getElementById(`coord-mark-${projectId}`);
     if (!input) {

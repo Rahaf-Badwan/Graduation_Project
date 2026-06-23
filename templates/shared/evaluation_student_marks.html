@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Evaluation Tasks</title>
+  <style>
+    :root {
+      --accent: #2e7d42;
+      --bg: #f6f8f7;
+      --card: #ffffff;
+      --muted: #667085;
+      --border: #d7e3dc;
+      --soft: #edf2ef;
+      --danger: #b42318;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: #1f2937;
+    }
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 24px 18px 70px;
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .help {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+    }
+    .btn.secondary {
+      background: #eef2f6;
+      color: #1f2937;
+    }
+    .btn:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--card);
+      margin-bottom: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(16, 24, 40, .05);
+    }
+    .card-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--soft);
+      background: #fbfcfb;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-weight: 900;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .open { background: #dcfae6; color: #067647; }
+    .closed { background: #fee4e2; color: var(--danger); }
+    .done { background: #e0f2fe; color: #075985; }
+    .waiting { background: #fef0c7; color: #b54708; }
+    .task {
+      padding: 14px 16px 18px;
+      border-bottom: 1px solid var(--soft);
+    }
+    .task:last-child { border-bottom: 0; }
+    .task-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--soft);
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      color: var(--muted);
+      background: #fbfcfb;
+      font-size: 12px;
+    }
+    input {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+      background: white;
+    }
+    input[type="number"] { width: 100px; }
+    input.note { width: min(260px, 90vw); }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(46, 125, 66, .12);
+    }
+    .empty {
+      padding: 18px;
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      background: white;
+      color: var(--muted);
+    }
+    .toast {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-15px);
+      opacity: 0;
+      transition: .2s ease;
+      pointer-events: none;
+      padding: 12px 16px;
+      border-radius: 14px;
+      background: white;
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 32px rgba(16,24,40,.16);
+      font-weight: 800;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.ok { background: #dcfae6; color: #067647; border-color: #abefc6; }
+    .toast.err { background: #fee4e2; color: var(--danger); border-color: #fecdca; }
+    @media(max-width: 760px) {
+      table, thead, tbody, th, td, tr { display: block; }
+      thead { display: none; }
+      tr { border: 1px solid var(--soft); border-radius: 12px; margin-bottom: 10px; padding: 8px; }
+      td { border: 0; padding: 7px 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toast" id="toast"></div>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>My Evaluation Tasks</h1>
+        <div class="help">Enter a separate mark for every student in the assigned project/section. A task becomes submitted only when all students have marks.</div>
+      </div>
+      <button class="btn secondary" onclick="loadTasks()">Refresh</button>
+    </div>
+    <div id="box" class="empty">Loading tasks...</div>
+  </div>
+
+  <script>
+    let items = [];
+
+    function esc(v) {
+      return String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+    function money(v) {
+      return (v === null || v === undefined || v === '') ? '' : Number(v).toFixed(2);
+    }
+    function toast(msg, ok = true) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `toast show ${ok ? 'ok' : 'err'}`;
+      clearTimeout(window.__timer);
+      window.__timer = setTimeout(() => t.className = 'toast', 3000);
+    }
+    async function api(url, options = {}) {
+      const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
+      const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+    async function loadTasks() {
+      const box = document.getElementById('box');
+      box.className = 'empty';
+      box.innerHTML = 'Loading tasks...';
+      try {
+        const data = await api('/api/evaluation/my-tasks');
+        items = data.items || [];
+        render();
+      } catch (e) {
+        box.className = 'empty';
+        box.innerHTML = esc(e.message);
+      }
+    }
+    function render() {
+      const box = document.getElementById('box');
+      if (!items.length) {
+        box.className = 'empty';
+        box.innerHTML = 'No evaluation tasks assigned to your account.';
+        return;
+      }
+      box.className = '';
+      box.innerHTML = items.map(itemCard).join('');
+    }
+    function itemCard(item) {
+      const tasks = item.tasks || [];
+      return `<div class="card">
+        <div class="card-head">
+          <div>
+            <div class="title">${esc(item.item_title || 'Evaluation item')}</div>
+            <div class="sub">${esc(item.course_code || '')}</div>
+          </div>
+          <span class="pill ${item.is_open ? 'open' : 'closed'}">${item.is_open ? 'Grade Entry Open' : 'Grade Entry Closed'}</span>
+        </div>
+        ${tasks.map(t => taskBlock(item, t)).join('') || '<div class="task">No tasks in this item.</div>'}
+      </div>`;
+    }
+    function taskBlock(item, task) {
+      const rows = task.student_marks || [];
+      const disabled = item.is_open ? '' : 'disabled';
+      const complete = Number(task.is_submitted);
+      const tbody = rows.map(r => {
+        const mark = r.mark === null || r.mark === undefined ? '' : Number(r.mark).toFixed(2);
+        return `<tr>
+          <td><b>${esc(r.student_name || 'Student')}</b><div class="sub">${esc(r.university_id || r.email || '')}</div></td>
+          <td><input id="mark-${task.task_id}-${r.student_id}" type="number" min="0" max="${Number(task.max_mark || 0)}" step="0.01" value="${esc(mark)}" ${disabled}> / ${money(task.max_mark)}</td>
+          <td><input class="note" id="note-${task.task_id}-${r.student_id}" value="${esc(r.notes || '')}" placeholder="Optional note" ${disabled}></td>
+          <td>${Number(r.is_submitted) ? '<span class="pill done">Submitted</span>' : '<span class="pill waiting">Waiting</span>'}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="task">
+        <div class="task-head">
+          <div>
+            <b>${esc(task.component_label || task.component || 'Task')}</b>
+            <div class="sub">Average: ${task.mark === null || task.mark === undefined ? '—' : money(task.mark)} / ${money(task.max_mark)}</div>
+          </div>
+          <span class="pill ${complete ? 'done' : 'waiting'}">${complete ? 'All students submitted' : 'Missing student marks'}</span>
+        </div>
+        <table>
+          <thead><tr><th>Student</th><th>Mark</th><th>Note</th><th>Status</th></tr></thead>
+          <tbody>${tbody || '<tr><td colspan="4">No students found.</td></tr>'}</tbody>
+        </table>
+        <div style="margin-top:12px">
+          <button class="btn" onclick="saveTask(${task.task_id})" ${disabled}>Save Student Marks</button>
+        </div>
+      </div>`;
+    }
+    async function saveTask(taskId) {
+      const task = items.flatMap(i => i.tasks || []).find(t => Number(t.task_id) === Number(taskId));
+      if (!task) return toast('Task not found.', false);
+      const marks = (task.student_marks || []).map(s => {
+        const markInput = document.getElementById(`mark-${taskId}-${s.student_id}`);
+        const noteInput = document.getElementById(`note-${taskId}-${s.student_id}`);
+        return {
+          student_id: s.student_id,
+          mark: markInput ? markInput.value : '',
+          notes: noteInput ? noteInput.value : ''
+        };
+      });
+      for (const row of marks) {
+        if (String(row.mark || '').trim() === '') {
+          return toast('Please enter marks for all students before saving.', false);
+        }
+      }
+      try {
+        const data = await api('/api/evaluation/student-marks', {
+          method: 'POST',
+          body: JSON.stringify({ task_id: taskId, marks })
+        });
+        toast(data.message || 'Student marks saved.');
+        await loadTasks();
+      } catch (e) {
+        toast(e.message, false);
+      }
+    }
+    document.addEventListener('DOMContentLoaded', loadTasks);
+  </script>
+</body>
+</html>

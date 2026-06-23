@@ -10138,6 +10138,52 @@ def _ensure_evaluation_schema(cursor):
             """
         )
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS evaluation_student_scores (
+            score_id INT PRIMARY KEY AUTO_INCREMENT,
+            course_scope ENUM('introduction','graduation_project') NOT NULL,
+            reference_id INT NOT NULL,
+            student_id INT NOT NULL,
+            report_score DECIMAL(6,2) NULL,
+            supervisor_score DECIMAL(6,2) NULL,
+            coordinator_score DECIMAL(6,2) NULL,
+            discussion_score DECIMAL(6,2) NULL,
+            committee_score DECIMAL(6,2) NULL,
+            calculated_final_score DECIMAL(6,2) NULL,
+            final_score DECIMAL(6,2) NULL,
+            manual_override BOOLEAN NOT NULL DEFAULT FALSE,
+            decision ENUM('pending','accepted','rejected','archived') NOT NULL DEFAULT 'pending',
+            notes TEXT NULL,
+            updated_by INT NULL,
+            synced_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_eval_student_score (course_scope, reference_id, student_id),
+            INDEX idx_eval_student_score_ref (course_scope, reference_id),
+            INDEX idx_eval_student_score_student (student_id),
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE,
+            FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+    student_score_columns = {
+        "report_score": "ALTER TABLE evaluation_student_scores ADD COLUMN report_score DECIMAL(6,2) NULL AFTER student_id",
+        "supervisor_score": "ALTER TABLE evaluation_student_scores ADD COLUMN supervisor_score DECIMAL(6,2) NULL AFTER report_score",
+        "coordinator_score": "ALTER TABLE evaluation_student_scores ADD COLUMN coordinator_score DECIMAL(6,2) NULL AFTER supervisor_score",
+        "discussion_score": "ALTER TABLE evaluation_student_scores ADD COLUMN discussion_score DECIMAL(6,2) NULL AFTER coordinator_score",
+        "committee_score": "ALTER TABLE evaluation_student_scores ADD COLUMN committee_score DECIMAL(6,2) NULL AFTER discussion_score",
+        "calculated_final_score": "ALTER TABLE evaluation_student_scores ADD COLUMN calculated_final_score DECIMAL(6,2) NULL AFTER committee_score",
+        "final_score": "ALTER TABLE evaluation_student_scores ADD COLUMN final_score DECIMAL(6,2) NULL AFTER calculated_final_score",
+        "manual_override": "ALTER TABLE evaluation_student_scores ADD COLUMN manual_override BOOLEAN NOT NULL DEFAULT FALSE AFTER final_score",
+        "decision": "ALTER TABLE evaluation_student_scores ADD COLUMN decision ENUM('pending','accepted','rejected','archived') NOT NULL DEFAULT 'pending' AFTER manual_override",
+        "notes": "ALTER TABLE evaluation_student_scores ADD COLUMN notes TEXT NULL AFTER decision",
+        "updated_by": "ALTER TABLE evaluation_student_scores ADD COLUMN updated_by INT NULL AFTER notes",
+        "synced_at": "ALTER TABLE evaluation_student_scores ADD COLUMN synced_at DATETIME NULL AFTER updated_by",
+    }
+    for column_name, alter_sql in student_score_columns.items():
+        if not _db_column_exists(cursor, "evaluation_student_scores", column_name):
+            cursor.execute(alter_sql)
+
 
 def _ensure_student_course_results_score_schema(cursor):
     if not _table_exists(cursor, "student_course_results"):
@@ -10718,6 +10764,286 @@ def _evaluation_blank_scores():
     }
 
 
+def _evaluation_item_students(cursor, course_scope, reference_id):
+    """Return the students that belong to one COMP4200 section or COMP4300 project."""
+    reference_id = int(reference_id)
+
+    if course_scope == "graduation_project":
+        if not _table_exists(cursor, "project_members"):
+            return []
+        cursor.execute(
+            """
+            SELECT DISTINCT
+                st.student_id,
+                u.user_id,
+                u.full_name AS student_name,
+                u.university_id,
+                u.email
+            FROM project_members pm
+            JOIN students st ON st.student_id = pm.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE pm.project_id = %s
+              AND u.role = 'student'
+              AND u.is_active = TRUE
+            ORDER BY pm.is_primary_contact DESC, u.full_name
+            """,
+            (reference_id,),
+        )
+    else:
+        if not _table_exists(cursor, "section_students"):
+            return []
+        cursor.execute(
+            """
+            SELECT DISTINCT
+                st.student_id,
+                u.user_id,
+                u.full_name AS student_name,
+                u.university_id,
+                u.email
+            FROM section_students ss
+            JOIN students st ON st.student_id = ss.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE ss.section_id = %s
+              AND u.role = 'student'
+              AND u.is_active = TRUE
+            ORDER BY u.full_name
+            """,
+            (reference_id,),
+        )
+
+    return cursor.fetchall()
+
+
+def _evaluation_saved_student_scores(cursor, course_scope, reference_id):
+    cursor.execute(
+        """
+        SELECT
+            student_id, report_score, supervisor_score, coordinator_score,
+            discussion_score, committee_score, calculated_final_score, final_score,
+            manual_override, decision, notes, updated_at
+        FROM evaluation_student_scores
+        WHERE course_scope = %s
+          AND reference_id = %s
+        """,
+        (course_scope, int(reference_id)),
+    )
+    return {int(row["student_id"]): row for row in cursor.fetchall()}
+
+
+def _evaluation_student_score_rows(cursor, course_scope, reference_id, scores=None):
+    """Build the per-student grade payload used by coordinator/evaluation.html."""
+    scores = scores or _evaluation_blank_scores()
+    students = _evaluation_item_students(cursor, course_scope, reference_id)
+    saved = _evaluation_saved_student_scores(cursor, course_scope, reference_id)
+
+    rows = []
+    for student in students:
+        student_id = int(student["student_id"])
+        existing = saved.get(student_id) or {}
+
+        def pick(field):
+            value = existing.get(field)
+            return value if value is not None else scores.get(field)
+
+        final_score = existing.get("final_score")
+        if final_score is None:
+            final_score = scores.get("final_score")
+
+        calculated_final = existing.get("calculated_final_score")
+        if calculated_final is None:
+            calculated_final = scores.get("calculated_final_score")
+
+        row = {
+            "student_id": student_id,
+            "user_id": student.get("user_id"),
+            "student_name": student.get("student_name"),
+            "university_id": student.get("university_id"),
+            "email": student.get("email"),
+            "report_score": pick("report_score"),
+            "supervisor_score": pick("supervisor_score"),
+            "coordinator_score": pick("coordinator_score"),
+            "discussion_score": pick("discussion_score"),
+            "committee_score": pick("committee_score"),
+            "calculated_final_score": calculated_final,
+            "final_score": final_score,
+            "manual_override": bool(existing.get("manual_override") or False),
+            "decision": existing.get("decision") or "pending",
+            "notes": existing.get("notes") or "",
+            "updated_at": str(existing.get("updated_at") or ""),
+        }
+
+        for key in (
+            "report_score", "supervisor_score", "coordinator_score",
+            "discussion_score", "committee_score", "calculated_final_score", "final_score"
+        ):
+            if row.get(key) is not None:
+                row[key] = float(row[key])
+
+        rows.append(row)
+
+    return rows
+
+
+def _evaluation_sync_individual_student_scores(cursor, course_scope, reference_id, scores, updated_by=None, notes=None):
+    """
+    Store one grade row per student.
+
+    Existing manual overrides are preserved, but the component/calculated scores
+    are refreshed from the shared committee calculation.
+    """
+    students = _evaluation_item_students(cursor, course_scope, reference_id)
+    if not students:
+        return 0
+
+    final_score = scores.get("final_score")
+    calculated_final_score = scores.get("calculated_final_score", final_score)
+    changed = 0
+
+    for student in students:
+        cursor.execute(
+            """
+            INSERT INTO evaluation_student_scores
+                (course_scope, reference_id, student_id, report_score, supervisor_score,
+                 coordinator_score, discussion_score, committee_score, calculated_final_score,
+                 final_score, manual_override, notes, updated_by, synced_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, %s, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                report_score = VALUES(report_score),
+                supervisor_score = VALUES(supervisor_score),
+                coordinator_score = VALUES(coordinator_score),
+                discussion_score = VALUES(discussion_score),
+                committee_score = VALUES(committee_score),
+                calculated_final_score = VALUES(calculated_final_score),
+                final_score = IF(manual_override = TRUE, final_score, VALUES(final_score)),
+                notes = COALESCE(VALUES(notes), notes),
+                updated_by = VALUES(updated_by),
+                synced_at = NOW()
+            """,
+            (
+                course_scope,
+                int(reference_id),
+                int(student["student_id"]),
+                scores.get("report_score"),
+                scores.get("supervisor_score"),
+                scores.get("coordinator_score"),
+                scores.get("discussion_score"),
+                scores.get("committee_score"),
+                calculated_final_score,
+                final_score,
+                notes or None,
+                updated_by,
+            ),
+        )
+        changed += 1
+
+    return changed
+
+
+def _evaluation_student_final_scores_map(cursor, course_scope, reference_id, scores=None):
+    rows = _evaluation_student_score_rows(cursor, course_scope, reference_id, scores)
+    return {int(row["student_id"]): row.get("final_score") for row in rows}
+
+
+def _evaluation_mark_student_scores_decision(cursor, course_scope, reference_id, decision, updated_by=None, notes=None):
+    cursor.execute(
+        """
+        UPDATE evaluation_student_scores
+        SET decision = %s,
+            notes = COALESCE(%s, notes),
+            updated_by = %s
+        WHERE course_scope = %s
+          AND reference_id = %s
+        """,
+        (decision, notes, updated_by, course_scope, int(reference_id)),
+    )
+    return cursor.rowcount
+
+
+def _sync_comp4300_project_individual_course_results(cursor, project_id, status, default_final_score, notes, updated_by, student_scores=None):
+    """Sync COMP4300 course results using each student's own final score."""
+    if not _ensure_student_course_results_score_schema(cursor):
+        return 0
+
+    student_scores = student_scores or {}
+    cursor.execute(
+        """
+        SELECT DISTINCT pm.student_id, p.semester_id
+        FROM projects p
+        JOIN project_members pm ON pm.project_id = p.project_id
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE p.project_id = %s
+          AND sem.course_code = 'COMP4300'
+        """,
+        (int(project_id),),
+    )
+    rows = cursor.fetchall()
+    changed = 0
+    for row in rows:
+        student_id = int(row["student_id"])
+        final_score = student_scores.get(student_id)
+        if final_score is None:
+            final_score = default_final_score
+        cursor.execute(
+            """
+            INSERT INTO student_course_results
+                (student_id, semester_id, status, final_score, updated_by, notes)
+            VALUES (%s, %s, %s, %s, %s, COALESCE(%s, 'COMP4300 final grade saved.'))
+            ON DUPLICATE KEY UPDATE
+                status = VALUES(status),
+                final_score = VALUES(final_score),
+                updated_by = VALUES(updated_by),
+                notes = VALUES(notes),
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (student_id, row["semester_id"], status, final_score, updated_by, notes),
+        )
+        changed += 1
+    return changed
+
+
+def _sync_comp4200_section_individual_course_results(cursor, section_id, status, default_final_score, notes, updated_by, student_scores=None):
+    """Sync COMP4200 section results using each student's own final score when the table exists."""
+    if not _ensure_student_course_results_score_schema(cursor):
+        return 0
+
+    semester = _get_active_comp4200_semester(cursor) or _get_active_semester(cursor)
+    semester_id = semester.get("semester_id") if semester else None
+    if not semester_id:
+        return 0
+
+    student_status = {
+        "pending": "pending",
+        "succeeded": "pending",
+        "not_succeeded": "failed",
+    }.get(status, "pending")
+
+    student_scores = student_scores or {}
+    students = _evaluation_item_students(cursor, "introduction", section_id)
+    changed = 0
+    for student in students:
+        student_id = int(student["student_id"])
+        final_score = student_scores.get(student_id)
+        if final_score is None:
+            final_score = default_final_score
+        cursor.execute(
+            """
+            INSERT INTO student_course_results
+                (student_id, semester_id, status, final_score, updated_by, notes)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                status = IF(student_course_results.promoted_at IS NULL, VALUES(status), student_course_results.status),
+                final_score = IF(student_course_results.promoted_at IS NULL, VALUES(final_score), student_course_results.final_score),
+                updated_by = IF(student_course_results.promoted_at IS NULL, VALUES(updated_by), student_course_results.updated_by),
+                notes = IF(student_course_results.promoted_at IS NULL, VALUES(notes), student_course_results.notes),
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (student_id, semester_id, student_status, final_score, updated_by, notes),
+        )
+        changed += 1
+
+    return changed
+
+
 def _evaluation_grade_completion(course_scope, grades):
     required_count = max(_evaluation_default_required_count(course_scope), len(grades))
     submitted_count = sum(
@@ -10874,16 +11200,21 @@ def _evaluation_project_payload(cursor, course_scope, base_row):
 
     payload = dict(base_row)
     payload.update(scores)
+    is_calculated = _evaluation_ready_for_calculation(window, completion)
+    student_scores = _evaluation_student_score_rows(cursor, course_scope, reference_id, scores)
+
     payload.update(
         {
             "is_open": bool(window.get("is_open") or False),
             "opened_at": str(window.get("opened_at") or ""),
             "closed_at": str(window.get("closed_at") or ""),
             "grades": grades,
+            "student_scores": student_scores,
+            "students_count": len(student_scores),
             "submitted_count": completion["submitted_count"],
             "required_count": completion["required_count"],
             "grades_complete": completion["grades_complete"],
-            "is_calculated": _evaluation_ready_for_calculation(window, completion),
+            "is_calculated": is_calculated,
         }
     )
     return payload
@@ -11481,6 +11812,127 @@ def api_coordinator_evaluation_coordinator_mark():
         return jsonify({"error": str(e)}), 500
 
 
+@coordinator_bp.route("/api/coordinator/evaluation/student-score", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_student_score():
+    """Save a coordinator override for one student's final evaluation score."""
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "").strip()
+    reference_id = data.get("project_id") or data.get("reference_id")
+    student_id = data.get("student_id")
+    raw_final_score = data.get("final_score")
+    notes = (data.get("notes") or "").strip() or None
+
+    if course_scope not in {"introduction", "graduation_project"}:
+        return jsonify({"error": "course_scope must be introduction or graduation_project."}), 400
+    if not reference_id:
+        return jsonify({"error": "project_id/reference_id is required."}), 400
+    if not student_id:
+        return jsonify({"error": "student_id is required."}), 400
+
+    try:
+        reference_id = int(reference_id)
+        student_id = int(student_id)
+        final_score = float(raw_final_score)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Student final score must be a valid number."}), 400
+
+    if final_score < 0 or final_score > 100:
+        return jsonify({"error": "Student final score must be between 0 and 100."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+
+        student_ids = {int(row["student_id"]) for row in _evaluation_item_students(cursor, course_scope, reference_id)}
+        if student_id not in student_ids:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "This student does not belong to the selected evaluation item."}), 400
+
+        _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
+        grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+        completion = _evaluation_grade_completion(course_scope, grades)
+        window = _evaluation_window_for_item(cursor, course_scope, reference_id)
+
+        if not _evaluation_ready_for_calculation(window, completion):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Close + Calculate the item first, then override individual student scores."}), 400
+
+        scores = _evaluation_scores_from_grades(course_scope, grades)
+        if scores.get("final_score") is None:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Cannot save a student score until the shared final score is calculated."}), 400
+
+        _evaluation_sync_individual_student_scores(
+            cursor,
+            course_scope,
+            reference_id,
+            scores,
+            session.get("user_id"),
+            None,
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO evaluation_student_scores
+                (course_scope, reference_id, student_id, report_score, supervisor_score,
+                 coordinator_score, discussion_score, committee_score, calculated_final_score,
+                 final_score, manual_override, notes, updated_by, synced_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                report_score = VALUES(report_score),
+                supervisor_score = VALUES(supervisor_score),
+                coordinator_score = VALUES(coordinator_score),
+                discussion_score = VALUES(discussion_score),
+                committee_score = VALUES(committee_score),
+                calculated_final_score = VALUES(calculated_final_score),
+                final_score = VALUES(final_score),
+                manual_override = TRUE,
+                notes = COALESCE(VALUES(notes), notes),
+                updated_by = VALUES(updated_by),
+                synced_at = NOW()
+            """,
+            (
+                course_scope,
+                reference_id,
+                student_id,
+                scores.get("report_score"),
+                scores.get("supervisor_score"),
+                scores.get("coordinator_score"),
+                scores.get("discussion_score"),
+                scores.get("committee_score"),
+                scores.get("calculated_final_score") or scores.get("final_score"),
+                final_score,
+                notes,
+                session.get("user_id"),
+            ),
+        )
+
+        student_scores = _evaluation_student_score_rows(cursor, course_scope, reference_id, scores)
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify(
+            _json_safe_value(
+                {
+                    "message": "Student score saved successfully.",
+                    "student_scores": student_scores,
+                    "scores": scores,
+                }
+            )
+        )
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return jsonify({"error": str(e)}), 500
+
+
 @coordinator_bp.route("/api/coordinator/evaluation/close", methods=["POST"])
 @login_required(role="coordinator")
 def api_coordinator_evaluation_close():
@@ -11517,6 +11969,15 @@ def api_coordinator_evaluation_close():
             cursor.close()
             db.close()
             return jsonify({"error": "Cannot calculate the final score until all required marks are submitted."}), 400
+
+        _evaluation_sync_individual_student_scores(
+            cursor,
+            course_scope,
+            reference_id,
+            scores,
+            session.get("user_id"),
+            None,
+        )
 
         cursor.execute(
             """
@@ -11598,6 +12059,15 @@ def api_coordinator_evaluation_close_all():
             if scores.get("final_score") is None:
                 skipped_count += 1
                 continue
+
+            _evaluation_sync_individual_student_scores(
+                cursor,
+                course_scope,
+                reference_id,
+                scores,
+                session.get("user_id"),
+                None,
+            )
 
             cursor.execute(
                 """
@@ -11705,6 +12175,14 @@ def api_coordinator_evaluation_send_to_supervisor():
             session.get("user_id"),
             notes,
         )
+        individual_count = _evaluation_sync_individual_student_scores(
+            cursor,
+            course_scope,
+            reference_id,
+            scores,
+            session.get("user_id"),
+            notes,
+        )
 
         _insert_notification(
             cursor,
@@ -11735,10 +12213,13 @@ def api_coordinator_evaluation_send_to_supervisor():
         db.commit()
         cursor.close()
         db.close()
+        student_scores = _evaluation_student_score_rows(cursor, course_scope, reference_id, scores)
         return jsonify({
             "message": f"Result sent to supervisor: {supervisor.get('full_name') or 'Supervisor'}.",
             "notifications_sent": 1,
+            "individual_scores_saved": individual_count,
             "scores": _json_safe_value(scores),
+            "student_scores": _json_safe_value(student_scores),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -11766,9 +12247,19 @@ def api_coordinator_evaluation_finalize():
         cursor = db.cursor(dictionary=True)
         _ensure_evaluation_schema(cursor)
 
+        _evaluation_cleanup_tasks(cursor, course_scope, reference_id)
         grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
         scores = _evaluation_scores_from_grades(course_scope, grades)
         final_score = scores.get("final_score")
+        _evaluation_sync_individual_student_scores(
+            cursor,
+            course_scope,
+            reference_id,
+            scores,
+            session.get("user_id"),
+            notes,
+        )
+        student_final_scores = _evaluation_student_final_scores_map(cursor, course_scope, reference_id, scores)
 
         if course_scope == "graduation_project":
             new_status = "archived" if decision == "archived" else decision
@@ -11789,13 +12280,14 @@ def api_coordinator_evaluation_finalize():
                     "UPDATE projects SET status = %s, coordinator_notes = COALESCE(%s, coordinator_notes) WHERE project_id = %s",
                     (new_status, notes, reference_id),
                 )
-            _sync_comp4300_project_course_results(
+            _sync_comp4300_project_individual_course_results(
                 cursor,
                 reference_id,
                 course_status,
                 final_score,
                 notes,
                 session.get("user_id"),
+                student_final_scores,
             )
         else:
             _ensure_section_results_schema(cursor)
@@ -11814,6 +12306,24 @@ def api_coordinator_evaluation_finalize():
                 """,
                 (reference_id, status_value, notes, session.get("user_id")),
             )
+            _sync_comp4200_section_individual_course_results(
+                cursor,
+                reference_id,
+                status_value,
+                final_score,
+                notes,
+                session.get("user_id"),
+                student_final_scores,
+            )
+
+        _evaluation_mark_student_scores_decision(
+            cursor,
+            course_scope,
+            reference_id,
+            decision,
+            session.get("user_id"),
+            notes,
+        )
 
         cursor.execute(
             """
@@ -11833,7 +12343,12 @@ def api_coordinator_evaluation_finalize():
         db.commit()
         cursor.close()
         db.close()
-        return jsonify({"message": "Final evaluation saved successfully.", "scores": _json_safe_value(scores)})
+        student_scores = _evaluation_student_score_rows(cursor, course_scope, reference_id, scores)
+        return jsonify({
+            "message": "Final evaluation saved successfully.",
+            "scores": _json_safe_value(scores),
+            "student_scores": _json_safe_value(student_scores),
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

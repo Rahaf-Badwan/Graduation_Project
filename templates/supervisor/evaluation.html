@@ -76,9 +76,120 @@
     font-weight: 800;
   }
 
+  #supEvalPage .waiting-sign {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--amber-light);
+    color: #b54708;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  #supEvalPage .closed-sign {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--coral-light);
+    color: #b42318;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
   #supEvalPage .small-muted {
     font-size: 12px;
     color: var(--color-text-secondary);
+  }
+
+  #supEvalPage .student-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+
+  #supEvalPage .student-table th,
+  #supEvalPage .student-table td {
+    border-bottom: 1px solid var(--color-border-tertiary);
+    padding: 9px 7px;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  #supEvalPage .student-table th {
+    background: var(--color-background-secondary);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+  }
+
+  #supEvalPage .student-mark-input {
+    width: 110px;
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 10px;
+    padding: 8px 9px;
+    background: var(--color-background-primary);
+  }
+
+  #supEvalPage .student-note-input {
+    width: min(260px, 100%);
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 10px;
+    padding: 8px 9px;
+    background: var(--color-background-primary);
+  }
+
+  #supEvalPage .student-mark-input:focus,
+  #supEvalPage .student-note-input:focus {
+    outline: none;
+    border-color: var(--sup-mid);
+    box-shadow: 0 0 0 3px rgba(46, 125, 66, .12);
+  }
+
+  #supEvalPage .btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  #supEvalPage .eval-toast {
+    position: fixed;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-18px);
+    opacity: 0;
+    pointer-events: none;
+    transition: .2s ease;
+    z-index: 9999;
+    padding: 12px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--color-border-tertiary);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    box-shadow: 0 14px 32px rgba(16, 24, 40, .16);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  #supEvalPage .eval-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  #supEvalPage .eval-toast.ok {
+    background: var(--green-light);
+    color: var(--green);
+    border-color: #abefc6;
+  }
+
+  #supEvalPage .eval-toast.err {
+    background: var(--coral-light);
+    color: #b42318;
+    border-color: #fecdca;
   }
 
   @media (max-width: 900px) {
@@ -86,13 +197,42 @@
       grid-template-columns: 1fr;
     }
   }
+
+  @media (max-width: 760px) {
+    #supEvalPage .student-table,
+    #supEvalPage .student-table thead,
+    #supEvalPage .student-table tbody,
+    #supEvalPage .student-table th,
+    #supEvalPage .student-table td,
+    #supEvalPage .student-table tr {
+      display: block;
+    }
+
+    #supEvalPage .student-table thead {
+      display: none;
+    }
+
+    #supEvalPage .student-table tr {
+      border: 1px solid var(--color-border-tertiary);
+      border-radius: 12px;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+
+    #supEvalPage .student-table td {
+      border: 0;
+      padding: 6px 4px;
+    }
+  }
 </style>
 
 <div id="supEvalPage">
+  <div id="supEvalToast" class="eval-toast" role="status" aria-live="polite"></div>
+
   <div class="eval-banner">
     <div style="font-size:13px;font-weight:700;color:var(--sup)">Your evaluation tasks</div>
     <div style="font-size:12px;color:var(--sup-dark);margin-top:3px">
-      When the coordinator opens grade entry, the project/section appears here. After you submit, the coordinator will see the ✓ submitted sign.
+      When the coordinator opens grade entry, the project/section appears here. Enter a separate mark for every student.
     </div>
   </div>
 
@@ -137,14 +277,33 @@
 
 {% block extra_scripts %}
 <script>
-  let supervisorEvalState = { tasks: [], completed: [], summary: { pending: 0, completed: 0 } };
+  let supervisorEvalState = { items: [] };
 
   function safeEval(value) {
     return String(value ?? '')
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')
       .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;');
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function moneyEval(value) {
+    return (value === null || value === undefined || value === '') ? '—' : Number(value).toFixed(2);
+  }
+
+  function toastEval(message, ok = true) {
+    const toast = document.getElementById('supEvalToast');
+    if (!toast) {
+      alert(message);
+      return;
+    }
+    toast.textContent = message;
+    toast.className = `eval-toast show ${ok ? 'ok' : 'err'}`;
+    clearTimeout(window.__supEvalToastTimer);
+    window.__supEvalToastTimer = setTimeout(() => {
+      toast.className = 'eval-toast';
+    }, 3200);
   }
 
   async function supervisorEvalFetch(url, options) {
@@ -152,52 +311,115 @@
       headers: { 'Content-Type': 'application/json' }
     }, options || {}));
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
     if (!res.ok || data.error) throw new Error(data.error || 'Request failed');
     return data;
   }
 
-  function taskCard(task) {
+  function allTasks() {
+    return (supervisorEvalState.items || []).flatMap(item =>
+      (item.tasks || []).map(task => ({ item, task }))
+    );
+  }
+
+  function isTaskDone(task) {
+    const rows = task.student_marks || [];
+    return rows.length > 0 && rows.every(row => Number(row.is_submitted));
+  }
+
+  function pendingPairs() {
+    return allTasks().filter(pair => pair.item.is_open && !isTaskDone(pair.task));
+  }
+
+  function completedPairs() {
+    return allTasks().filter(pair => isTaskDone(pair.task));
+  }
+
+  function taskCard(item, task) {
+    const rows = task.student_marks || [];
+    const disabled = item.is_open ? '' : 'disabled';
+    const status = isTaskDone(task)
+      ? '<span class="submitted-sign">✓ Submitted</span>'
+      : item.is_open
+        ? '<span class="waiting-sign">Open</span>'
+        : '<span class="closed-sign">Closed</span>';
+
+    const bodyRows = rows.map(row => {
+      const mark = row.mark === null || row.mark === undefined ? '' : Number(row.mark).toFixed(2);
+      return `
+        <tr>
+          <td>
+            <b>${safeEval(row.student_name || 'Student')}</b>
+            <div class="task-meta">${safeEval(row.university_id || row.email || '')}</div>
+          </td>
+          <td>
+            <input
+              class="student-mark-input"
+              id="mark-${task.task_id}-${row.student_id}"
+              type="number"
+              min="0"
+              max="${safeEval(task.max_mark || 0)}"
+              step="0.01"
+              value="${safeEval(mark)}"
+              placeholder="0 - ${safeEval(task.max_mark || 0)}"
+              ${disabled}>
+            / ${moneyEval(task.max_mark)}
+          </td>
+          <td>
+            <input
+              class="student-note-input"
+              id="note-${task.task_id}-${row.student_id}"
+              value="${safeEval(row.notes || '')}"
+              placeholder="Optional note"
+              ${disabled}>
+          </td>
+          <td>${Number(row.is_submitted) ? '<span class="submitted-sign">✓ Submitted</span>' : '<span class="waiting-sign">Waiting</span>'}</td>
+        </tr>`;
+    }).join('');
+
     return `
-      <div class="eval-task" id="task-${task.task_id}">
+      <div class="eval-task ${isTaskDone(task) ? 'done' : ''}" id="task-${task.task_id}">
         <div class="task-head">
           <div>
-            <div class="task-title">${safeEval(task.title)}</div>
+            <div class="task-title">${safeEval(item.item_title || 'Evaluation item')}</div>
             <div class="task-meta">
-              ${safeEval(task.students || 'No student names')}<br>
-              ${safeEval(task.course_label)} · ${safeEval(task.component_label)} · Max ${safeEval(task.max_mark)}
+              ${safeEval(item.course_code || '')} · ${safeEval(task.component_label || task.component || '')}<br>
+              Average mark: <b>${moneyEval(task.mark)}</b> / ${moneyEval(task.max_mark)}
             </div>
           </div>
-          <span class="pill p-late" style="font-size:10px">Open</span>
+          ${status}
         </div>
 
-        <div class="field-wrap">
-          <div class="field-label">Your mark <span class="req">*</span></div>
-          <input class="field-input" id="mark-${task.task_id}" type="number" min="0" max="${safeEval(task.max_mark)}" step="0.01" placeholder="0 - ${safeEval(task.max_mark)}">
-        </div>
-
-        <div class="field-wrap" style="margin-bottom:8px">
-          <div class="field-label">Comments</div>
-          <textarea class="field-textarea" id="notes-${task.task_id}" style="min-height:60px" placeholder="Your comments..."></textarea>
-        </div>
+        <table class="student-table">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Mark</th>
+              <th>Comment</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${bodyRows || '<tr><td colspan="4">No students found for this item.</td></tr>'}</tbody>
+        </table>
 
         <div class="btn-row">
-          <button class="btn btn-primary" type="button" onclick="submitEvalTask(${task.task_id})">Send the evaluation ↗</button>
+          <button class="btn btn-primary" type="button" onclick="submitStudentMarks(${task.task_id})" ${disabled}>
+            Save student marks ↗
+          </button>
         </div>
       </div>
     `;
   }
 
-  function completedCard(task) {
+  function completedCard(item, task) {
     return `
       <div class="eval-task done">
         <div class="task-head">
           <div>
-            <div class="task-title">${safeEval(task.title)}</div>
+            <div class="task-title">${safeEval(item.item_title || 'Evaluation item')}</div>
             <div class="task-meta">
-              ${safeEval(task.course_label)} · ${safeEval(task.component_label)}<br>
-              Submitted mark: <b>${safeEval(task.mark)}</b> / ${safeEval(task.max_mark)}
-              ${task.submitted_at ? ' · ' + safeEval(task.submitted_at) : ''}
+              ${safeEval(item.course_code || '')} · ${safeEval(task.component_label || task.component || '')}<br>
+              Average submitted mark: <b>${moneyEval(task.mark)}</b> / ${moneyEval(task.max_mark)}
             </div>
           </div>
           <span class="submitted-sign">✓ Submitted</span>
@@ -210,18 +432,18 @@
     const pendingBox = document.getElementById('pendingEvalTasks');
     const completedBox = document.getElementById('completedEvalTasks');
 
-    const tasks = supervisorEvalState.tasks || [];
-    const completed = supervisorEvalState.completed || [];
+    const pending = pendingPairs();
+    const completed = completedPairs();
 
-    pendingBox.innerHTML = tasks.length
-      ? tasks.map(taskCard).join('')
+    pendingBox.innerHTML = pending.length
+      ? pending.map(({ item, task }) => taskCard(item, task)).join('')
       : '<div class="empty-box">No open evaluation tasks now. They will appear here when the coordinator opens grade entry.</div>';
 
     completedBox.innerHTML = completed.length
-      ? completed.map(completedCard).join('')
+      ? completed.map(({ item, task }) => completedCard(item, task)).join('')
       : '<div class="empty-box">No submitted evaluations yet.</div>';
 
-    const pendingCount = tasks.length;
+    const pendingCount = pending.length;
     const completedCount = completed.length;
     const total = Math.max(1, pendingCount + completedCount);
 
@@ -234,32 +456,46 @@
 
   async function loadSupervisorEvaluationTasks() {
     try {
-      supervisorEvalState = await supervisorEvalFetch('/api/supervisor/evaluation/tasks');
+      supervisorEvalState = await supervisorEvalFetch('/api/supervisor/evaluation/my-tasks');
       renderSupervisorEvaluationTasks();
     } catch (err) {
       document.getElementById('pendingEvalTasks').innerHTML = `<div class="empty-box">Evaluation error: ${safeEval(err.message)}</div>`;
     }
   }
 
-  async function submitEvalTask(taskId) {
-    const markInput = document.getElementById(`mark-${taskId}`);
-    const notesInput = document.getElementById(`notes-${taskId}`);
-
-    const mark = markInput.value;
-    if (mark === '') {
-      alert('Please enter your mark.');
+  async function submitStudentMarks(taskId) {
+    const pair = allTasks().find(({ task }) => Number(task.task_id) === Number(taskId));
+    if (!pair) {
+      toastEval('Task not found.', false);
       return;
     }
 
+    const marks = (pair.task.student_marks || []).map(student => {
+      const markInput = document.getElementById(`mark-${taskId}-${student.student_id}`);
+      const noteInput = document.getElementById(`note-${taskId}-${student.student_id}`);
+      return {
+        student_id: student.student_id,
+        mark: markInput ? markInput.value : '',
+        notes: noteInput ? noteInput.value.trim() : ''
+      };
+    });
+
+    for (const row of marks) {
+      if (String(row.mark || '').trim() === '') {
+        toastEval('Please enter a mark for every student.', false);
+        return;
+      }
+    }
+
     try {
-      const data = await supervisorEvalFetch(`/api/supervisor/evaluation/tasks/${taskId}/submit`, {
+      const data = await supervisorEvalFetch('/api/supervisor/evaluation/student-marks', {
         method: 'POST',
-        body: JSON.stringify({ mark: Number(mark), notes: notesInput.value.trim() })
+        body: JSON.stringify({ task_id: taskId, marks })
       });
-      alert(data.message || 'Evaluation submitted successfully.');
+      toastEval(data.message || 'Student marks saved successfully.');
       await loadSupervisorEvaluationTasks();
     } catch (err) {
-      alert('Submit error: ' + err.message);
+      toastEval('Submit error: ' + err.message, false);
     }
   }
 
