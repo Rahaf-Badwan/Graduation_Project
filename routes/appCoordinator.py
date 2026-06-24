@@ -10184,6 +10184,39 @@ def _ensure_evaluation_schema(cursor):
         if not _db_column_exists(cursor, "evaluation_student_scores", column_name):
             cursor.execute(alter_sql)
 
+    _ensure_evaluation_student_task_score_schema(cursor)
+
+
+def _ensure_evaluation_student_task_score_schema(cursor):
+    """Create/repair the per-student marks table used by doctors and coordinator."""
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS evaluation_student_task_scores (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            task_id INT NOT NULL,
+            student_id INT NOT NULL,
+            mark DECIMAL(6,2) NULL,
+            notes TEXT NULL,
+            is_submitted BOOLEAN NOT NULL DEFAULT FALSE,
+            submitted_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_eval_task_student (task_id, student_id),
+            INDEX idx_eval_task_student_task (task_id),
+            INDEX idx_eval_task_student_student (student_id),
+            FOREIGN KEY (task_id) REFERENCES evaluation_grade_tasks(task_id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+    repair_columns = {
+        "mark": "ALTER TABLE evaluation_student_task_scores ADD COLUMN mark DECIMAL(6,2) NULL AFTER student_id",
+        "notes": "ALTER TABLE evaluation_student_task_scores ADD COLUMN notes TEXT NULL AFTER mark",
+        "is_submitted": "ALTER TABLE evaluation_student_task_scores ADD COLUMN is_submitted BOOLEAN NOT NULL DEFAULT FALSE AFTER notes",
+        "submitted_at": "ALTER TABLE evaluation_student_task_scores ADD COLUMN submitted_at DATETIME NULL AFTER is_submitted",
+    }
+    for column_name, alter_sql in repair_columns.items():
+        if not _db_column_exists(cursor, "evaluation_student_task_scores", column_name):
+            cursor.execute(alter_sql)
+
 
 def _ensure_student_course_results_score_schema(cursor):
     if not _table_exists(cursor, "student_course_results"):
@@ -10681,12 +10714,50 @@ def _evaluation_fetch_grade_rows(cursor, course_scope, reference_id):
         (course_scope, reference_id),
     )
     rows = cursor.fetchall()
+    task_ids = []
     for row in rows:
+        row["task_id"] = int(row.get("task_id") or 0)
         row["max_mark"] = float(row.get("max_mark") or 0)
         row["mark"] = None if row.get("mark") is None else float(row.get("mark") or 0)
         row["is_submitted"] = bool(row.get("is_submitted"))
+        row["shared_mark"] = row.get("component") in ("intro_report_reader", "grad_report_reader")
+        row["student_marks"] = []
         if row.get("submitted_at") is not None:
             row["submitted_at"] = str(row["submitted_at"])
+        if row["task_id"]:
+            task_ids.append(row["task_id"])
+
+    if task_ids and _table_exists(cursor, "evaluation_student_task_scores"):
+        placeholders = ",".join(["%s"] * len(task_ids))
+        cursor.execute(
+            f"""
+            SELECT ests.task_id, ests.student_id, ests.mark, ests.notes,
+                   ests.is_submitted, ests.submitted_at,
+                   u.full_name AS student_name, u.university_id, u.email
+            FROM evaluation_student_task_scores ests
+            JOIN students st ON st.student_id = ests.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE ests.task_id IN ({placeholders})
+            ORDER BY u.full_name
+            """,
+            tuple(task_ids),
+        )
+        marks_by_task = {}
+        for mark_row in cursor.fetchall():
+            task_id = int(mark_row.get("task_id") or 0)
+            marks_by_task.setdefault(task_id, []).append({
+                "student_id": int(mark_row.get("student_id") or 0),
+                "student_name": mark_row.get("student_name"),
+                "university_id": mark_row.get("university_id"),
+                "email": mark_row.get("email"),
+                "mark": None if mark_row.get("mark") is None else float(mark_row.get("mark") or 0),
+                "notes": mark_row.get("notes") or "",
+                "is_submitted": bool(mark_row.get("is_submitted")),
+                "submitted_at": str(mark_row.get("submitted_at") or ""),
+            })
+        for row in rows:
+            row["student_marks"] = marks_by_task.get(int(row.get("task_id") or 0), [])
+
     return rows
 
 
@@ -10830,28 +10901,250 @@ def _evaluation_saved_student_scores(cursor, course_scope, reference_id):
     return {int(row["student_id"]): row for row in cursor.fetchall()}
 
 
+def _evaluation_student_component_scores(cursor, course_scope, reference_id, fallback_scores=None):
+    """Return component/final scores per student.
+
+    Report reader marks are shared for the group. Supervisor, coordinator,
+    discussion and committee marks are taken per student when available.
+    """
+    fallback_scores = fallback_scores or _evaluation_blank_scores()
+    students = _evaluation_item_students(cursor, course_scope, reference_id)
+    result = {
+        int(student["student_id"]): {
+            "report_score": fallback_scores.get("report_score"),
+            "supervisor_score": None,
+            "coordinator_score": None,
+            "discussion_score": None,
+            "committee_score": None,
+            "calculated_final_score": None,
+            "final_score": None,
+        }
+        for student in students
+    }
+    if not result:
+        return result
+
+    grades = _evaluation_fetch_grade_rows(cursor, course_scope, reference_id)
+    student_ids = set(result.keys())
+
+    def avg(values):
+        values = [float(v) for v in values if v is not None]
+        return (sum(values) / len(values)) if values else None
+
+    def task_shared_values(component):
+        return [g.get("mark") for g in grades if g.get("component") == component and g.get("is_submitted") and g.get("mark") is not None]
+
+    def task_student_map(component):
+        values = {student_id: [] for student_id in student_ids}
+        for grade in grades:
+            if grade.get("component") != component or not grade.get("is_submitted"):
+                continue
+            marks = grade.get("student_marks") or []
+            if marks:
+                for mark_row in marks:
+                    student_id = int(mark_row.get("student_id") or 0)
+                    if student_id in values and mark_row.get("is_submitted") and mark_row.get("mark") is not None:
+                        values[student_id].append(float(mark_row.get("mark") or 0))
+            elif grade.get("mark") is not None:
+                # Backward-compatible fallback for old single-mark submissions.
+                for student_id in values:
+                    values[student_id].append(float(grade.get("mark") or 0))
+        return values
+
+    if course_scope == "graduation_project":
+        report = avg(task_shared_values("grad_report_reader"))
+        supervisor_by_student = task_student_map("grad_supervisor")
+        committee_by_student = task_student_map("grad_committee_member")
+        for student_id, row in result.items():
+            supervisor = avg(supervisor_by_student.get(student_id) or [])
+            committee_avg_25 = avg(committee_by_student.get(student_id) or [])
+            committee_score_50 = committee_avg_25 * 2 if committee_avg_25 is not None else None
+            final = None
+            if report is not None and supervisor is not None and committee_score_50 is not None:
+                final = report + supervisor + committee_score_50
+            row.update({
+                "report_score": round(report, 2) if report is not None else None,
+                "supervisor_score": round(supervisor, 2) if supervisor is not None else None,
+                "coordinator_score": None,
+                "discussion_score": None,
+                "committee_score": round(committee_score_50, 2) if committee_score_50 is not None else None,
+                "calculated_final_score": round(final, 2) if final is not None else None,
+                "final_score": round(final, 2) if final is not None else None,
+            })
+        return result
+
+    report = avg(task_shared_values("intro_report_reader"))
+    supervisor_by_student = task_student_map("intro_supervisor")
+    coordinator_by_student = task_student_map("intro_coordinator")
+    discussion_by_student = task_student_map("intro_discussion_member")
+
+    # Coordinator marks are also stored in evaluation_student_scores by the coordinator page.
+    saved = _evaluation_saved_student_scores(cursor, course_scope, reference_id)
+
+    for student_id, row in result.items():
+        supervisor = avg(supervisor_by_student.get(student_id) or [])
+        coordinator = avg(coordinator_by_student.get(student_id) or [])
+        saved_coordinator = (saved.get(student_id) or {}).get("coordinator_score")
+        if saved_coordinator is not None:
+            coordinator = float(saved_coordinator)
+        discussion_marks = discussion_by_student.get(student_id) or []
+        discussion = sum(discussion_marks) if discussion_marks else None
+        final = None
+        if report is not None and supervisor is not None and coordinator is not None and discussion is not None:
+            final = report + supervisor + coordinator + discussion
+        row.update({
+            "report_score": round(report, 2) if report is not None else None,
+            "supervisor_score": round(supervisor, 2) if supervisor is not None else None,
+            "coordinator_score": round(coordinator, 2) if coordinator is not None else None,
+            "discussion_score": round(discussion, 2) if discussion is not None else None,
+            "committee_score": None,
+            "calculated_final_score": round(final, 2) if final is not None else None,
+            "final_score": round(final, 2) if final is not None else None,
+        })
+    return result
+
+
+def _evaluation_student_absence_counts(cursor, course_scope, students):
+    """Return absence count per student for the selected course scope."""
+    counts = {}
+    for student in students or []:
+        if student.get("student_id") is not None:
+            counts[int(student.get("student_id"))] = 0
+
+    if not students:
+        return counts
+
+    if not (_table_exists(cursor, "coordinator_lecture_attendance") and _table_exists(cursor, "coordinator_lectures")):
+        return counts
+
+    def normalize_name(value):
+        raw = str(value or "").lower()
+        raw = raw.replace("comp4200", " ").replace("comp4300", " ")
+        raw = raw.replace("project introduction", " ").replace("graduation project", " ")
+        tokens = re.findall(r"[a-z]+|\d+", raw)
+        tokens = [t for t in tokens if t not in ("comp", "4200", "4300")]
+        return "".join(tokens)
+
+    def number_key(value):
+        raw = str(value or "")
+        raw = raw.replace("COMP4200", " ").replace("COMP4300", " ")
+        nums = [n for n in re.findall(r"\d+", raw) if n not in ("4200", "4300")]
+        return nums[-1].lstrip("0") if nums else ""
+
+    by_student_id = {}
+    by_user_id = {}
+    by_university_id = {}
+    by_email = {}
+    by_name = {}
+    by_number = {}
+
+    for student in students:
+        if student.get("student_id") is None:
+            continue
+        sid = int(student.get("student_id"))
+        by_student_id[sid] = sid
+        if student.get("user_id") is not None:
+            by_user_id[int(student.get("user_id"))] = sid
+        if student.get("university_id"):
+            by_university_id[str(student.get("university_id")).strip().lower()] = sid
+        if student.get("email"):
+            by_email[str(student.get("email")).strip().lower()] = sid
+        name_key = normalize_name(student.get("student_name"))
+        if name_key:
+            by_name[name_key] = sid
+        num = number_key(student.get("student_name")) or number_key(student.get("university_id"))
+        if num:
+            by_number[num] = sid
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                cla.student_id AS attendance_student_id,
+                st.student_id AS real_student_id,
+                st.user_id,
+                u.full_name,
+                u.university_id,
+                u.email,
+                COUNT(*) AS absent_count
+            FROM coordinator_lecture_attendance cla
+            JOIN coordinator_lectures cl ON cl.lecture_id = cla.lecture_id
+            LEFT JOIN students st ON st.student_id = cla.student_id
+            LEFT JOIN users u ON u.user_id = st.user_id
+            WHERE cl.course_scope = %s
+              AND LOWER(COALESCE(cla.attendance_status, '')) = 'absent'
+            GROUP BY cla.student_id, st.student_id, st.user_id, u.full_name, u.university_id, u.email
+            """,
+            (course_scope,),
+        )
+        absence_rows = cursor.fetchall()
+    except Exception:
+        return counts
+
+    for row in absence_rows:
+        matched_sid = None
+
+        attendance_sid = row.get("attendance_student_id")
+        real_sid = row.get("real_student_id")
+        user_id = row.get("user_id")
+        university_id = str(row.get("university_id") or "").strip().lower()
+        email = str(row.get("email") or "").strip().lower()
+        name_key = normalize_name(row.get("full_name"))
+        num = number_key(row.get("full_name")) or number_key(row.get("university_id"))
+
+        for candidate in (attendance_sid, real_sid):
+            if candidate is not None and int(candidate) in by_student_id:
+                matched_sid = by_student_id[int(candidate)]
+                break
+        if matched_sid is None and user_id is not None and int(user_id) in by_user_id:
+            matched_sid = by_user_id[int(user_id)]
+        if matched_sid is None and university_id and university_id in by_university_id:
+            matched_sid = by_university_id[university_id]
+        if matched_sid is None and email and email in by_email:
+            matched_sid = by_email[email]
+        if matched_sid is None and name_key and name_key in by_name:
+            matched_sid = by_name[name_key]
+        if matched_sid is None and num and num in by_number:
+            matched_sid = by_number[num]
+
+        if matched_sid is not None:
+            counts[matched_sid] = int(counts.get(matched_sid, 0) or 0) + int(row.get("absent_count") or 0)
+
+    return counts
+
+
 def _evaluation_student_score_rows(cursor, course_scope, reference_id, scores=None):
     """Build the per-student grade payload used by coordinator/evaluation.html."""
     scores = scores or _evaluation_blank_scores()
     students = _evaluation_item_students(cursor, course_scope, reference_id)
     saved = _evaluation_saved_student_scores(cursor, course_scope, reference_id)
+    per_student_components = _evaluation_student_component_scores(cursor, course_scope, reference_id, scores)
+    absence_counts = _evaluation_student_absence_counts(cursor, course_scope, students)
 
     rows = []
     for student in students:
         student_id = int(student["student_id"])
         existing = saved.get(student_id) or {}
+        calculated = per_student_components.get(student_id) or {}
 
         def pick(field):
-            value = existing.get(field)
-            return value if value is not None else scores.get(field)
+            saved_value = existing.get(field)
+            if saved_value is not None:
+                return saved_value
+            calculated_value = calculated.get(field)
+            return calculated_value if calculated_value is not None else scores.get(field)
 
-        final_score = existing.get("final_score")
-        if final_score is None:
-            final_score = scores.get("final_score")
-
-        calculated_final = existing.get("calculated_final_score")
+        calculated_final = calculated.get("calculated_final_score")
+        if calculated_final is None:
+            calculated_final = existing.get("calculated_final_score")
         if calculated_final is None:
             calculated_final = scores.get("calculated_final_score")
+
+        final_score = existing.get("final_score")
+        if final_score is None or not bool(existing.get("manual_override") or False):
+            final_score = calculated.get("final_score") if calculated.get("final_score") is not None else final_score
+        if final_score is None:
+            final_score = scores.get("final_score")
 
         row = {
             "student_id": student_id,
@@ -10859,6 +11152,7 @@ def _evaluation_student_score_rows(cursor, course_scope, reference_id, scores=No
             "student_name": student.get("student_name"),
             "university_id": student.get("university_id"),
             "email": student.get("email"),
+            "absence_count": int(absence_counts.get(student_id, 0) or 0),
             "report_score": pick("report_score"),
             "supervisor_score": pick("supervisor_score"),
             "coordinator_score": pick("coordinator_score"),
@@ -10888,18 +11182,21 @@ def _evaluation_sync_individual_student_scores(cursor, course_scope, reference_i
     """
     Store one grade row per student.
 
-    Existing manual overrides are preserved, but the component/calculated scores
-    are refreshed from the shared committee calculation.
+    Existing manual overrides are preserved. Component/calculated scores are
+    refreshed from the per-student task marks. Report remains shared.
     """
     students = _evaluation_item_students(cursor, course_scope, reference_id)
     if not students:
         return 0
 
-    final_score = scores.get("final_score")
-    calculated_final_score = scores.get("calculated_final_score", final_score)
+    per_student = _evaluation_student_component_scores(cursor, course_scope, reference_id, scores)
     changed = 0
 
     for student in students:
+        student_id = int(student["student_id"])
+        row = per_student.get(student_id) or scores
+        final_score = row.get("final_score")
+        calculated_final_score = row.get("calculated_final_score", final_score)
         cursor.execute(
             """
             INSERT INTO evaluation_student_scores
@@ -10922,12 +11219,12 @@ def _evaluation_sync_individual_student_scores(cursor, course_scope, reference_i
             (
                 course_scope,
                 int(reference_id),
-                int(student["student_id"]),
-                scores.get("report_score"),
-                scores.get("supervisor_score"),
-                scores.get("coordinator_score"),
-                scores.get("discussion_score"),
-                scores.get("committee_score"),
+                student_id,
+                row.get("report_score"),
+                row.get("supervisor_score"),
+                row.get("coordinator_score"),
+                row.get("discussion_score"),
+                row.get("committee_score"),
                 calculated_final_score,
                 final_score,
                 notes or None,
@@ -11804,6 +12101,187 @@ def api_coordinator_evaluation_coordinator_mark():
                 }
             )
         )
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/evaluation/coordinator-student-marks", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_evaluation_coordinator_student_marks():
+    """Save the coordinator /10 mark separately for every COMP4200 student."""
+    data = request.get_json(silent=True) or {}
+    course_scope = (data.get("course_scope") or "introduction").strip()
+    reference_id = data.get("project_id") or data.get("reference_id")
+    marks = data.get("marks") or []
+
+    if course_scope != "introduction":
+        return jsonify({"error": "Coordinator marks are only for Project Introduction — COMP4200."}), 400
+    if not reference_id:
+        return jsonify({"error": "project_id/reference_id is required."}), 400
+    if not isinstance(marks, list) or not marks:
+        return jsonify({"error": "Student marks are required."}), 400
+
+    try:
+        reference_id = int(reference_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid project_id/reference_id."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_evaluation_schema(cursor)
+        _ensure_evaluation_student_task_score_schema(cursor)
+
+        coordinator_faculty_id = _evaluation_current_coordinator_faculty_id(cursor)
+        if not coordinator_faculty_id:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Your coordinator account is not linked to a faculty record."}), 400
+
+        cursor.execute(
+            """
+            SELECT is_open
+            FROM evaluation_windows
+            WHERE course_scope = 'introduction'
+              AND reference_id = %s
+            LIMIT 1
+            """,
+            (reference_id,),
+        )
+        window = cursor.fetchone() or {}
+        if not bool(window.get("is_open")):
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Open grade entry first, then enter coordinator marks."}), 400
+
+        students = _evaluation_item_students(cursor, "introduction", reference_id)
+        valid_student_ids = {int(row["student_id"]) for row in students}
+        if not valid_student_ids:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No students found for this section."}), 400
+
+        received = {}
+        for row in marks:
+            try:
+                student_id = int(row.get("student_id"))
+                mark = float(row.get("mark"))
+            except (TypeError, ValueError):
+                cursor.close()
+                db.close()
+                return jsonify({"error": "Every coordinator mark must be a valid number."}), 400
+
+            if student_id not in valid_student_ids:
+                cursor.close()
+                db.close()
+                return jsonify({"error": "A submitted student does not belong to this section."}), 400
+            if mark < 0 or mark > 10:
+                cursor.close()
+                db.close()
+                return jsonify({"error": "Coordinator marks must be between 0 and 10."}), 400
+            received[student_id] = mark
+
+        missing = sorted(valid_student_ids - set(received.keys()))
+        if missing:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Please enter a coordinator mark for every student."}), 400
+
+        _evaluation_insert_task(
+            cursor,
+            "introduction",
+            reference_id,
+            "intro_coordinator",
+            coordinator_faculty_id,
+            session.get("user_id"),
+        )
+        cursor.execute(
+            """
+            SELECT task_id
+            FROM evaluation_grade_tasks
+            WHERE course_scope = 'introduction'
+              AND reference_id = %s
+              AND component = 'intro_coordinator'
+              AND evaluator_faculty_id = %s
+            LIMIT 1
+            """,
+            (reference_id, coordinator_faculty_id),
+        )
+        task = cursor.fetchone()
+        if not task:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "Coordinator evaluation task could not be created."}), 500
+        task_id = int(task["task_id"])
+
+        for student_id, mark in received.items():
+            cursor.execute(
+                """
+                INSERT INTO evaluation_student_task_scores
+                    (task_id, student_id, mark, notes, is_submitted, submitted_at)
+                VALUES (%s, %s, %s, NULL, TRUE, NOW())
+                ON DUPLICATE KEY UPDATE
+                    mark = VALUES(mark),
+                    is_submitted = TRUE,
+                    submitted_at = NOW()
+                """,
+                (task_id, student_id, mark),
+            )
+            cursor.execute(
+                """
+                INSERT INTO evaluation_student_scores
+                    (course_scope, reference_id, student_id, coordinator_score,
+                     updated_by, synced_at)
+                VALUES ('introduction', %s, %s, %s, %s, NOW())
+                ON DUPLICATE KEY UPDATE
+                    coordinator_score = VALUES(coordinator_score),
+                    updated_by = VALUES(updated_by),
+                    synced_at = NOW()
+                """,
+                (reference_id, student_id, mark, session.get("user_id")),
+            )
+
+        average_mark = round(sum(received.values()) / len(received), 2)
+        cursor.execute(
+            """
+            UPDATE evaluation_grade_tasks
+            SET mark = %s,
+                notes = %s,
+                is_submitted = TRUE,
+                submitted_at = NOW()
+            WHERE task_id = %s
+              AND evaluator_faculty_id = %s
+            """,
+            (
+                average_mark,
+                f"Coordinator per-student marks submitted for {len(received)} student(s).",
+                task_id,
+                coordinator_faculty_id,
+            ),
+        )
+
+        _evaluation_cleanup_tasks(cursor, "introduction", reference_id)
+        grades = _evaluation_fetch_grade_rows(cursor, "introduction", reference_id)
+        completion = _evaluation_grade_completion("introduction", grades)
+        scores = _evaluation_scores_from_grades("introduction", grades) if completion.get("grades_complete") else _evaluation_blank_scores()
+        student_scores = _evaluation_student_score_rows(cursor, "introduction", reference_id, scores)
+
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify(_json_safe_value({
+            "message": "Coordinator marks saved successfully.",
+            "average_mark": average_mark,
+            "scores": scores,
+            "student_scores": student_scores,
+            "grades_complete": completion.get("grades_complete"),
+            "submitted_count": completion.get("submitted_count"),
+            "required_count": completion.get("required_count"),
+        }))
     except Exception as e:
         try:
             db.rollback()

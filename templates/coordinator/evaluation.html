@@ -385,6 +385,24 @@
       font-size: 12px;
     }
 
+    .absence-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 54px;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 900;
+      background: var(--color-background-tertiary);
+      color: var(--color-text-secondary);
+    }
+
+    .absence-badge.has-absences {
+      background: var(--amber-light);
+      color: #b54708;
+    }
+
     .p-override {
       background: #eef4ff;
       color: #3538cd;
@@ -443,7 +461,10 @@
       <div style="font-size:12px;color:#667085;margin-top:6px" id="formulaText"></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input id="searchBox" placeholder="Search project or student..." oninput="renderProjects()">
+      <input id="searchBox" placeholder="Search project or student..." oninput="filterGroupOptions()">
+      <select id="groupSelect" onchange="renderProjects()" style="min-width:260px">
+        <option value="">Choose group / project...</option>
+      </select>
       <button class="mini-btn green" onclick="openAllWindows()">Open Grade for All + Notify</button>
       <button class="mini-btn red" onclick="closeAllEvaluations()">Close Evaluation for All</button>
       <button class="mini-btn blue" onclick="downloadCommitteeSchedule()">Download Committee Schedule Excel</button>
@@ -616,9 +637,12 @@
             : 'No COMP4300 projects are ready for evaluation. Create committees first in the Committee page.';
           box.innerHTML = `<div class="empty">${label}</div>`;
         }
+        const select = document.getElementById('groupSelect');
+        if (select) select.innerHTML = '<option value="">Choose group / project...</option>';
         return;
       }
 
+      fillGroupSelect();
       renderProjects();
     } catch (e) {
       if (seq !== loadSeq) return;
@@ -637,21 +661,61 @@
     const finals = list.filter(isReadyToSend).map(p => Number(p.calculated_final_score)).filter(v => !Number.isNaN(v));
     document.getElementById('statAvg').textContent = finals.length ? (finals.reduce((a, b) => a + b, 0) / finals.length).toFixed(1) : '—';
   }
-  function renderProjects() {
+
+  function projectOptionText(p) {
+    const students = (p.students || '').trim();
+    return `${p.title || 'Untitled'}${students ? ' — ' + students : ''}`;
+  }
+
+  function fillGroupSelect() {
+    const select = document.getElementById('groupSelect');
+    if (!select) return;
+    const oldValue = select.value;
+    const options = ['<option value="">Choose group / project...</option>'];
+    allProjects.forEach(p => {
+      options.push(`<option value="${escapeHtml(p.project_id)}">${escapeHtml(projectOptionText(p))}</option>`);
+    });
+    select.innerHTML = options.join('');
+    if (oldValue && allProjects.some(p => String(p.project_id) === String(oldValue))) {
+      select.value = oldValue;
+    }
+  }
+
+  function filterGroupOptions() {
     const q = (document.getElementById('searchBox').value || '').toLowerCase();
-    const list = allProjects.filter(p => {
+    const select = document.getElementById('groupSelect');
+    if (!select) return renderProjects();
+    const oldValue = select.value;
+    const filtered = allProjects.filter(p => {
       const studentText = (p.student_scores || []).map(s => `${s.student_name || ''} ${s.university_id || ''}`).join(' ');
       return `${p.title || ''} ${p.students || ''} ${p.supervisor_name || ''} ${studentText}`.toLowerCase().includes(q);
     });
-    renderStats(list);
-    if (!list.length) {
-      const label = currentScope === 'introduction'
-        ? 'No COMP4200 sections are ready for evaluation. Create committees first in the Committee page.'
-        : 'No COMP4300 projects are ready for evaluation. Create committees first in the Committee page.';
-      document.getElementById('projectsBox').innerHTML = `<div class="empty">${label}</div>`;
+    const options = ['<option value="">Choose group / project...</option>'];
+    filtered.forEach(p => {
+      options.push(`<option value="${escapeHtml(p.project_id)}">${escapeHtml(projectOptionText(p))}</option>`);
+    });
+    select.innerHTML = options.join('');
+    if (oldValue && filtered.some(p => String(p.project_id) === String(oldValue))) {
+      select.value = oldValue;
+    }
+    renderProjects();
+  }
+
+  function renderProjects() {
+    renderStats(allProjects);
+    const select = document.getElementById('groupSelect');
+    const selectedId = select ? select.value : '';
+    if (!selectedId) {
+      document.getElementById('projectsBox').innerHTML = '<div class="empty">Choose one group/project from the dropdown above.</div>';
       return;
     }
-    document.getElementById('projectsBox').innerHTML = list.map(projectCard).join('');
+
+    const selected = allProjects.find(p => String(p.project_id) === String(selectedId));
+    if (!selected) {
+      document.getElementById('projectsBox').innerHTML = '<div class="empty">Selected group/project was not found. Refresh the page.</div>';
+      return;
+    }
+    document.getElementById('projectsBox').innerHTML = projectCard(selected);
   }
   function scoreCards(p) {
     if (currentScope === 'introduction') {
@@ -670,6 +734,11 @@
   }
   function componentCell(value) {
     return (value === null || value === undefined || value === '') ? '—' : Number(value).toFixed(2);
+  }
+  function absenceCell(value) {
+    const count = Number(value || 0);
+    const cls = count > 0 ? 'absence-badge has-absences' : 'absence-badge';
+    return `<span class="${cls}">${count} absent</span>`;
   }
 
   function coordinatorStudentMarkBox(p) {
@@ -696,6 +765,7 @@
             <b>${escapeHtml(s.student_name || 'Student')}</b>
             <div class="student-muted">${escapeHtml(s.university_id || s.email || '')}</div>
           </td>
+          <td>${absenceCell(s.absence_count)}</td>
           <td>
             <input
               class="student-score-input coord-student-input"
@@ -718,7 +788,7 @@
           <span class="student-muted">Coordinator mark is individual. Report mark only is shared by the group.</span>
         </div>
         <table class="student-score-table">
-          <thead><tr><th>Student</th><th>Coordinator /10</th></tr></thead>
+          <thead><tr><th>Student</th><th>Absences</th><th>Coordinator /10</th></tr></thead>
           <tbody>${body}</tbody>
         </table>
         <div class="btn-row" style="padding:12px">
@@ -770,6 +840,7 @@
             <b>${escapeHtml(s.student_name || 'Student')}</b>
             <div class="student-muted">${escapeHtml(s.university_id || s.email || '')}</div>
           </td>
+          <td>${absenceCell(s.absence_count)}</td>
           ${midCells}
           <td>${calculated}</td>
           <td>
@@ -814,6 +885,7 @@
           <thead>
             <tr>
               <th>Student</th>
+              <th>Absences</th>
               ${componentHeaders}
               <th>Calculated /100</th>
               <th>Final /100</th>
@@ -864,17 +936,8 @@
 
 
   function projectCard(p) {
-    const grades = p.grades || [];
     const ready = isReadyToSend(p);
     const coordinatorMarkBox = currentScope === 'introduction' ? coordinatorStudentMarkBox(p) : '';
-    const rows = grades.length ? grades.map(g => `
-    <tr>
-      <td>${escapeHtml(componentName(g.component))}</td>
-      <td>${escapeHtml(g.evaluator_name || '—')}</td>
-      <td>${money(g.mark)} / ${money(g.max_mark)}</td>
-      <td>${gradeStatusPill(g)}</td>
-      <td>${taskStudentMarksCell(g)}</td>
-    </tr>`).join('') : `<tr><td colspan="5">No grade tasks yet. Open grade entry to notify the assigned doctors.</td></tr>`;
     return `<div class="eval-card" id="project-${p.project_id}">
     <div class="eval-card-head">
       <div>
@@ -886,7 +949,6 @@
         ${Number(p.is_open) ? '<span class="pill p-open">Grade Entry Open</span>' : ready ? '<span class="pill p-done">Calculated</span>' : '<span class="pill p-closed">Closed</span>'}
       </div>
     </div>
-    <table class="grade-table"><thead><tr><th>Component</th><th>Evaluator</th><th>Average Mark</th><th>Status</th><th>Per-student marks</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="eval-grid">${scoreCards(p)}</div>
     ${coordinatorMarkBox}
     ${studentScoreTable(p, ready)}

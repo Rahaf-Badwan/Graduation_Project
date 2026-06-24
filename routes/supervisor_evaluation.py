@@ -367,6 +367,37 @@ def _supervisor_eval_item_students(cursor, course_scope, reference_id):
     return cursor.fetchall()
 
 
+def _supervisor_student_absence_counts(cursor, course_scope, student_ids):
+    """Return {student_id: absence_count} for the selected course scope.
+
+    Attendance is course-level in APMS lectures. For evaluation, doctors see how
+    many times each student was marked Absent in the course lectures.
+    """
+    student_ids = sorted({int(sid) for sid in student_ids if sid is not None})
+    if not student_ids:
+        return {}
+    if not (_table_exists(cursor, "coordinator_lectures") and _table_exists(cursor, "coordinator_lecture_attendance")):
+        return {sid: 0 for sid in student_ids}
+
+    placeholders = ",".join(["%s"] * len(student_ids))
+    cursor.execute(
+        f"""
+        SELECT cla.student_id, COUNT(*) AS absence_count
+        FROM coordinator_lecture_attendance cla
+        JOIN coordinator_lectures cl ON cl.lecture_id = cla.lecture_id
+        WHERE cl.course_scope = %s
+          AND cla.attendance_status = 'absent'
+          AND cla.student_id IN ({placeholders})
+        GROUP BY cla.student_id
+        """,
+        (course_scope, *student_ids),
+    )
+    counts = {sid: 0 for sid in student_ids}
+    for row in cursor.fetchall():
+        counts[int(row["student_id"])] = int(row.get("absence_count") or 0)
+    return counts
+
+
 @supervisor_evaluation_bp.route("/api/supervisor/evaluation/my-tasks", methods=["GET"])
 @login_required(role="supervisor")
 def api_supervisor_evaluation_my_tasks():
@@ -441,6 +472,11 @@ def api_supervisor_evaluation_my_tasks():
 
             task_id = int(task.get("task_id"))
             students = _supervisor_eval_item_students(cursor, course_scope, reference_id)
+            absence_counts = _supervisor_student_absence_counts(
+                cursor,
+                course_scope,
+                [student.get("student_id") for student in students],
+            )
 
             cursor.execute(
                 """
@@ -474,6 +510,7 @@ def api_supervisor_evaluation_my_tasks():
                     "student_name": student.get("student_name"),
                     "university_id": student.get("university_id"),
                     "email": student.get("email"),
+                    "absence_count": int(absence_counts.get(student_id, 0)),
                     "mark": None if mark is None else float(mark),
                     "notes": saved.get("notes") or "",
                     "is_submitted": submitted,

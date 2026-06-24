@@ -673,7 +673,8 @@
 
   function attendanceRadioHtml(lectureId, student, status, label) {
     const studentId = Number(student.student_id);
-    const checked = student.attendance_status === status ? 'checked' : '';
+    const attendanceStatus = student.attendance_status || 'present';
+    const checked = attendanceStatus === status ? 'checked' : '';
     return `
       <label class="attendance-radio">
         <input type="radio" name="attend-${lectureId}-${studentId}" value="${status}" ${checked}>
@@ -684,8 +685,9 @@
 
   function attendanceSummaryFromStudents(students) {
     return (students || []).reduce((summary, student) => {
-      if (student.attendance_status === 'present') summary.present += 1;
-      if (student.attendance_status === 'absent') summary.absent += 1;
+      const attendanceStatus = student.attendance_status || 'present';
+      if (attendanceStatus === 'present') summary.present += 1;
+      if (attendanceStatus === 'absent') summary.absent += 1;
       return summary;
     }, { present: 0, absent: 0 });
   }
