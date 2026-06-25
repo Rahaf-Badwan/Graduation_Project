@@ -105,6 +105,20 @@
     color: var(--color-text-secondary);
   }
 
+  #supEvalPage .absence-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 5px 9px;
+    background: var(--amber-light);
+    color: #b54708;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+
   #supEvalPage .student-table {
     width: 100%;
     border-collapse: collapse;
@@ -395,6 +409,7 @@
             <b>${safeEval(row.student_name || 'Student')}</b>
             <div class="task-meta">${safeEval(row.university_id || row.email || '')}</div>
           </td>
+          <td><span class="absence-pill">${Number(row.absence_count || 0)} absent</span></td>
           <td>
             <input
               class="student-mark-input"
@@ -437,12 +452,13 @@
           <thead>
             <tr>
               <th>Student</th>
+              <th>Absences</th>
               <th>Mark</th>
               <th>Comment</th>
               <th>Status</th>
             </tr>
           </thead>
-          <tbody>${bodyRows || '<tr><td colspan="4">No students found for this item.</td></tr>'}</tbody>
+          <tbody>${bodyRows || '<tr><td colspan="5">No students found for this item.</td></tr>'}</tbody>
         </table>
 
         <div class="btn-row">

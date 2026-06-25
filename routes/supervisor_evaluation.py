@@ -102,6 +102,11 @@ def _component_label(component):
     }.get(component, component.replace("_", " ").title())
 
 
+def _is_shared_report_component(component):
+    """Report-reader marks are one shared mark for the whole group/project."""
+    return component in {"intro_report_reader", "grad_report_reader"}
+
+
 @supervisor_evaluation_bp.route("/api/supervisor/evaluation/tasks", methods=["GET"])
 @login_required(role="supervisor")
 def api_supervisor_evaluation_tasks():
@@ -368,31 +373,32 @@ def _supervisor_eval_item_students(cursor, course_scope, reference_id):
 
 
 def _supervisor_student_absence_counts(cursor, course_scope, student_ids):
-    """Return {student_id: absence_count} for the selected course scope.
+    """Return {student_id: absence_count} from supervisor lecture attendance.
 
-    Attendance is course-level in APMS lectures. For evaluation, doctors see how
-    many times each student was marked Absent in the course lectures.
+    This must read supervisor_lecture_attendance, not coordinator attendance,
+    because this page shows the supervisor's own lecture attendance.
     """
     student_ids = sorted({int(sid) for sid in student_ids if sid is not None})
+    counts = {sid: 0 for sid in student_ids}
     if not student_ids:
-        return {}
-    if not (_table_exists(cursor, "coordinator_lectures") and _table_exists(cursor, "coordinator_lecture_attendance")):
-        return {sid: 0 for sid in student_ids}
+        return counts
+
+    if not (_table_exists(cursor, "supervisor_lectures") and _table_exists(cursor, "supervisor_lecture_attendance")):
+        return counts
 
     placeholders = ",".join(["%s"] * len(student_ids))
     cursor.execute(
         f"""
-        SELECT cla.student_id, COUNT(*) AS absence_count
-        FROM coordinator_lecture_attendance cla
-        JOIN coordinator_lectures cl ON cl.lecture_id = cla.lecture_id
-        WHERE cl.course_scope = %s
-          AND cla.attendance_status = 'absent'
-          AND cla.student_id IN ({placeholders})
-        GROUP BY cla.student_id
+        SELECT sla.student_id, COUNT(*) AS absence_count
+        FROM supervisor_lecture_attendance sla
+        JOIN supervisor_lectures sl ON sl.lecture_id = sla.lecture_id
+        WHERE sl.course_scope = %s
+          AND LOWER(COALESCE(sla.attendance_status, '')) = 'absent'
+          AND sla.student_id IN ({placeholders})
+        GROUP BY sla.student_id
         """,
         (course_scope, *student_ids),
     )
-    counts = {sid: 0 for sid in student_ids}
     for row in cursor.fetchall():
         counts[int(row["student_id"])] = int(row.get("absence_count") or 0)
     return counts
@@ -517,6 +523,7 @@ def api_supervisor_evaluation_my_tasks():
                     "submitted_at": str(saved.get("submitted_at") or ""),
                 })
 
+            shared_mark = _is_shared_report_component(task.get("component"))
             grouped[group_key]["tasks"].append({
                 "task_id": task_id,
                 "component": task.get("component"),
@@ -526,7 +533,8 @@ def api_supervisor_evaluation_my_tasks():
                 "notes": task.get("notes") or "",
                 "is_submitted": bool(task.get("is_submitted")),
                 "submitted_at": str(task.get("submitted_at") or ""),
-                "student_marks": student_marks,
+                "shared_mark": shared_mark,
+                "student_marks": [] if shared_mark else student_marks,
             })
 
         cursor.close()

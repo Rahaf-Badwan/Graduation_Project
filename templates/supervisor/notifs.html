@@ -801,7 +801,7 @@
       <div class="sn-card-hd">
         <div>
           <div class="sn-card-title">Send Message</div>
-          <div class="sn-card-sub">Send a message to coordinators, doctors, sections, or students.</div>
+          <div class="sn-card-sub">Send a message to the Head, course coordinator, or your own students/sections only.</div>
         </div>
         <button class="sn-drawer-close" id="snCloseCompose" type="button" aria-label="Close">×</button>
       </div>
@@ -812,14 +812,11 @@
               <label for="snScope">Send to</label>
               <select id="snScope" name="scope" required>
                 <option value="">Choose receiver...</option>
-                <option value="coordinators">All Coordinators</option>
-                <option value="coordinator">One Coordinator</option>
-                <option value="doctors">All Doctors / Supervisors</option>
-                <option value="all_sections">All Sections / Projects for selected course</option>
-                <option value="doctor">One Doctor</option>
-                <option value="section">One Section / Project</option>
-                <option value="students">All Students / selected course</option>
-                <option value="student">One Student</option>
+                <option value="heads">Head of Department</option>
+                <option value="coordinators">Course Coordinator</option>
+                <option value="students">My Students / selected course</option>
+                <option value="section">My Section / Project students</option>
+                <option value="student">One of My Students</option>
               </select>
             </div>
             <div class="sn-field sn-specific-wrap" id="snSpecificWrap">
@@ -1052,7 +1049,7 @@
     }
 
     function sendScopeNeedsCourse(scope) {
-      return ['students', 'all_students', 'student', 'section', 'all_sections'].includes(scope);
+      return ['coordinators', 'students', 'student', 'section'].includes(scope);
     }
 
     function toggleCourseScopeField() {
@@ -1080,36 +1077,36 @@
       const selectedCourse = $('snCourseScope').value || 'both';
       const wrap = $('snSpecificWrap');
       const select = $('snSpecific');
+      const label = wrap ? wrap.querySelector('label') : null;
       select.innerHTML = '';
       let rows = [], placeholder = 'Choose...';
 
-      if (scope === 'coordinator') {
-        rows = filterByCourse(state.options.coordinators || []);
-        placeholder = selectedCourse === 'graduation_project'
-          ? 'Choose COMP4300 coordinator...'
-          : selectedCourse === 'introduction'
-            ? 'Choose COMP4200 coordinator...'
-            : 'Choose coordinator...';
-        rows.forEach(c => select.insertAdjacentHTML('beforeend', '<option value="' + esc(c.user_id) + '">' + esc(c.full_name) + ' — ' + esc(optionCourseLabel(c)) + '</option>'));
-      } else if (scope === 'doctor') {
-        rows = state.options.doctors || [];
-        placeholder = 'Choose doctor...';
-        rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' — ' + esc(d.university_id || '') + '</option>'));
-      } else if (scope === 'student') {
+      if (scope === 'student') {
         rows = filterByCourse(state.options.students || []);
-        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 student...' : selectedCourse === 'introduction' ? 'Choose COMP4200 student...' : 'Choose student...';
+        placeholder = selectedCourse === 'graduation_project'
+          ? 'Choose one of your COMP4300 students...'
+          : selectedCourse === 'introduction'
+            ? 'Choose one of your COMP4200 students...'
+            : 'Choose one of your students...';
+        if (label) label.textContent = 'Choose one of your students';
         rows.forEach(s => select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '">' + esc(s.full_name) + ' — ' + esc(s.university_id || '') + ' — ' + esc(optionCourseLabel(s)) + '</option>'));
       } else if (scope === 'section') {
         rows = filterByCourse(state.options.sections || []);
-        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 project/section...' : selectedCourse === 'introduction' ? 'Choose COMP4200 section...' : 'Choose section/project...';
-        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name) + ' — ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
+        placeholder = selectedCourse === 'graduation_project'
+          ? 'Choose one of your COMP4300 projects...'
+          : selectedCourse === 'introduction'
+            ? 'Choose one of your COMP4200 sections...'
+            : 'Choose one of your sections/projects...';
+        if (label) label.textContent = 'Choose your section/project';
+        rows.forEach(sec => select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' — ' + esc(sec.section_name) + ' (' + esc(sec.students_count || 0) + ' students)</option>'));
       }
 
-      if (['coordinator', 'doctor', 'student', 'section'].includes(scope)) {
+      if (['student', 'section'].includes(scope)) {
         select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>');
         wrap.style.display = 'flex';
       } else {
         wrap.style.display = 'none';
+        select.value = '';
       }
     }
 
@@ -1251,11 +1248,11 @@
 
     $('snSendForm').addEventListener('submit', async e => {
       e.preventDefault();
-      if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value) && !$('snSpecific').value) {
+      if (['student', 'section'].includes($('snScope').value) && !$('snSpecific').value) {
         showToast('Please choose a specific receiver.', true); return;
       }
       const fd = new FormData($('snSendForm'));
-      if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value);
+      if (['student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value);
       if (!$('snUrgent').checked) fd.delete('urgent');
       fd.set('can_reply', $('snCanReply') && $('snCanReply').checked ? '1' : '0');
       try {

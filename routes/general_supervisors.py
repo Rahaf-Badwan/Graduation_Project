@@ -562,6 +562,20 @@ def _validate_supervisor_lecture_target(cursor, faculty_id, course_scope, target
     return bool(cursor.fetchone())
 
 
+def _ensure_supervisor_lecture_attendance_defaults(cursor, lecture_id, marked_by=None):
+    """Create Present rows for every notified student that has no attendance row yet."""
+    cursor.execute(
+        """
+        INSERT IGNORE INTO supervisor_lecture_attendance
+            (lecture_id, student_id, attendance_status, marked_by, marked_at)
+        SELECT slr.lecture_id, slr.student_id, 'present', %s, NOW()
+        FROM supervisor_lecture_recipients slr
+        WHERE slr.lecture_id = %s
+        """,
+        (marked_by, lecture_id),
+    )
+
+
 def _snapshot_supervisor_lecture_recipients(cursor, lecture_id, user_ids):
     """Keep the exact student audience that received this lecture."""
     cursor.execute(
@@ -590,6 +604,7 @@ def _snapshot_supervisor_lecture_recipients(cursor, lecture_id, user_ids):
         """,
         (lecture_id,),
     )
+    _ensure_supervisor_lecture_attendance_defaults(cursor, lecture_id, session.get("user_id"))
 
 
 def _notify_supervisor_lecture(cursor, faculty_id, semester_id, scope, lecture, action, lecture_id):
@@ -787,10 +802,11 @@ def api_supervisor_lecture_attendance(lecture_id):
         if not lecture.get("has_started"):
             return jsonify({"error": "Attendance opens after the lecture date and time."}), 400
         _ensure_lecture_recipient_snapshot(cursor, lecture)
+        _ensure_supervisor_lecture_attendance_defaults(cursor, lecture_id, session.get("user_id"))
         cursor.execute(
             """
             SELECT st.student_id, u.full_name, u.university_id,
-                   sla.attendance_status
+                   COALESCE(sla.attendance_status, 'present') AS attendance_status
             FROM supervisor_lecture_recipients slr
             JOIN students st ON st.student_id = slr.student_id
             JOIN users u ON u.user_id = st.user_id
@@ -827,6 +843,7 @@ def api_save_supervisor_lecture_attendance(lecture_id):
         if not lecture.get("has_started"):
             return jsonify({"error": "Attendance opens after the lecture date and time."}), 400
         _ensure_lecture_recipient_snapshot(cursor, lecture)
+        _ensure_supervisor_lecture_attendance_defaults(cursor, lecture_id, session.get("user_id"))
         cursor.execute(
             "SELECT student_id FROM supervisor_lecture_recipients WHERE lecture_id = %s",
             (lecture_id,),
@@ -1249,75 +1266,211 @@ def _supervisor_coordinator_user_ids_for_scope(cursor, course_scope):
     return [r["user_id"] for r in cursor.fetchall()]
 
 
-def _supervisor_comp4200_section_recipients(cursor, section_id=None):
-    if not (_supervisor_table_exists(cursor, "student_distribution_sections") and _supervisor_table_exists(cursor, "section_students")):
-        return []
+def _supervisor_current_faculty_id_for_notifications(cursor):
+    """Return the faculty_id for the logged-in supervisor."""
+    faculty_id = session.get("faculty_id")
+    if faculty_id:
+        try:
+            return int(faculty_id)
+        except Exception:
+            pass
+    cursor.execute(
+        """
+        SELECT faculty_id
+        FROM faculty
+        WHERE user_id = %s
+        LIMIT 1
+        """,
+        (session.get("user_id"),),
+    )
+    row = cursor.fetchone() or {}
+    return row.get("faculty_id")
+
+
+def _supervisor_head_user_ids(cursor, value=None):
     params = []
-    section_filter = ""
-    if section_id:
-        section_filter = "AND sec.section_id = %s"
-        params.append(section_id)
+    extra = ""
+    if value:
+        extra = "AND user_id = %s"
+        params.append(value)
     cursor.execute(
         f"""
-        SELECT DISTINCT recipient_id
-        FROM (
-            SELECT us.user_id AS recipient_id
-            FROM student_distribution_sections sec
-            JOIN section_students ss ON ss.section_id = sec.section_id
-            JOIN students st ON st.student_id = ss.student_id
-            JOIN users us ON us.user_id = st.user_id
-            WHERE us.is_active = TRUE {section_filter}
-            UNION
-            SELECT u_sup.user_id AS recipient_id
+        SELECT user_id
+        FROM users
+        WHERE role = 'head_of_department'
+          AND is_active = TRUE
+          {extra}
+        ORDER BY full_name
+        """,
+        tuple(params),
+    )
+    return [r["user_id"] for r in cursor.fetchall()]
+
+
+def _supervisor_owned_comp4200_student_rows(cursor, faculty_id, course_scope="introduction", section_id=None, student_id=None):
+    if course_scope not in {"introduction", "both"}:
+        return []
+    if not (_supervisor_table_exists(cursor, "student_distribution_sections") and _supervisor_table_exists(cursor, "section_students")):
+        return []
+
+    params = [faculty_id]
+    filters = ["sec.supervisor_id = %s", "u.is_active = TRUE"]
+    if section_id:
+        filters.append("sec.section_id = %s")
+        params.append(str(section_id).replace("s:", "", 1))
+    if student_id:
+        filters.append("st.student_id = %s")
+        params.append(student_id)
+
+    cursor.execute(
+        f"""
+        SELECT DISTINCT
+               st.student_id,
+               u.user_id,
+               u.full_name,
+               u.university_id,
+               'introduction' AS course_scope,
+               'COMP4200' AS course_code,
+               sec.section_id,
+               sec.section_name
+        FROM student_distribution_sections sec
+        JOIN section_students ss ON ss.section_id = sec.section_id
+        JOIN students st ON st.student_id = ss.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE {' AND '.join(filters)}
+        ORDER BY sec.section_name, u.full_name
+        """,
+        tuple(params),
+    )
+    return cursor.fetchall()
+
+
+def _supervisor_owned_comp4300_student_rows(cursor, faculty_id, course_scope="graduation_project", project_id=None, student_id=None):
+    if course_scope not in {"graduation_project", "both"}:
+        return []
+    params = [faculty_id]
+    filters = ["p.supervisor_id = %s", "s.course_code = 'COMP4300'", "u.is_active = TRUE"]
+    if project_id:
+        filters.append("p.project_id = %s")
+        params.append(str(project_id).replace("p:", "", 1))
+    if student_id:
+        filters.append("st.student_id = %s")
+        params.append(student_id)
+
+    cursor.execute(
+        f"""
+        SELECT DISTINCT
+               st.student_id,
+               u.user_id,
+               u.full_name,
+               u.university_id,
+               'graduation_project' AS course_scope,
+               'COMP4300' AS course_code,
+               p.project_id AS section_id,
+               COALESCE(NULLIF(p.title, ''), CONCAT('COMP4300 Project ', p.project_id)) AS section_name
+        FROM projects p
+        JOIN semesters s ON s.semester_id = p.semester_id
+        JOIN project_members pm ON pm.project_id = p.project_id
+        JOIN students st ON st.student_id = pm.student_id
+        JOIN users u ON u.user_id = st.user_id
+        WHERE {' AND '.join(filters)}
+        ORDER BY p.project_id DESC, u.full_name
+        """,
+        tuple(params),
+    )
+    return cursor.fetchall()
+
+
+def _supervisor_owned_student_rows(cursor, faculty_id, course_scope="both", student_id=None):
+    rows = []
+    if course_scope in {"introduction", "both"}:
+        rows.extend(_supervisor_owned_comp4200_student_rows(cursor, faculty_id, "introduction", student_id=student_id))
+    if course_scope in {"graduation_project", "both"}:
+        rows.extend(_supervisor_owned_comp4300_student_rows(cursor, faculty_id, "graduation_project", student_id=student_id))
+
+    # Deduplicate the same student if old data accidentally links them more than once.
+    seen = set()
+    result = []
+    for row in rows:
+        key = row.get("student_id")
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(row)
+    return result
+
+
+def _supervisor_owned_sections(cursor, faculty_id):
+    sections = []
+    if _supervisor_table_exists(cursor, "student_distribution_sections") and _supervisor_table_exists(cursor, "section_students"):
+        cursor.execute(
+            """
+            SELECT CONCAT('s:', sec.section_id) AS section_key,
+                   sec.section_id,
+                   sec.section_name,
+                   'introduction' AS course_scope,
+                   'COMP4200' AS course_code,
+                   u_sup.full_name AS supervisor_name,
+                   COUNT(DISTINCT ss.student_id) AS students_count
             FROM student_distribution_sections sec
             JOIN faculty f ON f.faculty_id = sec.supervisor_id
             JOIN users u_sup ON u_sup.user_id = f.user_id
-            WHERE u_sup.is_active = TRUE {section_filter}
-        ) x
+            LEFT JOIN section_students ss ON ss.section_id = sec.section_id
+            WHERE sec.supervisor_id = %s
+            GROUP BY sec.section_id, sec.section_name, u_sup.full_name
+            HAVING students_count > 0
+            ORDER BY sec.section_id DESC
+            """,
+            (faculty_id,),
+        )
+        sections.extend(cursor.fetchall())
+
+    cursor.execute(
+        """
+        SELECT CONCAT('p:', p.project_id) AS section_key,
+               p.project_id AS section_id,
+               COALESCE(NULLIF(p.title, ''), CONCAT('COMP4300 Project ', p.project_id)) AS section_name,
+               'graduation_project' AS course_scope,
+               'COMP4300' AS course_code,
+               COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
+               COUNT(DISTINCT pm.student_id) AS students_count
+        FROM projects p
+        JOIN semesters s ON s.semester_id = p.semester_id
+        LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
+        LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
+        LEFT JOIN project_members pm ON pm.project_id = p.project_id
+        WHERE s.course_code = 'COMP4300'
+          AND p.supervisor_id = %s
+        GROUP BY p.project_id, p.title, u_sup.full_name
+        HAVING students_count > 0
+        ORDER BY p.project_id DESC
         """,
-        tuple(params + params),
+        (faculty_id,),
     )
-    return [r["recipient_id"] for r in cursor.fetchall()]
+    sections.extend(cursor.fetchall())
+    return sections
+
+
+def _supervisor_comp4200_section_recipients(cursor, section_id=None):
+    faculty_id = _supervisor_current_faculty_id_for_notifications(cursor)
+    if not faculty_id:
+        return []
+    rows = _supervisor_owned_comp4200_student_rows(cursor, faculty_id, "introduction", section_id=section_id)
+    return [r["user_id"] for r in rows]
 
 
 def _supervisor_comp4300_project_recipients(cursor, project_id=None):
-    params = []
-    project_filter = ""
-    if project_id:
-        project_filter = "AND p.project_id = %s"
-        params.append(project_id)
-    cursor.execute(
-        f"""
-        SELECT DISTINCT recipient_id
-        FROM (
-            SELECT us.user_id AS recipient_id
-            FROM projects p
-            JOIN semesters s ON s.semester_id = p.semester_id
-            JOIN project_members pm ON pm.project_id = p.project_id
-            JOIN students st ON st.student_id = pm.student_id
-            JOIN users us ON us.user_id = st.user_id
-            WHERE s.course_code = 'COMP4300'
-              AND us.is_active = TRUE
-              {project_filter}
-            UNION
-            SELECT u_sup.user_id AS recipient_id
-            FROM projects p
-            JOIN semesters s ON s.semester_id = p.semester_id
-            JOIN faculty f ON f.faculty_id = p.supervisor_id
-            JOIN users u_sup ON u_sup.user_id = f.user_id
-            WHERE s.course_code = 'COMP4300'
-              AND u_sup.is_active = TRUE
-              {project_filter}
-        ) x
-        """,
-        tuple(params + params),
-    )
-    return [r["recipient_id"] for r in cursor.fetchall()]
+    faculty_id = _supervisor_current_faculty_id_for_notifications(cursor)
+    if not faculty_id:
+        return []
+    rows = _supervisor_owned_comp4300_student_rows(cursor, faculty_id, "graduation_project", project_id=project_id)
+    return [r["user_id"] for r in rows]
 
 
 def _supervisor_notification_recipients(cursor, scope, value=None, course_scope="both"):
     scope = (scope or "").strip()
     course_scope = (course_scope or "both").strip()
+    faculty_id = _supervisor_current_faculty_id_for_notifications(cursor)
 
     if scope == "coordinators":
         return _supervisor_coordinator_user_ids_for_scope(cursor, course_scope)
@@ -1329,62 +1482,47 @@ def _supervisor_notification_recipients(cursor, scope, value=None, course_scope=
         )
         return [r["user_id"] for r in cursor.fetchall()]
 
-    if scope == "doctors":
-        cursor.execute("SELECT user_id FROM users WHERE role = 'supervisor' AND is_active = TRUE")
-        return [r["user_id"] for r in cursor.fetchall()]
+    if scope == "heads":
+        return _supervisor_head_user_ids(cursor)
 
-    if scope == "doctor":
-        cursor.execute(
-            """
-            SELECT u.user_id
-            FROM faculty f
-            JOIN users u ON u.user_id = f.user_id
-            WHERE f.faculty_id = %s
-              AND u.role = 'supervisor'
-              AND u.is_active = TRUE
-            """,
-            (value,),
-        )
-        return [r["user_id"] for r in cursor.fetchall()]
+    if scope == "head":
+        return _supervisor_head_user_ids(cursor, value)
 
     if scope == "students":
-        cursor.execute("SELECT user_id FROM users WHERE role = 'student' AND is_active = TRUE")
-        return [r["user_id"] for r in cursor.fetchall()]
+        if not faculty_id:
+            return []
+        return [r["user_id"] for r in _supervisor_owned_student_rows(cursor, faculty_id, course_scope)]
 
     if scope == "student":
-        cursor.execute(
-            """
-            SELECT u.user_id
-            FROM students st
-            JOIN users u ON u.user_id = st.user_id
-            WHERE st.student_id = %s
-              AND u.role = 'student'
-              AND u.is_active = TRUE
-            """,
-            (value,),
-        )
-        return [r["user_id"] for r in cursor.fetchall()]
+        if not faculty_id:
+            return []
+        return [r["user_id"] for r in _supervisor_owned_student_rows(cursor, faculty_id, course_scope, student_id=value)]
 
     if scope == "section":
+        if not faculty_id:
+            return []
         if course_scope == "graduation_project" or str(value).startswith("p:"):
             project_id = str(value).replace("p:", "", 1)
-            return _supervisor_comp4300_project_recipients(cursor, project_id)
+            return [r["user_id"] for r in _supervisor_owned_comp4300_student_rows(cursor, faculty_id, "graduation_project", project_id=project_id)]
         section_id = str(value).replace("s:", "", 1)
-        return _supervisor_comp4200_section_recipients(cursor, section_id)
+        return [r["user_id"] for r in _supervisor_owned_comp4200_student_rows(cursor, faculty_id, "introduction", section_id=section_id)]
 
+    # Kept for compatibility with old forms: now means all of MY sections/projects only.
     if scope == "all_sections":
-        recipients = []
-        if course_scope in {"introduction", "both"}:
-            recipients.extend(_supervisor_comp4200_section_recipients(cursor))
-        if course_scope in {"graduation_project", "both"}:
-            recipients.extend(_supervisor_comp4300_project_recipients(cursor))
-        return sorted(set(recipients))
+        if not faculty_id:
+            return []
+        return [r["user_id"] for r in _supervisor_owned_student_rows(cursor, faculty_id, course_scope)]
 
     if scope == "reply":
         cursor.execute("SELECT user_id FROM users WHERE user_id = %s AND is_active = TRUE", (value,))
         return [r["user_id"] for r in cursor.fetchall()]
 
+    # Supervisors are not allowed to broadcast to all doctors or unrelated students from this page.
     return []
+
+
+def _supervisor_scope_is_student_target(scope):
+    return scope in {"students", "student", "section", "all_sections"}
 
 
 # ============================================================
@@ -1430,83 +1568,26 @@ def options():
 
         cursor.execute(
             """
-            SELECT f.faculty_id, u.user_id, u.full_name, u.university_id
-            FROM faculty f
-            JOIN users u ON u.user_id = f.user_id
-            WHERE u.role = 'supervisor' AND u.is_active = TRUE
-            ORDER BY u.full_name
+            SELECT user_id, full_name, university_id
+            FROM users
+            WHERE role = 'head_of_department'
+              AND is_active = TRUE
+            ORDER BY full_name
             """
         )
-        doctors = cursor.fetchall()
+        heads = cursor.fetchall()
 
-        cursor.execute(
-            """
-            SELECT st.student_id, u.user_id, u.full_name, u.university_id,
-                   CASE WHEN EXISTS (
-                        SELECT 1
-                        FROM project_members pm
-                        JOIN projects p ON p.project_id = pm.project_id
-                        JOIN semesters s ON s.semester_id = p.semester_id
-                        WHERE pm.student_id = st.student_id AND s.course_code = 'COMP4300'
-                   ) THEN 'graduation_project' ELSE 'introduction' END AS course_scope
-            FROM students st
-            JOIN users u ON u.user_id = st.user_id
-            WHERE u.role = 'student' AND u.is_active = TRUE
-            ORDER BY u.full_name
-            """
-        )
-        students = cursor.fetchall()
-
-        sections = []
-        if _supervisor_table_exists(cursor, "student_distribution_sections") and _supervisor_table_exists(cursor, "section_students"):
-            cursor.execute(
-                """
-                SELECT CONCAT('s:', sec.section_id) AS section_key,
-                       sec.section_id,
-                       sec.section_name,
-                       'introduction' AS course_scope,
-                       'COMP4200' AS course_code,
-                       u_sup.full_name AS supervisor_name,
-                       COUNT(DISTINCT ss.student_id) AS students_count
-                FROM student_distribution_sections sec
-                JOIN faculty f ON f.faculty_id = sec.supervisor_id
-                JOIN users u_sup ON u_sup.user_id = f.user_id
-                LEFT JOIN section_students ss ON ss.section_id = sec.section_id
-                GROUP BY sec.section_id, sec.section_name, u_sup.full_name
-                ORDER BY sec.section_id DESC
-                """
-            )
-            sections.extend(cursor.fetchall())
-
-        cursor.execute(
-            """
-            SELECT CONCAT('p:', p.project_id) AS section_key,
-                   p.project_id AS section_id,
-                   COALESCE(NULLIF(p.title, ''), CONCAT('COMP4300 Project ', p.project_id)) AS section_name,
-                   'graduation_project' AS course_scope,
-                   'COMP4300' AS course_code,
-                   COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
-                   COUNT(DISTINCT pm.student_id) AS students_count
-            FROM projects p
-            JOIN semesters s ON s.semester_id = p.semester_id
-            LEFT JOIN faculty f ON f.faculty_id = p.supervisor_id
-            LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
-            LEFT JOIN project_members pm ON pm.project_id = p.project_id
-            WHERE s.course_code = 'COMP4300'
-            GROUP BY p.project_id, p.title, u_sup.full_name
-            HAVING students_count > 0
-            ORDER BY p.project_id DESC
-            """
-        )
-        sections.extend(cursor.fetchall())
+        faculty_id = _supervisor_current_faculty_id_for_notifications(cursor)
+        students = _supervisor_owned_student_rows(cursor, faculty_id, "both") if faculty_id else []
+        sections = _supervisor_owned_sections(cursor, faculty_id) if faculty_id else []
 
         cursor.close()
         db.close()
         return jsonify(
             {
-                "heads": [],
+                "heads": heads,
                 "coordinators": coordinator_rows,
-                "doctors": doctors,
+                "doctors": [],
                 "students": students,
                 "sections": sections,
             }
@@ -1628,13 +1709,16 @@ def send():
 
     if course_scope not in {"introduction", "graduation_project", "both"}:
         return jsonify({"error": "Please choose the course scope."}), 400
+    allowed_scopes = {"coordinators", "heads", "students", "student", "section", "reply", "coordinator", "head", "all_sections"}
     if not scope:
         return jsonify({"error": "Please choose who should receive the message."}), 400
+    if scope not in allowed_scopes:
+        return jsonify({"error": "Supervisors can send only to their own students/sections, the Head, or the Coordinator."}), 403
     if not title:
         return jsonify({"error": "Please write a title."}), 400
     if not message:
         return jsonify({"error": "Please write a message."}), 400
-    if scope in {"coordinator", "doctor", "student", "section", "reply"} and not value:
+    if scope in {"student", "section", "reply"} and not value:
         return jsonify({"error": "Please choose the exact receiver."}), 400
 
     attachment_name = None
@@ -1653,6 +1737,10 @@ def send():
     _ensure_supervisor_notification_schema(cursor)
     recipients = _supervisor_notification_recipients(cursor, scope, value, course_scope)
     sender_id = session.get("user_id")
+
+    # Any supervisor message sent to students is also copied to the course coordinator.
+    if _supervisor_scope_is_student_target(scope):
+        recipients = list(recipients or []) + _supervisor_coordinator_user_ids_for_scope(cursor, course_scope)
 
     if scope == "reply":
         raw_recipients = [int(r) for r in recipients if r]

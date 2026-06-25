@@ -32,10 +32,13 @@
     #pg-supervisor-lectures .empty { padding:18px; border:1px dashed #cddbd2; border-radius:14px; background:var(--color-background-tertiary); color:#667085; text-align:center; }
     #pg-supervisor-lectures .attendance-panel { margin-top:12px; padding:14px; border:1px solid #dce9e0; border-radius:14px; background:#f8fbf9; }
     #pg-supervisor-lectures .attendance-title { font-size:13px; font-weight:900; margin-bottom:10px; color:var(--color-text-primary); }
-    #pg-supervisor-lectures .attendance-row { display:grid; grid-template-columns:minmax(0,1fr) 160px; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid #e7eee9; }
-    #pg-supervisor-lectures .attendance-row:last-child { border-bottom:0; }
-    #pg-supervisor-lectures .attendance-name { font-size:13px; font-weight:800; color:var(--color-text-primary); }
-    #pg-supervisor-lectures .attendance-id { font-size:11px; color:#667085; margin-top:2px; }
+    #pg-supervisor-lectures .attendance-list { display:grid; gap:8px; }
+    #pg-supervisor-lectures .attendance-row { display:grid; grid-template-columns:minmax(0,1fr) 160px 240px; align-items:center; gap:12px; padding:10px 12px; border:1px solid #e7eee9; border-radius:12px; background:#fff; }
+    #pg-supervisor-lectures .attendance-name { color:var(--color-text-primary); font-size:13px; font-weight:900; }
+    #pg-supervisor-lectures .attendance-id { color:#667085; font-size:12px; }
+    #pg-supervisor-lectures .attendance-status-options { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    #pg-supervisor-lectures .attendance-radio { display:inline-flex; align-items:center; gap:6px; margin:0; color:var(--color-text-primary); font-size:12px; font-weight:900; cursor:pointer; }
+    #pg-supervisor-lectures .attendance-radio input { width:auto; margin:0; accent-color:#2e7d42; }
     .supervisor-lecture-toast { display:none; position:fixed; top:88px; left:50%; transform:translateX(-50%); z-index:10000; width:min(620px,calc(100vw - 32px)); padding:15px 20px; border-radius:15px; background:#166534; color:#fff; text-align:center; font-weight:800; box-shadow:0 18px 42px rgba(0,0,0,.24); }
     @media(max-width:800px) { #pg-supervisor-lectures .form-grid { grid-template-columns:1fr; } #pg-supervisor-lectures .lecture-tab { width:100%; } #pg-supervisor-lectures .lecture-item { grid-template-columns:1fr; } #pg-supervisor-lectures .attendance-row { grid-template-columns:1fr; } }
   </style>
@@ -166,14 +169,21 @@
       }
       box.innerHTML = `<div class="attendance-panel">
         <div class="attendance-title">Attendance — ${lectureSafe(data.title || 'Lecture')}</div>
-        ${students.map(student => `<div class="attendance-row">
-          <div><div class="attendance-name">${lectureSafe(student.full_name)}</div><div class="attendance-id">${lectureSafe(student.university_id || '')}</div></div>
-          <select class="attendance-status" data-student-id="${student.student_id}">
-            <option value="">Select status...</option>
-            <option value="present" ${student.attendance_status === 'present' ? 'selected' : ''}>Present</option>
-            <option value="absent" ${student.attendance_status === 'absent' ? 'selected' : ''}>Absent</option>
-          </select>
-        </div>`).join('')}
+        <div class="attendance-list">
+          ${students.map(student => {
+            const status = String(student.attendance_status || 'present').toLowerCase();
+            const isAbsent = status === 'absent';
+            const radioName = `attendance-${lectureId}-${student.student_id}`;
+            return `<div class="attendance-row" data-student-id="${Number(student.student_id)}">
+              <div class="attendance-name">${lectureSafe(student.full_name)}</div>
+              <div class="attendance-id">${lectureSafe(student.university_id || '')}</div>
+              <div class="attendance-status-options" data-student-id="${student.student_id}">
+                <label class="attendance-radio"><input class="attendance-status" type="radio" name="${radioName}" data-student-id="${student.student_id}" value="present" ${!isAbsent ? 'checked' : ''}> Present</label>
+                <label class="attendance-radio"><input class="attendance-status" type="radio" name="${radioName}" data-student-id="${student.student_id}" value="absent" ${isAbsent ? 'checked' : ''}> Absent</label>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
         <div class="item-actions"><button class="btn btn-primary" type="button" onclick="saveLectureAttendance(${lectureId})">Save Attendance</button><button class="btn btn-outline" type="button" onclick="document.getElementById('lectureAttendance-${lectureId}').innerHTML=''">Close</button></div>
       </div>`;
     } catch (error) {
@@ -183,12 +193,16 @@
   }
 
   async function saveLectureAttendance(lectureId) {
-    const selects = Array.from(document.querySelectorAll(`#lectureAttendance-${lectureId} .attendance-status`));
-    const attendance = selects.map(select => ({student_id:Number(select.dataset.studentId),status:select.value}));
-    const missing = selects.find(select => !select.value);
+    const rows = Array.from(document.querySelectorAll(`#lectureAttendance-${lectureId} .attendance-status-options`));
+    const attendance = rows.map(row => {
+      const checked = row.querySelector('.attendance-status:checked');
+      return { student_id: Number(row.dataset.studentId), status: checked ? checked.value : '' };
+    });
+    const missing = rows.find(row => !row.querySelector('.attendance-status:checked'));
     if (missing) {
       lectureToast('Mark every student as present or absent.',true);
-      missing.focus();
+      const firstRadio = missing.querySelector('.attendance-status');
+      if (firstRadio) firstRadio.focus();
       return;
     }
     try {
