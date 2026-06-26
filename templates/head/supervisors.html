@@ -73,20 +73,154 @@
 
         <div class="field-wrap">
           <div class="field-label">{{ t['head']['full_name'] }}</div>
-          <input id="add-name" class="field-input" type="text" placeholder="Dr. …"/>
+          <div style="display:flex;align-items:center">
+            <span style="padding:0 10px;height:38px;display:flex;align-items:center;
+                         background:var(--color-surface,#f3f4f6);border:1px solid var(--color-border,#d1d5db);
+                         border-right:none;border-radius:var(--rm,6px) 0 0 var(--rm,6px);
+                         font-size:13px;font-weight:600;color:var(--color-text-secondary);
+                         white-space:nowrap;user-select:none">Dr.</span>
+            <input id="add-name" class="field-input" type="text" placeholder="Hamza Al-Ahmad"
+                   style="border-radius:0 var(--rm,6px) var(--rm,6px) 0;flex:1;margin:0"/>
+          </div>
         </div>
         <div class="field-wrap">
           <div class="field-label">{{ t['head']['uid_4digits'] }}</div>
           <input id="add-uid" class="field-input" type="text" placeholder="xxxx" maxlength="4"/>
         </div>
         <div class="field-wrap">
-          <div class="field-label">{{ t['head']['email'] }}</div>
-          <input id="add-email" class="field-input" type="email" placeholder="xxxx@birzeit.edu"/>
-        </div>
-        <div class="field-wrap">
           <div class="field-label">{{ t['head']['specialization'] }}</div>
-          <input id="add-spec" class="field-input" type="text" placeholder="{{ t['head']['specialization_placeholder'] }}"/>
+          <div class="select-control">
+            <select id="add-spec" class="field-input is-placeholder" onchange="handleSpecChange(this)" required>
+              <option value="" selected disabled hidden>-- Select Specialization --</option>
+              <option value="software_engineering">Software Engineering</option>
+              <option value="artificial_intelligence">Artificial Intelligence</option>
+              <option value="web_development">Web Development</option>
+              <option value="mobile">Mobile Development</option>
+              <option value="security_networks">Security &amp; Networks</option>
+              <option value="databases">Databases</option>
+              <option value="data_science">Data Science</option>
+              <option value="computer_vision">Computer Vision</option>
+              <option value="cloud_computing">Cloud Computing</option>
+              <option value="human_computer_interaction">Human-Computer Interaction</option>
+              <option value="embedded_systems">Embedded Systems</option>
+              <option value="other">Other…</option>
+            </select>
+          </div>
+          <div id="selected-spec-preview" class="selected-preview"></div>
         </div>
+
+        <div class="field-wrap" id="other-spec-wrap"
+             style="display:none;margin-top:-4px;animation:fadeIn .15s ease">
+          <div class="field-label">Please specify</div>
+          <input id="add-spec-other" class="field-input" type="text"
+                 placeholder="e.g. Quantum Computing, Bioinformatics…"
+                 style="border-color:var(--amber);"/>
+        </div>
+
+        <style>
+          @keyframes fadeIn { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:none } }
+
+          .select-control {
+            position: relative;
+          }
+
+          .select-control::after {
+            content: "⌄";
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: var(--green,#166534);
+            font-size: 16px;
+            font-weight: 800;
+          }
+
+          #add-spec {
+            width: 100%;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            padding-right: 42px;
+            transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+          }
+
+          #add-spec.is-placeholder {
+            color: var(--color-text-secondary,#6b7280);
+            border-color: var(--color-border,#d1d5db);
+            background: var(--color-background,#fff);
+          }
+
+          #add-spec.has-value {
+            color: var(--color-text-primary,#111827);
+            border-color: var(--green,#166534);
+            background: var(--teal-light,#e7f6ee);
+            font-weight: 600;
+          }
+
+          .selected-preview {
+            display: none;
+            margin-top: 6px;
+            padding: 6px 10px;
+            border-radius: var(--rm,6px);
+            background: var(--teal-light,#e7f6ee);
+            color: var(--green,#166534);
+            font-size: 12px;
+            font-weight: 700;
+          }
+        </style>
+        <script>
+          function handleSpecChange(selectEl) {
+            toggleOtherSpec(selectEl.value);
+            updateSpecSelectStyle();
+          }
+
+          function updateSpecSelectStyle() {
+            const sel = document.getElementById('add-spec');
+            const preview = document.getElementById('selected-spec-preview');
+            if (!sel) return;
+
+            const hasValue = !!sel.value;
+            sel.classList.toggle('has-value', hasValue);
+            sel.classList.toggle('is-placeholder', !hasValue);
+
+            if (preview) {
+              if (hasValue) {
+                preview.style.display = 'block';
+                preview.textContent = '✓ Selected: ' + sel.options[sel.selectedIndex].text;
+              } else {
+                preview.style.display = 'none';
+                preview.textContent = '';
+              }
+            }
+          }
+
+          function toggleOtherSpec(val) {
+            const wrap = document.getElementById('other-spec-wrap');
+            const inp  = document.getElementById('add-spec-other');
+            if (val === 'other') {
+              wrap.style.display = 'block';
+              inp.focus();
+            } else {
+              wrap.style.display = 'none';
+              inp.value = '';
+            }
+          }
+
+          document.addEventListener('DOMContentLoaded', updateSpecSelectStyle);
+
+          /* Helper used by supervisors.js → addSupervisor() payload */
+          function getSpecValue() {
+            return document.getElementById('add-spec').value;
+          }
+          function getSpecCustom() {
+            const sel = document.getElementById('add-spec').value;
+            if (sel === 'other') {
+              return (document.getElementById('add-spec-other').value || '').trim();
+            }
+            return '';
+          }
+        </script>
 
         <div id="add-error"
              style="font-size:12px;color:var(--red,#dc2626);margin-bottom:8px;min-height:16px"></div>

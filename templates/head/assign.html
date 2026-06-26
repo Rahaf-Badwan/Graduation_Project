@@ -20,7 +20,12 @@
         <div class="form-grid">
           <div class="field-wrap">
             <div class="field-label">{{ t['head']['this_semester'] }} <span class="req">*</span></div>
-            <select id="semesterSelect" class="field-select"><option></option></select>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="semesterSelect" class="field-select" style="flex:1"><option></option></select>
+              <button class="btn btn-outline" type="button" onclick="openAcademicYearModal()" style="white-space:nowrap">
+                + Create
+              </button>
+            </div>
           </div>
           <div class="field-wrap">
             <div class="field-label">{{ t['head']['new_coordinator'] }} <span class="req">*</span></div>
@@ -29,7 +34,7 @@
         </div>
         <div class="field-wrap">
           <div class="field-label">{{ t['general']['notes'] }}</div>
-          <textarea class="field-textarea" style="min-height:60px"
+          <textarea id="assignNotes" class="field-textarea" style="min-height:60px"
             placeholder="{{ t['head']['coordinator_notes_placeholder'] }}"></textarea>
         </div>
         <div class="btn-row">
@@ -48,8 +53,8 @@
         <div class="card-hd" style="flex-wrap:wrap; gap:8px;">
           <span class="card-title">{{ t['head']['course_overview'] }}</span>
           <div class="tabs">
-            <button class="tab active" onclick="selectTab('COMP4200', this)">COMP4200</button>
-            <button class="tab" onclick="selectTab('COMP4300', this)">COMP4300</button>
+            <button class="tab active" type="button" onclick="selectOverviewTab('COMP4200', this)">COMP4200</button>
+            <button class="tab" type="button" onclick="selectOverviewTab('COMP4300', this)">COMP4300</button>
           </div>
         </div>
         <div id="doctorList"></div>
@@ -58,5 +63,42 @@
 
   </div>
 </div>
+
+<div id="academicYearModal"
+     style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.42);
+            z-index:500;align-items:center;justify-content:center;padding:18px">
+  <div class="card" style="width:520px;max-width:calc(100vw - 28px);max-height:calc(100vh - 28px);overflow:auto">
+    <div class="card-hd">
+      <span class="card-title">Create Academic Year</span>
+      <button class="btn btn-outline" type="button" onclick="closeAcademicYearModal()">Cancel</button>
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Academic Year <span class="req">*</span></div>
+      <input id="newAcademicYear" class="field-input" type="text" placeholder="2026/2027">
+    </div>
+    <div class="form-grid">
+      <div class="field-wrap">
+        <div class="field-label">Semester Start <span class="req">*</span></div>
+        <input id="semesterStart" class="field-input" type="date">
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Semester End <span class="req">*</span></div>
+        <input id="semesterEnd" class="field-input" type="date">
+      </div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--color-text-secondary);margin:8px 0 14px">
+      <input id="setActiveYear" type="checkbox">
+      Set this as the active academic year
+    </label>
+    <div id="academicYearError" style="min-height:18px;color:var(--color-text-danger);font-size:12px;margin-bottom:8px"></div>
+    <div class="btn-row">
+      <button id="createAcademicYearBtn" class="btn btn-primary" type="button" onclick="createAcademicYear()">
+        Create Academic Year &#x2197;
+      </button>
+      <button class="btn btn-outline" type="button" onclick="closeAcademicYearModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/assets/head/assign_rols.js"></script>
 {% endblock %}

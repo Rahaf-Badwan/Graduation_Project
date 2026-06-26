@@ -63,7 +63,6 @@ function clearActivationFields() {
     'password',
     'confirmPassword',
     'supervisor-id',
-    'supervisor-email',
     'sup-hours',
     'sup-password',
     'sup-confirmPassword'
@@ -74,7 +73,7 @@ function clearActivationFields() {
     el.value = '';
     el.defaultValue = '';
     el.setAttribute('autocomplete', 'new-password');
-    if (['universityId', 'supervisor-id', 'supervisor-email'].indexOf(id) !== -1) {
+    if (['universityId', 'supervisor-id'].indexOf(id) !== -1) {
       el.setAttribute('readonly', 'readonly');
     }
   });
@@ -267,10 +266,9 @@ function updateSupStrength() {
 async function verifySupervisor() {
   hideFeedback('sup-verify-feedback');
   var uid   = document.getElementById('supervisor-id').value.trim();
-  var email = document.getElementById('supervisor-email').value.trim();
 
-  if (!uid || !email) {
-    showFeedback('sup-verify-feedback', 'Please fill in all fields.', 'warn');
+  if (!uid) {
+    showFeedback('sup-verify-feedback', 'Please enter your university ID.', 'warn');
     return;
   }
   if (!/^\d{4}$/.test(uid)) {
@@ -285,7 +283,7 @@ async function verifySupervisor() {
     var res  = await fetch('/api/activate/supervisor/verify', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ university_id: uid, email: email })
+      body: JSON.stringify({ university_id: uid })
     });
     var data = await res.json();
 

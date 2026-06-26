@@ -143,11 +143,10 @@ async function addSupervisor() {
 
   const name  = document.getElementById('add-name').value.trim();
   const uid   = document.getElementById('add-uid').value.trim();
-  const email = document.getElementById('add-email').value.trim();
   const spec  = document.getElementById('add-spec').value.trim();
 
-  if (!name || !uid || !email) {
-    errEl.textContent = 'Full name, university ID, and email are required.'; return;
+  if (!name || !uid) {
+    errEl.textContent = 'Full name and university ID are required.'; return;
   }
   if (!/^\d{4}$/.test(uid)) {
     errEl.textContent = 'University ID must be exactly 4 digits.'; return;
@@ -160,13 +159,13 @@ async function addSupervisor() {
     const res  = await fetch('/head/supervisors-api/add', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ full_name: name, university_id: uid, email, specialization: spec })
+      body:    JSON.stringify({ full_name: name, university_id: uid, specialization: spec })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed');
 
     showToast('Supervisor added! They can activate at /activate', 'success');
-    ['add-name','add-uid','add-email','add-spec'].forEach(id =>
+    ['add-name','add-uid','add-spec'].forEach(id =>
       document.getElementById(id).value = ''
     );
     loadSupervisors();

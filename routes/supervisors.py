@@ -19,6 +19,31 @@ from auth import login_required
 head_supervisors_bp = Blueprint('head_supervisors', __name__)
 
 
+def _current_supervisor_semester(cursor):
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE is_active = TRUE
+          AND start_date IS NOT NULL
+          AND end_date IS NOT NULL
+          AND CURDATE() BETWEEN start_date AND end_date
+        ORDER BY start_date DESC, semester_id DESC
+        LIMIT 1
+    """)
+    semester = cursor.fetchone()
+    if semester:
+        return semester
+
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE is_active = TRUE
+        ORDER BY semester_id DESC
+        LIMIT 1
+    """)
+    return cursor.fetchone()
+
+
 # ─────────────────────────────────────────────────────────────
 #  GET /api/head/supervisors
 # ─────────────────────────────────────────────────────────────
@@ -28,6 +53,22 @@ def api_list_supervisors():
     try:
         db     = get_db()
         cursor = db.cursor(dictionary=True)
+        semester = _current_supervisor_semester(cursor)
+        semester_id = semester["semester_id"] if semester else None
+
+        if not semester_id:
+            cursor.close()
+            db.close()
+            return jsonify({
+                'supervisors': [],
+                'stats': {
+                    'total': 0,
+                    'active': 0,
+                    'pending': 0,
+                    'projects': 0,
+                },
+                'semester': None,
+            }), 200
 
         cursor.execute("""
            SELECT
@@ -42,7 +83,18 @@ def api_list_supervisors():
             JOIN  faculty f ON f.user_id = u.user_id
             LEFT  JOIN projects gp
                 ON gp.supervisor_id = f.faculty_id
-                     AND gp.status  IN ('cancelled', 'rejected', 'archived', 'draft', 'accepted')
+               AND gp.semester_id = %s
+               AND gp.status <> 'archived'
+               AND EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    JOIN students st ON st.student_id = pm.student_id
+                    JOIN users us ON us.user_id = st.user_id
+                    WHERE pm.project_id = gp.project_id
+                      AND us.is_active = TRUE
+               )
+            WHERE u.role = 'supervisor'
+              AND u.is_active = TRUE
             
             GROUP BY 
                 u.user_id, u.full_name, u.university_id,
@@ -50,7 +102,7 @@ def api_list_supervisors():
                 f.specialization
 			HAVING COUNT(gp.project_id) > 0
             ORDER BY u.full_name
-        """)
+        """, (semester_id,))
         rows = cursor.fetchall()
         cursor.close()
         db.close()
@@ -77,7 +129,8 @@ def api_list_supervisors():
                 'active':   active,
                 'pending':  pending,
                 'projects': projects,
-            }
+            },
+            'semester': semester,
         }), 200
 
     except Exception as e:
@@ -94,19 +147,45 @@ def api_list_supervisors():
 def api_add_supervisor():
     data = request.get_json(silent=True) or {}
 
-    full_name      = (data.get('full_name')      or '').strip()
+    full_name_raw  = (data.get('full_name')      or '').strip()
+    # Prepend "Dr." prefix if not already present
+    if full_name_raw and not full_name_raw.lower().startswith('dr'):
+        full_name = 'Dr. ' + full_name_raw
+    else:
+        full_name = full_name_raw
     university_id  = (data.get('university_id')  or '').strip()
-    email          = (data.get('email')          or '').strip()
     specialization = (data.get('specialization') or '').strip()
+    spec_custom    = (data.get('spec_custom')    or '').strip()   # free-text when "other" selected
 
-    if not full_name or not university_id or not email:
-        return jsonify({'error': 'Full name, university ID, and email are required.'}), 400
+    if not full_name or not university_id:
+        return jsonify({'error': 'Full name and university ID are required.'}), 400
 
     if not re.match(r'^\d{4}$', university_id):
         return jsonify({'error': 'University ID must be exactly 4 digits.'}), 400
 
-    if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
-        return jsonify({'error': 'Invalid email address.'}), 400
+    # All ENUM values accepted by the DB
+    DB_ENUM_SPECS = {
+        'software_engineering', 'artificial_intelligence', 'web_development',
+        'mobile', 'security_networks', 'databases', 'other'
+    }
+    # Extended dropdown values that map to 'other' in the DB
+    MAP_TO_OTHER = {
+        'data_science', 'computer_vision', 'cloud_computing',
+        'human_computer_interaction', 'embedded_systems'
+    }
+
+    if specialization in MAP_TO_OTHER:
+        if not spec_custom:
+            spec_custom = specialization.replace('_', ' ').title()
+        specialization = 'other'
+
+    if specialization and specialization not in DB_ENUM_SPECS:
+        return jsonify({'error': 'Invalid specialization value.'}), 400
+
+    if specialization == 'other' and spec_custom and len(spec_custom) > 120:
+        return jsonify({'error': 'Custom specialization must be under 120 characters.'}), 400
+
+    email = f'{university_id}@birzeit.edu'
 
     try:
         db     = get_db()
@@ -139,7 +218,9 @@ def api_add_supervisor():
         return jsonify({
             'message':        f'Supervisor "{full_name}" added successfully.',
             'user_id':        new_user_id,
-            'activation_url': '/activate'
+            'email':          email,
+            'activation_url': '/activate',
+            'spec_custom':    spec_custom or None,
         }), 201
 
     except Exception as e:

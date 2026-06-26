@@ -118,10 +118,9 @@ def api_verify_supervisor():
     data = request.get_json(silent=True) or {}
 
     university_id = (data.get('university_id') or '').strip()
-    email         = (data.get('email')         or '').strip()
 
-    if not university_id or not email:
-        return jsonify({'error': 'Please fill in your university ID and email.'}), 400
+    if not university_id:
+        return jsonify({'error': 'Please enter your university ID.'}), 400
 
     # ── 4-digit ID for supervisors ──
     if not re.match(r'^\d{4}$', university_id):
@@ -135,16 +134,15 @@ def api_verify_supervisor():
             SELECT u.user_id, u.full_name, u.is_active
             FROM   users u
             WHERE  u.university_id = %s
-              AND  u.email         = %s
               AND  u.role          = 'supervisor'
-        """, (university_id, email))
+        """, (university_id,))
         sup = cursor.fetchone()
         cursor.close()
         db.close()
 
         if not sup:
             return jsonify({
-                'error': 'No supervisor account found with that ID and email. '
+                'error': 'No supervisor account found with that ID. '
                          'Please contact the head of department.'
             }), 404
 

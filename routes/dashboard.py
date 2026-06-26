@@ -5,36 +5,93 @@ from auth import login_required
 dashboard_bp = Blueprint("dashboard_bp", __name__)
 
 
+def _current_dashboard_semester(cursor):
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE is_active = TRUE
+          AND start_date IS NOT NULL
+          AND end_date IS NOT NULL
+          AND CURDATE() BETWEEN start_date AND end_date
+        ORDER BY start_date DESC, semester_id DESC
+        LIMIT 1
+    """)
+    semester = cursor.fetchone()
+    if semester:
+        return semester
+
+    cursor.execute("""
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE is_active = TRUE
+        ORDER BY semester_id DESC
+        LIMIT 1
+    """)
+    return cursor.fetchone()
+
+
 @dashboard_bp.route('/api/dashboard-data')
 @login_required(role="head_of_department")
 def api_dashboard_data():
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    # Dashboard statistics describe the current cycle only. Historical and
-    # archived projects must not leak into the "this semester" cards.
-    active_semester_join = """
+    semester = _current_dashboard_semester(cursor)
+    semester_id = semester["semester_id"] if semester else None
+
+    if not semester_id:
+        cursor.close()
+        db.close()
+        return jsonify({
+            "total_projects": 0,
+            "active_supervisors": 0,
+            "acceptance_rate": 0,
+            "avg_grade": 0,
+            "notifications": [],
+            "specializations": [],
+            "coordinator": {},
+            "semester": None,
+        })
+
+    current_semester_projects = """
         FROM projects p
-        JOIN semesters s ON s.semester_id = p.semester_id
-        WHERE s.is_active = TRUE
+        WHERE p.semester_id = %s
           AND p.status <> 'archived'
+          AND EXISTS (
+                SELECT 1
+                FROM project_members pm
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users us ON us.user_id = st.user_id
+                WHERE pm.project_id = p.project_id
+                  AND us.is_active = TRUE
+          )
     """
 
     cursor.execute(f"""
         SELECT COUNT(*) AS total_projects
-        {active_semester_join}
-    """)
+        {current_semester_projects}
+    """, (semester_id,))
     total_projects = (cursor.fetchone() or {}).get("total_projects", 0)
 
-    # Active supervisor accounts are independent of whether projects have
-    # already been created in the current cycle.
+    # Count supervisors participating in this semester, not all supervisor accounts.
     cursor.execute("""
         SELECT COUNT(DISTINCT f.faculty_id) AS active_supervisors
-        FROM faculty f
+        FROM projects p
+        JOIN faculty f ON f.faculty_id = p.supervisor_id
         JOIN users u ON u.user_id = f.user_id
-        WHERE u.is_active = TRUE
+        WHERE p.semester_id = %s
+          AND p.status <> 'archived'
+          AND u.is_active = TRUE
           AND u.role = 'supervisor'
-    """)
+          AND EXISTS (
+                SELECT 1
+                FROM project_members pm
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users us ON us.user_id = st.user_id
+                WHERE pm.project_id = p.project_id
+                  AND us.is_active = TRUE
+          )
+    """, (semester_id,))
     active_supervisors = (cursor.fetchone() or {}).get("active_supervisors", 0)
 
     # Acceptance rate
@@ -42,8 +99,8 @@ def api_dashboard_data():
         SELECT
             SUM(p.status = 'accepted') AS accepted_count,
             SUM(p.status = 'rejected') AS rejected_count
-        {active_semester_join}
-    """)
+        {current_semester_projects}
+    """, (semester_id,))
     row = cursor.fetchone() or {}
     accepted = row.get("accepted_count") or 0
     rejected = row.get("rejected_count") or 0
@@ -53,9 +110,9 @@ def api_dashboard_data():
     # Average grade
     cursor.execute(f"""
         SELECT ROUND(AVG(p.final_score), 1) AS avg_grade
-        {active_semester_join}
+        {current_semester_projects}
           AND p.final_score IS NOT NULL
-    """)
+    """, (semester_id,))
     avg_grade = (cursor.fetchone() or {}).get("avg_grade") or 0
 
     # Last 3 notifications
@@ -82,14 +139,21 @@ def api_dashboard_data():
             ROUND(AVG(p.final_score), 1) AS avg_score,
             COUNT(p.project_id) AS project_count
         FROM projects p
-        JOIN semesters s ON s.semester_id = p.semester_id
         JOIN faculty f ON f.faculty_id = p.supervisor_id
-        WHERE s.is_active = TRUE
+        WHERE p.semester_id = %s
           AND p.status <> 'archived'
           AND p.final_score IS NOT NULL
+          AND EXISTS (
+                SELECT 1
+                FROM project_members pm
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users us ON us.user_id = st.user_id
+                WHERE pm.project_id = p.project_id
+                  AND us.is_active = TRUE
+          )
         GROUP BY f.specialization
         ORDER BY avg_score DESC
-    """)
+    """, (semester_id,))
     specialization_raw = cursor.fetchall()
 
     spec_labels = {
@@ -122,16 +186,15 @@ def api_dashboard_data():
         for r in specialization_raw
     ]
 
-    # Current coordinator (active semester, any course)
+    # Current coordinator for the same semester used by the statistic cards.
     cursor.execute("""
         SELECT u.full_name AS coordinator_name, u.email AS coordinator_email
         FROM coordinator_assignments ca
-        JOIN semesters s ON s.semester_id = ca.semester_id
         JOIN faculty f ON f.faculty_id = ca.faculty_id
         JOIN users u ON u.user_id = f.user_id
-        WHERE s.is_active = TRUE
+        WHERE ca.semester_id = %s
         LIMIT 1
-    """)
+    """, (semester_id,))
     coordinator = cursor.fetchone() or {}
 
     cursor.close()
@@ -145,6 +208,7 @@ def api_dashboard_data():
         "notifications": notifications,
         "specializations": specializations,
         "coordinator": coordinator,
+        "semester": semester,
     })
 
 

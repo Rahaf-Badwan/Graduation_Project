@@ -4,19 +4,36 @@ document.addEventListener('DOMContentLoaded', function(){
     loadCurrentAnn();
 });
 
+function escapeAnnHtml(value){
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function renderCurrentAnn(ann){
+  var box = document.getElementById('ann-current-info');
+  if(!box || !ann) return;
+
+  var daysLeft = Number(ann.days_left || 0);
+  box.style.display = 'block';
+  box.innerHTML =
+    '<strong>Active announcement:</strong> ' + escapeAnnHtml(ann.message) + '<br>' +
+    '<span style="opacity:.8;">' +
+    '<span class="material-symbols-outlined icon-inline">hourglass_bottom</span> ' +
+    daysLeft + ' day' + (daysLeft !== 1 ? 's' : '') +
+    ' remaining - expires on ' + escapeAnnHtml(ann.expires_at) +
+    '</span>';
+}
+
 async function loadCurrentAnn(){
   try{
     var res = await fetch('/head/api/announcements/active');
     var data = await res.json();
     if(data.announcement){
-      var ann = data.announcement;
-      var box = document.getElementById('ann-current-info');
-      box.style.display = 'block';
-      box.innerHTML = 
-      '<strong>Active:</strong> ' + ann.message + '<br>' + 
-      '<span style="opacity:.8;"> <span class="material-symbols-outlined">hourglass_bottom</span> ' + ann.days_left +
-      ' day' + (ann.days_left !== 1 ? 's' : '') + ' remaining-expires ' +
-      ann.expires_at + '</span>';
+      renderCurrentAnn(data.announcement);
     }
   }catch(e){}
 }
@@ -53,14 +70,19 @@ function closeAnnModal(e){
 async function createAnnModal(){
   hideFeedback_ann();
   var msg = document.getElementById('ann-msg').value.trim();
-  var days = parseInt(document.getElementById('ann-days').value) || 20;
+  var days = parseInt(document.getElementById('ann-days').value, 10);
   if(!msg){
-    showFeedback_ann('Please write a message first.', 'warn');
+    showFeedback_ann('Please write the announcement message before publishing.', 'warn');
+    return;
+  }
+  if(!Number.isFinite(days) || days < 1 || days > 90){
+    showFeedback_ann('Choose a duration between 1 and 90 days.', 'warn');
     return;
   }
 
   var btn = document.querySelector('#ann-overlay .btn.btn-primary');
-  btn.disabled = true; btn.textContent = 'Publishing...';
+  btn.disabled = true;
+  btn.textContent = 'Publishing...';
   
   try{
     var res = await fetch('/head/api/announcements/create', {
@@ -68,29 +90,26 @@ async function createAnnModal(){
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({message: msg, days: days})
     });
-    var data = await res.json();
+    var data = await res.json().catch(function(){ return {}; });
 
     if(res.ok){
       showFeedback_ann(
-        'Published! Expires on' + data.expires_at + '(' + data.days + 'days).',
+        'Announcement published successfully. It will expire on ' + data.expires_at + ' after ' + data.days + ' day' + (data.days !== 1 ? 's' : '') + '.',
         'success'
       );
 
-      //update box
-      var box = document.getElementById('ann-current-info');
-      box.style.display = 'block';
-      box.innerHTML =
-      '<strong>Active:</strong' + ann.msg + '<br>' +
-      '<span style="opacity:.8;"> <span class="material-symbols-outlined icon-inline">hourglass_bottom</span> ' + ann.days_left +
-      'day' + (ann.days_left !== 1 ? 's' : '') + 'remaining-expires' +
-      ann.expires_at + '</span>';
+      renderCurrentAnn({
+        message: msg,
+        days_left: data.days,
+        expires_at: data.expires_at
+      });
 
       document.getElementById('ann-msg').value = '';
     }else{
-      showFeedback_ann(data.error || 'Something went wrong.', 'error');
+      showFeedback_ann(data.error || 'The announcement could not be published. Please review the details and try again.', 'error');
     }
   }catch(e){
-    showFeedback_ann('Could not reach the server.', 'error');
+    showFeedback_ann('Unable to publish the announcement right now. Please check your connection and try again.', 'error');
   }finally{
     btn.disabled = false; 
     btn.innerHTML = 'Publish &#x2197;';
@@ -113,7 +132,7 @@ function showFeedback_ann(msg, type){
   el.style.fontSize ='13px';
   el.style.color = s.color;
   el.style.background = s.bg;
-  el.style.border = '0.5px solid' + s.border;
+  el.style.border = '0.5px solid ' + s.border;
   el.textContent = msg;
   clearTimeout(el._t);
   el._t = setTimeout(hideFeedback_ann, 5000);
