@@ -78,7 +78,7 @@ function renderSelectedYear() {
 
 function renderDoctorList(year, coordinator) {
   const doctorList = document.getElementById('doctorList');
-  const counts = assignState.projectCountsByYear[year] || {};
+  const counts = mergedProjectCountsForYear(year);
   doctorList.innerHTML = '';
 
   if (!assignState.doctors.length) {
@@ -177,7 +177,7 @@ function assignCoordinator(facultyId) {
         showToast(data.error || 'Coordinator assignment failed.', 'error');
         return;
       }
-      showToast('Coordinator assigned to COMP4200 and COMP4300 successfully.', 'success');
+      showToast('Coordinator assigned successfully.', 'success');
       return loadAssignCoordinatorPage(academicYear);
     })
     .catch(() => showToast('Something went wrong.', 'error'))
@@ -187,6 +187,24 @@ function assignCoordinator(facultyId) {
 function updateCoordinatorUI(coordinator) {
   document.getElementById('coordinator').innerText =
     coordinator ? coordinator.full_name : 'None';
+}
+
+function mergedProjectCountsForYear(year) {
+  const counts = assignState.projectCountsByYear[year] || {};
+  const merged = {};
+
+  Object.entries(counts).forEach(([key, value]) => {
+    if (value && typeof value === 'object') {
+      Object.entries(value).forEach(([facultyId, count]) => {
+        merged[facultyId] = (merged[facultyId] || 0) + Number(count || 0);
+      });
+      return;
+    }
+
+    merged[key] = (merged[key] || 0) + Number(value || 0);
+  });
+
+  return merged;
 }
 
 function showToast(message, type = 'success') {

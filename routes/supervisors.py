@@ -44,6 +44,38 @@ def _current_supervisor_semester(cursor):
     return cursor.fetchone()
 
 
+def _supervisor_semester_ids(cursor, semester):
+    if not semester:
+        return []
+
+    cursor.execute("""
+        SELECT semester_id
+        FROM semesters
+        WHERE academic_year = %s
+          AND course_code IN ('COMP4200', 'COMP4300')
+        ORDER BY semester_id
+    """, (semester["academic_year"],))
+    rows = cursor.fetchall()
+    semester_ids = [row["semester_id"] for row in rows]
+    return semester_ids or [semester["semester_id"]]
+
+
+def _supervisor_account_stats(cursor):
+    cursor.execute("""
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN u.is_active = FALSE THEN 1 ELSE 0 END) AS pending
+        FROM users u
+        JOIN faculty f ON f.user_id = u.user_id
+        WHERE u.role = 'supervisor'
+    """)
+    row = cursor.fetchone() or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "pending": int(row.get("pending") or 0),
+    }
+
+
 # ─────────────────────────────────────────────────────────────
 #  GET /api/head/supervisors
 # ─────────────────────────────────────────────────────────────
@@ -54,23 +86,25 @@ def api_list_supervisors():
         db     = get_db()
         cursor = db.cursor(dictionary=True)
         semester = _current_supervisor_semester(cursor)
-        semester_id = semester["semester_id"] if semester else None
+        semester_ids = _supervisor_semester_ids(cursor, semester)
+        account_stats = _supervisor_account_stats(cursor)
 
-        if not semester_id:
+        if not semester_ids:
             cursor.close()
             db.close()
             return jsonify({
                 'supervisors': [],
                 'stats': {
-                    'total': 0,
+                    'total': account_stats['total'],
                     'active': 0,
-                    'pending': 0,
+                    'pending': account_stats['pending'],
                     'projects': 0,
                 },
                 'semester': None,
             }), 200
 
-        cursor.execute("""
+        semester_placeholders = ",".join(["%s"] * len(semester_ids))
+        cursor.execute(f"""
            SELECT
                 u.user_id,
                 u.full_name,
@@ -78,12 +112,12 @@ def api_list_supervisors():
                 u.email,
                 u.is_active,
                 f.specialization,
-                COUNT(gp.project_id) AS project_count
+                COUNT(DISTINCT gp.project_id) AS project_count
             FROM  users u
             JOIN  faculty f ON f.user_id = u.user_id
             LEFT  JOIN projects gp
                 ON gp.supervisor_id = f.faculty_id
-               AND gp.semester_id = %s
+               AND gp.semester_id IN ({semester_placeholders})
                AND gp.status <> 'archived'
                AND EXISTS (
                     SELECT 1
@@ -100,9 +134,9 @@ def api_list_supervisors():
                 u.user_id, u.full_name, u.university_id,
                 u.email,   u.is_active,
                 f.specialization
-			HAVING COUNT(gp.project_id) > 0
+            HAVING COUNT(DISTINCT gp.project_id) > 0
             ORDER BY u.full_name
-        """, (semester_id,))
+        """, tuple(semester_ids))
         rows = cursor.fetchall()
         cursor.close()
         db.close()
@@ -117,9 +151,9 @@ def api_list_supervisors():
             'project_count':            int(r['project_count']),
         } for r in rows]
 
-        total    = len(supervisors)
-        active   = sum(1 for s in supervisors if s['is_active'])
-        pending  = total - active
+        total    = account_stats['total']
+        active   = len(supervisors)
+        pending  = account_stats['pending']
         projects = sum(s['project_count'] for s in supervisors)
 
         return jsonify({
