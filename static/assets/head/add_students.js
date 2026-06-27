@@ -112,8 +112,8 @@ async function addStudent(){
     var data = await res.json();
 
     if(res.ok){
-      showFeedback('Student added successfully. Status: Pending', 'success');
-      clearForm();
+      clearForm(false);
+      showFeedback(data.message || 'تم إضافة الطالب بنجاح. حالة الحساب: بانتظار التفعيل.', 'success');
       loadStudents();
     }else{
       showFeedback(data.error || 'Something went wrong.', 'error');
@@ -127,7 +127,9 @@ async function addStudent(){
 }
 
 /*clear the form */
-function clearForm(){
+function clearForm(hideMessage){
+  if(hideMessage === undefined) hideMessage = true;
+
   ['fullName', 'universityId'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.value = '';
@@ -135,7 +137,7 @@ function clearForm(){
 
   var textarea = document.querySelector('.field-textarea');
   if(textarea) textarea.value = '';
-  hideFeedback();
+  if(hideMessage) hideFeedback();
 }
 
 /*feedback to head of department to know if the student add or any something happen */

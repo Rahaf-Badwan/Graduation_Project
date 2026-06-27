@@ -132,7 +132,7 @@ def api_student_registration_check():
             FROM project_members pm
             JOIN students st ON st.student_id = pm.student_id
             JOIN projects p  ON p.project_id  = pm.project_id
-            JOIN semesters s ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            JOIN semesters s ON s.semester_id  = p.semester_id
             LEFT JOIN faculty f1  ON f1.faculty_id = p.preferred_supervisor_1
             LEFT JOIN users pref1 ON pref1.user_id = f1.user_id
             LEFT JOIN faculty f2  ON f2.faculty_id = p.preferred_supervisor_2
@@ -335,7 +335,7 @@ def api_student_distribution_submit():
                 JOIN students st ON st.student_id = pm.student_id
                 JOIN users u     ON u.user_id      = st.user_id
                 JOIN projects p  ON p.project_id   = pm.project_id
-                JOIN semesters s ON s.semester_id   = p.semester_id AND s.is_active = TRUE
+                JOIN semesters s ON s.semester_id   = p.semester_id
                 WHERE u.university_id = %s
                   AND p.semester_id = %s
                 LIMIT 1

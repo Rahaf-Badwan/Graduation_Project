@@ -1,6 +1,7 @@
 """Shared helpers for student-facing routes."""
 
 from db import get_db
+from semester_lifecycle import auto_rollover_semesters
 
 
 ALLOWED_EXTENSIONS = {
@@ -518,16 +519,82 @@ def _student_intro_timeline_tables_ready(cursor):
     return int((cursor.fetchone() or {}).get("cnt") or 0) == 2
 
 
-def _student_active_semester(cursor):
-    cursor.execute("""
-        SELECT semester_id, academic_year, semester_number
+def _student_semester_for_course(cursor, course_code, include_distribution=False):
+    try:
+        auto_rollover_semesters(cursor)
+    except Exception:
+        pass
+
+    has_start_date = _db_column_exists_student(cursor, "semesters", "start_date")
+    has_end_date = _db_column_exists_student(cursor, "semesters", "end_date")
+    fields = ["semester_id", "academic_year", "semester_number", "course_code"]
+    if has_start_date:
+        fields.append("start_date")
+    if has_end_date:
+        fields.append("end_date")
+    if include_distribution:
+        fields.append(
+            "COALESCE(distribution_open, 0) AS distribution_open"
+            if _db_column_exists_student(cursor, "semesters", "distribution_open")
+            else "0 AS distribution_open"
+        )
+        fields.append(
+            "distribution_opened_at"
+            if _db_column_exists_student(cursor, "semesters", "distribution_opened_at")
+            else "NULL AS distribution_opened_at"
+        )
+        fields.append(
+            "distribution_closed_at"
+            if _db_column_exists_student(cursor, "semesters", "distribution_closed_at")
+            else "NULL AS distribution_closed_at"
+        )
+        fields.append(
+            "distribution_close_at"
+            if _db_column_exists_student(cursor, "semesters", "distribution_close_at")
+            else "NULL AS distribution_close_at"
+        )
+    semester_order = (
+        "start_date DESC, semester_id DESC" if has_start_date else "semester_id DESC"
+    )
+
+    cursor.execute(f"""
+        SELECT {', '.join(fields)}
         FROM semesters
         WHERE is_active = TRUE
-          AND course_code = 'COMP4200'
-        ORDER BY semester_id DESC
+          AND course_code = %s
+        ORDER BY {semester_order}
         LIMIT 1
-        """)
+        """, (course_code,))
+    row = cursor.fetchone()
+    if row:
+        return row
+
+    if has_start_date and has_end_date:
+        cursor.execute(f"""
+            SELECT {', '.join(fields)}
+            FROM semesters
+            WHERE course_code = %s
+              AND (start_date IS NULL OR start_date <= CURDATE())
+              AND (end_date IS NULL OR end_date >= CURDATE())
+            ORDER BY {semester_order}
+            LIMIT 1
+            """, (course_code,))
+        row = cursor.fetchone()
+        if row:
+            return row
+
+    cursor.execute(f"""
+        SELECT {', '.join(fields)}
+        FROM semesters
+        WHERE course_code = %s
+        ORDER BY {semester_order}
+        LIMIT 1
+        """, (course_code,))
     return cursor.fetchone()
+
+
+def _student_active_semester(cursor):
+    return _student_semester_for_course(cursor, "COMP4200")
 
 
 def _target_semester_for_submission(cursor, student_id, timeline_item_id=None):
@@ -568,16 +635,7 @@ def _target_semester_for_submission(cursor, student_id, timeline_item_id=None):
         if promoted_semester:
             return promoted_semester, target_course, course_status
 
-    cursor.execute(
-        """
-        SELECT semester_id, academic_year, course_code, start_date, end_date
-        FROM semesters
-        WHERE is_active = TRUE AND course_code = %s
-        ORDER BY semester_id DESC LIMIT 1
-        """,
-        (target_course,),
-    )
-    return cursor.fetchone(), target_course, course_status
+    return _student_semester_for_course(cursor, target_course), target_course, course_status
 
 
 def _student_published_intro_timeline(cursor):
@@ -799,17 +857,7 @@ def _student_final_submission_window(cursor, student_id):
 
     course_context = _student_course_context_for_id(cursor, student_id)
     target_course = course_context["target_course"]
-    cursor.execute(
-        """
-        SELECT semester_id
-        FROM semesters
-        WHERE is_active = TRUE AND course_code = %s
-        ORDER BY semester_id DESC
-        LIMIT 1
-        """,
-        (target_course,),
-    )
-    semester = cursor.fetchone() or {}
+    semester = _student_semester_for_course(cursor, target_course) or {}
 
     if target_course == "COMP4300":
         window = _comp4300_final_submission_window(cursor, semester.get("semester_id"))
@@ -1220,7 +1268,14 @@ def _sync_final_report_timeline_submission(
 
 def _get_active_semester_st(cursor):
     """Local copy of _get_active_semester for student blueprint."""
+    try:
+        auto_rollover_semesters(cursor)
+    except Exception:
+        pass
+
     has_course_code = _db_column_exists_student(cursor, "semesters", "course_code")
+    has_start_date = _db_column_exists_student(cursor, "semesters", "start_date")
+    has_end_date = _db_column_exists_student(cursor, "semesters", "end_date")
     fields = ["semester_id", "academic_year", "semester_number"]
     fields.append("course_code" if has_course_code else "'COMP4200' AS course_code")
     fields.append(
@@ -1243,6 +1298,9 @@ def _get_active_semester_st(cursor):
         if _db_column_exists_student(cursor, "semesters", "distribution_close_at")
         else "NULL AS distribution_close_at"
     )
+    semester_order = (
+        "start_date DESC, semester_id DESC" if has_start_date else "semester_id DESC"
+    )
 
     where = "is_active = TRUE"
     params = []
@@ -1254,10 +1312,38 @@ def _get_active_semester_st(cursor):
         SELECT {', '.join(fields)}
         FROM semesters
         WHERE {where}
-        ORDER BY semester_id DESC
+        ORDER BY {semester_order}
         LIMIT 1
     """, tuple(params))
-    return cursor.fetchone()
+    semester = cursor.fetchone()
+    if semester:
+        return semester
+
+    if has_course_code and has_start_date and has_end_date:
+        cursor.execute(f"""
+            SELECT {', '.join(fields)}
+            FROM semesters
+            WHERE course_code = %s
+              AND (start_date IS NULL OR start_date <= CURDATE())
+              AND (end_date IS NULL OR end_date >= CURDATE())
+            ORDER BY {semester_order}
+            LIMIT 1
+        """, ("COMP4200",))
+        semester = cursor.fetchone()
+        if semester:
+            return semester
+
+    if has_course_code:
+        cursor.execute(f"""
+            SELECT {', '.join(fields)}
+            FROM semesters
+            WHERE course_code = %s
+            ORDER BY {semester_order}
+            LIMIT 1
+        """, ("COMP4200",))
+        return cursor.fetchone()
+
+    return None
 
 
 def _sync_lifecycle(cursor, project_id):
@@ -1555,6 +1641,7 @@ __all__ = [
     "_student_intro_section",
     "_notify_intro_section_team",
     "_student_intro_timeline_tables_ready",
+    "_student_semester_for_course",
     "_student_active_semester",
     "_target_semester_for_submission",
     "_student_published_intro_timeline",

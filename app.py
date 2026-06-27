@@ -34,7 +34,12 @@ from routes.appCoordinator import coordinator_bp
 from ai_engine import ask_apms_ai, get_ai_health, get_archived_projects
 from activate_student import activate_bp
 from announcements import announcements_bp
-from routes.general_supervisors import general_supervisors_bp, supervisor_api_bp
+from routes.general_supervisors import (
+    general_supervisors_bp,
+    supervisor_api_bp,
+    _current_supervisor_faculty_id,
+    _supervisor_all_project_hours,
+)
 from routes.supervisor_progress_submitted_api import supervisor_progress_api_bp
 from routes.supervisor_mystudents import supervisor_mystudents_bp
 from routes.supervisor_dashboard import supervisor_dashboard_bp
@@ -109,6 +114,61 @@ app.register_blueprint(supervisor_mystudents_bp)
 app.register_blueprint(supervisor_dashboard_bp)
 app.register_blueprint(supervisor_grades_bp)
 app.register_blueprint(head_grades_bp)
+
+
+def _supervisor_project_hours_complete():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        faculty_id = _current_supervisor_faculty_id(cursor)
+        if not faculty_id:
+            return True
+
+        hours, semesters = _supervisor_all_project_hours(cursor, faculty_id)
+        db.commit()
+
+        required_scopes = [
+            scope for scope in ("introduction", "graduation_project")
+            if semesters.get(scope)
+        ]
+        if not required_scopes:
+            return True
+
+        return all((hours.get(scope) or {}).get("submitted") for scope in required_scopes)
+    except Exception:
+        return True
+    finally:
+        cursor.close()
+        db.close()
+
+
+@app.before_request
+def require_supervisor_project_hours():
+    if session.get("role") != "supervisor":
+        return None
+
+    path = request.path or ""
+    if not path.startswith("/supervisor"):
+        return None
+
+    allowed_prefixes = (
+        "/supervisor/hours",
+        "/supervisor/api/project-hours",
+        "/supervisor/api/graduation-hours",
+    )
+    if path.startswith(allowed_prefixes):
+        return None
+
+    if _supervisor_project_hours_complete():
+        return None
+
+    if path.startswith("/supervisor/api/"):
+        return jsonify({
+            "error": "Please submit your COMP4200 and COMP4300 project hours first.",
+            "redirect": "/supervisor/hours",
+        }), 403
+
+    return redirect("/supervisor/hours")
 # ─── Helpers ─────────────────────────────────────────────────────────────
 def _get_active_semester(cursor):
     cursor.execute("""

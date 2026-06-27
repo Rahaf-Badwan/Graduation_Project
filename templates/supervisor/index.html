@@ -50,6 +50,10 @@
             {% set card_class = 'student-card good' %}
             {% set pill_class = 'p-review' %}
             {% set pill_text  = 'Under review' %}
+          {% elif p.status == 'submitted' or p.has_final_report %}
+            {% set card_class = 'student-card good' %}
+            {% set pill_class = 'p-accepted' %}
+            {% set pill_text  = 'Submitted' %}
           {% elif p.status == 'needs_revision' %}
             {% set card_class = 'student-card normal' %}
             {% set pill_class = 'p-late' %}
@@ -79,11 +83,11 @@
             <div class="prog-wrap" style="margin:0">
               <div class="prog-label">
                 <span>Project progress</span>
-                <span>{{ p.overall_progress }}%</span>
+                <span>{{ p.overall_progress|int }}%</span>
               </div>
               <div class="prog-bg">
                 <div class="prog-fill"
-                     style="width:{{ p.overall_progress }}%;background:var(--sup-mid)"></div>
+                     style="width:{{ p.overall_progress|int }}%;background:var(--sup-mid)"></div>
               </div>
             </div>
             {% if p.urgency == 'urgent' and p.last_note %}
@@ -113,6 +117,11 @@
             {% set date_color= 'var(--coral)' %}
             {% set pill_cls  = 'p-late' %}
             {% set pill_lbl  = 'Today' %}
+          {% elif d.days_left < 0 %}
+            {% set row_bg    = '#f8fafc' %}
+            {% set date_color= 'var(--color-text-secondary)' %}
+            {% set pill_cls  = 'p-late' %}
+            {% set pill_lbl  = 'Past' %}
           {% elif d.days_left <= 7 %}
             {% set row_bg    = 'var(--sup-light)' %}
             {% set date_color= 'var(--sup)' %}
@@ -142,7 +151,7 @@
         {% endfor %}
       {% else %}
         <div style="text-align:center;padding:20px;color:var(--color-text-secondary);font-size:13px">
-          No upcoming deadlines.
+          No dates for this semester.
         </div>
       {% endif %}
     </div>
@@ -174,7 +183,7 @@
       </div>
       <div class="prog-wrap">
         <div class="prog-label">
-          <span>Projects in progress</span><span>{{ progress_pct }}%</span>
+          <span>Overall project progress</span><span>{{ progress_pct }}%</span>
         </div>
         <div class="prog-bg">
           <div class="prog-fill" style="width:{{ progress_pct }}%;background:var(--green)"></div>

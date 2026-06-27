@@ -302,11 +302,13 @@ function renderSupervisorOptions(professors) {
     const wantedHours = Number(prof.wanted_hours || prof.graduation_project_hours || prof.project_hours || 0);
     const usedHours = Number(prof.used_hours || prof.current_hours || prof.assigned_hours || 0);
     const remainingHours = Math.max(0, Number(prof.remaining_hours ?? (wantedHours - usedHours)));
+    const hoursSubmitted = Boolean(prof.hours_submitted || prof.project_hours_submitted || prof.graduation_hours_submitted);
     opt.value = prof.faculty_id;
     opt.dataset.remainingHours = String(remainingHours);
     opt.dataset.wantedHours = String(wantedHours);
     opt.dataset.usedHours = String(usedHours);
-    if (wantedHours <= 0) {
+    opt.dataset.hoursSubmitted = hoursSubmitted ? '1' : '0';
+    if (!hoursSubmitted) {
       opt.textContent = `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`;
       opt.disabled = true;
       opt.title = 'This doctor has not submitted project hours.';
@@ -327,7 +329,8 @@ function updateSectionSupervisorAvailability(selectedCount) {
     if (index === 0) return;
     const remainingHours = Number(option.dataset.remainingHours || 0);
     const wantedHours = Number(option.dataset.wantedHours || 0);
-    option.disabled = wantedHours <= 0 || remainingHours < requiredHours;
+    const hoursSubmitted = option.dataset.hoursSubmitted === '1';
+    option.disabled = !hoursSubmitted || wantedHours <= 0 || remainingHours < requiredHours;
   });
 
   if (select.selectedOptions[0]?.disabled) {
@@ -358,9 +361,10 @@ function renderForms(forms, professors) {
         const wantedHours = Number(prof.wanted_hours || prof.graduation_project_hours || prof.project_hours || 0);
         const usedHours = Number(prof.used_hours || prof.current_hours || prof.assigned_hours || 0);
         const remainingHours = Math.max(0, Number(prof.remaining_hours ?? (wantedHours - usedHours)));
+        const hoursSubmitted = Boolean(prof.hours_submitted || prof.project_hours_submitted || prof.graduation_hours_submitted);
         const requiredHours = Math.max(Number(form.member_count || 1), 1) * 0.5;
-        const disabled = wantedHours <= 0 || remainingHours < requiredHours ? 'disabled' : '';
-        const label = wantedHours <= 0
+        const disabled = !hoursSubmitted || wantedHours <= 0 || remainingHours < requiredHours ? 'disabled' : '';
+        const label = !hoursSubmitted
           ? `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`
           : `${prof.full_name} — wants ${wantedHours.toFixed(1)} project hours / remaining ${remainingHours.toFixed(1)}`;
         return `<option value="${prof.faculty_id}" ${selected} ${disabled}>${escapeHtml(label)}</option>`;

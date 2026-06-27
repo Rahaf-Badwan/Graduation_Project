@@ -39,7 +39,7 @@ def api_supervisor_my_grades():
             efr.final_score,
             efr.workflow_status,
             efr.course_scope,
-            sec.section_name AS project_title,
+            COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS project_title,
             GROUP_CONCAT(
                 DISTINCT u.full_name
                 ORDER BY u.full_name
@@ -49,13 +49,15 @@ def api_supervisor_my_grades():
         JOIN student_distribution_sections sec
           ON sec.section_id = efr.reference_id
          AND efr.course_scope = 'introduction'
+        LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+        LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
         LEFT JOIN section_students ss ON ss.section_id = sec.section_id
         LEFT JOIN students st ON st.student_id = ss.student_id
         LEFT JOIN users u ON u.user_id = st.user_id
         WHERE sec.supervisor_id = %s
           AND efr.workflow_status IN ('sent_to_supervisor', 'sent_to_head', 'published_to_students')
         GROUP BY efr.result_id, efr.final_score, efr.workflow_status,
-                 efr.course_scope, sec.section_name
+                 efr.course_scope, sec.section_name, p_intro.title
     """, (faculty_id,))
     grades = cursor.fetchall()
 

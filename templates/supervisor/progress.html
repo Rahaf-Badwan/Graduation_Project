@@ -497,6 +497,17 @@ function showSupervisorExamSection(mode, button) {
   document.addEventListener('DOMContentLoaded', () => {
     loadTimeline('introduction');
     loadTimeline('graduation_project');
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = (params.get('tab') || '').toLowerCase();
+    if (requestedTab === 'submissions' || requestedTab === 'student_submissions') {
+      const submissionsTab = Array.from(document.querySelectorAll('#pg-supervisor-submissions .exam-tab'))
+        .find(tab => tab.textContent.includes('Student Submissions'));
+      if (submissionsTab) showSupervisorExamSection('submissions', submissionsTab);
+    } else if (requestedTab === 'graduation' || requestedTab === 'grad') {
+      const graduationTab = Array.from(document.querySelectorAll('#pg-supervisor-submissions .exam-tab'))
+        .find(tab => tab.textContent.includes('COMP4300'));
+      if (graduationTab) showSupervisorExamSection('graduation', graduationTab);
+    }
   });
 })();
 
@@ -712,6 +723,15 @@ function showSupervisorExamSection(mode, button) {
       }
 
       submissionFilesState = data.files || [];
+      const params = new URLSearchParams(window.location.search);
+      const projectId = params.get('project_id');
+      if (projectId) {
+        const projectFile = submissionFilesState.find(file => String(file.project_id || '') === String(projectId));
+        const search = document.getElementById('submissionSearch');
+        if (projectFile && search && !search.value) {
+          search.value = projectFile.project_title || projectFile.team_members || projectFile.submitted_by || '';
+        }
+      }
       renderSupervisorSubmissionFiles();
     } catch (err) {
       submissionFilesState = [];

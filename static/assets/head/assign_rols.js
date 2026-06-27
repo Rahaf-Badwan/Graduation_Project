@@ -239,7 +239,8 @@ function escapeHtml(value) {
 function openAcademicYearModal() {
   const modal = document.getElementById('academicYearModal');
   modal.style.display = 'flex';
-  document.getElementById('newAcademicYear').value = '';
+  document.getElementById('academicYearStart').value = '';
+  document.getElementById('academicYearEnd').value = '';
   document.getElementById('semesterStart').value = '';
   document.getElementById('semesterEnd').value = '';
   document.getElementById('setActiveYear').checked = false;
@@ -255,8 +256,14 @@ async function createAcademicYear() {
   const btn = document.getElementById('createAcademicYearBtn');
   errorEl.textContent = '';
 
+  const academicYear = readAcademicYearFromFields();
+  if (!academicYear) {
+    errorEl.textContent = 'Please enter a valid academic year, for example 2026 - 2027.';
+    return;
+  }
+
   const payload = {
-    academic_year: document.getElementById('newAcademicYear').value.trim(),
+    academic_year: academicYear,
     semester_start: document.getElementById('semesterStart').value,
     semester_end: document.getElementById('semesterEnd').value,
     set_active: document.getElementById('setActiveYear').checked,
@@ -297,4 +304,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.target === this) closeAcademicYearModal();
     });
   }
+
+  const startYear = document.getElementById('academicYearStart');
+  const endYear = document.getElementById('academicYearEnd');
+  if (startYear && endYear) {
+    startYear.addEventListener('input', () => {
+      startYear.value = startYear.value.replace(/\D/g, '').slice(0, 4);
+      if (startYear.value.length === 4) {
+        endYear.value = String(Number(startYear.value) + 1);
+      }
+    });
+    endYear.addEventListener('input', () => {
+      endYear.value = endYear.value.replace(/\D/g, '').slice(0, 4);
+    });
+  }
 });
+
+function readAcademicYearFromFields() {
+  const start = document.getElementById('academicYearStart').value.trim();
+  const end = document.getElementById('academicYearEnd').value.trim();
+  if (!/^\d{4}$/.test(start) || !/^\d{4}$/.test(end)) return '';
+  if (Number(end) !== Number(start) + 1) return '';
+  return `${start}/${end}`;
+}

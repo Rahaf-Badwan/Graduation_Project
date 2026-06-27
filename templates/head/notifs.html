@@ -26,10 +26,12 @@
   .sn-body { padding:18px 22px }
   .sn-head-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end }
   .sn-form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+  .sn-form-row>*, .sn-field { min-width:0 }
   @media(max-width:700px) { .sn-form-row { grid-template-columns:1fr } .sn-card-hd { align-items:flex-start; flex-direction:column } .sn-head-actions { width:100%; justify-content:space-between } }
   .sn-field { display:flex; flex-direction:column; gap:7px; margin-bottom:13px }
   .sn-field label { font-size:13px; font-weight:800; color:var(--color-text-primary) }
-  .sn-field input, .sn-field select, .sn-field textarea { border:1px solid #d8e2dc; border-radius:14px; padding:11px 13px; font-size:14px; background:var(--color-background-primary); outline:none; font-family:inherit; transition:border-color .15s,box-shadow .15s,background .15s }
+  .sn-field input, .sn-field select, .sn-field textarea { border:1px solid #d8e2dc; border-radius:14px; padding:11px 13px; font-size:14px; background:var(--color-background-primary); outline:none; font-family:inherit; box-sizing:border-box; max-width:100%; min-width:0; transition:border-color .15s,box-shadow .15s,background .15s }
+  .sn-course-lock { border:1px solid #cfe0d4; border-radius:14px; padding:11px 13px; font-size:14px; font-weight:800; color:var(--sn-green); background:var(--green-light) }
   .sn-field textarea { min-height:118px; resize:vertical; line-height:1.55 }
   .sn-field input:focus, .sn-field select:focus, .sn-field textarea:focus { border-color:var(--sn-green); box-shadow:0 0 0 4px rgba(31,122,59,.12); background:var(--color-background-primary) }
   .sn-file-zone { border:2px dashed #c9ddcf; border-radius:14px; padding:15px; text-align:center; cursor:pointer; transition:border-color .15s,background .15s,transform .15s; background:var(--color-background-tertiary); position:relative }
@@ -73,7 +75,8 @@
   .sn-compose-drawer { position:fixed; top:0; right:0; bottom:0; width:min(520px,94vw); background:var(--color-background-primary); z-index:190; box-shadow:-18px 0 44px rgba(15,23,42,.18); transform:translateX(105%); transition:transform .24s ease; border-radius:22px 0 0 22px; display:flex; flex-direction:column; overflow:hidden }
   .sn-compose-drawer.open { transform:translateX(0) }
   .sn-compose-drawer .sn-card { height:100%; border:0; border-radius:0; box-shadow:none; display:flex; flex-direction:column }
-  .sn-compose-drawer .sn-body { overflow:auto; flex:1; padding-bottom:28px }
+  .sn-compose-drawer .sn-body { overflow-y:auto; overflow-x:hidden; flex:1; padding-bottom:28px }
+  .sn-compose-drawer .sn-form-row { grid-template-columns:1fr }
   .sn-drawer-close { width:36px; height:36px; border-radius:999px; border:1px solid #d8e2dc; background:var(--color-background-tertiary); color:var(--green); font-size:21px; line-height:1; cursor:pointer; font-weight:800 }
   .sn-fab { position:fixed; right:28px; bottom:28px; z-index:160; width:58px; height:58px; border-radius:999px; border:0; background:var(--sn-green); color:#fff; font-size:24px; box-shadow:0 14px 30px rgba(31,122,59,.30); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .15s,box-shadow .15s,opacity .15s }
   .sn-fab:hover { transform:translateY(-2px) scale(1.03); box-shadow:0 18px 36px rgba(31,122,59,.34) }
@@ -259,6 +262,8 @@
                 <option value="doctor">{{ t['head']['one_doctor'] }}</option>
                 <option value="section">{{ t['head']['one_section'] }}</option>
                 <option value="students">{{ t['head']['all_students'] }}</option>
+                <option value="comp4200_students">All COMP4200 Students</option>
+                <option value="comp4300_students">All COMP4300 Students</option>
                 <option value="student">{{ t['head']['one_student'] }}</option>
                 <option value="all_users">{{ t['head']['all_users'] }}</option>
               </select>
@@ -275,6 +280,7 @@
               <option value="graduation_project">{{ t['head']['notice_comp4300'] }}</option>
               <option value="both">{{ t['head']['notice_both'] }}</option>
             </select>
+            <div class="sn-course-lock" id="snCourseLocked" style="display:none"></div>
           </div>
           <div class="sn-field">
             <label for="snTitle">{{ t['head']['msg_title'] }}</label>
@@ -465,6 +471,143 @@
       if (['coordinator', 'doctor', 'student', 'section'].includes(scope)) { select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>'); wrap.style.display = 'flex'; } else { wrap.style.display = 'none'; }
     }
 
+    function normalizeCourseScope(row) {
+      if (!row) return 'both';
+      const scope = String(row.course_scope || '').trim();
+      if (['introduction', 'graduation_project', 'both'].includes(scope)) return scope;
+      const code = String(row.course_code || '').trim().toUpperCase();
+      if (code === 'COMP4200') return 'introduction';
+      if (code === 'COMP4300') return 'graduation_project';
+      const key = String(row.section_key || '').trim();
+      if (key.startsWith('s:')) return 'introduction';
+      if (key.startsWith('p:')) return 'graduation_project';
+      return 'both';
+    }
+
+    function optionCourseLabel(row) {
+      const scope = normalizeCourseScope(row);
+      return row.course_code || (scope === 'graduation_project' ? 'COMP4300' : scope === 'introduction' ? 'COMP4200' : 'Both');
+    }
+
+    function courseScopeText(scope) {
+      if (scope === 'introduction') return 'Project Introduction / COMP4200';
+      if (scope === 'graduation_project') return 'Graduation Project / COMP4300';
+      return 'Both Courses';
+    }
+
+    function sendScopeNeedsCourse(scope) {
+      return ['students', 'all_students', 'student', 'section', 'all_sections'].includes(scope);
+    }
+
+    function selectedSpecificCourseScope() {
+      const select = $('snSpecific');
+      if (!select || !select.selectedOptions || !select.selectedOptions.length) return '';
+      const scope = select.selectedOptions[0].dataset.courseScope || '';
+      return ['introduction', 'graduation_project', 'both'].includes(scope) ? scope : '';
+    }
+
+    function courseScopeForSend() {
+      const scope = $('snScope').value;
+      if (scope === 'comp4200_students') return 'introduction';
+      if (scope === 'comp4300_students') return 'graduation_project';
+      if (['coordinator', 'student', 'section'].includes(scope)) return selectedSpecificCourseScope() || $('snCourseScope').value || 'both';
+      if (sendScopeNeedsCourse(scope)) return $('snCourseScope').value || 'both';
+      return 'both';
+    }
+
+    function setCourseScopeMode() {
+      const scope = $('snScope').value;
+      const select = $('snCourseScope');
+      const locked = $('snCourseLocked');
+      const specificScope = selectedSpecificCourseScope();
+      const shouldLock = ['coordinator', 'student', 'section'].includes(scope) && specificScope;
+      if (!select || !locked) return;
+      if (shouldLock) {
+        select.value = specificScope;
+        select.style.display = 'none';
+        locked.textContent = courseScopeText(specificScope);
+        locked.style.display = 'block';
+      } else {
+        select.style.display = '';
+        locked.style.display = 'none';
+        locked.textContent = '';
+      }
+    }
+
+    function toggleCourseScopeField() {
+      const scope = $('snScope').value;
+      const wrap = $('courseScopeWrap');
+      const select = $('snCourseScope');
+      if (!wrap || !select) return;
+      if (sendScopeNeedsCourse(scope)) {
+        wrap.style.display = 'flex';
+      } else {
+        wrap.style.display = 'none';
+        select.value = scope === 'comp4200_students' ? 'introduction' : scope === 'comp4300_students' ? 'graduation_project' : 'both';
+        const locked = $('snCourseLocked');
+        if (locked) {
+          locked.style.display = 'none';
+          locked.textContent = '';
+        }
+      }
+    }
+
+    function filterByCourse(rows) {
+      const selected = courseScopeForSend();
+      if (selected === 'both') return rows || [];
+      return (rows || []).filter(row => {
+        const rowScope = normalizeCourseScope(row);
+        return rowScope === selected || rowScope === 'both';
+      });
+    }
+
+    function updateSpecificWrap() {
+      toggleCourseScopeField();
+      const scope = $('snScope').value;
+      const selectedCourse = courseScopeForSend();
+      const wrap = $('snSpecificWrap');
+      const select = $('snSpecific');
+      select.innerHTML = '';
+      let rows = [], placeholder = 'Choose...';
+
+      if (scope === 'coordinator') {
+        rows = filterByCourse(state.options.coordinators || []);
+        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 coordinator...' : selectedCourse === 'introduction' ? 'Choose COMP4200 coordinator...' : 'Choose coordinator...';
+        rows.forEach(c => {
+          const rowScope = normalizeCourseScope(c);
+          select.insertAdjacentHTML('beforeend', '<option value="' + esc(c.user_id) + '" data-course-scope="' + esc(rowScope) + '">' + esc(c.full_name) + ' - ' + esc(optionCourseLabel(c)) + '</option>');
+        });
+      } else if (scope === 'doctor') {
+        rows = state.options.doctors || [];
+        placeholder = 'Choose doctor...';
+        rows.forEach(d => select.insertAdjacentHTML('beforeend', '<option value="' + esc(d.faculty_id) + '">' + esc(d.full_name) + ' - ' + esc(d.university_id || '') + '</option>'));
+      } else if (scope === 'student') {
+        rows = filterByCourse(state.options.students || []);
+        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 student...' : selectedCourse === 'introduction' ? 'Choose COMP4200 student...' : 'Choose student...';
+        rows.forEach(s => {
+          const rowScope = normalizeCourseScope(s);
+          select.insertAdjacentHTML('beforeend', '<option value="' + esc(s.student_id) + '" data-course-scope="' + esc(rowScope) + '">' + esc(s.full_name) + ' - ' + esc(s.university_id || '') + ' - ' + esc(optionCourseLabel(s)) + '</option>');
+        });
+      } else if (scope === 'section') {
+        rows = filterByCourse(state.options.sections || []);
+        placeholder = selectedCourse === 'graduation_project' ? 'Choose COMP4300 project...' : selectedCourse === 'introduction' ? 'Choose COMP4200 section...' : 'Choose section/project...';
+        rows.forEach(sec => {
+          const rowScope = normalizeCourseScope(sec);
+          select.insertAdjacentHTML('beforeend', '<option value="' + esc(sec.section_key || sec.section_id) + '" data-course-scope="' + esc(rowScope) + '">' + esc(sec.course_code || optionCourseLabel(sec)) + ' - ' + esc(sec.section_name) + ' - ' + esc(sec.supervisor_name || '') + ' (' + esc(sec.students_count || 0) + ' students)</option>');
+        });
+      }
+
+      if (['coordinator', 'doctor', 'student', 'section'].includes(scope)) {
+        select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>');
+        if (!rows.length) select.insertAdjacentHTML('beforeend', '<option value="" disabled>No receivers found for this course.</option>');
+        wrap.style.display = 'flex';
+      } else {
+        wrap.style.display = 'none';
+        select.value = '';
+      }
+      setCourseScopeMode();
+    }
+
     function renderInbox(rows) {
       if (!rows.length) { list.innerHTML = '<div class="sn-empty">No received messages yet.</div>'; return; }
       list.innerHTML = rows.map(r =>
@@ -527,12 +670,13 @@
 
     $('modalReplyForm').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData($('modalReplyForm')); try { const data = await postForm('/head/api/notifications/send', fd); showToast(data.message || 'Reply sent!'); closeModal(); state.tab = 'sent'; document.querySelectorAll('.sn-tab').forEach(b => { const selected = b.dataset.tab === 'sent'; b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected ? 'true' : 'false'); }); showMainTab('messages'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
 
-    $('snSendForm').addEventListener('submit', async e => { e.preventDefault(); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value) && !$('snSpecific').value) { showToast('Please choose a specific receiver.', true); return; } const fd = new FormData($('snSendForm')); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value); if (!$('snUrgent').checked) fd.delete('urgent'); fd.set('can_reply', $('snCanReply') && $('snCanReply').checked ? '1' : '0'); try { const data = await postForm('/head/api/notifications/send', fd); showToast(data.message || 'Message sent successfully.'); $('snSendForm').reset(); $('snFile').value = ''; $('snFileChosen').style.display = 'none'; $('snFileZone').style.display = 'block'; updateSpecificWrap(); closeCompose(); state.tab = 'sent'; document.querySelectorAll('.sn-tab').forEach(b => { const selected = b.dataset.tab === 'sent'; b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected ? 'true' : 'false'); }); showMainTab('messages'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
+    $('snSendForm').addEventListener('submit', async e => { e.preventDefault(); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value) && !$('snSpecific').value) { showToast('Please choose a specific receiver.', true); return; } const fd = new FormData($('snSendForm')); if (['coordinator', 'doctor', 'student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value); fd.set('course_scope', courseScopeForSend()); if (!$('snUrgent').checked) fd.delete('urgent'); fd.set('can_reply', $('snCanReply') && $('snCanReply').checked ? '1' : '0'); try { const data = await postForm('/head/api/notifications/send', fd); showToast(data.message || 'Message sent successfully.'); $('snSendForm').reset(); $('snCanReply').checked = true; $('snFile').value = ''; $('snFileChosen').style.display = 'none'; $('snFileZone').style.display = 'block'; updateSpecificWrap(); closeCompose(); state.tab = 'sent'; document.querySelectorAll('.sn-tab').forEach(b => { const selected = b.dataset.tab === 'sent'; b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected ? 'true' : 'false'); }); showMainTab('messages'); await loadMessages(); } catch (e) { showToast(e.message, true); } });
 
-    $('snClearBtn').addEventListener('click', () => { $('snSendForm').reset(); $('snFile').value = ''; $('snFileChosen').style.display = 'none'; $('snFileZone').style.display = 'block'; setTimeout(updateSpecificWrap, 0); });
+    $('snClearBtn').addEventListener('click', () => { $('snSendForm').reset(); $('snCanReply').checked = true; $('snFile').value = ''; $('snFileChosen').style.display = 'none'; $('snFileZone').style.display = 'block'; setTimeout(updateSpecificWrap, 0); });
 
     $('snScope').addEventListener('change', updateSpecificWrap);
     $('snCourseScope').addEventListener('change', updateSpecificWrap);
+    $('snSpecific').addEventListener('change', setCourseScopeMode);
 
     document.querySelectorAll('.sn-tab').forEach(btn => { btn.addEventListener('click', () => { state.tab = btn.dataset.tab; document.querySelectorAll('.sn-tab').forEach(b => { const selected = b === btn; b.classList.toggle('on', selected); b.setAttribute('aria-selected', selected ? 'true' : 'false'); }); loadMessages(); }); });
 

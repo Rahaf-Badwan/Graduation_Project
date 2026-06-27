@@ -102,6 +102,18 @@
     margin-bottom: 16px;
   }
 
+  #pg-supervisor-hours .required-box {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-left: 5px solid #f97316;
+    border-radius: 16px;
+    padding: 14px 16px;
+    color: #9a3412;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 18px;
+  }
+
   #pg-supervisor-hours .summary-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -190,6 +202,12 @@
     cursor: pointer;
   }
 
+  #pg-supervisor-hours .continue-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+  }
+
   #pg-supervisor-hours .meta-line {
     color: #667085;
     font-size: 13px;
@@ -225,6 +243,11 @@
         This is not your total teaching load. Maximum per course is 4.5 project hours.
       </p>
     </section>
+
+    <div class="required-box" id="hours-required-box">
+      Please submit both COMP4200 Project Introduction hours and COMP4300 Graduation Project hours before opening the rest of your supervisor workspace.
+      You can enter 0 if you do not want hours for one of the courses.
+    </div>
 
     <div class="course-grid">
       <section class="course-card" data-scope="introduction">
@@ -307,6 +330,12 @@
         </div>
       </section>
     </div>
+
+    <div class="continue-row">
+      <button class="btn-main" type="button" id="continue-dashboard" onclick="window.location.href='/supervisor/index'" disabled>
+        Continue to Dashboard
+      </button>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -366,12 +395,34 @@
 
     const academicYear = semester.academic_year ? safeText(semester.academic_year) : '-';
     document.getElementById(`meta-${scope}`).textContent = `Academic year: ${academicYear} · Course: ${info.code}`;
-    document.getElementById(`status-${scope}`).textContent = row.updated_at ? 'Submitted' : 'Not Submitted Yet';
+    document.getElementById(`status-${scope}`).textContent = row.submitted ? 'Submitted' : 'Not Submitted Yet';
+  }
+
+  function allRequiredHoursSubmitted() {
+    return ['introduction', 'graduation_project'].every(scope => {
+      const semester = projectHoursState.semesters?.[scope];
+      const row = projectHoursState.hours?.[scope] || {};
+      return !semester || !!row.submitted;
+    });
   }
 
   function renderAllCourses() {
     renderCourse('introduction');
     renderCourse('graduation_project');
+
+    const complete = allRequiredHoursSubmitted();
+    const continueBtn = document.getElementById('continue-dashboard');
+    const requiredBox = document.getElementById('hours-required-box');
+    if (continueBtn) continueBtn.disabled = !complete;
+    if (requiredBox) {
+      requiredBox.textContent = complete
+        ? 'Project hours submitted. You can now open the rest of your supervisor workspace.'
+        : 'Please submit both COMP4200 Project Introduction hours and COMP4300 Graduation Project hours before opening the rest of your supervisor workspace. You can enter 0 if you do not want hours for one of the courses.';
+      requiredBox.style.background = complete ? '#ecfdf3' : '#fff7ed';
+      requiredBox.style.borderColor = complete ? '#bbf7d0' : '#fed7aa';
+      requiredBox.style.borderLeftColor = complete ? '#2e7d42' : '#f97316';
+      requiredBox.style.color = complete ? '#166534' : '#9a3412';
+    }
   }
 
   async function loadProjectHours() {

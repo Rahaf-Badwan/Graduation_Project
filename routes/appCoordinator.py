@@ -25,6 +25,7 @@ from db import get_db
 from auth import login_required
 from ai_engine import search_uploaded_semantic
 from routes.project_cleanup import clear_supervisor_project_workspace
+from semester_lifecycle import auto_rollover_semesters
 
 coordinator_bp = Blueprint("coordinator_bp", __name__)
 
@@ -102,7 +103,6 @@ def _get_active_semester(cursor):
     fields.append(
         "distribution_close_at" if has_close_at else "NULL AS distribution_close_at"
     )
-
     cursor.execute(f"""
         SELECT {', '.join(fields)}
         FROM semesters
@@ -126,12 +126,19 @@ def _get_active_semester_for_committee_scope(cursor, course_scope):
 
 
 def _get_active_semester_by_course(cursor, course_code):
+    try:
+        auto_rollover_semesters(cursor)
+    except Exception:
+        pass
+
     # Keep this helper safe even before running the migration.
     has_distribution_open = _db_column_exists(cursor, "semesters", "distribution_open")
     has_opened_at = _db_column_exists(cursor, "semesters", "distribution_opened_at")
     has_closed_at = _db_column_exists(cursor, "semesters", "distribution_closed_at")
     has_close_at = _db_column_exists(cursor, "semesters", "distribution_close_at")
     has_course_code = _db_column_exists(cursor, "semesters", "course_code")
+    has_start_date = _db_column_exists(cursor, "semesters", "start_date")
+    has_end_date = _db_column_exists(cursor, "semesters", "end_date")
 
     fields = ["semester_id", "academic_year", "semester_number"]
     fields.append("course_code" if has_course_code else f"'{course_code}' AS course_code")
@@ -149,6 +156,9 @@ def _get_active_semester_by_course(cursor, course_code):
     fields.append(
         "distribution_close_at" if has_close_at else "NULL AS distribution_close_at"
     )
+    semester_order = (
+        "start_date DESC, semester_id DESC" if has_start_date else "semester_id DESC"
+    )
 
     where = "is_active = TRUE"
     params = []
@@ -160,10 +170,38 @@ def _get_active_semester_by_course(cursor, course_code):
         SELECT {', '.join(fields)}
         FROM semesters
         WHERE {where}
-        ORDER BY semester_id DESC
+        ORDER BY {semester_order}
         LIMIT 1
         """, tuple(params))
-    return cursor.fetchone()
+    semester = cursor.fetchone()
+    if semester:
+        return semester
+
+    if has_course_code and has_start_date and has_end_date:
+        cursor.execute(f"""
+            SELECT {', '.join(fields)}
+            FROM semesters
+            WHERE course_code = %s
+              AND (start_date IS NULL OR start_date <= CURDATE())
+              AND (end_date IS NULL OR end_date >= CURDATE())
+            ORDER BY {semester_order}
+            LIMIT 1
+            """, (course_code,))
+        semester = cursor.fetchone()
+        if semester:
+            return semester
+
+    if has_course_code:
+        cursor.execute(f"""
+            SELECT {', '.join(fields)}
+            FROM semesters
+            WHERE course_code = %s
+            ORDER BY {semester_order}
+            LIMIT 1
+            """, (course_code,))
+        return cursor.fetchone()
+
+    return None
 
 
 def _get_anchor_semester_for_year(cursor, academic_year):
@@ -207,6 +245,24 @@ def _table_exists(cursor, table_name):
     )
     row = cursor.fetchone() or {}
     return int(row.get("cnt") or 0) > 0
+
+
+def _ensure_faculty_load_submission_columns(cursor):
+    if not _table_exists(cursor, "faculty_load_settings"):
+        return
+    required_columns = {
+        "introduction_hours_submitted": (
+            "ALTER TABLE faculty_load_settings "
+            "ADD COLUMN introduction_hours_submitted TINYINT(1) NOT NULL DEFAULT 0"
+        ),
+        "graduation_hours_submitted": (
+            "ALTER TABLE faculty_load_settings "
+            "ADD COLUMN graduation_hours_submitted TINYINT(1) NOT NULL DEFAULT 0"
+        ),
+    }
+    for column, ddl in required_columns.items():
+        if not _db_column_exists(cursor, "faculty_load_settings", column):
+            cursor.execute(ddl)
 
 
 def _notification_enum_values(cursor):
@@ -561,34 +617,83 @@ def _active_distribution_is_open(semester):
     return True
 
 
-def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id=None):
+def _faculty_load_snapshot(
+    cursor,
+    faculty_id,
+    academic_year,
+    anchor_semester_id=None,
+    course_code="COMP4300",
+):
     if anchor_semester_id is None:
         anchor = _get_anchor_semester_for_year(cursor, academic_year)
         anchor_semester_id = anchor["semester_id"] if anchor else None
 
-    has_grad_hours = _db_column_exists(
-        cursor, "faculty_load_settings", "graduation_project_hours"
+    _ensure_faculty_load_submission_columns(cursor)
+
+    course_code = course_code if course_code in {"COMP4200", "COMP4300"} else "COMP4300"
+    requested_column = (
+        "introduction_project_hours"
+        if course_code == "COMP4200"
+        else "graduation_project_hours"
     )
+    submitted_column = (
+        "introduction_hours_submitted"
+        if course_code == "COMP4200"
+        else "graduation_hours_submitted"
+    )
+    has_requested_column = _db_column_exists(
+        cursor, "faculty_load_settings", requested_column
+    )
+    has_submitted_column = _db_column_exists(
+        cursor, "faculty_load_settings", submitted_column
+    )
+    settings_semester_id = anchor_semester_id
+    if academic_year:
+        cursor.execute(
+            """
+            SELECT semester_id
+            FROM semesters
+            WHERE academic_year = %s
+              AND course_code = %s
+            ORDER BY semester_number DESC, semester_id DESC
+            LIMIT 1
+            """,
+            (academic_year, course_code),
+        )
+        settings_semester = cursor.fetchone()
+        if settings_semester:
+            settings_semester_id = settings_semester["semester_id"]
+
     wanted_hours = 0.0
 
-    if anchor_semester_id and _table_exists(cursor, "faculty_load_settings"):
+    if settings_semester_id and _table_exists(cursor, "faculty_load_settings"):
         select_field = (
-            "COALESCE(graduation_project_hours, 0) AS graduation_project_hours"
-            if has_grad_hours
-            else "0 AS graduation_project_hours"
+            f"COALESCE({requested_column}, 0) AS requested_hours"
+            if has_requested_column
+            else "0 AS requested_hours"
+        )
+        submitted_field = (
+            f"COALESCE({submitted_column}, 0) AS hours_submitted"
+            if has_submitted_column
+            else "0 AS hours_submitted"
         )
         cursor.execute(
             f"""
-            SELECT {select_field}
+            SELECT {select_field}, {submitted_field}
             FROM faculty_load_settings
             WHERE faculty_id = %s AND semester_id = %s
             LIMIT 1
             """,
-            (faculty_id, anchor_semester_id),
+            (faculty_id, settings_semester_id),
         )
         row = cursor.fetchone()
         if row:
-            wanted_hours = float(row.get("graduation_project_hours") or 0)
+            wanted_hours = float(row.get("requested_hours") or 0)
+            hours_submitted = bool(row.get("hours_submitted"))
+        else:
+            hours_submitted = False
+    else:
+        hours_submitted = False
 
     cursor.execute(
         """
@@ -600,8 +705,9 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
         LEFT JOIN project_members pm ON pm.project_id = p.project_id
         WHERE p.supervisor_id = %s
           AND s.academic_year = %s
+          AND s.course_code = %s
         """,
-        (faculty_id, academic_year),
+        (faculty_id, academic_year, course_code),
     )
     project_row = cursor.fetchone() or {}
 
@@ -630,8 +736,18 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
         intro_sections = int(intro_row.get("intro_sections") or 0)
         intro_students = int(intro_row.get("intro_students") or 0)
 
-    graduation_used_hours = project_students * 0.5
-    introduction_used_hours = intro_students * 0.5
+    if course_code == "COMP4200":
+        effective_intro_students = intro_students if intro_sections else project_students
+        effective_intro_groups = intro_sections if intro_sections else project_groups
+        graduation_used_hours = 0.0
+        introduction_used_hours = effective_intro_students * 0.5
+        supervised_groups = effective_intro_groups
+        supervised_students = effective_intro_students
+    else:
+        graduation_used_hours = project_students * 0.5
+        introduction_used_hours = 0.0
+        supervised_groups = project_groups
+        supervised_students = project_students
 
     used_hours = graduation_used_hours + introduction_used_hours
     remaining_hours = wanted_hours - used_hours
@@ -647,13 +763,16 @@ def _faculty_load_snapshot(cursor, faculty_id, academic_year, anchor_semester_id
 
     return {
         "graduation_project_hours": wanted_hours,
+        "introduction_project_hours": wanted_hours,
         "wanted_hours": wanted_hours,
+        "hours_submitted": hours_submitted,
+        "course_code": course_code,
         "project_groups": project_groups,
         "project_students": project_students,
         "intro_sections": intro_sections,
         "intro_students": intro_students,
-        "supervised_groups": project_groups + intro_sections,
-        "supervised_students": project_students + intro_students,
+        "supervised_groups": supervised_groups,
+        "supervised_students": supervised_students,
         "graduation_used_hours": graduation_used_hours,
         "introduction_used_hours": introduction_used_hours,
         "used_hours": used_hours,
@@ -695,7 +814,11 @@ def fetch_supervisors():
     for row in rows:
         snapshot = (
             _faculty_load_snapshot(
-                cursor, row["faculty_id"], academic_year, anchor_semester_id
+                cursor,
+                row["faculty_id"],
+                academic_year,
+                anchor_semester_id,
+                "COMP4200",
             )
             if academic_year
             else {
@@ -713,6 +836,7 @@ def fetch_supervisors():
                 "full_name": row["full_name"],
                 "assigned_projects": snapshot["supervised_groups"],
                 "wanted_hours": snapshot["wanted_hours"],
+                "hours_submitted": snapshot["hours_submitted"],
                 "used_hours": snapshot["used_hours"],
                 "current_hours": snapshot["used_hours"],
                 "max_hours": snapshot["wanted_hours"],
@@ -1104,11 +1228,58 @@ def _required_coordinator_lecture_schedule(data):
     if not lecture_time:
         raise ValueError("Lecture time is required before sending the lecture.")
     try:
-        datetime.strptime(lecture_date, "%Y-%m-%d")
-        datetime.strptime(lecture_time, "%H:%M")
+        parsed_date = datetime.strptime(lecture_date, "%Y-%m-%d").date()
+        parsed_time = datetime.strptime(lecture_time, "%H:%M").time()
     except ValueError as exc:
         raise ValueError("Lecture date or time is invalid.") from exc
+    if datetime.combine(parsed_date, parsed_time) <= datetime.now():
+        raise ValueError("Lecture date and time must be in the future.")
     return lecture_date, lecture_time
+
+
+def _student_user_ids_by_student_id(cursor, student_ids):
+    if not student_ids:
+        return {}
+    placeholders = ",".join(["%s"] * len(student_ids))
+    cursor.execute(
+        f"""
+        SELECT st.student_id, u.user_id
+        FROM students st
+        JOIN users u ON u.user_id = st.user_id
+        WHERE st.student_id IN ({placeholders})
+          AND u.role = 'student'
+          AND u.is_active = TRUE
+        """,
+        tuple(student_ids),
+    )
+    return {int(row["student_id"]): int(row["user_id"]) for row in cursor.fetchall()}
+
+
+def _notify_coordinator_absences(cursor, lecture, newly_absent_student_ids):
+    user_ids = _student_user_ids_by_student_id(cursor, newly_absent_student_ids)
+    if not user_ids:
+        return 0
+
+    lecture_time = str(lecture.get("lecture_time") or "")[:5] or "the scheduled time"
+    message = (
+        f"You have an absence recorded for \"{lecture.get('title') or 'Lecture'}\" "
+        f"on {lecture.get('lecture_date') or 'the scheduled date'} at {lecture_time}. "
+        "Please contact the course coordinator if this is incorrect."
+    )
+    sent = 0
+    for recipient_id in user_ids.values():
+        _insert_notification(
+            cursor,
+            recipient_id,
+            session.get("user_id"),
+            "urgent_alert",
+            "You have an absence",
+            message,
+            None,
+            lecture.get("course_scope") or "both",
+        )
+        sent += 1
+    return sent
 
 
 def _snapshot_coordinator_lecture_recipients(cursor, lecture_id, user_ids):
@@ -1625,6 +1796,23 @@ def api_save_coordinator_lecture_attendance(lecture_id):
             (lecture_id,),
         )
         allowed_ids = {int(row["student_id"]) for row in cursor.fetchall()}
+        if allowed_ids:
+            placeholders = ",".join(["%s"] * len(allowed_ids))
+            cursor.execute(
+                f"""
+                SELECT student_id, attendance_status
+                FROM coordinator_lecture_attendance
+                WHERE lecture_id = %s
+                  AND student_id IN ({placeholders})
+                """,
+                (lecture_id, *sorted(allowed_ids)),
+            )
+            previous_status = {
+                int(row["student_id"]): (row.get("attendance_status") or "").lower()
+                for row in cursor.fetchall()
+            }
+        else:
+            previous_status = {}
         cleaned = []
         for row in attendance:
             try:
@@ -1650,8 +1838,17 @@ def api_save_coordinator_lecture_attendance(lecture_id):
                 """,
                 (lecture_id, student_id, status, session.get("user_id")),
             )
+        notified = _notify_coordinator_absences(
+            cursor,
+            lecture,
+            [
+                student_id
+                for student_id, status in cleaned
+                if status == "absent" and previous_status.get(student_id) != "absent"
+            ],
+        )
         db.commit()
-        return jsonify({"message": f"Attendance saved for {len(cleaned)} student(s)."})
+        return jsonify({"message": f"Attendance saved for {len(cleaned)} student(s). Absence notifications sent: {notified}."})
     except Exception as e:
         db.rollback()
         return jsonify({"error": str(e)}), 500
@@ -3062,6 +3259,7 @@ def api_coordinator_notification_options():
         students = _all_active_student_rows(cursor)
         comp4200_students = _student_user_rows_by_course(cursor, "COMP4200")
         comp4300_students = _student_user_rows_by_course(cursor, "COMP4300")
+        _ensure_comp4200_section_schema(cursor)
 
         sections = []
         if _table_exists(cursor, "student_distribution_sections") and _table_exists(
@@ -3070,17 +3268,19 @@ def api_coordinator_notification_options():
             cursor.execute("""
                 SELECT CONCAT('s:', sec.section_id) AS section_key,
                        sec.section_id,
-                       sec.section_name,
+                       COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS section_name,
                        'introduction' AS course_scope,
                        'COMP4200' AS course_code,
                        u_sup.full_name AS supervisor_name,
                        COUNT(DISTINCT ss.student_id) AS students_count
                 FROM student_distribution_sections sec
+                LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+                LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
                 JOIN faculty f ON f.faculty_id = sec.supervisor_id
                 JOIN users u_sup ON u_sup.user_id = f.user_id
                 LEFT JOIN section_students ss ON ss.section_id = sec.section_id
-                GROUP BY sec.section_id, sec.section_name, u_sup.full_name
-                ORDER BY sec.section_id DESC
+                GROUP BY sec.section_id, sec.section_name, p_intro.title, u_sup.full_name
+                ORDER BY section_name
                 """)
             sections.extend(cursor.fetchall())
 
@@ -3181,6 +3381,122 @@ def api_coordinator_notifications_sent():
         cursor.close()
         db.close()
         return jsonify({"sent": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@coordinator_bp.route("/api/coordinator/notifications/supervisor-activity", methods=["GET"])
+@login_required(role="coordinator")
+def api_coordinator_supervisor_activity():
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        _ensure_notification_attachment_columns(cursor)
+        _ensure_comp4200_section_schema(cursor)
+        intro_semester = _get_active_semester_by_course(cursor, "COMP4200")
+        if intro_semester and intro_semester.get("semester_id"):
+            _committee_sync_comp4200_project_sections(cursor, intro_semester["semester_id"])
+        db.commit()
+
+        has_message_origin = _db_column_exists(cursor, "notifications", "message_origin")
+        manual_filter = "AND n.message_origin IN ('manual', 'reply')" if has_message_origin else ""
+
+        cursor.execute(
+            f"""
+            SELECT
+                'message' AS activity_type,
+                MIN(n.notification_id) AS activity_id,
+                n.title,
+                n.message,
+                COALESCE(n.course_scope, 'both') AS course_scope,
+                sender.full_name AS supervisor_name,
+                sender.user_id AS supervisor_user_id,
+                COUNT(DISTINCT n.recipient_id) AS recipient_count,
+                GROUP_CONCAT(DISTINCT recipient.full_name ORDER BY recipient.full_name SEPARATOR ', ') AS recipient_names,
+                MAX(n.created_at) AS activity_at
+            FROM notifications n
+            JOIN users sender ON sender.user_id = n.sender_id
+            JOIN users recipient ON recipient.user_id = n.recipient_id
+            WHERE sender.role = 'supervisor'
+              AND recipient.role = 'student'
+              {manual_filter}
+            GROUP BY
+                n.sender_id, n.title, n.message, COALESCE(n.course_scope, 'both'),
+                sender.full_name, sender.user_id,
+                DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i:%s')
+            ORDER BY activity_at DESC
+            LIMIT 80
+            """
+        )
+        activities = []
+        for row in cursor.fetchall():
+            row["activity_at"] = str(row.get("activity_at") or "")
+            row["recipient_count"] = int(row.get("recipient_count") or 0)
+            activities.append(row)
+
+        if _table_exists(cursor, "supervisor_lectures"):
+            lecture_recipient_count = (
+                """
+                (
+                    SELECT COUNT(*)
+                    FROM supervisor_lecture_recipients slr
+                    WHERE slr.lecture_id = sl.lecture_id
+                ) AS recipient_count
+                """
+                if _table_exists(cursor, "supervisor_lecture_recipients")
+                else "0 AS recipient_count"
+            )
+            cursor.execute(
+                f"""
+                SELECT
+                    'lecture' AS activity_type,
+                    sl.lecture_id AS activity_id,
+                    sl.title,
+                    COALESCE(sl.description, '') AS message,
+                    sl.course_scope,
+                    u.full_name AS supervisor_name,
+                    u.user_id AS supervisor_user_id,
+                    COALESCE(
+                        CASE
+                            WHEN sl.target_kind = 'all' THEN 'All assigned students'
+                            WHEN sl.target_kind = 'section' THEN COALESCE(NULLIF(p_sec.title, ''), sec.section_name)
+                            WHEN sl.target_kind = 'project' THEN COALESCE(NULLIF(p.title, ''), CONCAT('Project ', p.project_id))
+                            ELSE NULL
+                        END,
+                        'Assigned students'
+                    ) AS target_name,
+                    sl.lecture_date,
+                    sl.lecture_time,
+                    sl.week_label,
+                    sl.status,
+                    sl.created_at AS activity_at,
+                    {lecture_recipient_count}
+                FROM supervisor_lectures sl
+                JOIN faculty f ON f.faculty_id = sl.supervisor_id
+                JOIN users u ON u.user_id = f.user_id
+                LEFT JOIN student_distribution_sections sec
+                  ON sl.target_kind = 'section' AND sec.section_id = sl.target_id
+                LEFT JOIN comp4200_project_sections cps_sec
+                  ON sl.target_kind = 'section' AND cps_sec.section_id = sec.section_id
+                LEFT JOIN projects p_sec
+                  ON sl.target_kind = 'section' AND p_sec.project_id = cps_sec.project_id
+                LEFT JOIN projects p
+                  ON sl.target_kind = 'project' AND p.project_id = sl.target_id
+                ORDER BY sl.created_at DESC, sl.lecture_id DESC
+                LIMIT 80
+                """
+            )
+            for row in cursor.fetchall():
+                for key in ("activity_at", "lecture_date", "lecture_time"):
+                    if row.get(key) is not None:
+                        row[key] = str(row[key])
+                row["recipient_count"] = int(row.get("recipient_count") or 0)
+                activities.append(row)
+
+        activities.sort(key=lambda item: str(item.get("activity_at") or ""), reverse=True)
+        cursor.close()
+        db.close()
+        return jsonify({"activity": activities[:120]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -4461,14 +4777,17 @@ def api_assign_group_supervisor():
             SELECT p.project_id,
                    p.title,
                    p.supervisor_id,
+                   s.course_code,
+                   s.academic_year,
                    old_sup.full_name AS old_supervisor_name,
                    COUNT(DISTINCT pm.student_id) AS member_count
             FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
             LEFT JOIN project_members pm ON pm.project_id = p.project_id
             LEFT JOIN faculty old_f ON old_f.faculty_id = p.supervisor_id
             LEFT JOIN users old_sup ON old_sup.user_id = old_f.user_id
             WHERE p.project_id = %s
-            GROUP BY p.project_id, p.title, p.supervisor_id, old_sup.full_name
+            GROUP BY p.project_id, p.title, p.supervisor_id, s.course_code, s.academic_year, old_sup.full_name
             """,
             (project_id,),
         )
@@ -4491,8 +4810,9 @@ def api_assign_group_supervisor():
         snapshot = _faculty_load_snapshot(
             cursor,
             int(supervisor_id),
-            active_semester["academic_year"],
+            project.get("academic_year") or active_semester["academic_year"],
             anchor_semester_id,
+            project.get("course_code") or "COMP4300",
         )
         required_hours = required_students * 0.5
 
@@ -4713,6 +5033,7 @@ def api_add_section():
             int(supervisor_id),
             semester["academic_year"],
             anchor_semester_id,
+            "COMP4200",
         )
         required_hours = len(student_ids) * 0.5
 
@@ -4820,6 +5141,9 @@ def api_add_section():
                 """,
                 (project_id, sid, index == 0),
             )
+
+        _ensure_comp4200_section_schema(cursor)
+        _committee_sync_comp4200_project_sections(cursor, semester["semester_id"])
 
         cursor.execute(
             """
@@ -6388,17 +6712,22 @@ def api_export_groups():
 def api_export_sections():
     db = get_db()
     cursor = db.cursor(dictionary=True)
+    _ensure_comp4200_section_schema(cursor)
     cursor.execute("""
-        SELECT s.section_name, u.full_name AS supervisor_name, s.created_at,
+        SELECT COALESCE(NULLIF(p_intro.title, ''), s.section_name) AS section_name,
+               u.full_name AS supervisor_name,
+               s.created_at,
                COALESCE(GROUP_CONCAT(us.full_name ORDER BY us.full_name SEPARATOR ', '), '') AS assigned_students
         FROM student_distribution_sections s
+        LEFT JOIN comp4200_project_sections cps ON cps.section_id = s.section_id
+        LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
         JOIN faculty f ON f.faculty_id = s.supervisor_id
         JOIN users u ON u.user_id = f.user_id
         LEFT JOIN section_students ss ON ss.section_id = s.section_id
         LEFT JOIN students st ON st.student_id = ss.student_id
         LEFT JOIN users us ON us.user_id = st.user_id
-        GROUP BY s.section_id, s.section_name, u.full_name, s.created_at
-        ORDER BY s.section_id DESC
+        GROUP BY s.section_id, s.section_name, p_intro.title, u.full_name, s.created_at
+        ORDER BY section_name
         """)
     rows = cursor.fetchall()
     cursor.close()
@@ -6460,6 +6789,7 @@ def api_faculty_hours_data():
                     "full_name": row["full_name"],
                     "graduation_project_hours": snapshot["wanted_hours"],
                     "wanted_hours": snapshot["wanted_hours"],
+                    "hours_submitted": snapshot["hours_submitted"],
                     "project_groups": snapshot["project_groups"],
                     "project_students": snapshot["project_students"],
                     "used_hours": snapshot["used_hours"],
@@ -6517,18 +6847,34 @@ def api_faculty_hours_save():
             db.close()
             return jsonify({"error": "No academic year settings row found."}), 400
 
+        _ensure_faculty_load_submission_columns(cursor)
+
+        cursor.execute(
+            """
+            SELECT semester_id
+            FROM semesters
+            WHERE academic_year = %s
+              AND course_code = 'COMP4300'
+            ORDER BY semester_number DESC, semester_id DESC
+            LIMIT 1
+            """,
+            (active_semester["academic_year"],),
+        )
+        settings_semester = cursor.fetchone() or anchor_semester
+
         cursor.execute(
             """
             INSERT INTO faculty_load_settings
-                (faculty_id, semester_id, graduation_project_hours, updated_by)
-            VALUES (%s, %s, %s, %s)
+                (faculty_id, semester_id, graduation_project_hours, graduation_hours_submitted, updated_by)
+            VALUES (%s, %s, %s, 1, %s)
             ON DUPLICATE KEY UPDATE
                 graduation_project_hours = VALUES(graduation_project_hours),
+                graduation_hours_submitted = 1,
                 updated_by = VALUES(updated_by)
             """,
             (
                 faculty_id,
-                anchor_semester["semester_id"],
+                settings_semester["semester_id"],
                 graduation_project_hours,
                 session.get("user_id"),
             ),
@@ -7639,8 +7985,8 @@ def _committee_build_supervisor_project_groups(eligible_projects, projects_per_c
 
     return groups
 
-def _committee_ensure_course_schema(cursor):
-    """Keep committee tables compatible with both COMP4200 and COMP4300."""
+def _ensure_comp4200_section_schema(cursor):
+    """Create the COMP4200 section mirror used by supervisor tools."""
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS student_distribution_sections (
@@ -7679,6 +8025,11 @@ def _committee_ensure_course_schema(cursor):
         """
     )
 
+
+def _committee_ensure_course_schema(cursor):
+    """Keep committee tables compatible with both COMP4200 and COMP4300."""
+    _ensure_comp4200_section_schema(cursor)
+
     if not _db_column_exists(cursor, "committee_plans", "course_scope"):
         cursor.execute(
             "ALTER TABLE committee_plans ADD COLUMN course_scope ENUM('introduction','graduation_project') NOT NULL DEFAULT 'graduation_project' AFTER committee_name"
@@ -7703,6 +8054,12 @@ def _committee_ensure_course_schema(cursor):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
     )
+    try:
+        semester = _get_active_semester_by_course(cursor, "COMP4200")
+        if semester and semester.get("semester_id"):
+            _committee_sync_comp4200_project_sections(cursor, semester["semester_id"])
+    except Exception:
+        pass
 
 
 def _committee_sync_comp4200_project_sections(cursor, semester_id=None):
@@ -7714,7 +8071,7 @@ def _committee_sync_comp4200_project_sections(cursor, semester_id=None):
         """
         SELECT
             p.project_id,
-            LEFT(COALESCE(NULLIF(p.group_name, ''), NULLIF(p.title, ''), CONCAT('Group ', p.project_id)), 100) AS section_name,
+            LEFT(COALESCE(NULLIF(p.title, ''), NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id)), 100) AS section_name,
             p.supervisor_id
         FROM projects p
         JOIN semesters sem ON sem.semester_id = p.semester_id
@@ -7722,8 +8079,8 @@ def _committee_sync_comp4200_project_sections(cursor, semester_id=None):
           AND sem.course_code = 'COMP4200'
           AND p.supervisor_id IS NOT NULL
           AND p.status IN ('submitted', 'under_review', 'needs_revision', 'committee_evaluation')
-          AND p.title NOT LIKE 'Committee Demo%%'
-          AND p.title NOT LIKE 'COMP4300 Graduation Project%%'
+          AND COALESCE(p.title, '') NOT LIKE 'Committee Demo%%'
+          AND COALESCE(p.title, '') NOT LIKE 'COMP4300 Graduation Project%%'
           AND EXISTS (
               SELECT 1
               FROM project_members pmx
@@ -7817,7 +8174,7 @@ def _committee_fetch_eligible_projects(
             SELECT
                 sec.section_id AS project_id,
                 sec.section_id AS section_id,
-                sec.section_name AS title,
+                COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS title,
                 'submitted' AS status,
                 'introduction' AS project_type,
                 sec.supervisor_id,
@@ -7829,6 +8186,8 @@ def _committee_fetch_eligible_projects(
                     ''
                 ) AS team_members
             FROM student_distribution_sections sec
+            LEFT JOIN comp4200_project_sections cps_title ON cps_title.section_id = sec.section_id
+            LEFT JOIN projects p_intro ON p_intro.project_id = cps_title.project_id
             JOIN faculty sup_f ON sup_f.faculty_id = sec.supervisor_id
             JOIN users sup_u ON sup_u.user_id = sup_f.user_id
             JOIN section_students ss ON ss.section_id = sec.section_id
@@ -7837,9 +8196,9 @@ def _committee_fetch_eligible_projects(
             WHERE 1 = 1
               {assigned_filter}
             GROUP BY sec.section_id, sec.section_name, sec.supervisor_id,
-                     sup_u.full_name, sup_f.specialization
+                     p_intro.title, sup_u.full_name, sup_f.specialization
             HAVING COUNT(DISTINCT ss.student_id) > 0
-            ORDER BY sec.supervisor_id ASC, sec.section_id DESC
+            ORDER BY sec.supervisor_id ASC, title
             """
         )
         sections = cursor.fetchall()
@@ -8131,8 +8490,11 @@ def _notify_section_students(cursor, section_id, sender_id):
     """Notify COMP4200 students about their supervisor and group/section students."""
     cursor.execute(
         """
-        SELECT sec.section_name, u_sup.full_name AS supervisor_name
+        SELECT COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS section_name,
+               u_sup.full_name AS supervisor_name
         FROM student_distribution_sections sec
+        LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+        LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
         JOIN faculty f ON f.faculty_id = sec.supervisor_id
         JOIN users u_sup ON u_sup.user_id = f.user_id
         WHERE sec.section_id = %s
@@ -8397,7 +8759,7 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
                 TIME_FORMAT(cps.slot_end, '%H:%i') AS slot_end,
                 sec.section_id AS project_id,
                 sec.section_id AS section_id,
-                sec.section_name AS title,
+                COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS title,
                 sec.supervisor_id,
                 sup_u.full_name AS supervisor_name,
                 'introduction' AS course_scope,
@@ -8411,6 +8773,8 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
                 r2_u.full_name AS reader2_name
             FROM committee_plan_sections cps
             JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+            LEFT JOIN comp4200_project_sections cps_title ON cps_title.section_id = sec.section_id
+            LEFT JOIN projects p_intro ON p_intro.project_id = cps_title.project_id
             LEFT JOIN faculty sup_f ON sup_f.faculty_id = sec.supervisor_id
             LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
             LEFT JOIN section_students ss ON ss.section_id = sec.section_id
@@ -8426,7 +8790,7 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
             LEFT JOIN users r2_u ON r2_u.user_id = r2_f.user_id
             WHERE cps.plan_id = %s
             GROUP BY cps.slot_order, cps.slot_start, cps.slot_end,
-                     sec.section_id, sec.section_name, sec.supervisor_id, sup_u.full_name,
+                     sec.section_id, sec.section_name, p_intro.title, sec.supervisor_id, sup_u.full_name,
                      r1.faculty_id, r1_u.full_name, r2.faculty_id, r2_u.full_name
             ORDER BY cps.slot_order ASC
             """,
@@ -9010,7 +9374,7 @@ def api_coordinator_sections_list():
         cursor.execute("""
             SELECT 
                 sec.section_id,
-                sec.section_name,
+                COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS section_name,
                 sec.supervisor_id,
                 u_sup.full_name AS supervisor_name,
                 COUNT(DISTINCT ss.student_id) AS student_count,
@@ -9019,13 +9383,15 @@ def api_coordinator_sections_list():
                     ''
                 ) AS assigned_students
             FROM student_distribution_sections sec
+            LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+            LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
             JOIN faculty f ON f.faculty_id = sec.supervisor_id
             JOIN users u_sup ON u_sup.user_id = f.user_id
             LEFT JOIN section_students ss ON ss.section_id = sec.section_id
             LEFT JOIN students st ON st.student_id = ss.student_id
             LEFT JOIN users u_st ON u_st.user_id = st.user_id
-            GROUP BY sec.section_id, sec.section_name, sec.supervisor_id, u_sup.full_name
-            ORDER BY sec.section_id DESC
+            GROUP BY sec.section_id, sec.section_name, p_intro.title, sec.supervisor_id, u_sup.full_name
+            ORDER BY section_name
         """)
 
         sections = cursor.fetchall()
@@ -9196,6 +9562,40 @@ def api_add_students_to_existing_section():
                 VALUES (%s, %s)
             """, (section_id, student_id))
 
+        if _table_exists(cursor, "comp4200_project_sections"):
+            cursor.execute(
+                """
+                SELECT project_id
+                FROM comp4200_project_sections
+                WHERE section_id = %s
+                LIMIT 1
+                """,
+                (section_id,),
+            )
+            link = cursor.fetchone()
+            if link and link.get("project_id"):
+                project_id = int(link["project_id"])
+                for student_id in student_ids:
+                    cursor.execute(
+                        """
+                        DELETE p
+                        FROM projects p
+                        JOIN project_members pm ON pm.project_id = p.project_id
+                        WHERE pm.student_id = %s
+                          AND p.semester_id = %s
+                          AND p.status = 'solo_pending'
+                        """,
+                        (student_id, active_semester["semester_id"]),
+                    )
+                    cursor.execute(
+                        """
+                        INSERT IGNORE INTO project_members
+                            (project_id, student_id, is_primary_contact)
+                        VALUES (%s, %s, 0)
+                        """,
+                        (project_id, student_id),
+                    )
+
         _notify_section_students(cursor, section_id, session.get("user_id"))
 
         db.commit()
@@ -9267,6 +9667,7 @@ def api_coordinator_groups_with_space():
                     int(supervisor_id),
                     semester["academic_year"],
                     anchor_semester_id,
+                    "COMP4200",
                 )
                 group["supervisor_wanted_hours"] = snapshot["wanted_hours"]
                 group["supervisor_remaining_hours"] = snapshot["remaining_hours"]
@@ -9348,6 +9749,7 @@ def api_coordinator_add_student_to_group():
             int(project["supervisor_id"]),
             semester["academic_year"],
             anchor_semester_id,
+            "COMP4200",
         )
         required_hours = len(student_ids) * 0.5
         if snapshot["wanted_hours"] <= 0 or snapshot["remaining_hours"] < required_hours:
@@ -9413,6 +9815,9 @@ def api_coordinator_add_student_to_group():
                 (project_id, student_id),
             )
             added.append(student_id)
+
+        _ensure_comp4200_section_schema(cursor)
+        _committee_sync_comp4200_project_sections(cursor, semester["semester_id"])
 
         group_name_expr = (
             "COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id))"
@@ -9546,10 +9951,12 @@ def api_delete_distribution_section():
         cursor.execute("""
             SELECT 
                 sec.section_id,
-                sec.section_name,
+                COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS section_name,
                 sec.supervisor_id,
                 u.full_name AS supervisor_name
             FROM student_distribution_sections sec
+            LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+            LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
             JOIN faculty f ON f.faculty_id = sec.supervisor_id
             JOIN users u ON u.user_id = f.user_id
             WHERE sec.section_id = %s
@@ -10409,12 +10816,14 @@ def _evaluation_committee_setup_for_item(cursor, course_scope, reference_id):
                 COALESCE(cp.course_scope, 'introduction') AS course_scope,
                 cp.responsible_faculty_id,
                 sec.section_id AS reference_id,
-                sec.section_name AS title,
+                COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS title,
                 sec.supervisor_id,
                 sup_u.full_name AS supervisor_name
             FROM committee_plan_sections cps
             JOIN committee_plans cp ON cp.plan_id = cps.plan_id
             JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+            LEFT JOIN comp4200_project_sections cps_title ON cps_title.section_id = sec.section_id
+            LEFT JOIN projects p_intro ON p_intro.project_id = cps_title.project_id
             LEFT JOIN faculty sup_f ON sup_f.faculty_id = sec.supervisor_id
             LEFT JOIN users sup_u ON sup_u.user_id = sup_f.user_id
             WHERE cps.section_id = %s
@@ -11601,7 +12010,7 @@ def api_coordinator_committee_schedule_export():
                     TIME_FORMAT(cps.slot_end, '%%H:%%i') AS slot_end,
                     COALESCE(dr.room_name, '') AS room_name,
                     COALESCE(resp_u.full_name, '') AS responsible_name,
-                    sec.section_name AS item_title,
+                    COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS item_title,
                     COALESCE(sup_u.full_name, '') AS supervisor_name,
                     COALESCE(GROUP_CONCAT(DISTINCT stu_u.full_name ORDER BY stu_u.full_name SEPARATOR ', '), '') AS students,
                     COALESCE(r1_u.full_name, '') AS reader1_name,
@@ -11617,6 +12026,8 @@ def api_coordinator_committee_schedule_export():
                 FROM committee_plan_sections cps
                 JOIN committee_plans cp ON cp.plan_id = cps.plan_id
                 JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+                LEFT JOIN comp4200_project_sections cps_title ON cps_title.section_id = sec.section_id
+                LEFT JOIN projects p_intro ON p_intro.project_id = cps_title.project_id
                 LEFT JOIN discussion_rooms dr ON dr.room_id = cp.room_id
                 LEFT JOIN faculty resp_f ON resp_f.faculty_id = cp.responsible_faculty_id
                 LEFT JOIN users resp_u ON resp_u.user_id = resp_f.user_id
@@ -11635,9 +12046,9 @@ def api_coordinator_committee_schedule_export():
                   AND COALESCE(cp.course_scope, 'introduction') = 'introduction'
                   {scope_filter_sql}
                 GROUP BY cp.plan_id, cp.committee_name, cp.discussion_date, cps.slot_start, cps.slot_end,
-                         dr.room_name, resp_u.full_name, sec.section_name, sup_u.full_name,
+                         dr.room_name, resp_u.full_name, sec.section_name, p_intro.title, sup_u.full_name,
                          r1_u.full_name, r2_u.full_name, cp.status, cp.course_scope
-                ORDER BY cp.discussion_date DESC, cp.plan_id DESC, cps.slot_start ASC, sec.section_name ASC
+                ORDER BY cp.discussion_date DESC, cp.plan_id DESC, cps.slot_start ASC, item_title ASC
                 """,
                 tuple(params),
             )
@@ -11778,7 +12189,7 @@ def api_coordinator_evaluation_projects():
                     """
                     SELECT
                         sec.section_id AS project_id,
-                        sec.section_name AS title,
+                        COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS title,
                         'introduction' AS course_scope,
                         'COMP4200' AS course_code,
                         COALESCE(cp.status, 'scheduled') AS status,
@@ -11792,6 +12203,8 @@ def api_coordinator_evaluation_projects():
                     FROM committee_plan_sections cps
                     JOIN committee_plans cp ON cp.plan_id = cps.plan_id
                     JOIN student_distribution_sections sec ON sec.section_id = cps.section_id
+                    LEFT JOIN comp4200_project_sections cps_title ON cps_title.section_id = sec.section_id
+                    LEFT JOIN projects p_intro ON p_intro.project_id = cps_title.project_id
                     JOIN faculty f_sup ON f_sup.faculty_id = sec.supervisor_id
                     JOIN users u_sup ON u_sup.user_id = f_sup.user_id
                     LEFT JOIN faculty resp_f ON resp_f.faculty_id = cp.responsible_faculty_id
@@ -11809,7 +12222,7 @@ def api_coordinator_evaluation_projects():
                             AND COALESCE(cp2.course_scope, 'introduction') = 'introduction'
                             AND COALESCE(cp2.status, 'scheduled') <> 'cancelled'
                       )
-                    GROUP BY sec.section_id, sec.section_name, cp.status, cp.plan_id, cp.committee_name,
+                    GROUP BY sec.section_id, sec.section_name, p_intro.title, cp.status, cp.plan_id, cp.committee_name,
                              cp.responsible_faculty_id, resp_u.full_name, u_sup.full_name
                     HAVING COUNT(DISTINCT ss.student_id) > 0
                     ORDER BY cp.plan_id DESC, sec.section_id DESC
@@ -11892,7 +12305,17 @@ def api_coordinator_evaluation_open():
             cursor.execute("SELECT project_id, title FROM projects WHERE project_id = %s", (reference_id,))
             item = cursor.fetchone()
         else:
-            cursor.execute("SELECT section_id AS project_id, section_name AS title FROM student_distribution_sections WHERE section_id = %s", (reference_id,))
+            cursor.execute(
+                """
+                SELECT sec.section_id AS project_id,
+                       COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS title
+                FROM student_distribution_sections sec
+                LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+                LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
+                WHERE sec.section_id = %s
+                """,
+                (reference_id,),
+            )
             item = cursor.fetchone()
         if not item:
             cursor.close()
@@ -12602,7 +13025,17 @@ def api_coordinator_evaluation_send_to_supervisor():
             cursor.execute("SELECT project_id AS reference_id, title FROM projects WHERE project_id = %s", (reference_id,))
             item = cursor.fetchone()
         else:
-            cursor.execute("SELECT section_id AS reference_id, section_name AS title FROM student_distribution_sections WHERE section_id = %s", (reference_id,))
+            cursor.execute(
+                """
+                SELECT sec.section_id AS reference_id,
+                       COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS title
+                FROM student_distribution_sections sec
+                LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+                LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
+                WHERE sec.section_id = %s
+                """,
+                (reference_id,),
+            )
             item = cursor.fetchone()
 
         if not item:

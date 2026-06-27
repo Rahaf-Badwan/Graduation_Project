@@ -34,8 +34,12 @@
     }
     html[data-theme="dark"] [style*="color:#065f46"] { color: #4ade80 !important; }
     html[data-theme="dark"] [style*="background:#e5e7eb"] { background: #30363d !important; }
-    html[data-theme="dark"] #activate-theme-btn { background: #161b22 !important; border-color: #30363d !important; color: #c9d1d9 !important; }
+    html[data-theme="dark"] #activate-theme-btn { background: transparent !important; border-color: transparent !important; color: #c9d1d9 !important; }
     html[data-theme="dark"] #activate-theme-btn:hover { background: #21262d !important; }
+    html[data-theme="dark"] #activate-nav { background: #161b22 !important; border-bottom-color: #30363d !important; }
+    html[data-theme="dark"] #activate-nav .nav-brand { color: #e5edf7 !important; }
+    html[data-theme="dark"] #activate-login-link { color: #c9d1d9 !important; }
+    html[data-theme="dark"] #activate-login-link:hover { background: #21262d !important; }
 
     /* ── Dark mode: supervisor card ── */
     html[data-theme="dark"] #sup-card .card {
@@ -49,8 +53,7 @@
     html[data-theme="dark"] #sup-pill-2 { background: #30363d !important; }
     html[data-theme="dark"] #supervisor-id,
     html[data-theme="dark"] #sup-password,
-    html[data-theme="dark"] #sup-confirmPassword,
-    html[data-theme="dark"] #sup-hours {
+    html[data-theme="dark"] #sup-confirmPassword {
       background: #1e2128 !important;
       border-color: #30363d !important;
       color: #e2e8f0 !important;
@@ -142,7 +145,6 @@
     #password,
     #confirmPassword,
     #supervisor-id,
-    #sup-hours,
     #sup-password,
     #sup-confirmPassword {
       background: var(--activate-field) !important;
@@ -156,7 +158,6 @@
     #password:focus,
     #confirmPassword:focus,
     #supervisor-id:focus,
-    #sup-hours:focus,
     #sup-password:focus,
     #sup-confirmPassword:focus {
       background: var(--activate-field-focus) !important;
@@ -233,15 +234,38 @@
     }
 
     #activate-theme-btn {
-      background: var(--activate-card) !important;
+      background: none !important;
       color: var(--activate-text) !important;
-      border-color: var(--activate-border) !important;
     }
   </style>
 </head>
 <body autocomplete="off">
 
-<div class="hero" style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
+<div class="page" id="page">
+  <nav id="activate-nav">
+    <div class="nav-brand">
+      <div class="nav-brand-icon">AP</div>
+      Academic Project Management System
+    </div>
+    <ul class="nav-links nav-right">
+      <li>
+        <button id="activate-theme-btn" onclick="toggleLoginTheme()" title="Toggle dark / light mode" style="
+          background:none; border:none; cursor:pointer;
+          padding:5px 7px; border-radius:6px; color:#555;
+          display:flex; align-items:center; transition:background 0.15s;">
+          <span class="material-symbols-outlined" style="font-size:18px;line-height:1">dark_mode</span>
+        </button>
+      </li>
+      <li>
+        <a id="activate-login-link" href="/login" title="Back to Sign In">
+          <span aria-hidden="true">←</span>
+          Back to Sign In
+        </a>
+      </li>
+    </ul>
+  </nav>
+
+<div class="hero" style="min-height:calc(100vh - 52px); display:flex; align-items:center; justify-content:center; padding:24px;">
   <div style="width:100%; max-width:440px;">
 
     <!-- ── Role toggle tabs ── -->
@@ -390,13 +414,8 @@
             <div id="sup-verify-feedback" style="display:none; margin-top:12px;"></div>
           </div>
 
-          <!-- Sup Phase 2: Hours + Password -->
+          <!-- Sup Phase 2: Password -->
           <div id="sup-phase-password" style="display:none;">
-            <div style="margin-bottom:14px;">
-              <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">Graduation Project Hours</div>
-              <input id="sup-hours" type="number" min="0" step="0.5" autocomplete="new-password" name="apms_supervisor_hours" data-lpignore="true" placeholder="e.g. 3"
-                style="width:100%; padding:9px 12px; border:0.5px solid #e5e7eb; border-radius:8px; font-size:13px; outline:none;">
-            </div>
             <div style="margin-bottom:14px;">
               <div style="font-size:12px; font-weight:500; color:#6b7280; margin-bottom:5px;">New Password</div>
               <input id="sup-password" type="password" autocomplete="new-password" name="apms_supervisor_activation_password" data-lpignore="true" placeholder="At least 8 characters" oninput="updateSupStrength()"
@@ -461,15 +480,7 @@
   </div>
 </div>
 
-<!-- Theme toggle button -->
-<button id="activate-theme-btn" onclick="toggleLoginTheme()" title="Toggle dark / light mode" style="
-  position:fixed; top:14px; right:14px; z-index:999;
-  background:#fff; border:1px solid #e0e0e0; border-radius:8px;
-  padding:6px 8px; cursor:pointer; line-height:1; color:#555;
-  display:flex; align-items:center;
-  box-shadow:0 2px 8px rgba(0,0,0,0.1); transition:background 0.15s;">
-  <span class="material-symbols-outlined" style="font-size:18px;line-height:1">dark_mode</span>
-</button>
+</div>
 
 <script src="/static/assets/js/activate_student.js"></script>
 <script>
@@ -485,8 +496,8 @@
     var btn = document.getElementById('activate-theme-btn');
     if (btn) {
       btn.style.color       = isDark ? '#c9d1d9' : '#555';
-      btn.style.background  = isDark ? '#1e2128' : '#fff';
-      btn.style.borderColor = isDark ? '#30363d' : '#e0e0e0';
+      btn.style.background  = 'transparent';
+      btn.style.borderColor = 'transparent';
     }
   }
   document.addEventListener('DOMContentLoaded', function() {

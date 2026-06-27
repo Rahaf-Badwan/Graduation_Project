@@ -34,16 +34,35 @@ def supervisor_mystudents():
     cursor.execute("""
         SELECT
             p.project_id,
-            p.title,
+            COALESCE(NULLIF(p.title, ''), NULLIF(p.group_name, ''), CONCAT('Project ', p.project_id)) AS title,
             p.status,
             p.final_score,
             p.group_name,
+            CASE
+                WHEN COALESCE(p.group_name, '') REGEXP '^Group [0-9]+$'
+                    THEN CONCAT('Group ', p.project_id)
+                ELSE COALESCE(NULLIF(p.group_name, ''), CONCAT('Group ', p.project_id))
+            END AS display_group_name,
             s.academic_year,
             s.course_code,
-            COALESCE(pp_overall.percentage, 0) AS overall_progress,
-            COALESCE(pp_report.percentage,  0) AS report_progress,
-            COALESCE(pp_code.percentage,    0) AS code_progress,
-            COALESCE(pp_slides.percentage,  0) AS slides_progress,
+            CASE
+                WHEN pf.has_final_report = 1 AND s.course_code = 'COMP4300' THEN 100
+                ELSE GREATEST(
+                    COALESCE(pp_overall.percentage, 0),
+                    ROUND((
+                        CASE WHEN pf.has_final_report = 1 THEN 100 ELSE 0 END +
+                        CASE WHEN pf.has_source_code = 1 THEN 100 ELSE 0 END +
+                        CASE WHEN pf.has_presentation = 1 THEN 100 ELSE 0 END
+                    ) / 3)
+                )
+            END AS overall_progress,
+            GREATEST(COALESCE(pp_report.percentage, 0), CASE WHEN pf.has_final_report = 1 THEN 100 ELSE 0 END) AS report_progress,
+            GREATEST(COALESCE(pp_code.percentage, 0), CASE WHEN pf.has_source_code = 1 THEN 100 ELSE 0 END) AS code_progress,
+            GREATEST(COALESCE(pp_slides.percentage, 0), CASE WHEN pf.has_presentation = 1 THEN 100 ELSE 0 END) AS slides_progress,
+            COALESCE(pf.has_final_report, 0) AS has_final_report,
+            COALESCE(pf.has_source_code, 0) AS has_source_code,
+            COALESCE(pf.has_presentation, 0) AS has_presentation,
+            pf.latest_uploaded_at,
             GROUP_CONCAT(u.full_name ORDER BY u.full_name SEPARATOR ', ') AS students,
             COUNT(DISTINCT pm.student_id) AS team_size,
             (SELECT sn.urgency FROM supervisor_notes sn
@@ -65,13 +84,31 @@ def supervisor_mystudents():
                ON pp_code.project_id    = p.project_id AND pp_code.component    = 'source_code'
         LEFT JOIN project_progress pp_slides
                ON pp_slides.project_id  = p.project_id AND pp_slides.component  = 'presentation'
+        LEFT JOIN (
+            SELECT
+                project_id,
+                MAX(CASE WHEN file_type = 'final_report' THEN 1 ELSE 0 END) AS has_final_report,
+                MAX(CASE WHEN file_type = 'source_code' THEN 1 ELSE 0 END) AS has_source_code,
+                MAX(CASE WHEN file_type = 'presentation' THEN 1 ELSE 0 END) AS has_presentation,
+                MAX(uploaded_at) AS latest_uploaded_at
+            FROM project_files
+            WHERE (
+                COALESCE(upload_status, 'uploaded') = 'uploaded'
+                OR uploaded_at IS NOT NULL
+                OR file_data IS NOT NULL
+                OR COALESCE(file_path, '') <> ''
+            )
+            GROUP BY project_id
+        ) pf ON pf.project_id = p.project_id
         WHERE p.supervisor_id = %s
-          AND s.is_active = TRUE
+          AND LOWER(COALESCE(p.status, '')) NOT IN ('archived', 'archive', 'draft', 'cancelled')
         GROUP BY
             p.project_id, p.title, p.status, p.final_score,
             p.group_name, s.academic_year, s.course_code,
             pp_overall.percentage, pp_report.percentage,
-            pp_code.percentage, pp_slides.percentage
+            pp_code.percentage, pp_slides.percentage,
+            pf.has_final_report, pf.has_source_code, pf.has_presentation, pf.latest_uploaded_at
+        HAVING team_size > 0
         ORDER BY FIELD(p.status,
             'under_review','submitted','committee_evaluation',
             'needs_revision','accepted','rejected','archived','draft')

@@ -89,6 +89,17 @@
     window.supervisorLectureToastTimer = setTimeout(() => toast.style.display='none', error ? 5000 : 3500);
   }
 
+  function todayInputValue() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  function isFutureLectureDateTime(dateValue, timeValue) {
+    if (!dateValue || !timeValue) return false;
+    const scheduledAt = new Date(`${dateValue}T${String(timeValue).slice(0, 5)}`);
+    return !Number.isNaN(scheduledAt.getTime()) && scheduledAt > new Date();
+  }
+
   function showSupervisorLectureScope(scope, button) {
     document.querySelectorAll('#pg-supervisor-lectures .lecture-section').forEach(el => el.classList.remove('active'));
     document.getElementById(`lectureSection-${scope}`).classList.add('active');
@@ -109,7 +120,7 @@
     return `<div class="form-grid">
       <div><label>Lecture Title</label><input id="title-${prefix}" value="${lectureSafe(row.title)}" placeholder="Lecture title"></div>
       <div><label>Section / Group</label><select id="target-${prefix}">${targetOptions(scope,row.target_key || 'all')}</select></div>
-      <div><label for="date-${prefix}">Lecture Date <span style="color:#b42318">*</span></label><input id="date-${prefix}" type="date" value="${lectureSafe(row.lecture_date)}" required aria-required="true"></div>
+      <div><label for="date-${prefix}">Lecture Date <span style="color:#b42318">*</span></label><input id="date-${prefix}" type="date" value="${lectureSafe(row.lecture_date)}" min="${todayInputValue()}" required aria-required="true"></div>
       <div><label for="time-${prefix}">Lecture Time <span style="color:#b42318">*</span></label><input id="time-${prefix}" type="time" value="${lectureSafe(row.lecture_time)}" required aria-required="true"></div>
       <div><label>Week Label</label><input id="week-${prefix}" value="${lectureSafe(row.week_label)}" placeholder="Example: Week 3"></div>
       <div><label>Status</label><select id="status-${prefix}">
@@ -271,6 +282,12 @@
         timeInput.focus();
         timeInput.reportValidity();
       }
+      return;
+    }
+    if (!isFutureLectureDateTime(payload.lecture_date, payload.lecture_time)) {
+      const dateInput = document.getElementById(`date-${prefix}`);
+      lectureToast('Lecture date and time must be in the future.', true);
+      if (dateInput) dateInput.focus();
       return;
     }
     try {

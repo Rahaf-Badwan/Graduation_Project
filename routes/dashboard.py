@@ -1,11 +1,26 @@
 from flask import Blueprint, jsonify, session
 from db import get_db
 from auth import login_required
+from semester_lifecycle import auto_rollover_semesters
 
 dashboard_bp = Blueprint("dashboard_bp", __name__)
 
 
-def _current_dashboard_semester(cursor):
+def _table_exists(cursor, table_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+        """,
+        (table_name,),
+    )
+    row = cursor.fetchone() or {}
+    return int(row.get("cnt") or 0) > 0
+
+
+def _current_dashboard_semesters(cursor):
     cursor.execute("""
         SELECT semester_id, academic_year, semester_number, course_code
         FROM semesters
@@ -14,20 +29,86 @@ def _current_dashboard_semester(cursor):
           AND end_date IS NOT NULL
           AND CURDATE() BETWEEN start_date AND end_date
         ORDER BY start_date DESC, semester_id DESC
-        LIMIT 1
     """)
-    semester = cursor.fetchone()
-    if semester:
-        return semester
+    semesters = cursor.fetchall()
+    if semesters:
+        return _project_year_semesters(cursor, semesters)
 
     cursor.execute("""
         SELECT semester_id, academic_year, semester_number, course_code
         FROM semesters
         WHERE is_active = TRUE
         ORDER BY semester_id DESC
-        LIMIT 1
     """)
-    return cursor.fetchone()
+    semesters = cursor.fetchall()
+    return _project_year_semesters(cursor, semesters) if semesters else []
+
+
+def _project_year_semesters(cursor, anchor_semesters):
+    academic_years = sorted({
+        row["academic_year"]
+        for row in anchor_semesters
+        if row.get("academic_year")
+    })
+    if not academic_years:
+        return anchor_semesters
+
+    placeholders = ",".join(["%s"] * len(academic_years))
+    cursor.execute(f"""
+        SELECT semester_id, academic_year, semester_number, course_code
+        FROM semesters
+        WHERE academic_year IN ({placeholders})
+          AND course_code IN ('COMP4200', 'COMP4300')
+        ORDER BY academic_year DESC, semester_number DESC, semester_id DESC
+    """, tuple(academic_years))
+    scoped = cursor.fetchall()
+    if not scoped:
+        return anchor_semesters
+
+    anchor_ids = {row["semester_id"] for row in anchor_semesters if row.get("semester_id")}
+    scoped.sort(
+        key=lambda row: (
+            0 if row.get("semester_id") in anchor_ids else 1,
+            -int(row.get("semester_id") or 0),
+        )
+    )
+    return scoped
+
+
+def _dashboard_project_scope(cursor, semesters, include_rejected=False):
+    semester_ids = [row["semester_id"] for row in semesters if row.get("semester_id")]
+    placeholders = ",".join(["%s"] * len(semester_ids))
+    promotion_filter = ""
+    if _table_exists(cursor, "project_course_promotions"):
+        promotion_filter = """
+          AND NOT EXISTS (
+                SELECT 1
+                FROM project_course_promotions pcp
+                WHERE pcp.source_project_id = p.project_id
+          )
+        """
+    rejected_status = "" if include_rejected else "'rejected',"
+    sql = f"""
+        FROM projects p
+        WHERE p.semester_id IN ({placeholders})
+          AND LOWER(COALESCE(p.status, '')) NOT IN (
+                'archived', 'archive', 'draft', 'cancelled', {rejected_status}
+                'promoted', 'search', 'search_only', 'imported_archive',
+                'solo_pending'
+          )
+          AND COALESCE(p.title, '') NOT LIKE 'Committee Demo%%'
+          AND COALESCE(p.title, '') NOT LIKE 'COMP4300 Graduation Project%%'
+          {promotion_filter}
+          AND EXISTS (
+                SELECT 1
+                FROM project_members pm
+                JOIN students st ON st.student_id = pm.student_id
+                JOIN users us ON us.user_id = st.user_id
+                WHERE pm.project_id = p.project_id
+                  AND us.is_active = TRUE
+          )
+    """
+    return sql, tuple(semester_ids)
 
 
 @dashboard_bp.route('/api/dashboard-data')
@@ -36,10 +117,12 @@ def api_dashboard_data():
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    semester = _current_dashboard_semester(cursor)
-    semester_id = semester["semester_id"] if semester else None
+    auto_rollover_semesters(cursor)
+    db.commit()
 
-    if not semester_id:
+    semesters = _current_dashboard_semesters(cursor)
+
+    if not semesters:
         cursor.close()
         db.close()
         return jsonify({
@@ -51,47 +134,36 @@ def api_dashboard_data():
             "specializations": [],
             "coordinator": {},
             "semester": None,
+            "semesters": [],
         })
 
-    current_semester_projects = """
-        FROM projects p
-        WHERE p.semester_id = %s
-          AND p.status <> 'archived'
-          AND EXISTS (
-                SELECT 1
-                FROM project_members pm
-                JOIN students st ON st.student_id = pm.student_id
-                JOIN users us ON us.user_id = st.user_id
-                WHERE pm.project_id = p.project_id
-                  AND us.is_active = TRUE
-          )
-    """
+    current_semester_projects, semester_params = _dashboard_project_scope(cursor, semesters)
+    decided_semester_projects, decided_semester_params = _dashboard_project_scope(
+        cursor, semesters, include_rejected=True
+    )
 
     cursor.execute(f"""
         SELECT COUNT(*) AS total_projects
         {current_semester_projects}
-    """, (semester_id,))
+    """, semester_params)
     total_projects = (cursor.fetchone() or {}).get("total_projects", 0)
 
     # Count supervisors participating in this semester, not all supervisor accounts.
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT COUNT(DISTINCT f.faculty_id) AS active_supervisors
         FROM projects p
         JOIN faculty f ON f.faculty_id = p.supervisor_id
         JOIN users u ON u.user_id = f.user_id
-        WHERE p.semester_id = %s
-          AND p.status <> 'archived'
+        WHERE p.project_id IN (
+            SELECT scoped.project_id
+            FROM (
+                SELECT p.project_id
+                {current_semester_projects}
+            ) scoped
+        )
           AND u.is_active = TRUE
           AND u.role = 'supervisor'
-          AND EXISTS (
-                SELECT 1
-                FROM project_members pm
-                JOIN students st ON st.student_id = pm.student_id
-                JOIN users us ON us.user_id = st.user_id
-                WHERE pm.project_id = p.project_id
-                  AND us.is_active = TRUE
-          )
-    """, (semester_id,))
+    """, semester_params)
     active_supervisors = (cursor.fetchone() or {}).get("active_supervisors", 0)
 
     # Acceptance rate
@@ -99,8 +171,8 @@ def api_dashboard_data():
         SELECT
             SUM(p.status = 'accepted') AS accepted_count,
             SUM(p.status = 'rejected') AS rejected_count
-        {current_semester_projects}
-    """, (semester_id,))
+        {decided_semester_projects}
+    """, decided_semester_params)
     row = cursor.fetchone() or {}
     accepted = row.get("accepted_count") or 0
     rejected = row.get("rejected_count") or 0
@@ -112,7 +184,7 @@ def api_dashboard_data():
         SELECT ROUND(AVG(p.final_score), 1) AS avg_grade
         {current_semester_projects}
           AND p.final_score IS NOT NULL
-    """, (semester_id,))
+    """, semester_params)
     avg_grade = (cursor.fetchone() or {}).get("avg_grade") or 0
 
     # Last 3 notifications
@@ -133,27 +205,24 @@ def api_dashboard_data():
             n["created_at"] = n["created_at"].strftime("%Y-%m-%dT%H:%M:%S")
 
     # Performance per specialization
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT
             f.specialization,
             ROUND(AVG(p.final_score), 1) AS avg_score,
             COUNT(p.project_id) AS project_count
         FROM projects p
         JOIN faculty f ON f.faculty_id = p.supervisor_id
-        WHERE p.semester_id = %s
-          AND p.status <> 'archived'
+        WHERE p.project_id IN (
+            SELECT scoped.project_id
+            FROM (
+                SELECT p.project_id
+                {current_semester_projects}
+            ) scoped
+        )
           AND p.final_score IS NOT NULL
-          AND EXISTS (
-                SELECT 1
-                FROM project_members pm
-                JOIN students st ON st.student_id = pm.student_id
-                JOIN users us ON us.user_id = st.user_id
-                WHERE pm.project_id = p.project_id
-                  AND us.is_active = TRUE
-          )
         GROUP BY f.specialization
         ORDER BY avg_score DESC
-    """, (semester_id,))
+    """, semester_params)
     specialization_raw = cursor.fetchall()
 
     spec_labels = {
@@ -187,14 +256,15 @@ def api_dashboard_data():
     ]
 
     # Current coordinator for the same semester used by the statistic cards.
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT u.full_name AS coordinator_name, u.email AS coordinator_email
         FROM coordinator_assignments ca
         JOIN faculty f ON f.faculty_id = ca.faculty_id
         JOIN users u ON u.user_id = f.user_id
-        WHERE ca.semester_id = %s
+        WHERE ca.semester_id IN ({",".join(["%s"] * len(semester_params))})
+        ORDER BY ca.semester_id DESC
         LIMIT 1
-    """, (semester_id,))
+    """, semester_params)
     coordinator = cursor.fetchone() or {}
 
     cursor.close()
@@ -208,7 +278,8 @@ def api_dashboard_data():
         "notifications": notifications,
         "specializations": specializations,
         "coordinator": coordinator,
-        "semester": semester,
+        "semester": semesters[0],
+        "semesters": semesters,
     })
 
 

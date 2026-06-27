@@ -438,6 +438,13 @@
           <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...</div>
         </div>
       </div>
+
+      <div class="card" id="absence-summary-card">
+        <div class="card-hd"><span class="card-title">Attendance Summary</span></div>
+        <div id="absence-summary">
+          <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;padding:16px 0">Loading...</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -524,6 +531,7 @@
     file_uploaded : { icon: 'upload_file',    color: 'var(--blue)',  label: 'File'     },
     system        : { icon: 'info',           color: 'var(--amber)', label: 'System'   },
     milestone     : { icon: 'flag',           color: 'var(--green)', label: 'Milestone'},
+    urgent_alert  : { icon: 'warning',        color: 'var(--coral)', label: 'Alert'    },
   };
 
   function renderNotifications(notifs) {
@@ -540,13 +548,13 @@
       return `<div
         style="display:flex;align-items:center;gap:12px;padding:10px 12px;
                background:var(--color-background-secondary);border-radius:10px;
-               border-left:3px solid var(--green);margin-bottom:8px;
+               border-left:3px solid ${cfg.color};margin-bottom:8px;
                transition:background .18s,box-shadow .18s,transform .12s;cursor:default;"
         onmouseenter="this.style.background='rgba(26,107,58,.07)';this.style.boxShadow='0 2px 12px rgba(0,0,0,.08)';this.style.transform='translateY(-1px)'"
         onmouseleave="this.style.background='var(--color-background-secondary)';this.style.boxShadow='none';this.style.transform='translateY(0)'">
         <div style="width:32px;height:32px;border-radius:8px;background:rgba(26,107,58,.1);
                     display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">
-          <span class="material-symbols-outlined" style="font-size:17px;color:var(--green)">notifications</span>
+          <span class="material-symbols-outlined" style="font-size:17px;color:${cfg.color}">${cfg.icon}</span>
         </div>
         <div style="width:1px;height:30px;background:var(--color-border-tertiary);flex-shrink:0"></div>
         <div style="flex:1;min-width:0">
@@ -559,6 +567,36 @@
         ${unreadDot}
       </div>`;
     }).join('');
+  }
+
+  function renderAbsenceSummary(summary) {
+    const card = document.getElementById('absence-summary-card');
+    const box = document.getElementById('absence-summary');
+    const data = summary || {};
+    const total = Number(data.total || 0);
+    const coordinator = Number(data.coordinator || 0);
+    const supervisor = Number(data.supervisor || 0);
+    if (card) card.style.display = total > 0 ? '' : 'none';
+    if (total <= 0) {
+      box.innerHTML = '';
+      return;
+    }
+    const tone = total > 0 ? 'var(--coral)' : 'var(--green)';
+    const bg = total > 0 ? 'var(--coral-light)' : 'var(--green-light)';
+    box.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;background:${bg};border-radius:10px;border-left:3px solid ${tone}">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.72);display:grid;place-items:center;flex-shrink:0">
+          <span class="material-symbols-outlined" style="font-size:20px;color:${tone}">${total > 0 ? 'event_busy' : 'event_available'}</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--color-text-primary)">
+            ${total} absence${total === 1 ? '' : 's'} this semester
+          </div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:3px">
+            Coordinator lectures: ${coordinator} · Supervisor lectures: ${supervisor}
+          </div>
+        </div>
+      </div>`;
   }
 
   function initCharts() {
@@ -857,6 +895,7 @@
     document.getElementById('needs-title-banner').style.display = d.needs_title ? '' : 'none';
 
     renderNotifications((d.notifications || []).slice(0, 3));
+    renderAbsenceSummary(d.absence_summary);
 
     overallChart.data.datasets[0].data = [readiness, Math.max(0, 100 - readiness)];
     overallChart.update();

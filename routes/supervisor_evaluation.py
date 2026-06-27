@@ -76,14 +76,16 @@ def _evaluation_item_title(cursor, course_scope, reference_id):
     else:
         cursor.execute(
             """
-            SELECT sec.section_name AS title,
+            SELECT COALESCE(NULLIF(p.title, ''), sec.section_name) AS title,
                    COALESCE(GROUP_CONCAT(DISTINCT u.full_name ORDER BY u.full_name SEPARATOR ', '), '') AS students
             FROM student_distribution_sections sec
+            LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+            LEFT JOIN projects p ON p.project_id = cps.project_id
             LEFT JOIN section_students ss ON ss.section_id = sec.section_id
             LEFT JOIN students st ON st.student_id = ss.student_id
             LEFT JOIN users u ON u.user_id = st.user_id
             WHERE sec.section_id = %s
-            GROUP BY sec.section_id, sec.section_name
+            GROUP BY sec.section_id, sec.section_name, p.title
             """,
             (reference_id,),
         )

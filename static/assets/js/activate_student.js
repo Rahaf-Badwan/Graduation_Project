@@ -63,7 +63,6 @@ function clearActivationFields() {
     'password',
     'confirmPassword',
     'supervisor-id',
-    'sup-hours',
     'sup-password',
     'sup-confirmPassword'
   ].forEach(function(id) {
@@ -291,7 +290,7 @@ async function verifySupervisor() {
       pendingSupUserId = data.user_id;
       goToSupPhase('sup-phase-password');
       setSupPills('done', 'active');
-      document.getElementById('sup-card-title').textContent = 'Set Hours & Password';
+      document.getElementById('sup-card-title').textContent = 'Set Your Password';
     } else if (res.status === 404) {
       goToSupPhase('sup-phase-not-found');
       setSupPills('done', 'active');
@@ -309,16 +308,11 @@ async function verifySupervisor() {
 
 async function setSupPassword() {
   hideFeedback('sup-pass-feedback');
-  var hours   = document.getElementById('sup-hours').value.trim();
   var pass    = document.getElementById('sup-password').value;
   var confirm = document.getElementById('sup-confirmPassword').value;
 
-  if (!hours || !pass || !confirm) {
+  if (!pass || !confirm) {
     showFeedback('sup-pass-feedback', 'Please fill in all fields.', 'warn');
-    return;
-  }
-  if (isNaN(hours) || parseFloat(hours) < 0) {
-    showFeedback('sup-pass-feedback', 'Please enter a valid hours value.', 'warn');
     return;
   }
   if (pass.length < 8) {
@@ -339,7 +333,6 @@ async function setSupPassword() {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         user_id: pendingSupUserId,
-        graduation_project_hours: parseFloat(hours),
         password: pass,
         confirm_password: confirm
       })
@@ -363,7 +356,7 @@ async function setSupPassword() {
 
 function resetSupToStep1() {
   pendingSupUserId = null;
-  ['sup-hours', 'sup-password', 'sup-confirmPassword'].forEach(function(id) {
+  ['sup-password', 'sup-confirmPassword'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });

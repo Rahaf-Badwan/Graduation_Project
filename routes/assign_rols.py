@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request, session
 from db import get_db
 from auth import login_required
+from semester_lifecycle import auto_rollover_semesters
 
 assign_rols_bp = Blueprint("assign_rols_bp", __name__)
 
@@ -50,7 +51,7 @@ def _ensure_academic_year_semesters(cursor, academic_year):
     start_year, end_year = parsed
     course_rows = [
         ("COMP4200", 1, f"{start_year}-09-01", f"{end_year}-07-01"),
-        ("COMP4300", 1, f"{start_year}-09-01", f"{end_year}-07-01"),
+        ("COMP4300", 2, f"{start_year}-09-01", f"{end_year}-07-01"),
     ]
 
     for course_code, semester_number, start_date, end_date in course_rows:
@@ -60,9 +61,10 @@ def _ensure_academic_year_semesters(cursor, academic_year):
             FROM semesters
             WHERE academic_year = %s
               AND semester_number = %s
+              AND course_code = %s
             LIMIT 1
             """,
-            (academic_year, semester_number),
+            (academic_year, semester_number, course_code),
         )
         existing = cursor.fetchone()
         if existing:
@@ -124,6 +126,9 @@ def _project_counts_by_year(cursor):
 def get_assign_coordinator_data():
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
+
+    auto_rollover_semesters(cursor)
+    conn.commit()
 
     cursor.execute(
         """
@@ -237,7 +242,7 @@ def create_academic_year():
 
         rows = [
             ("COMP4200", 1, semester_start, semester_end),
-            ("COMP4300", 1, semester_start, semester_end),
+            ("COMP4300", 2, semester_start, semester_end),
         ]
         for course_code, semester_number, start_date, end_date in rows:
             cursor.execute(

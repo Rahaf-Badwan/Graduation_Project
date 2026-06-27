@@ -130,6 +130,59 @@ def _student_dashboard_notifications(
     )
 
 
+def _student_absence_summary(cursor, student_id, semester_id=None):
+    summary = {"total": 0, "coordinator": 0, "supervisor": 0}
+    if not student_id:
+        return summary
+
+    semester_filter = "AND cl.semester_id = %s" if semester_id else ""
+    params = [student_id]
+    if semester_id:
+        params.append(semester_id)
+    if (
+        _table_exists_student(cursor, "coordinator_lecture_attendance")
+        and _table_exists_student(cursor, "coordinator_lectures")
+    ):
+        cursor.execute(
+            f"""
+            SELECT COUNT(DISTINCT cla.lecture_id) AS cnt
+            FROM coordinator_lecture_attendance cla
+            JOIN coordinator_lectures cl ON cl.lecture_id = cla.lecture_id
+            WHERE cla.student_id = %s
+              AND LOWER(COALESCE(cla.attendance_status, '')) = 'absent'
+              AND COALESCE(cl.status, '') <> 'cancelled'
+              {semester_filter}
+            """,
+            tuple(params),
+        )
+        summary["coordinator"] = int((cursor.fetchone() or {}).get("cnt") or 0)
+
+    semester_filter = "AND sl.semester_id = %s" if semester_id else ""
+    params = [student_id]
+    if semester_id:
+        params.append(semester_id)
+    if (
+        _table_exists_student(cursor, "supervisor_lecture_attendance")
+        and _table_exists_student(cursor, "supervisor_lectures")
+    ):
+        cursor.execute(
+            f"""
+            SELECT COUNT(DISTINCT sla.lecture_id) AS cnt
+            FROM supervisor_lecture_attendance sla
+            JOIN supervisor_lectures sl ON sl.lecture_id = sla.lecture_id
+            WHERE sla.student_id = %s
+              AND LOWER(COALESCE(sla.attendance_status, '')) = 'absent'
+              AND COALESCE(sl.status, '') <> 'cancelled'
+              {semester_filter}
+            """,
+            tuple(params),
+        )
+        summary["supervisor"] = int((cursor.fetchone() or {}).get("cnt") or 0)
+
+    summary["total"] = summary["coordinator"] + summary["supervisor"]
+    return summary
+
+
 @student_bp.route("/api/dashboard-data", methods=["GET"])
 @login_required(role="student")
 def api_dashboard_data():
@@ -156,6 +209,7 @@ def api_dashboard_data():
         "days_to_deadline": None,
         "notifications": [],
         "unread_notifs": 0,
+        "absence_summary": {"total": 0, "coordinator": 0, "supervisor": 0},
         "team_members": [],
         "project_type_distribution": [],
         "final_submission_window": None,
@@ -236,16 +290,7 @@ def api_dashboard_data():
             db.commit()
 
         # 3. السمستر الأكتف
-        cursor.execute(
-            """
-            SELECT semester_id, academic_year, start_date, end_date
-            FROM   semesters
-            WHERE  is_active = TRUE AND course_code = %s
-            ORDER  BY semester_id DESC LIMIT 1
-            """,
-            (target_course,),
-        )
-        sem = cursor.fetchone()
+        sem = _student_semester_for_course(cursor, target_course)
         if target_course == "COMP4300" and promoted_to:
             cursor.execute(
                 """
@@ -263,6 +308,7 @@ def api_dashboard_data():
         semester_id = sem["semester_id"]
         semester_start = _as_date(sem["start_date"])
         result["academic_year"] = sem["academic_year"] or ""
+        result["absence_summary"] = _student_absence_summary(cursor, student_id, semester_id)
         intro_section = None
         is_section_workspace = False
         if target_course == "COMP4200":
@@ -315,7 +361,7 @@ def api_dashboard_data():
             FROM   project_members pm
             JOIN   students  st  ON st.student_id = pm.student_id
             JOIN   projects  p   ON p.project_id  = pm.project_id
-            JOIN   semesters s   ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            JOIN   semesters s   ON s.semester_id  = p.semester_id
             LEFT JOIN faculty  f ON f.faculty_id  = p.supervisor_id
             LEFT JOIN users    u ON u.user_id      = f.user_id
             WHERE  st.user_id = %s
@@ -800,6 +846,11 @@ def api_set_project_idea():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        semester = _student_semester_for_course(cursor, "COMP4200")
+        if not semester:
+            cursor.close()
+            db.close()
+            return jsonify({"error": "No COMP4200 semester found."}), 404
 
         cursor.execute(
             """
@@ -808,14 +859,14 @@ def api_set_project_idea():
             JOIN students st ON st.student_id = pm.student_id
             JOIN projects p  ON p.project_id  = pm.project_id
             JOIN semesters s ON s.semester_id  = p.semester_id
-                            AND s.is_active = TRUE
                             AND s.course_code = 'COMP4200'
             WHERE st.user_id = %s
+              AND p.semester_id = %s
               AND p.status NOT IN ('solo_pending', 'archived')
             ORDER BY p.project_id DESC
             LIMIT 1
             """,
-            (user_id,),
+            (user_id, semester["semester_id"]),
         )
         row = cursor.fetchone()
         if not row:

@@ -94,6 +94,11 @@
     gap: 12px
   }
 
+  .sn-form-row>*,
+  .sn-field {
+    min-width: 0
+  }
+
   @media(max-width:700px) {
     .sn-form-row {
       grid-template-columns: 1fr
@@ -133,7 +138,19 @@
     background: var(--color-background-primary);
     outline: none;
     font-family: inherit;
+    max-width: 100%;
+    min-width: 0;
     transition: border-color .15s, box-shadow .15s, background .15s
+  }
+
+  .sn-course-lock {
+    border: 1px solid #cfe0d4;
+    border-radius: 14px;
+    padding: 11px 13px;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--sn-green);
+    background: var(--green-light)
   }
 
   .sn-field textarea {
@@ -459,7 +476,8 @@
   }
 
   .sn-compose-drawer .sn-body {
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     flex: 1;
     padding-bottom: 28px
   }
@@ -814,15 +832,19 @@
                 <option value="">Choose receiver...</option>
                 <option value="heads">Head of Department</option>
                 <option value="coordinators">Course Coordinator</option>
-                <option value="students">My Students / selected course</option>
+                <option value="students">All My Students</option>
                 <option value="section">My Section / Project students</option>
                 <option value="student">One of My Students</option>
               </select>
             </div>
-            <div class="sn-field sn-specific-wrap" id="snSpecificWrap">
-              <label for="snSpecific">Choose specific receiver</label>
-              <select id="snSpecific" name="value"></select>
-            </div>
+          </div>
+          <div class="sn-field" id="snSectionWrap" style="display:none">
+            <label for="snSectionSelect">Choose section / project</label>
+            <select id="snSectionSelect"></select>
+          </div>
+          <div class="sn-field sn-specific-wrap" id="snSpecificWrap">
+            <label for="snSpecific">Choose specific receiver</label>
+            <select id="snSpecific" name="value"></select>
           </div>
           <div class="sn-field" id="courseScopeWrap" style="display:none">
             <label for="snCourseScope">Message for</label>
@@ -831,6 +853,7 @@
               <option value="graduation_project">Graduation Project / COMP4300</option>
               <option value="both">Both</option>
             </select>
+            <div class="sn-course-lock" id="snCourseLocked" style="display:none"></div>
           </div>
           <div class="sn-field">
             <label for="snTitle">Title</label>
@@ -1048,8 +1071,14 @@
       return code;
     }
 
+    function courseScopeText(scope) {
+      if (scope === 'introduction') return 'Project Introduction / COMP4200';
+      if (scope === 'graduation_project') return 'Graduation Project / COMP4300';
+      return 'Both';
+    }
+
     function sendScopeNeedsCourse(scope) {
-      return ['coordinators', 'students', 'student', 'section'].includes(scope);
+      return ['students', 'student', 'section'].includes(scope);
     }
 
     function toggleCourseScopeField() {
@@ -1063,6 +1092,41 @@
         wrap.style.display = 'none';
         select.value = 'both';
       }
+    }
+
+    function selectedSpecificCourseScope() {
+      const select = $('snSpecific');
+      if (!select || !select.selectedOptions || !select.selectedOptions.length) return '';
+      const scope = select.selectedOptions[0].dataset.courseScope || '';
+      return ['introduction', 'graduation_project', 'both'].includes(scope) ? scope : '';
+    }
+
+    function setCourseScopeMode() {
+      const scope = $('snScope').value;
+      const select = $('snCourseScope');
+      const locked = $('snCourseLocked');
+      const specificScope = selectedSpecificCourseScope();
+      const shouldLock = ['student', 'section'].includes(scope) && specificScope;
+      if (!select || !locked) return;
+      if (shouldLock) {
+        select.value = specificScope;
+        select.style.display = 'none';
+        locked.textContent = courseScopeText(specificScope);
+        locked.style.display = 'block';
+      } else {
+        select.style.display = '';
+        locked.style.display = 'none';
+        locked.textContent = '';
+      }
+    }
+
+    function effectiveCourseScopeForSend() {
+      const scope = $('snScope').value;
+      if (scope === 'coordinators') return 'both';
+      if (['student', 'section'].includes(scope)) {
+        return selectedSpecificCourseScope() || $('snCourseScope').value || 'both';
+      }
+      return $('snCourseScope').value || 'both';
     }
 
     function filterByCourse(rows) {
@@ -1108,6 +1172,185 @@
         wrap.style.display = 'none';
         select.value = '';
       }
+    }
+
+    function updateSpecificWrap() {
+      toggleCourseScopeField();
+      const scope = $('snScope').value;
+      const selectedCourse = $('snCourseScope').value || 'both';
+      const wrap = $('snSpecificWrap');
+      const select = $('snSpecific');
+      const label = wrap ? wrap.querySelector('label') : null;
+      select.innerHTML = '';
+      let rows = [], placeholder = 'Choose...';
+
+      if (scope === 'student') {
+        rows = filterByCourse(state.options.students || []);
+        placeholder = selectedCourse === 'graduation_project'
+          ? 'Choose one of your COMP4300 students...'
+          : selectedCourse === 'introduction'
+            ? 'Choose one of your COMP4200 students...'
+            : 'Choose one of your students...';
+        if (label) label.textContent = 'Choose one of your students';
+        rows.forEach(s => {
+          const rowScope = s.course_scope || 'both';
+          select.insertAdjacentHTML(
+            'beforeend',
+            '<option value="' + esc(s.student_id) + '" data-course-scope="' + esc(rowScope) + '">' +
+            esc(s.full_name) + ' - ' + esc(s.university_id || '') + ' - ' + esc(optionCourseLabel(s)) +
+            '</option>'
+          );
+        });
+      } else if (scope === 'section') {
+        rows = filterByCourse(state.options.sections || []);
+        placeholder = selectedCourse === 'graduation_project'
+          ? 'Choose one of your COMP4300 projects...'
+          : selectedCourse === 'introduction'
+            ? 'Choose one of your COMP4200 sections...'
+            : 'Choose one of your sections/projects...';
+        if (label) label.textContent = 'Choose your section/project';
+        rows.forEach(sec => {
+          const rowScope = sec.course_scope || 'both';
+          select.insertAdjacentHTML(
+            'beforeend',
+            '<option value="' + esc(sec.section_key || sec.section_id) + '" data-course-scope="' + esc(rowScope) + '">' +
+            esc(sec.course_code || optionCourseLabel(sec)) + ' - ' + esc(sec.section_name) +
+            ' (' + esc(sec.students_count || 0) + ' students)</option>'
+          );
+        });
+      }
+
+      if (['student', 'section'].includes(scope)) {
+        select.insertAdjacentHTML('afterbegin', '<option value="">' + placeholder + '</option>');
+        wrap.style.display = 'flex';
+      } else {
+        wrap.style.display = 'none';
+        select.value = '';
+      }
+      setCourseScopeMode();
+    }
+
+    function sendScopeNeedsCourse(scope) {
+      return false;
+    }
+
+    function sectionKey(row) {
+      if (!row) return '';
+      if (row.section_key) return String(row.section_key);
+      const prefix = row.course_scope === 'graduation_project' ? 'p:' : 's:';
+      return prefix + String(row.section_id || '');
+    }
+
+    function selectedSectionRow() {
+      const selected = $('snSectionSelect') ? $('snSectionSelect').value : '';
+      if (!selected) return null;
+      return (state.options.sections || []).find(sec => sectionKey(sec) === selected) || null;
+    }
+
+    function rowMatchesSection(row, section) {
+      if (!row || !section) return false;
+      return (row.course_scope || 'both') === (section.course_scope || 'both')
+        && String(row.section_id || '') === String(section.section_id || '');
+    }
+
+    function setCourseScopeMode() {
+      const scope = $('snScope').value;
+      const wrap = $('courseScopeWrap');
+      const select = $('snCourseScope');
+      const locked = $('snCourseLocked');
+      const section = selectedSectionRow();
+      const derivedScope = selectedSpecificCourseScope() || (section ? section.course_scope : '');
+      const shouldShowDerived = ['student', 'section'].includes(scope) && derivedScope;
+      if (!wrap || !select || !locked) return;
+      if (shouldShowDerived) {
+        wrap.style.display = 'none';
+        select.value = derivedScope;
+        select.style.display = 'none';
+        locked.textContent = courseScopeText(derivedScope);
+        locked.style.display = 'none';
+      } else {
+        wrap.style.display = 'none';
+        select.value = 'both';
+        select.style.display = '';
+        locked.style.display = 'none';
+        locked.textContent = '';
+      }
+    }
+
+    function effectiveCourseScopeForSend() {
+      const scope = $('snScope').value;
+      if (scope === 'coordinators' || scope === 'students') return 'both';
+      if (['student', 'section'].includes(scope)) {
+        const section = selectedSectionRow();
+        return selectedSpecificCourseScope() || (section ? section.course_scope : '') || 'both';
+      }
+      return 'both';
+    }
+
+    function updateSpecificWrap() {
+      const scope = $('snScope').value;
+      const sectionWrap = $('snSectionWrap');
+      const sectionSelect = $('snSectionSelect');
+      const specificWrap = $('snSpecificWrap');
+      const specificSelect = $('snSpecific');
+      const specificLabel = specificWrap ? specificWrap.querySelector('label') : null;
+      const needsSection = ['section', 'student'].includes(scope);
+      const selectedSection = sectionSelect ? sectionSelect.value : '';
+
+      if (sectionSelect) {
+        sectionSelect.innerHTML = '';
+        if (needsSection) {
+          const placeholder = scope === 'student'
+            ? 'Choose section/project first...'
+            : 'Choose section/project...';
+          sectionSelect.insertAdjacentHTML('beforeend', '<option value="">' + placeholder + '</option>');
+          (state.options.sections || []).forEach(sec => {
+            const key = sectionKey(sec);
+            sectionSelect.insertAdjacentHTML(
+              'beforeend',
+              '<option value="' + esc(key) + '" data-course-scope="' + esc(sec.course_scope || 'both') + '">' +
+              esc(sec.course_code || optionCourseLabel(sec)) + ' - ' + esc(sec.section_name) +
+              ' (' + esc(sec.students_count || 0) + ' students)</option>'
+            );
+          });
+          if ([...sectionSelect.options].some(opt => opt.value === selectedSection)) {
+            sectionSelect.value = selectedSection;
+          }
+        }
+      }
+
+      if (sectionWrap) sectionWrap.style.display = needsSection ? 'flex' : 'none';
+
+      if (specificSelect) {
+        specificSelect.innerHTML = '';
+        if (scope === 'student') {
+          const section = selectedSectionRow();
+          const rows = section
+            ? (state.options.students || []).filter(row => rowMatchesSection(row, section))
+            : [];
+          specificSelect.disabled = !section;
+          specificSelect.insertAdjacentHTML(
+            'beforeend',
+            '<option value="">' + (section ? 'Choose one student...' : 'Choose section/project first...') + '</option>'
+          );
+          rows.forEach(s => {
+            const rowScope = s.course_scope || (section ? section.course_scope : 'both');
+            specificSelect.insertAdjacentHTML(
+              'beforeend',
+              '<option value="' + esc(s.student_id) + '" data-course-scope="' + esc(rowScope) + '">' +
+              esc(s.full_name) + ' - ' + esc(s.university_id || '') + '</option>'
+            );
+          });
+          if (specificLabel) specificLabel.textContent = 'Choose student';
+          specificWrap.style.display = 'flex';
+        } else {
+          specificSelect.disabled = false;
+          specificSelect.value = '';
+          specificWrap.style.display = 'none';
+        }
+      }
+
+      setCourseScopeMode();
     }
 
     function renderInbox(rows) {
@@ -1248,11 +1491,20 @@
 
     $('snSendForm').addEventListener('submit', async e => {
       e.preventDefault();
-      if (['student', 'section'].includes($('snScope').value) && !$('snSpecific').value) {
-        showToast('Please choose a specific receiver.', true); return;
+      const sendScope = $('snScope').value;
+      if (sendScope === 'section' && !$('snSectionSelect').value) {
+        showToast('Please choose a section/project.', true); return;
+      }
+      if (sendScope === 'student' && !$('snSectionSelect').value) {
+        showToast('Please choose a section/project first.', true); return;
+      }
+      if (sendScope === 'student' && !$('snSpecific').value) {
+        showToast('Please choose a student.', true); return;
       }
       const fd = new FormData($('snSendForm'));
-      if (['student', 'section'].includes($('snScope').value)) fd.set('value', $('snSpecific').value);
+      if (sendScope === 'section') fd.set('value', $('snSectionSelect').value);
+      if (sendScope === 'student') fd.set('value', $('snSpecific').value);
+      fd.set('course_scope', effectiveCourseScopeForSend());
       if (!$('snUrgent').checked) fd.delete('urgent');
       fd.set('can_reply', $('snCanReply') && $('snCanReply').checked ? '1' : '0');
       try {
@@ -1281,6 +1533,8 @@
 
     $('snScope').addEventListener('change', updateSpecificWrap);
     $('snCourseScope').addEventListener('change', updateSpecificWrap);
+    $('snSectionSelect').addEventListener('change', updateSpecificWrap);
+    $('snSpecific').addEventListener('change', setCourseScopeMode);
 
     document.querySelectorAll('.sn-tab').forEach(btn => {
       btn.addEventListener('click', () => {

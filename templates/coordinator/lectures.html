@@ -496,6 +496,17 @@
     }, isError ? 5000 : 3600);
   }
 
+  function todayInputValue() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  function isFutureLectureDateTime(dateValue, timeValue) {
+    if (!dateValue || !timeValue) return false;
+    const scheduledAt = new Date(`${dateValue}T${String(timeValue).slice(0, 5)}`);
+    return !Number.isNaN(scheduledAt.getTime()) && scheduledAt > new Date();
+  }
+
   function resetLectureScroll() {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
@@ -556,7 +567,7 @@
 
         <div>
           <label>Lecture Date <span style="color:#b42318">*</span></label>
-          <input id="lecDate-${scope}" type="date" required>
+          <input id="lecDate-${scope}" type="date" min="${todayInputValue()}" required>
         </div>
 
         <div>
@@ -612,7 +623,7 @@
 
         <div>
           <label>Lecture Date <span style="color:#b42318">*</span></label>
-          <input id="lecEditDate-${lecture.lecture_id}" type="date" value="${safe(lecture.lecture_date || '')}" required>
+          <input id="lecEditDate-${lecture.lecture_id}" type="date" value="${safe(lecture.lecture_date || '')}" min="${todayInputValue()}" required>
         </div>
 
         <div>
@@ -957,6 +968,12 @@
       if (missing) { missing.focus(); missing.reportValidity(); }
       return;
     }
+    if (!isFutureLectureDateTime(payload.lecture_date, payload.lecture_time)) {
+      showLectureToast('Lecture date and time must be in the future.', true);
+      const dateInput = document.getElementById(`lecDate-${scope}`);
+      if (dateInput) dateInput.focus();
+      return;
+    }
 
     try {
       const result = await apiFetch('/api/coordinator/lectures', {
@@ -985,6 +1002,11 @@
       showLectureToast('Lecture date and time are required.', true);
       const missing = !dateInput.value ? dateInput : timeInput;
       missing.focus(); missing.reportValidity();
+      return;
+    }
+    if (!isFutureLectureDateTime(dateInput.value, timeInput.value)) {
+      showLectureToast('Lecture date and time must be in the future.', true);
+      dateInput.focus();
       return;
     }
 
@@ -1021,6 +1043,12 @@
         ? document.getElementById(`lecEditDate-${lectureId}`)
         : document.getElementById(`lecEditTime-${lectureId}`);
       if (missing) { missing.focus(); missing.reportValidity(); }
+      return;
+    }
+    if (!isFutureLectureDateTime(payload.lecture_date, payload.lecture_time)) {
+      showLectureToast('Lecture date and time must be in the future.', true);
+      const dateInput = document.getElementById(`lecEditDate-${lectureId}`);
+      if (dateInput) dateInput.focus();
       return;
     }
 

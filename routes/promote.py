@@ -6,6 +6,7 @@ from auth import login_required
 from ai_pdf_indexer import index_archived_project_reports
 from db import get_db
 from routes.project_cleanup import clear_supervisor_project_workspace
+from semester_lifecycle import auto_rollover_semesters
 
 
 promote_bp = Blueprint("promote", __name__)
@@ -178,13 +179,28 @@ def _insert_notification(
 
 
 def _active_comp4300_semester(cursor):
+    try:
+        auto_rollover_semesters(cursor)
+    except Exception:
+        pass
+    has_start_date = _db_column_exists(cursor, "semesters", "start_date")
+    has_end_date = _db_column_exists(cursor, "semesters", "end_date")
+    fields = ["semester_id", "academic_year", "semester_number", "course_code"]
+    if has_start_date:
+        fields.append("start_date")
+    if has_end_date:
+        fields.append("end_date")
+    semester_order = (
+        "start_date DESC, semester_id DESC" if has_start_date else "semester_id DESC"
+    )
+
     cursor.execute(
-        """
-        SELECT semester_id, academic_year, semester_number, course_code
+        f"""
+        SELECT {', '.join(fields)}
         FROM semesters
         WHERE course_code = 'COMP4300'
           AND is_active = TRUE
-        ORDER BY semester_id DESC
+        ORDER BY {semester_order}
         LIMIT 1
         """
     )
@@ -193,11 +209,34 @@ def _active_comp4300_semester(cursor):
         return semester
 
     cursor.execute(
-        """
-        SELECT semester_id, academic_year, semester_number, course_code
+        f"""
+        SELECT {', '.join(fields)}
         FROM semesters
         WHERE course_code = 'COMP4300'
-        ORDER BY semester_id DESC
+          AND (start_date IS NULL OR start_date <= CURDATE())
+          AND (end_date IS NULL OR end_date >= CURDATE())
+        ORDER BY {semester_order}
+        LIMIT 1
+        """
+        if has_start_date and has_end_date
+        else f"""
+        SELECT {', '.join(fields)}
+        FROM semesters
+        WHERE course_code = 'COMP4300'
+        ORDER BY {semester_order}
+        LIMIT 1
+        """,
+    )
+    semester = cursor.fetchone()
+    if semester:
+        return semester
+
+    cursor.execute(
+        f"""
+        SELECT {', '.join(fields)}
+        FROM semesters
+        WHERE course_code = 'COMP4300'
+        ORDER BY {semester_order}
         LIMIT 1
         """
     )

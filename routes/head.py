@@ -19,6 +19,7 @@ from routes.assign_rols import assign_rols_bp
 from routes.promote import promote_bp
 from routes.dashboard import dashboard_bp
 from routes.supervisors import head_supervisors_bp
+from semester_lifecycle import auto_rollover_semesters
 
 head_bp = Blueprint("head", __name__, url_prefix="/head")
 head_bp.register_blueprint(add_student_bp)
@@ -486,12 +487,59 @@ def _head_notification_row_to_json(row):
 
 def _head_active_semester_by_course(cursor, course_code):
     """Return the active semester for one course code."""
+    try:
+        auto_rollover_semesters(cursor)
+    except Exception:
+        pass
+
+    has_start_date = _head_db_column_exists(cursor, "semesters", "start_date")
+    has_end_date = _head_db_column_exists(cursor, "semesters", "end_date")
+    fields = ["semester_id", "academic_year", "semester_number", "course_code"]
+    if has_start_date:
+        fields.append("start_date")
+    if has_end_date:
+        fields.append("end_date")
+    semester_order = (
+        "start_date DESC, semester_id DESC" if has_start_date else "semester_id DESC"
+    )
+
     cursor.execute(
-        """
-        SELECT semester_id, academic_year, semester_number, course_code
+        f"""
+        SELECT {', '.join(fields)}
         FROM semesters
         WHERE is_active = TRUE AND course_code = %s
-        ORDER BY semester_id DESC
+        ORDER BY {semester_order}
+        LIMIT 1
+        """,
+        (course_code,),
+    )
+    row = cursor.fetchone()
+    if row:
+        return row
+
+    if has_start_date and has_end_date:
+        cursor.execute(
+            f"""
+            SELECT {', '.join(fields)}
+            FROM semesters
+            WHERE course_code = %s
+              AND (start_date IS NULL OR start_date <= CURDATE())
+              AND (end_date IS NULL OR end_date >= CURDATE())
+            ORDER BY {semester_order}
+            LIMIT 1
+            """,
+            (course_code,),
+        )
+        row = cursor.fetchone()
+        if row:
+            return row
+
+    cursor.execute(
+        f"""
+        SELECT {', '.join(fields)}
+        FROM semesters
+        WHERE course_code = %s
+        ORDER BY {semester_order}
         LIMIT 1
         """,
         (course_code,),
@@ -666,17 +714,18 @@ def _head_notification_recipients(cursor, scope, value=None, course_scope="both"
 
     if scope == "all_users":
         cursor.execute(
-        """
-        SELECT user_id
-        FROM users
-        WHERE is_active = TRUE
-          AND role IN ('student', 'supervisor', 'coordinator', 'head_of_department')
-          AND user_id <> %s
-        ORDER BY role, full_name
-        """,
-        (session.get("user_id"),)
-    )
-    return [r["user_id"] for r in cursor.fetchall()]
+            """
+            SELECT user_id
+            FROM users
+            WHERE is_active = TRUE
+              AND role IN ('student', 'supervisor', 'coordinator', 'head_of_department')
+              AND user_id <> %s
+            ORDER BY role, full_name
+            """,
+            (session.get("user_id"),)
+        )
+        return [r["user_id"] for r in cursor.fetchall()]
+
     if scope == "doctors":
         cursor.execute("SELECT user_id FROM users WHERE role = 'supervisor' AND is_active = TRUE")
         return [r["user_id"] for r in cursor.fetchall()]

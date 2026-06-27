@@ -152,7 +152,7 @@ def api_verify_supervisor():
             }), 409
 
         return jsonify({
-            'message':   f'Welcome, {sup["full_name"]}. Please set your hours and password.',
+            'message':   f'Welcome, {sup["full_name"]}. Please set your password.',
             'user_id':   sup['user_id'],
             'full_name': sup['full_name'],
         }), 200
@@ -162,18 +162,17 @@ def api_verify_supervisor():
 
 
 # ─────────────────────────────────────────────────────────────
-#  SUPERVISOR  –  Step 2: Set Hours + Password  →  Activate
+#  SUPERVISOR  -  Step 2: Set Password  ->  Activate
 # ─────────────────────────────────────────────────────────────
 @activate_bp.route('/api/activate/supervisor/set-password', methods=['POST'])
 def api_supervisor_set_password():
     data = request.get_json(silent=True) or {}
 
     user_id  = data.get('user_id')
-    hours    = data.get('graduation_project_hours')
     password = (data.get('password')         or '').strip()
     confirm  = (data.get('confirm_password') or '').strip()
 
-    if not user_id or not password or hours is None:
+    if not user_id or not password:
         return jsonify({'error': 'Please fill in all fields.'}), 400
 
     if password != confirm:
@@ -181,13 +180,6 @@ def api_supervisor_set_password():
 
     if len(password) < 8:
         return jsonify({'error': 'Password must be at least 8 characters long.'}), 400
-
-    try:
-        hours_val = float(hours)
-        if hours_val < 0:
-            raise ValueError
-    except (TypeError, ValueError):
-        return jsonify({'error': 'Invalid hours value.'}), 400
 
     try:
         db     = get_db()
@@ -219,23 +211,6 @@ def api_supervisor_set_password():
         """, (hashed, user_id))
 
        
-
-        # Store in faculty_load_settings for the active semester
-        cursor.execute("""
-            SELECT semester_id FROM semesters
-            WHERE  is_active = TRUE
-            ORDER  BY semester_id DESC
-            LIMIT  1
-        """)
-        sem = cursor.fetchone()
-        if sem:
-            cursor.execute("""
-                INSERT INTO faculty_load_settings
-                    (faculty_id, semester_id, graduation_project_hours)
-                VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    graduation_project_hours = VALUES(graduation_project_hours)
-            """, (row['faculty_id'], sem['semester_id'], hours_val))
 
         db.commit()
         cursor.close()

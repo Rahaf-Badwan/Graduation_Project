@@ -65,11 +65,7 @@ def submit():
             )
 
         # جيب السمستر الأكتف للكورس الصح
-        cursor.execute(
-            "SELECT semester_id FROM semesters WHERE is_active = TRUE AND course_code = %s ORDER BY semester_id DESC LIMIT 1",
-            (target_course,),
-        )
-        sem_row = cursor.fetchone()
+        sem_row = _student_semester_for_course(cursor, target_course)
         if target_course == "COMP4300" and promoted_to:
             cursor.execute(
                 """
@@ -278,18 +274,7 @@ def api_submit_info():
             )
 
         # Get the active semester for the target course
-        cursor.execute(
-            """
-            SELECT semester_id, academic_year, course_code, start_date, end_date
-            FROM   semesters
-            WHERE  is_active = TRUE
-              AND  course_code = %s
-            ORDER  BY semester_id DESC
-            LIMIT  1
-            """,
-            (target_course,),
-        )
-        target_sem = cursor.fetchone()
+        target_sem = _student_semester_for_course(cursor, target_course)
         if not target_sem:
             cursor.close()
             db.close()
@@ -320,7 +305,7 @@ def api_submit_info():
             FROM   project_members pm
             JOIN   students st  ON st.student_id = pm.student_id
             JOIN   projects p   ON p.project_id  = pm.project_id
-            JOIN   semesters s  ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            JOIN   semesters s  ON s.semester_id  = p.semester_id
             LEFT JOIN faculty f ON f.faculty_id   = p.supervisor_id
             LEFT JOIN users sup_u ON sup_u.user_id = f.user_id
             LEFT JOIN project_members pm2 ON pm2.project_id = p.project_id
@@ -451,16 +436,7 @@ def api_submit_project():
                 cursor, student_id, promoted_at=(result_row or {}).get("promoted_at")
             )
 
-        cursor.execute(
-            """
-            SELECT semester_id, academic_year, course_code, start_date, end_date
-            FROM   semesters
-            WHERE  is_active = TRUE AND course_code = %s
-            ORDER  BY semester_id DESC LIMIT 1
-            """,
-            (target_course,),
-        )
-        target_sem = cursor.fetchone()
+        target_sem = _student_semester_for_course(cursor, target_course)
         if target_course == "COMP4300" and promoted_to:
             cursor.execute(
                 """
@@ -879,15 +855,7 @@ def api_upload_file():
             )
 
         # جيب السمستر الأكتف للكورس الصح
-        cursor.execute(
-            """
-            SELECT semester_id FROM semesters
-            WHERE  is_active = TRUE AND course_code = %s
-            ORDER  BY semester_id DESC LIMIT 1
-            """,
-            (target_course,),
-        )
-        sem_row = cursor.fetchone()
+        sem_row = _student_semester_for_course(cursor, target_course)
         if target_course == "COMP4300" and promoted_to:
             cursor.execute(
                 """
@@ -1128,7 +1096,7 @@ def api_clear_submission():
             JOIN   students st ON st.student_id = pm.student_id
             JOIN   projects p  ON p.project_id  = pm.project_id
             JOIN   semesters s ON s.semester_id  = p.semester_id
-            WHERE  st.user_id = %s AND s.is_active = TRUE
+            WHERE  st.user_id = %s
             ORDER  BY p.project_id DESC LIMIT 1
             """,
             (user_id,),
@@ -1432,7 +1400,7 @@ def api_milestone_submit():
             SELECT pm.project_id, p.title
             FROM   project_members pm
             JOIN   projects p  ON p.project_id  = pm.project_id
-            JOIN   semesters s ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            JOIN   semesters s ON s.semester_id  = p.semester_id
             JOIN   students st ON st.student_id  = pm.student_id
             WHERE  st.user_id = %s
             ORDER  BY pm.project_id DESC LIMIT 1
@@ -1653,7 +1621,7 @@ def api_milestone_submissions_list():
             SELECT pm.project_id
             FROM   project_members pm
             JOIN   projects p  ON p.project_id  = pm.project_id
-            JOIN   semesters s ON s.semester_id  = p.semester_id AND s.is_active = TRUE
+            JOIN   semesters s ON s.semester_id  = p.semester_id
             WHERE  pm.student_id = %s
             ORDER  BY pm.project_id DESC
             LIMIT  1

@@ -15,11 +15,26 @@ import re
 from flask import Blueprint, request, jsonify, current_app
 from db import get_db
 from auth import login_required
+from semester_lifecycle import auto_rollover_semesters
 
 head_supervisors_bp = Blueprint('head_supervisors', __name__)
 
 
-def _current_supervisor_semester(cursor):
+def _table_exists(cursor, table_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = %s
+        """,
+        (table_name,),
+    )
+    row = cursor.fetchone() or {}
+    return int(row.get("cnt") or 0) > 0
+
+
+def _current_supervisor_semesters(cursor):
     cursor.execute("""
         SELECT semester_id, academic_year, semester_number, course_code
         FROM semesters
@@ -28,36 +43,77 @@ def _current_supervisor_semester(cursor):
           AND end_date IS NOT NULL
           AND CURDATE() BETWEEN start_date AND end_date
         ORDER BY start_date DESC, semester_id DESC
-        LIMIT 1
     """)
-    semester = cursor.fetchone()
-    if semester:
-        return semester
+    semesters = cursor.fetchall()
+    if semesters:
+        return _project_year_semesters(cursor, semesters)
 
     cursor.execute("""
         SELECT semester_id, academic_year, semester_number, course_code
         FROM semesters
         WHERE is_active = TRUE
         ORDER BY semester_id DESC
-        LIMIT 1
     """)
-    return cursor.fetchone()
+    semesters = cursor.fetchall()
+    return _project_year_semesters(cursor, semesters) if semesters else []
 
 
-def _supervisor_semester_ids(cursor, semester):
-    if not semester:
-        return []
+def _project_year_semesters(cursor, anchor_semesters):
+    academic_years = sorted({
+        row["academic_year"]
+        for row in anchor_semesters
+        if row.get("academic_year")
+    })
+    if not academic_years:
+        return anchor_semesters
 
-    cursor.execute("""
-        SELECT semester_id
+    placeholders = ",".join(["%s"] * len(academic_years))
+    cursor.execute(f"""
+        SELECT semester_id, academic_year, semester_number, course_code
         FROM semesters
-        WHERE academic_year = %s
+        WHERE academic_year IN ({placeholders})
           AND course_code IN ('COMP4200', 'COMP4300')
-        ORDER BY semester_id
-    """, (semester["academic_year"],))
-    rows = cursor.fetchall()
-    semester_ids = [row["semester_id"] for row in rows]
-    return semester_ids or [semester["semester_id"]]
+        ORDER BY academic_year DESC, semester_number DESC, semester_id DESC
+    """, tuple(academic_years))
+    scoped = cursor.fetchall()
+    if not scoped:
+        return anchor_semesters
+
+    anchor_ids = {row["semester_id"] for row in anchor_semesters if row.get("semester_id")}
+    scoped.sort(
+        key=lambda row: (
+            0 if row.get("semester_id") in anchor_ids else 1,
+            -int(row.get("semester_id") or 0),
+        )
+    )
+    return scoped
+
+
+def _supervisor_semester_ids(semesters):
+    return [row["semester_id"] for row in semesters if row.get("semester_id")]
+
+
+def _supervisor_project_filters(cursor, alias="gp"):
+    promotion_filter = ""
+    if _table_exists(cursor, "project_course_promotions"):
+        promotion_filter = f"""
+               AND NOT EXISTS (
+                    SELECT 1
+                    FROM project_course_promotions pcp
+                    WHERE pcp.source_project_id = {alias}.project_id
+               )
+        """
+
+    return f"""
+               AND LOWER(COALESCE({alias}.status, '')) NOT IN (
+                    'archived', 'archive', 'draft', 'cancelled', 'rejected',
+                    'promoted', 'search', 'search_only', 'imported_archive',
+                    'solo_pending'
+               )
+               AND COALESCE({alias}.title, '') NOT LIKE 'Committee Demo%%'
+               AND COALESCE({alias}.title, '') NOT LIKE 'COMP4300 Graduation Project%%'
+               {promotion_filter}
+    """
 
 
 def _supervisor_account_stats(cursor):
@@ -85,8 +141,12 @@ def api_list_supervisors():
     try:
         db     = get_db()
         cursor = db.cursor(dictionary=True)
-        semester = _current_supervisor_semester(cursor)
-        semester_ids = _supervisor_semester_ids(cursor, semester)
+
+        auto_rollover_semesters(cursor)
+        db.commit()
+
+        semesters = _current_supervisor_semesters(cursor)
+        semester_ids = _supervisor_semester_ids(semesters)
         account_stats = _supervisor_account_stats(cursor)
 
         if not semester_ids:
@@ -101,9 +161,11 @@ def api_list_supervisors():
                     'projects': 0,
                 },
                 'semester': None,
+                'semesters': [],
             }), 200
 
         semester_placeholders = ",".join(["%s"] * len(semester_ids))
+        project_filters = _supervisor_project_filters(cursor, "gp")
         cursor.execute(f"""
            SELECT
                 u.user_id,
@@ -118,7 +180,7 @@ def api_list_supervisors():
             LEFT  JOIN projects gp
                 ON gp.supervisor_id = f.faculty_id
                AND gp.semester_id IN ({semester_placeholders})
-               AND gp.status <> 'archived'
+               {project_filters}
                AND EXISTS (
                     SELECT 1
                     FROM project_members pm
@@ -164,7 +226,8 @@ def api_list_supervisors():
                 'pending':  pending,
                 'projects': projects,
             },
-            'semester': semester,
+            'semester': semesters[0],
+            'semesters': semesters,
         }), 200
 
     except Exception as e:

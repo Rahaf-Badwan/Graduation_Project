@@ -4,145 +4,470 @@
 {% block topbar_title %}Students & Projects{% endblock %}
 
 {% block content %}
+<style>
+  #pg-mystudents .students-page {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
 
+  #pg-mystudents .students-hero {
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    padding: 18px;
+  }
 
+  #pg-mystudents .hero-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
 
-{# ── Projects List ─────────────────────────────────────────── #}
-{% if projects %}
-  {% for p in projects %}
+  #pg-mystudents .hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--sup);
+    background: var(--sup-light);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
 
-  {# ── تحديد CSS class ── #}
-  {% if p.urgency == 'urgent' %}
-    {% set card_class = 'student-card urgent' %}
-  {% elif p.status == 'accepted' %}
-    {% set card_class = 'student-card good' %}
-  {% elif p.status in ['under_review', 'committee_evaluation'] %}
-    {% set card_class = 'student-card good' %}
-  {% else %}
-    {% set card_class = 'student-card normal' %}
+  #pg-mystudents .hero-title {
+    color: var(--color-text-primary);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  #pg-mystudents .hero-sub {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    margin-top: 5px;
+  }
+
+  #pg-mystudents .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  #pg-mystudents .summary-tile {
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 12px;
+  }
+
+  #pg-mystudents .summary-value {
+    color: var(--color-text-primary);
+    font-size: 20px;
+    font-weight: 750;
+    line-height: 1;
+  }
+
+  #pg-mystudents .summary-label {
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    margin-top: 5px;
+  }
+
+  #pg-mystudents .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  #pg-mystudents .project-card {
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    transition: border-color .15s, transform .15s;
+  }
+
+  #pg-mystudents .project-card:hover {
+    border-color: var(--sup-mid);
+    transform: translateY(-1px);
+  }
+
+  #pg-mystudents .project-card.urgent {
+    border-color: color-mix(in srgb, var(--coral) 35%, var(--color-border-tertiary));
+  }
+
+  #pg-mystudents .project-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+  }
+
+  #pg-mystudents .project-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    background: var(--sup-light);
+    color: var(--sup);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 800;
+    flex: 0 0 auto;
+  }
+
+  #pg-mystudents .project-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  #pg-mystudents .project-title {
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  #pg-mystudents .project-meta {
+    color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    margin-top: 5px;
+  }
+
+  #pg-mystudents .dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary);
+  }
+
+  #pg-mystudents .student-line {
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    background: var(--color-background-secondary);
+    padding: 9px 10px;
+  }
+
+  #pg-mystudents .submission-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-radius: var(--border-radius-md);
+    background: var(--green-light);
+    color: var(--green);
+    padding: 9px 10px;
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  #pg-mystudents .submission-time {
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  #pg-mystudents .student-label {
+    color: var(--color-text-secondary);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    margin-bottom: 4px;
+  }
+
+  #pg-mystudents .student-names {
+    color: var(--color-text-primary);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  #pg-mystudents .progress-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  #pg-mystudents .progress-row {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr) 36px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #pg-mystudents .progress-name,
+  #pg-mystudents .progress-value {
+    color: var(--color-text-secondary);
+    font-size: 11px;
+  }
+
+  #pg-mystudents .progress-value {
+    color: var(--color-text-primary);
+    font-weight: 650;
+    text-align: right;
+  }
+
+  #pg-mystudents .bar {
+    height: 7px;
+    background: var(--color-background-secondary);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  #pg-mystudents .bar-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--sup-mid);
+  }
+
+  #pg-mystudents .actions-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: auto;
+  }
+
+  #pg-mystudents .urgent-note {
+    color: var(--coral);
+    background: var(--coral-light);
+    border-radius: var(--border-radius-md);
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  #pg-mystudents .empty-state {
+    background: var(--color-background-primary);
+    border: 0.5px dashed var(--color-border-secondary);
+    border-radius: var(--border-radius-lg);
+    padding: 46px 20px;
+    text-align: center;
+  }
+
+  #pg-mystudents .empty-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    margin: 0 auto 12px;
+    background: var(--sup-light);
+    color: var(--sup);
+  }
+
+  @media (max-width: 980px) {
+    #pg-mystudents .projects-grid,
+    #pg-mystudents .summary-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    #pg-mystudents .hero-row,
+    #pg-mystudents .project-top {
+      flex-direction: column;
+    }
+
+    #pg-mystudents .projects-grid,
+    #pg-mystudents .summary-grid,
+    #pg-mystudents .actions-row {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-mystudents .progress-row {
+      grid-template-columns: 76px minmax(0, 1fr) 34px;
+    }
+  }
+</style>
+
+{% set status_map = {
+  'draft':                ('p-pending',  'Draft'),
+  'submitted':            ('p-pending',  'Submitted'),
+  'under_review':         ('p-review',   'Under review'),
+  'needs_revision':       ('p-late',     'Needs revision'),
+  'committee_evaluation': ('p-review',   'Committee'),
+  'accepted':             ('p-accepted', 'Accepted'),
+  'rejected':             ('p-late',     'Rejected'),
+  'archived':             ('p-pending',  'Archived'),
+  'solo_pending':         ('p-pending',  'Solo pending')
+} %}
+
+{% set ns = namespace(comp4200=0, comp4300=0, urgent=0, active=0) %}
+{% for project in projects %}
+  {% if project.course_code == 'COMP4200' %}
+    {% set ns.comp4200 = ns.comp4200 + 1 %}
+  {% elif project.course_code == 'COMP4300' %}
+    {% set ns.comp4300 = ns.comp4300 + 1 %}
   {% endif %}
+  {% if project.urgency == 'urgent' %}
+    {% set ns.urgent = ns.urgent + 1 %}
+  {% endif %}
+  {% if project.status not in ['accepted', 'rejected', 'archived'] %}
+    {% set ns.active = ns.active + 1 %}
+  {% endif %}
+{% endfor %}
 
-  {# ── تحديد pill ── #}
-  {% set status_map = {
-    'draft':                ('p-pending',  'Draft'),
-    'submitted':            ('p-pending',  'Submitted'),
-    'under_review':         ('p-review',   'Under review'),
-    'needs_revision':       ('p-late',     'Needs revision'),
-    'committee_evaluation': ('p-review',   'Committee'),
-    'accepted':             ('p-accepted', 'Accepted'),
-    'rejected':             ('p-late',     'Rejected'),
-    'archived':             ('p-pending',  'Archived'),
-    'solo_pending':         ('p-pending',  'Solo pending')
-  } %}
-  {% set pill_class, pill_text = status_map.get(p.status, ('p-pending', p.status)) %}
-
-  <div class="{{ card_class }}">
-
-    {# ── Header ── #}
-    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
-
-      <div class="person-avatar"
-           style="background:var(--sup-light);color:var(--sup);width:36px;height:36px;font-size:11px;flex-shrink:0">
-        {{ (p.title[:2]) | upper }}
-      </div>
-
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:2px">
-          {{ p.title }}
+<div id="pg-mystudents">
+<div class="students-page">
+  <section class="students-hero">
+    <div class="hero-row">
+      <div>
+        <div class="hero-kicker">
+          <span class="material-symbols-outlined icon-inline">groups</span>
+          Supervision workspace
         </div>
-        <div style="font-size:11px;color:var(--color-text-secondary)">
-          {% if p.group_name %}
-            <span style="font-weight:500">{{ p.group_name }}</span> ·
-          {% endif %}
-          {{ p.students or 'No students assigned' }}
-          · <span style="text-transform:capitalize">{{ p.course_code }}</span>
-          · {{ p.academic_year }}
-        </div>
+        <div class="hero-title">Your students and project groups</div>
+        <div class="hero-sub">Review assigned COMP4200 and COMP4300 groups, track progress, and jump into feedback or submissions.</div>
       </div>
+      <a class="btn btn-outline" href="/supervisor/index">
+        <span class="material-symbols-outlined icon-inline">dashboard</span>
+        Dashboard
+      </a>
+    </div>
 
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-        {% if p.final_score %}
-          <span style="font-size:13px;font-weight:700;color:var(--sup-mid)">
-            {{ p.final_score }}
-          </span>
+    <div class="summary-grid">
+      <div class="summary-tile">
+        <div class="summary-value">{{ total }}</div>
+        <div class="summary-label">Total groups</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-value">{{ ns.comp4200 }}</div>
+        <div class="summary-label">COMP4200 groups</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-value">{{ ns.comp4300 }}</div>
+        <div class="summary-label">COMP4300 groups</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-value">{{ ns.urgent }}</div>
+        <div class="summary-label">Need attention</div>
+      </div>
+    </div>
+  </section>
+
+  {% if projects %}
+    <section class="projects-grid" aria-label="Assigned student projects">
+      {% for p in projects %}
+        {% set pill_class, pill_text = status_map.get(p.status, ('p-pending', p.status or 'Waiting')) %}
+        {% if p.course_code == 'COMP4300' and p.has_final_report %}
+          {% set pill_class = 'p-accepted' %}
+          {% set pill_text = 'Final submitted' %}
         {% endif %}
-        <span class="pill {{ pill_class }}">{{ pill_text }}</span>
+        {% set overall = p.overall_progress or 0 %}
+        {% set report = p.report_progress or 0 %}
+        {% set code = p.code_progress or 0 %}
+        {% set slides = p.slides_progress or 0 %}
+
+        <article class="project-card {% if p.urgency == 'urgent' %}urgent{% endif %}">
+          <div class="project-top">
+            <div class="project-avatar">{{ (p.title[:2] or 'PR') | upper }}</div>
+
+            <div class="project-main">
+              <div class="project-title">{{ p.title }}</div>
+              <div class="project-meta">
+                {% if p.display_group_name %}
+                  <span>{{ p.display_group_name }}</span>
+                  <span class="dot"></span>
+                {% endif %}
+                <span>{{ p.course_code }}</span>
+                <span class="dot"></span>
+                <span>{{ p.academic_year }}</span>
+                {% if p.team_size %}
+                  <span class="dot"></span>
+                  <span>{{ p.team_size }} student{% if p.team_size != 1 %}s{% endif %}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <span class="pill {{ pill_class }}">{{ pill_text }}</span>
+          </div>
+
+          <div class="student-line">
+            <div class="student-label">Assigned students</div>
+            <div class="student-names">{{ p.students or 'No students assigned' }}</div>
+          </div>
+
+          {% if p.has_final_report %}
+            <div class="submission-line">
+              <span>
+                <span class="material-symbols-outlined icon-inline">task_alt</span>
+                Final submission received
+              </span>
+              {% if p.latest_uploaded_at %}
+                <span class="submission-time">{{ p.latest_uploaded_at }}</span>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <div class="progress-grid">
+            <div class="progress-row">
+              <span class="progress-name">Overall</span>
+              <span class="bar"><span class="bar-fill" style="width:{{ overall }}%"></span></span>
+              <span class="progress-value">{{ overall }}%</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-name">Report</span>
+              <span class="bar"><span class="bar-fill" style="width:{{ report }}%"></span></span>
+              <span class="progress-value">{{ report }}%</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-name">Code</span>
+              <span class="bar"><span class="bar-fill" style="width:{{ code }}%;background:var(--blue)"></span></span>
+              <span class="progress-value">{{ code }}%</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-name">Slides</span>
+              <span class="bar"><span class="bar-fill" style="width:{{ slides }}%;background:var(--green)"></span></span>
+              <span class="progress-value">{{ slides }}%</span>
+            </div>
+          </div>
+
+          {% if p.final_score %}
+            <div class="student-line">
+              <div class="student-label">Final score</div>
+              <div class="student-names">{{ p.final_score }}</div>
+            </div>
+          {% endif %}
+
+          {% if p.urgency == 'urgent' and p.last_note %}
+            <div class="urgent-note">{{ p.last_note }}</div>
+          {% endif %}
+
+          <div class="actions-row">
+            <a href="/supervisor/feedback?project_id={{ p.project_id }}" class="btn btn-primary">
+              <span class="material-symbols-outlined icon-inline">rate_review</span>
+              Feedback
+            </a>
+            <a href="/supervisor/progress?tab=submissions&project_id={{ p.project_id }}" class="btn btn-outline">
+              <span class="material-symbols-outlined icon-inline">folder_open</span>
+              Submissions
+            </a>
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <section class="empty-state">
+      <div class="empty-icon">
+        <span class="material-symbols-outlined">folder_open</span>
       </div>
-    </div>
-
-    {# ── Progress bars ── #}
-    {% if p.report_progress is not none %}
-    <div class="prog-wrap" style="margin:0 0 4px">
-      <div class="prog-label">
-        <span>Final report</span><span>{{ p.report_progress }}%</span>
-      </div>
-      <div class="prog-bg">
-        <div class="prog-fill" style="width:{{ p.report_progress }}%;background:var(--sup-mid)"></div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if p.code_progress is not none %}
-    <div class="prog-wrap" style="margin:0 0 4px">
-      <div class="prog-label">
-        <span>Source Code</span><span>{{ p.code_progress }}%</span>
-      </div>
-      <div class="prog-bg">
-        <div class="prog-fill" style="width:{{ p.code_progress }}%;background:var(--blue)"></div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if p.slides_progress is not none %}
-    <div class="prog-wrap" style="margin:0">
-      <div class="prog-label">
-        <span>Slides</span><span>{{ p.slides_progress }}%</span>
-      </div>
-      <div class="prog-bg">
-        <div class="prog-fill" style="width:{{ p.slides_progress }}%;background:var(--green)"></div>
-      </div>
-    </div>
-    {% endif %}
-
-    {# ── Urgent alert ── #}
-    {% if p.urgency == 'urgent' and p.last_note %}
-    <div style="font-size:11px;color:var(--coral);margin-top:8px;
-                background:var(--coral-light);padding:6px 10px;border-radius:5px">
-      &#9873; {{ p.last_note }}
-    </div>
-    {% endif %}
-
-    {# ── Buttons ── #}
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <a href="/supervisor/feedback?project_id={{ p.project_id }}"
-         class="btn btn-primary"
-         style="font-size:12px;padding:6px 14px;flex:1;text-align:center">
-         Add new feedback
-      </a>
-      <a href="/supervisor/progress?project_id={{ p.project_id }}"
-         class="btn btn-outline"
-         style="font-size:12px;padding:6px 14px;flex:1;text-align:center">
-        Submit Files
-      </a>
-      {% if p.urgency == 'urgent' %}
-      <a href="/supervisor/alert/{{ p.project_id }}"
-         class="btn btn-outline"
-         style="font-size:12px;padding:6px 12px;color:var(--coral);border-color:var(--coral)">
-        Send urgent alert &#8599;
-      </a>
-      {% endif %}
-    </div>
-
-  </div>
-  {% endfor %}
-
-{% else %}
-  <div style="text-align:center;padding:60px 20px;color:var(--color-text-secondary)">
-    <div style="font-size:36px;margin-bottom:12px">&#128203;</div>
-    <div style="font-size:14px">No active projects assigned to you this semester.</div>
-  </div>
-{% endif %}
-
+      <div class="hero-title" style="font-size:16px">No assigned projects yet</div>
+      <div class="hero-sub">Projects assigned by the coordinator will appear here.</div>
+    </section>
+  {% endif %}
+</div>
+</div>
 {% endblock %}
-
-

@@ -55,16 +55,7 @@ def api_student_topbar_info():
             else "COMP4200"
         )
 
-        # Get active semester academic_year
-        cursor.execute(
-            """
-            SELECT academic_year FROM semesters
-            WHERE  is_active = TRUE AND course_code = %s
-            ORDER  BY semester_id DESC LIMIT 1
-            """,
-            (course_code,),
-        )
-        sem = cursor.fetchone()
+        sem = _student_semester_for_course(cursor, course_code)
         academic_year = (sem or {}).get("academic_year") or ""
 
         cursor.close()

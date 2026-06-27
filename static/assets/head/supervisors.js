@@ -185,7 +185,6 @@ function openActivateModal(userId, name) {
   pendingSupId = userId;
   document.getElementById('activate-modal-name').textContent  = name;
   document.getElementById('activate-modal-error').textContent = '';
-  document.getElementById('activate-hours').value    = '';
   document.getElementById('activate-password').value = '';
   document.getElementById('activate-confirm').value  = '';
 
@@ -202,15 +201,11 @@ async function submitActivateSupervisor() {
   const errEl   = document.getElementById('activate-modal-error');
   errEl.textContent = '';
 
-  const hours   = document.getElementById('activate-hours').value.trim();
   const pass    = document.getElementById('activate-password').value;
   const confirm = document.getElementById('activate-confirm').value;
 
-  if (!hours || !pass || !confirm) {
+  if (!pass || !confirm) {
     errEl.textContent = 'Please fill in all fields.'; return;
-  }
-  if (isNaN(hours) || parseFloat(hours) < 0) {
-    errEl.textContent = 'Please enter a valid hours value.'; return;
   }
   if (pass.length < 8) {
     errEl.textContent = 'Password must be at least 8 characters.'; return;
@@ -225,7 +220,6 @@ async function submitActivateSupervisor() {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
         user_id: pendingSupId,
-        graduation_project_hours: parseFloat(hours),
         password: pass,
         confirm_password: confirm
       })

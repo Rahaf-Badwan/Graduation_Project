@@ -2,6 +2,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from db import get_db
 from auth import login_required
+from semester_lifecycle import auto_rollover_semesters
 import bcrypt, re
 
 add_student_bp = Blueprint("add_student", __name__)
@@ -65,13 +66,37 @@ def api_add_student():
 
         student_id = cursor.lastrowid
 
-        cursor.execute("""
+        try:
+            auto_rollover_semesters(cursor)
+        except Exception:
+            pass
+
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'semesters'
+              AND COLUMN_NAME = 'start_date'
+            """
+        )
+        has_start_date = int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+        semester_order = (
+            "start_date DESC, semester_id DESC" if has_start_date else "semester_id DESC"
+        )
+        cursor.execute(
+            f"""
             INSERT INTO student_course_results (student_id, semester_id, status)
             SELECT %s, semester_id, 'pending'
             FROM semesters
-            WHERE course_code = 'COMP4200' AND is_active = TRUE
+            WHERE course_code = 'COMP4200'
+            ORDER BY
+              CASE WHEN is_active = TRUE THEN 0 ELSE 1 END,
+              {semester_order}
             LIMIT 1
-                """, (student_id,),)
+            """,
+            (student_id,),
+        )
         db.commit()
         cursor.close()
         db.close()
@@ -79,9 +104,9 @@ def api_add_student():
         return (
             jsonify(
                 {
-                    "message": "Student added successfully.",
+                    "message": "تم إضافة الطالب بنجاح. حالة الحساب: بانتظار التفعيل.",
                     "user_id": user_id,
-                    "statues": "pending",
+                    "status": "pending",
                 }
             ),
             200,
