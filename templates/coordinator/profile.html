@@ -24,7 +24,7 @@
         <span id="profileSpecializationBadge" style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--green-light);color:var(--green)">Computer Science</span>
       </div>
     </div>
-    <form action="{{ url_for('coordinator_bp.switch_to_supervisor') }}" method="post">
+    <form id="switchSupervisorForm" action="{{ url_for('coordinator_bp.switch_to_supervisor') }}" method="post" hidden aria-hidden="true">
       <button class="btn btn-outline" type="submit">
         <span class="material-symbols-outlined icon-inline">swap_horiz</span>
         {{ t['coordinator']['switch_supervisor'] }}
@@ -35,10 +35,11 @@
   <div class="two-col">
     <div class="card">
       <div class="card-hd"><span class="card-title">{{ t['head']['personal_info'] }}</span></div>
+      <form id="profileInfoForm"></form>
       <div class="field-wrap"><div class="field-label">{{ t['head']['full_name'] }}</div><input class="field-input" id="fullName" readonly style="background:var(--color-background-secondary)" /></div>
       <div class="field-wrap"><div class="field-label">{{ t['head']['staff_id'] }}</div><input class="field-input" id="staffId" readonly style="background:var(--color-background-secondary)" /></div>
       <div class="field-wrap"><div class="field-label">{{ t['head']['email'] }}</div><input class="field-input" id="email" readonly style="background:var(--color-background-secondary)" /></div>
-      <div class="field-wrap"><div class="field-label">{{ t['head']['office'] }}</div><input class="field-input" id="officeNumber" readonly style="background:var(--color-background-secondary)" /></div>
+      <div class="field-wrap"><div class="field-label">{{ t['head']['office'] }}</div><input class="field-input" form="profileInfoForm" name="office_number" id="officeNumber" maxlength="50" placeholder="e.g. Masri 214" /></div>
       <div class="profile-msg" id="profileMsg"></div>
     </div>
 
@@ -78,7 +79,8 @@
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">{{ t['head']['role_label'] }}</span><span>{{ t['coordinator']['role'] }}</span></div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">{{ t['head']['department'] }}</span><span>{{ t['head']['dept_cs'] }}</span></div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--color-border-tertiary)"><span style="color:var(--color-text-secondary)">{{ t['head']['specialization'] }}</span><span id="specialization">--</span></div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--color-text-secondary)">{{ t['head']['years_experience'] }}</span><span id="yearsExperience">--</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--color-text-secondary)">{{ t['head']['years_experience'] }}</span><input class="field-input" form="profileInfoForm" name="years_experience" id="yearsExperience" type="number" min="0" max="80" step="1" style="width:130px;margin:0;text-align:right;padding:6px 9px" /></div>
+          <div class="btn-row" style="justify-content:flex-end;margin-top:8px"><button type="submit" form="profileInfoForm" class="btn btn-primary">Update Profile Info</button></div>
         </div>
       </div>
     </div>
@@ -102,11 +104,33 @@
         const data = await apiFetch('/api/coordinator/profile');
         const p = data.profile||{};
         const spec = readable(p.specialization);
-        $('fullName').value=p.full_name||''; $('staffId').value=p.university_id||''; $('email').value=p.email||''; $('officeNumber').value=p.office_number||'--';
+        $('fullName').value=p.full_name||''; $('staffId').value=p.university_id||''; $('email').value=p.email||''; $('officeNumber').value=p.office_number||'';
         $('profileName').textContent=p.full_name||'Coordinator'; $('profileAvatar').textContent=p.avatar_initials||initials(p.full_name);
-        $('profileStaffId').textContent=p.university_id||'--'; $('profileSpecializationBadge').textContent=spec; $('specialization').textContent=spec; $('yearsExperience').textContent=p.years_experience??'--';
+        $('profileStaffId').textContent=p.university_id||'--'; $('profileSpecializationBadge').textContent=spec; $('specialization').textContent=spec; $('yearsExperience').value=p.years_experience??'';
+        const switchForm = $('switchSupervisorForm');
+        if (switchForm) {
+          const canSwitch = Boolean(p.can_switch_to_supervisor);
+          switchForm.hidden = !canSwitch;
+          switchForm.setAttribute('aria-hidden', String(!canSwitch));
+        }
       } catch(error) { $('profileName').textContent='Coordinator Profile'; showMsg('profileMsg',error.message,'error'); }
     }
+    $('profileInfoForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      try {
+        const data = await apiFetch('/api/coordinator/profile/update-info', {
+          method: 'POST',
+          body: JSON.stringify({
+            office_number: $('officeNumber').value,
+            years_experience: $('yearsExperience').value
+          })
+        });
+        showMsg('profileMsg', data.message || 'Profile information updated successfully.', 'ok');
+        await loadProfile();
+      } catch(error) {
+        showMsg('profileMsg', error.message, 'error');
+      }
+    });
     $('passwordForm').addEventListener('submit', async event => {
       event.preventDefault();
       const cp=$('currentPassword').value, np=$('newPassword').value, conf=$('confirmPassword').value;

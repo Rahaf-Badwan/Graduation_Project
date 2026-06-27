@@ -1129,6 +1129,82 @@ def profile():
 
 
 # ─── Change Password ────────────────────────────────────────
+@general_supervisors_bp.route("/profile/update-info", methods=["POST"])
+@login_required(role="supervisor")
+def update_profile_info():
+    office_number = (request.form.get("office_number") or "").strip()
+    years_raw = (request.form.get("years_experience") or "").strip()
+
+    try:
+        user = _load_supervisor_profile_user()
+    except Exception:
+        user = None
+
+    def render_profile_error(message):
+        return render_template(
+            "supervisor/profile.html",
+            user=user,
+            profile_error=message,
+            profile_success=None,
+            pwd_error=None,
+            pwd_success=None,
+        )
+
+    if len(office_number) > 50:
+        return render_profile_error("Office number must be 50 characters or fewer.")
+
+    if years_raw:
+        try:
+            years_experience = int(years_raw)
+        except ValueError:
+            return render_profile_error("Years of experience must be a whole number.")
+        if years_experience < 0 or years_experience > 80:
+            return render_profile_error("Years of experience must be between 0 and 80.")
+    else:
+        years_experience = None
+
+    db = None
+    cursor = None
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        if user and user.get("faculty_id"):
+            cursor.execute(
+                """
+                UPDATE faculty
+                SET office_number = %s, years_experience = %s
+                WHERE faculty_id = %s
+                """,
+                (office_number or None, years_experience, user["faculty_id"]),
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE faculty
+                SET office_number = %s, years_experience = %s
+                WHERE user_id = %s
+                """,
+                (office_number or None, years_experience, session.get("user_id")),
+            )
+        db.commit()
+        user = _load_supervisor_profile_user()
+        return render_template(
+            "supervisor/profile.html",
+            user=user,
+            profile_error=None,
+            profile_success="Profile information updated successfully.",
+            pwd_error=None,
+            pwd_success=None,
+        )
+    except Exception as e:
+        return render_profile_error(str(e))
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
+
+
 @general_supervisors_bp.route("/profile/change-password", methods=["POST"])
 @login_required(role="supervisor")
 def change_password():

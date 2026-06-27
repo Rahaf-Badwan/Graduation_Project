@@ -195,6 +195,7 @@ def api_dashboard_data():
         "student_university_id": "",
         "project": None,
         "supervisor_name": None,
+        "supervisor_id": None,
         "academic_year": "",
         "progress": {
             # Overall completion is based only on the required final report.
@@ -315,6 +316,7 @@ def api_dashboard_data():
             cursor.execute(
                 """
                 SELECT sec.section_id, sec.section_name, ss.created_at AS joined_at,
+                       f_sup.faculty_id AS supervisor_id,
                        u_sup.full_name AS supervisor_name
                 FROM section_students ss
                 JOIN student_distribution_sections sec
@@ -357,6 +359,7 @@ def api_dashboard_data():
             """
             SELECT p.project_id, p.title, p.status, p.final_score, p.project_type,
                    pm.joined_at, pm.is_primary_contact,
+                   f.faculty_id AS supervisor_id,
                    u.full_name AS supervisor_name
             FROM   project_members pm
             JOIN   students  st  ON st.student_id = pm.student_id
@@ -374,6 +377,7 @@ def api_dashboard_data():
         if intro_section and project and project.get("status") == "solo_pending":
             project["title"] = intro_section.get("section_name") or "Assigned Section"
             project["status"] = "section_assigned"
+            project["supervisor_id"] = intro_section.get("supervisor_id")
             project["supervisor_name"] = intro_section.get("supervisor_name")
             project["joined_at"] = intro_section.get("joined_at") or project.get("joined_at")
             is_section_workspace = True
@@ -383,6 +387,7 @@ def api_dashboard_data():
                     """
                     SELECT p.project_id, p.title, p.status, p.project_type,
                            pm.joined_at, pm.is_primary_contact,
+                           f.faculty_id AS supervisor_id,
                            u.full_name AS supervisor_name
                     FROM project_members pm
                     JOIN students st ON st.student_id = pm.student_id
@@ -412,6 +417,7 @@ def api_dashboard_data():
                         ),
                         "final_score": None,
                     }
+                    result["supervisor_id"] = previous_project.get("supervisor_id")
                     result["supervisor_name"] = previous_project["supervisor_name"] or "-"
                     result["registration_date"] = _fmt_date(
                         previous_project.get("joined_at")
@@ -479,6 +485,7 @@ def api_dashboard_data():
                 float(project["final_score"]) if project["final_score"] else None
             ),
         }
+        result["supervisor_id"] = project.get("supervisor_id")
         result["supervisor_name"] = project["supervisor_name"] or "—"
         result["registration_date"] = _fmt_date(project.get("joined_at"))
         if target_course == "COMP4300":
@@ -814,6 +821,110 @@ def api_dashboard_data():
             pass
 
     return jsonify(_json_safe(result))
+
+
+@student_bp.route("/api/supervisor-profile/<int:faculty_id>", methods=["GET"])
+@login_required(role="student")
+def api_supervisor_profile(faculty_id):
+    user_id = session["user_id"]
+    db = None
+    cursor = None
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+
+        cursor.execute(
+            "SELECT student_id FROM students WHERE user_id = %s LIMIT 1",
+            (user_id,),
+        )
+        student = cursor.fetchone()
+        if not student:
+            return jsonify({"error": "Student record not found."}), 404
+        student_id = student["student_id"]
+
+        cursor.execute(
+            """
+            SELECT f.faculty_id
+            FROM faculty f
+            WHERE f.faculty_id = %s
+              AND (
+                EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    JOIN projects p ON p.project_id = pm.project_id
+                    WHERE pm.student_id = %s
+                      AND p.supervisor_id = f.faculty_id
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM section_students ss
+                    JOIN student_distribution_sections sec
+                      ON sec.section_id = ss.section_id
+                    WHERE ss.student_id = %s
+                      AND sec.supervisor_id = f.faculty_id
+                )
+              )
+            LIMIT 1
+            """,
+            (faculty_id, student_id, student_id),
+        )
+        if not cursor.fetchone():
+            return jsonify({"error": "Supervisor profile is not available for this student."}), 403
+
+        cursor.execute(
+            """
+            SELECT f.faculty_id, f.title, f.specialization, f.years_experience,
+                   f.office_number, u.full_name, u.university_id, u.email,
+                   u.avatar_initials
+            FROM faculty f
+            JOIN users u ON u.user_id = f.user_id
+            WHERE f.faculty_id = %s
+            LIMIT 1
+            """,
+            (faculty_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"error": "Supervisor not found."}), 404
+
+        title = (row.get("title") or "Dr.").strip()
+        full_name = (row.get("full_name") or "").strip()
+        display_name = full_name if full_name.lower().startswith(title.lower()) else f"{title} {full_name}".strip()
+        specialization = (row.get("specialization") or "").replace("_", " ").title()
+
+        return jsonify(
+            _json_safe(
+                {
+                    "faculty_id": row.get("faculty_id"),
+                    "display_name": display_name,
+                    "full_name": full_name,
+                    "staff_id": row.get("university_id") or "",
+                    "email": row.get("email") or "",
+                    "avatar_initials": row.get("avatar_initials") or "",
+                    "personal": {
+                        "office": row.get("office_number") or "—",
+                        "email": row.get("email") or "—",
+                    },
+                    "academic": {
+                        "title": title or "—",
+                        "department": "Computer Science",
+                        "specialization": specialization or "—",
+                        "years_experience": row.get("years_experience")
+                        if row.get("years_experience") is not None
+                        else "—",
+                    },
+                }
+            )
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            if cursor:
+                cursor.close()
+        finally:
+            if db:
+                db.close()
 
 
 @student_bp.route("/api/graduation-notice/seen", methods=["POST"])

@@ -11,7 +11,16 @@ ALLOWED_EXTENSIONS = {
 }
 
 
-MAX_FILE_MB = 50
+MAX_FILE_MB = 500
+MAX_FILE_LIMITS_MB = {
+    "final_report": 500,
+    "source_code": 500,
+    "presentation": 50,
+}
+
+
+def _max_file_mb_for_type(file_type):
+    return MAX_FILE_LIMITS_MB.get(file_type, MAX_FILE_MB)
 
 
 PROJECT_TYPE_VALUES = {
@@ -1354,7 +1363,7 @@ def _sync_lifecycle(cursor, project_id):
     Rules (student-controlled stages only):
       registration    → completed  : always (project exists)
       file_submission → in_progress: at least 1 required file uploaded
-      file_submission → completed  : final_report + source_code both uploaded
+      file_submission → completed  : final_report uploaded
       initial_review  → in_progress: auto when file_submission = completed
     """
     # 1. Ensure all lifecycle rows exist
@@ -1396,7 +1405,7 @@ def _sync_lifecycle(cursor, project_id):
         (project_id,),
     )
     uploaded = {r["file_type"] for r in cursor.fetchall()}
-    required_done = "final_report" in uploaded and "source_code" in uploaded
+    required_done = "final_report" in uploaded
 
     if required_done:
         # file_submission → completed
@@ -1621,7 +1630,9 @@ def _student_mark_graduation_notice_seen(cursor, user_id):
 __all__ = [
     "ALLOWED_EXTENSIONS",
     "MAX_FILE_MB",
+    "MAX_FILE_LIMITS_MB",
     "PROJECT_TYPE_VALUES",
+    "_max_file_mb_for_type",
     "_fmt_date",
     "_fmt_short",
     "_as_date",

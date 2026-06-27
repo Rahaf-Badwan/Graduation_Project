@@ -213,6 +213,94 @@
     overflow-wrap: anywhere;
   }
 
+  #pg-dashboard .supervisor-profile-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--green);
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 750;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  #pg-dashboard .supervisor-profile-link:hover {
+    text-decoration: underline;
+  }
+
+  #supervisor-profile-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(15, 23, 42, .48);
+    backdrop-filter: blur(4px);
+  }
+
+  #supervisor-profile-modal .supervisor-modal-card {
+    width: min(560px, 100%);
+    background: var(--color-background-primary);
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, .25);
+    overflow: hidden;
+  }
+
+  #supervisor-profile-modal .supervisor-modal-header {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(26, 107, 58, .12), rgba(24, 95, 165, .08));
+    border-bottom: 1px solid var(--color-border-tertiary);
+  }
+
+  #supervisor-profile-modal .supervisor-modal-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--green-light);
+    color: var(--green);
+    font-size: 17px;
+    font-weight: 850;
+    flex-shrink: 0;
+  }
+
+  #supervisor-profile-modal .supervisor-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 18px 20px 20px;
+  }
+
+  #supervisor-profile-modal .supervisor-info-box {
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 10px;
+    padding: 12px;
+    background: var(--color-background-secondary);
+  }
+
+  #supervisor-profile-modal .supervisor-info-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--color-border-tertiary);
+  }
+
+  #supervisor-profile-modal .supervisor-info-row:last-child {
+    border-bottom: 0;
+  }
+
   html[data-theme="dark"] #pg-dashboard .student-focus-card {
     background: #171c24;
     border-color: #303a48;
@@ -283,6 +371,10 @@
 
     #pg-dashboard .work-chart {
       justify-self: start;
+    }
+
+    #supervisor-profile-modal .supervisor-info-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -448,6 +540,33 @@
     </div>
   </div>
 </div>
+
+<div id="supervisor-profile-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="supervisor-modal-card">
+    <div class="supervisor-modal-header">
+      <div class="supervisor-modal-avatar" id="supervisor-modal-avatar">--</div>
+      <div style="flex:1;min-width:0">
+        <div id="supervisor-modal-name" style="font-size:18px;font-weight:850;color:var(--color-text-primary)">Supervisor</div>
+        <div id="supervisor-modal-subtitle" style="font-size:12px;color:var(--color-text-secondary);margin-top:3px">Department of Computer Science</div>
+      </div>
+      <button type="button" class="btn btn-outline" onclick="closeSupervisorProfileModal()">Close</button>
+    </div>
+    <div id="supervisor-modal-status" style="display:none;padding:14px 20px;font-size:13px;color:var(--color-text-secondary)"></div>
+    <div class="supervisor-info-grid" id="supervisor-modal-content">
+      <div class="supervisor-info-box">
+        <div style="font-size:13px;font-weight:850;color:var(--color-text-primary);margin-bottom:8px">Personal Information</div>
+        <div class="supervisor-info-row"><span style="color:var(--color-text-secondary)">Email</span><b id="supervisor-modal-email">--</b></div>
+        <div class="supervisor-info-row"><span style="color:var(--color-text-secondary)">Office</span><b id="supervisor-modal-office">--</b></div>
+      </div>
+      <div class="supervisor-info-box">
+        <div style="font-size:13px;font-weight:850;color:var(--color-text-primary);margin-bottom:8px">Academic Information</div>
+        <div class="supervisor-info-row"><span style="color:var(--color-text-secondary)">Title</span><b id="supervisor-modal-title">--</b></div>
+        <div class="supervisor-info-row"><span style="color:var(--color-text-secondary)">Specialization</span><b id="supervisor-modal-specialization">--</b></div>
+        <div class="supervisor-info-row"><span style="color:var(--color-text-secondary)">Experience</span><b id="supervisor-modal-experience">--</b></div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -485,6 +604,51 @@
     }[ch]));
   }
 
+  function closeSupervisorProfileModal() {
+    const modal = document.getElementById('supervisor-profile-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  function setSupervisorModalStatus(message) {
+    const status = document.getElementById('supervisor-modal-status');
+    const content = document.getElementById('supervisor-modal-content');
+    status.textContent = message || '';
+    status.style.display = message ? '' : 'none';
+    content.style.display = message ? 'none' : '';
+  }
+
+  async function openSupervisorProfile(facultyId) {
+    if (!facultyId) return;
+    const modal = document.getElementById('supervisor-profile-modal');
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    setSupervisorModalStatus('Loading supervisor profile...');
+
+    try {
+      const res = await fetch(`/student/api/supervisor-profile/${encodeURIComponent(facultyId)}`);
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Could not load supervisor profile.');
+
+      document.getElementById('supervisor-modal-avatar').textContent = safeText(data.avatar_initials, '--');
+      document.getElementById('supervisor-modal-name').textContent = safeText(data.display_name);
+      document.getElementById('supervisor-modal-subtitle').textContent = `${safeText(data.staff_id)} · Department of Computer Science`;
+      document.getElementById('supervisor-modal-email').textContent = safeText(data.personal?.email);
+      document.getElementById('supervisor-modal-office').textContent = safeText(data.personal?.office);
+      document.getElementById('supervisor-modal-title').textContent = safeText(data.academic?.title);
+      document.getElementById('supervisor-modal-specialization').textContent = safeText(data.academic?.specialization);
+      const years = data.academic?.years_experience;
+      document.getElementById('supervisor-modal-experience').textContent =
+        years === '—' || years === null || years === undefined || years === ''
+          ? '—'
+          : `${years} year${Number(years) === 1 ? '' : 's'}`;
+      setSupervisorModalStatus('');
+    } catch (err) {
+      setSupervisorModalStatus(err.message || 'Could not load supervisor profile.');
+    }
+  }
+
   function setActionLink(id, href, label, options = {}) {
     const el = document.getElementById(id);
     const disabled = Boolean(options.disabled);
@@ -502,6 +666,15 @@
 
   function fileUploaded(files, key) {
     return Boolean(files?.[key]?.uploaded);
+  }
+
+  function supervisorNameHtml(name, facultyId) {
+    const label = escapeHtml(safeText(name));
+    if (!facultyId || label === '—') return label;
+    return `<button type="button" class="supervisor-profile-link" onclick="openSupervisorProfile(${Number(facultyId)})">
+      ${label}
+      <span class="material-symbols-outlined" style="font-size:15px">open_in_new</span>
+    </button>`;
   }
 
   function renderChecklist(items) {
@@ -721,7 +894,7 @@
     showGraduationNotice(d.graduation_notice);
 
     document.getElementById('stat-student').textContent = safeText(d.student_name);
-    document.getElementById('stat-supervisor').textContent = safeText(d.supervisor_name);
+    document.getElementById('stat-supervisor').innerHTML = supervisorNameHtml(d.supervisor_name, d.supervisor_id);
     document.getElementById('stat-team').textContent = members.length || '—';
 
     const focusStat = document.getElementById('stat-overall');
@@ -740,7 +913,7 @@
     document.getElementById('project-meta').textContent = project.project_id
       ? `Academic Year: ${safeText(d.academic_year)}`
       : 'Register your project to see its details here.';
-    document.getElementById('supervisor-name').textContent = safeText(d.supervisor_name);
+    document.getElementById('supervisor-name').innerHTML = supervisorNameHtml(d.supervisor_name, d.supervisor_id);
     document.getElementById('project-type').textContent = milestoneLabel;
     document.getElementById('registration-date').textContent = safeText(d.registration_date);
 
@@ -1040,6 +1213,13 @@
       btn.textContent = 'Save Idea';
     }
   }
+
+  document.getElementById('supervisor-profile-modal')?.addEventListener('click', event => {
+    if (event.target.id === 'supervisor-profile-modal') closeSupervisorProfileModal();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeSupervisorProfileModal();
+  });
 
   initCharts();
   loadDashboard();

@@ -303,12 +303,17 @@ function renderSupervisorOptions(professors) {
     const usedHours = Number(prof.used_hours || prof.current_hours || prof.assigned_hours || 0);
     const remainingHours = Math.max(0, Number(prof.remaining_hours ?? (wantedHours - usedHours)));
     const hoursSubmitted = Boolean(prof.hours_submitted || prof.project_hours_submitted || prof.graduation_hours_submitted);
+    const isLoadExempt = Boolean(prof.is_load_exempt || ['coordinator', 'head_of_department'].includes(prof.role));
     opt.value = prof.faculty_id;
     opt.dataset.remainingHours = String(remainingHours);
     opt.dataset.wantedHours = String(wantedHours);
     opt.dataset.usedHours = String(usedHours);
     opt.dataset.hoursSubmitted = hoursSubmitted ? '1' : '0';
-    if (!hoursSubmitted) {
+    opt.dataset.loadExempt = isLoadExempt ? '1' : '0';
+    if (isLoadExempt) {
+      const roleLabel = prof.role === 'head_of_department' ? 'Head of Department' : 'Coordinator';
+      opt.textContent = `${prof.full_name} - ${roleLabel}`;
+    } else if (!hoursSubmitted) {
       opt.textContent = `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`;
       opt.disabled = true;
       opt.title = 'This doctor has not submitted project hours.';
@@ -330,7 +335,8 @@ function updateSectionSupervisorAvailability(selectedCount) {
     const remainingHours = Number(option.dataset.remainingHours || 0);
     const wantedHours = Number(option.dataset.wantedHours || 0);
     const hoursSubmitted = option.dataset.hoursSubmitted === '1';
-    option.disabled = !hoursSubmitted || wantedHours <= 0 || remainingHours < requiredHours;
+    const isLoadExempt = option.dataset.loadExempt === '1';
+    option.disabled = !isLoadExempt && (!hoursSubmitted || wantedHours <= 0 || remainingHours < requiredHours);
   });
 
   if (select.selectedOptions[0]?.disabled) {
@@ -362,9 +368,13 @@ function renderForms(forms, professors) {
         const usedHours = Number(prof.used_hours || prof.current_hours || prof.assigned_hours || 0);
         const remainingHours = Math.max(0, Number(prof.remaining_hours ?? (wantedHours - usedHours)));
         const hoursSubmitted = Boolean(prof.hours_submitted || prof.project_hours_submitted || prof.graduation_hours_submitted);
+        const isLoadExempt = Boolean(prof.is_load_exempt || ['coordinator', 'head_of_department'].includes(prof.role));
         const requiredHours = Math.max(Number(form.member_count || 1), 1) * 0.5;
-        const disabled = !hoursSubmitted || wantedHours <= 0 || remainingHours < requiredHours ? 'disabled' : '';
-        const label = !hoursSubmitted
+        const disabled = !isLoadExempt && (!hoursSubmitted || wantedHours <= 0 || remainingHours < requiredHours) ? 'disabled' : '';
+        const roleLabel = prof.role === 'head_of_department' ? 'Head of Department' : 'Coordinator';
+        const label = isLoadExempt
+          ? `${prof.full_name} - ${roleLabel}`
+          : !hoursSubmitted
           ? `${prof.full_name} — project hours not submitted / used ${usedHours.toFixed(1)} project hours`
           : `${prof.full_name} — wants ${wantedHours.toFixed(1)} project hours / remaining ${remainingHours.toFixed(1)}`;
         return `<option value="${prof.faculty_id}" ${selected} ${disabled}>${escapeHtml(label)}</option>`;

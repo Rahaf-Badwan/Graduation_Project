@@ -815,8 +815,9 @@ def api_upload_file():
     f.seek(0)
     if not size_bytes:
         return jsonify({"error": "The selected file is empty."}), 400
-    if size_bytes > MAX_FILE_MB * 1024 * 1024:
-        return jsonify({"error": f"File exceeds the {MAX_FILE_MB} MB upload limit."}), 413
+    max_file_mb = _max_file_mb_for_type(file_type)
+    if size_bytes > max_file_mb * 1024 * 1024:
+        return jsonify({"error": f"File exceeds the {max_file_mb} MB upload limit."}), 413
 
     try:
         db = get_db()

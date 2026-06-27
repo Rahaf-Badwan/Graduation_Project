@@ -1316,29 +1316,29 @@ SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
 INSERT IGNORE INTO users
 (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
 SELECT * FROM (
-    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, 'sobhi.ahmad@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'SA' AS avatar_initials, TRUE AS is_active
-    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', 'radi.jarrar@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
-    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', 'abdullah.krakeh@birzeit.edu', @pwd, 'supervisor', 'AK', TRUE
-    UNION ALL SELECT '3006', 'Dr. Murad Njoum', 'murad.njoum@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
-    UNION ALL SELECT '3007', 'Dr. Adel Taweel', 'adel.taweel@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
-    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', 'yousef.hassouneh@birzeit.edu', @pwd, 'supervisor', 'YH', TRUE
-    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', 'ahmad.abusneina@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
-    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', 'bassem.alserafi@birzeit.edu', @pwd, 'supervisor', 'BA', TRUE
-    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', 'mamoun.nawahdah@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
-    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', 'tasneem.zayt@birzeit.edu', @pwd, 'supervisor', 'TZ', TRUE
-    UNION ALL SELECT '3013', 'Dr. Samer Zein', 'samer.zein@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
-    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', 'hafez.barghouthi@birzeit.edu', @pwd, 'supervisor', 'HB', TRUE
-    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', 'abdullah.alnatsheh@birzeit.edu', @pwd, 'supervisor', 'AN', TRUE
-    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', 'alaa.hasheesh@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
-    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', 'faisal.shehadeh@birzeit.edu', @pwd, 'supervisor', 'FS', TRUE
-    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', 'fadi.khalil@birzeit.edu', @pwd, 'supervisor', 'FK', TRUE
-    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', 'mohammad.helal@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
-    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', 'rashid.yousef@birzeit.edu', @pwd, 'supervisor', 'RY', TRUE
-    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', 'ehab.alshaer@birzeit.edu', @pwd, 'supervisor', 'EA', TRUE
-    UNION ALL SELECT '3022', 'Dr. Sobhi Ahmad', 'naima.harbawi@birzeit.edu', @pwd, 'supervisor', 'NH', TRUE
-    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', 'ahmad.fahl@birzeit.edu', @pwd, 'supervisor', 'AF', TRUE
-    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', 'ahmad.sabbah@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
-    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', 'mohammad.alkhanafseh@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
+    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, '3002@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'SA' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', '3003@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
+    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', '3004@birzeit.edu', @pwd, 'supervisor', 'AK', TRUE
+    UNION ALL SELECT '3006', 'Dr. Murad Njoum', '3006@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3007', 'Dr. Adel Taweel', '3007@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
+    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', '3008@birzeit.edu', @pwd, 'supervisor', 'YH', TRUE
+    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', '3009@birzeit.edu', @pwd, 'supervisor', 'RA', TRUE
+    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', '3010@birzeit.edu', @pwd, 'supervisor', 'BA', TRUE
+    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', '3011@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', '3012@birzeit.edu', @pwd, 'supervisor', 'TZ', TRUE
+    UNION ALL SELECT '3013', 'Dr. Samer Zein', '3013@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
+    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', '3014@birzeit.edu', @pwd, 'supervisor', 'HB', TRUE
+    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', '3015@birzeit.edu', @pwd, 'supervisor', 'AN', TRUE
+    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', '3016@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
+    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', '3017@birzeit.edu', @pwd, 'supervisor', 'FS', TRUE
+    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', '3018@birzeit.edu', @pwd, 'supervisor', 'FK', TRUE
+    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', '3019@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
+    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', '3020@birzeit.edu', @pwd, 'supervisor', 'RY', TRUE
+    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', '3021@birzeit.edu', @pwd, 'supervisor', 'EA', TRUE
+    UNION ALL SELECT '3022', 'Dr. Naima Hirbawi', '3022@birzeit.edu', @pwd, 'supervisor', 'NH', TRUE
+    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', '3023@birzeit.edu', @pwd, 'supervisor', 'AF', TRUE
+    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', '3024@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', '3025@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
 ) AS doctors
 WHERE NOT EXISTS (
     SELECT 1
@@ -1347,6 +1347,38 @@ WHERE NOT EXISTS (
        OR u.email = doctors.email
        OR u.university_id = doctors.university_id
 );
+
+UPDATE users u
+JOIN (
+    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, '3002@birzeit.edu' AS email, 'SA' AS avatar_initials
+    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', '3003@birzeit.edu', 'RJ'
+    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', '3004@birzeit.edu', 'AK'
+    UNION ALL SELECT '3006', 'Dr. Murad Njoum', '3006@birzeit.edu', 'MN'
+    UNION ALL SELECT '3007', 'Dr. Adel Taweel', '3007@birzeit.edu', 'AT'
+    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', '3008@birzeit.edu', 'YH'
+    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', '3009@birzeit.edu', 'RA'
+    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', '3010@birzeit.edu', 'BA'
+    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', '3011@birzeit.edu', 'MN'
+    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', '3012@birzeit.edu', 'TZ'
+    UNION ALL SELECT '3013', 'Dr. Samer Zein', '3013@birzeit.edu', 'SZ'
+    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', '3014@birzeit.edu', 'HB'
+    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', '3015@birzeit.edu', 'AN'
+    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', '3016@birzeit.edu', 'AH'
+    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', '3017@birzeit.edu', 'FS'
+    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', '3018@birzeit.edu', 'FK'
+    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', '3019@birzeit.edu', 'MH'
+    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', '3020@birzeit.edu', 'RY'
+    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', '3021@birzeit.edu', 'EA'
+    UNION ALL SELECT '3022', 'Dr. Naima Hirbawi', '3022@birzeit.edu', 'NH'
+    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', '3023@birzeit.edu', 'AF'
+    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', '3024@birzeit.edu', 'AS'
+    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', '3025@birzeit.edu', 'MA'
+) AS doctors ON doctors.university_id = u.university_id
+SET u.full_name = doctors.full_name,
+    u.email = doctors.email,
+    u.avatar_initials = doctors.avatar_initials,
+    u.role = 'supervisor',
+    u.is_active = TRUE;
 
 INSERT IGNORE INTO faculty
 (user_id, specialization, years_experience, title)
@@ -1374,7 +1406,7 @@ SELECT
         WHEN 'Dr. Mohammad Helal' THEN 'artificial_intelligence'
         WHEN 'Dr. Rashid Yousef' THEN 'software_engineering'
         WHEN 'Dr. Ehab Alshaer' THEN 'software_engineering'
-        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Naima Hirbawi' THEN 'software_engineering'
         WHEN 'Dr. Ahmad Fahl' THEN 'software_engineering'
         WHEN 'Dr. Ahmad Sabbah' THEN 'artificial_intelligence'
         WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
@@ -1406,7 +1438,7 @@ WHERE u.full_name IN (
     'Dr. Mohammad Helal',
     'Dr. Rashid Yousef',
     'Dr. Ehab Alshaer',
-    'Dr. Sobhi Ahmad',
+    'Dr. Naima Hirbawi',
     'Dr. Ahmad Fahl',
     'Dr. Ahmad Sabbah',
     'Dr. Mohammad Alkhanafseh'
@@ -1440,7 +1472,7 @@ SET f.specialization = CASE
         WHEN 'Dr. Mohammad Helal' THEN 'artificial_intelligence'
         WHEN 'Dr. Rashid Yousef' THEN 'software_engineering'
         WHEN 'Dr. Ehab Alshaer' THEN 'software_engineering'
-        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Naima Hirbawi' THEN 'software_engineering'
         WHEN 'Dr. Ahmad Fahl' THEN 'software_engineering'
         WHEN 'Dr. Ahmad Sabbah' THEN 'artificial_intelligence'
         WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
@@ -1470,7 +1502,7 @@ WHERE u.full_name IN (
     'Dr. Mohammad Helal',
     'Dr. Rashid Yousef',
     'Dr. Ehab Alshaer',
-    'Dr. Sobhi Ahmad',
+    'Dr. Naima Hirbawi',
     'Dr. Ahmad Fahl',
     'Dr. Ahmad Sabbah',
     'Dr. Mohammad Alkhanafseh'
@@ -3265,29 +3297,29 @@ SET @pwd := '$2b$12$Wvdyz6MS0G3hhhh.M5PxxOk556cP4HZZ6gs068VOWsGZ1MDEgU1i.';
 INSERT IGNORE INTO users
 (university_id, full_name, email, password_hash, role, avatar_initials, is_active)
 SELECT * FROM (
-    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, 'sobhi.ahmad@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'SA' AS avatar_initials, TRUE AS is_active
-    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', 'radi.jarrar@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
-    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', 'abdullah.krakeh@birzeit.edu', @pwd, 'supervisor', 'AK', TRUE
-    UNION ALL SELECT '3006', 'Dr. Murad Njoum', 'murad.njoum@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
-    UNION ALL SELECT '3007', 'Dr. Adel Taweel', 'adel.taweel@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
-    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', 'yousef.hassouneh@birzeit.edu', @pwd, 'supervisor', 'YH', TRUE
-    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', 'ahmad.abusneina@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
-    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', 'bassem.alserafi@birzeit.edu', @pwd, 'supervisor', 'BA', TRUE
-    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', 'mamoun.nawahdah@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
-    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', 'tasneem.zayt@birzeit.edu', @pwd, 'supervisor', 'TZ', TRUE
-    UNION ALL SELECT '3013', 'Dr. Samer Zein', 'samer.zein@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
-    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', 'hafez.barghouthi@birzeit.edu', @pwd, 'supervisor', 'HB', TRUE
-    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', 'abdullah.alnatsheh@birzeit.edu', @pwd, 'supervisor', 'AN', TRUE
-    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', 'alaa.hasheesh@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
-    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', 'faisal.shehadeh@birzeit.edu', @pwd, 'supervisor', 'FS', TRUE
-    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', 'fadi.khalil@birzeit.edu', @pwd, 'supervisor', 'FK', TRUE
-    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', 'mohammad.helal@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
-    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', 'rashid.yousef@birzeit.edu', @pwd, 'supervisor', 'RY', TRUE
-    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', 'ehab.alshaer@birzeit.edu', @pwd, 'supervisor', 'EA', TRUE
-    UNION ALL SELECT '3022', 'Dr. Sobhi Ahmad', 'naima.harbawi@birzeit.edu', @pwd, 'supervisor', 'NH', TRUE
-    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', 'ahmad.fahl@birzeit.edu', @pwd, 'supervisor', 'AF', TRUE
-    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', 'ahmad.sabbah@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
-    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', 'mohammad.alkhanafseh@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
+    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, '3002@birzeit.edu' AS email, @pwd AS password_hash, 'supervisor' AS role, 'SA' AS avatar_initials, TRUE AS is_active
+    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', '3003@birzeit.edu', @pwd, 'supervisor', 'RJ', TRUE
+    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', '3004@birzeit.edu', @pwd, 'supervisor', 'AK', TRUE
+    UNION ALL SELECT '3006', 'Dr. Murad Njoum', '3006@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3007', 'Dr. Adel Taweel', '3007@birzeit.edu', @pwd, 'supervisor', 'AT', TRUE
+    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', '3008@birzeit.edu', @pwd, 'supervisor', 'YH', TRUE
+    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', '3009@birzeit.edu', @pwd, 'supervisor', 'RA', TRUE
+    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', '3010@birzeit.edu', @pwd, 'supervisor', 'BA', TRUE
+    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', '3011@birzeit.edu', @pwd, 'supervisor', 'MN', TRUE
+    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', '3012@birzeit.edu', @pwd, 'supervisor', 'TZ', TRUE
+    UNION ALL SELECT '3013', 'Dr. Samer Zein', '3013@birzeit.edu', @pwd, 'supervisor', 'SZ', TRUE
+    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', '3014@birzeit.edu', @pwd, 'supervisor', 'HB', TRUE
+    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', '3015@birzeit.edu', @pwd, 'supervisor', 'AN', TRUE
+    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', '3016@birzeit.edu', @pwd, 'supervisor', 'AH', TRUE
+    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', '3017@birzeit.edu', @pwd, 'supervisor', 'FS', TRUE
+    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', '3018@birzeit.edu', @pwd, 'supervisor', 'FK', TRUE
+    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', '3019@birzeit.edu', @pwd, 'supervisor', 'MH', TRUE
+    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', '3020@birzeit.edu', @pwd, 'supervisor', 'RY', TRUE
+    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', '3021@birzeit.edu', @pwd, 'supervisor', 'EA', TRUE
+    UNION ALL SELECT '3022', 'Dr. Naima Hirbawi', '3022@birzeit.edu', @pwd, 'supervisor', 'NH', TRUE
+    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', '3023@birzeit.edu', @pwd, 'supervisor', 'AF', TRUE
+    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', '3024@birzeit.edu', @pwd, 'supervisor', 'AS', TRUE
+    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', '3025@birzeit.edu', @pwd, 'supervisor', 'MA', TRUE
 ) AS doctors
 WHERE NOT EXISTS (
     SELECT 1
@@ -3296,6 +3328,38 @@ WHERE NOT EXISTS (
        OR u.email = doctors.email
        OR u.university_id = doctors.university_id
 );
+
+UPDATE users u
+JOIN (
+    SELECT '3002' AS university_id, 'Dr. Sobhi Ahmad' AS full_name, '3002@birzeit.edu' AS email, 'SA' AS avatar_initials
+    UNION ALL SELECT '3003', 'Dr. Radi Jarrar', '3003@birzeit.edu', 'RJ'
+    UNION ALL SELECT '3004', 'Dr. Abdullah Krakeh', '3004@birzeit.edu', 'AK'
+    UNION ALL SELECT '3006', 'Dr. Murad Njoum', '3006@birzeit.edu', 'MN'
+    UNION ALL SELECT '3007', 'Dr. Adel Taweel', '3007@birzeit.edu', 'AT'
+    UNION ALL SELECT '3008', 'Dr. Yousef Hassouneh', '3008@birzeit.edu', 'YH'
+    UNION ALL SELECT '3009', 'Dr. Ruba Awadallah', '3009@birzeit.edu', 'RA'
+    UNION ALL SELECT '3010', 'Dr. Bassem Alserafi', '3010@birzeit.edu', 'BA'
+    UNION ALL SELECT '3011', 'Dr. Mamoun Nawahdah', '3011@birzeit.edu', 'MN'
+    UNION ALL SELECT '3012', 'Dr. Tasneem Zayt', '3012@birzeit.edu', 'TZ'
+    UNION ALL SELECT '3013', 'Dr. Samer Zein', '3013@birzeit.edu', 'SZ'
+    UNION ALL SELECT '3014', 'Dr. Hafez Barghouthi', '3014@birzeit.edu', 'HB'
+    UNION ALL SELECT '3015', 'Dr. Abdullah Al-Natsheh', '3015@birzeit.edu', 'AN'
+    UNION ALL SELECT '3016', 'Dr. Alaa Hasheesh', '3016@birzeit.edu', 'AH'
+    UNION ALL SELECT '3017', 'Dr. Faisal Shehadeh', '3017@birzeit.edu', 'FS'
+    UNION ALL SELECT '3018', 'Dr. Fadi Khalil', '3018@birzeit.edu', 'FK'
+    UNION ALL SELECT '3019', 'Dr. Mohammad Helal', '3019@birzeit.edu', 'MH'
+    UNION ALL SELECT '3020', 'Dr. Rashid Yousef', '3020@birzeit.edu', 'RY'
+    UNION ALL SELECT '3021', 'Dr. Ehab Alshaer', '3021@birzeit.edu', 'EA'
+    UNION ALL SELECT '3022', 'Dr. Naima Hirbawi', '3022@birzeit.edu', 'NH'
+    UNION ALL SELECT '3023', 'Dr. Ahmad Fahl', '3023@birzeit.edu', 'AF'
+    UNION ALL SELECT '3024', 'Dr. Ahmad Sabbah', '3024@birzeit.edu', 'AS'
+    UNION ALL SELECT '3025', 'Dr. Mohammad Alkhanafseh', '3025@birzeit.edu', 'MA'
+) AS doctors ON doctors.university_id = u.university_id
+SET u.full_name = doctors.full_name,
+    u.email = doctors.email,
+    u.avatar_initials = doctors.avatar_initials,
+    u.role = 'supervisor',
+    u.is_active = TRUE;
 
 INSERT IGNORE INTO faculty (user_id, specialization, years_experience, title)
 SELECT
@@ -3322,7 +3386,7 @@ SELECT
         WHEN 'Dr. Mohammad Helal' THEN 'artificial_intelligence'
         WHEN 'Dr. Rashid Yousef' THEN 'software_engineering'
         WHEN 'Dr. Ehab Alshaer' THEN 'software_engineering'
-        WHEN 'Dr. Sobhi Ahmad' THEN 'software_engineering'
+        WHEN 'Dr. Naima Hirbawi' THEN 'software_engineering'
         WHEN 'Dr. Ahmad Fahl' THEN 'software_engineering'
         WHEN 'Dr. Ahmad Sabbah' THEN 'artificial_intelligence'
         WHEN 'Dr. Mohammad Alkhanafseh' THEN 'security_networks'
@@ -3354,7 +3418,7 @@ WHERE u.full_name IN (
     'Dr. Mohammad Helal',
     'Dr. Rashid Yousef',
     'Dr. Ehab Alshaer',
-    'Dr. Sobhi Ahmad',
+    'Dr. Naima Hirbawi',
     'Dr. Ahmad Fahl',
     'Dr. Ahmad Sabbah',
     'Dr. Mohammad Alkhanafseh'
@@ -5148,16 +5212,6 @@ INSERT INTO projects (semester_id, supervisor_id, title, project_type, status, f
             ORDER BY u.full_name;
 
 
-INSERT INTO notifications (recipient_id, sender_id, notification_type, title, message, course_scope, is_read)
-VALUES (
-  1,
-  2,
-  'feedback_received',
-  'Project Submission Update — COMP4300',
-  'Dear Dr. Iyad,\n\nI wanted to inform you that several students have recently submitted their COMP4300 graduation projects. A total of 7 projects are now under review and awaiting your approval.\n\nPlease review the submissions at your earliest convenience.\n\nBest regards,\nDr. Ruba Awadallah\nCourse Coordinator',
-  'graduation_project',
-  0
-);
 SELECT u.user_id, u.university_id, u.full_name, u.email,
                    u.avatar_initials, f.specialization, f.years_experience,
                    f.title, f.office_number

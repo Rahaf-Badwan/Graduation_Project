@@ -55,6 +55,21 @@
     <div class="card">
       <div class="card-hd"><span class="card-title">Personal Information</span></div>
 
+      {% if profile_error %}
+      <div style="background:#fff0f0;border:1px solid #f5c6c6;color:#c0392b;
+                  font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
+        {{ profile_error }}
+      </div>
+      {% endif %}
+      {% if profile_success %}
+      <div style="background:#f0fff4;border:1px solid #a8d5b5;color:#1a5c2a;
+                  font-size:12px;padding:8px 12px;border-radius:7px;margin-bottom:12px;">
+        {{ profile_success }}
+      </div>
+      {% endif %}
+
+      <form id="profileInfoForm" method="POST" action="{{ url_for('general_supervisors.update_profile_info') }}"></form>
+
       <div class="field-wrap">
         <div class="field-label">Full Name</div>
         <input class="field-input" readonly style="background:var(--color-background-secondary)"
@@ -72,11 +87,11 @@
       </div>
       <div class="field-wrap">
         <div class="field-label">Office</div>
-        <input class="field-input" readonly style="background:var(--color-background-secondary)"
-          value="{{ user.office_number if user and user.office_number else '—' }}" />
+        <input class="field-input" form="profileInfoForm" name="office_number" maxlength="50"
+          placeholder="e.g. Masri 214"
+          value="{{ user.office_number if user and user.office_number else '' }}" />
       </div>
     </div>
-
     <div>
 
       <!-- ── Change Password ── -->
@@ -154,7 +169,13 @@
           </div>
           <div style="display:flex;justify-content:space-between;padding:5px 0">
             <span style="color:var(--color-text-secondary)">Years of Experience</span>
-            <span>{{ user.years_experience if user and user.years_experience else '—' }}</span>
+            <input class="field-input" form="profileInfoForm" name="years_experience"
+              type="number" min="0" max="80" step="1"
+              style="width:130px;margin:0;text-align:right;padding:6px 9px"
+              value="{{ user.years_experience if user and user.years_experience is not none else '' }}" />
+          </div>
+          <div class="btn-row" style="justify-content:flex-end;margin-top:8px">
+            <button type="submit" form="profileInfoForm" class="btn btn-primary">Update Profile Info</button>
           </div>
         </div>
       </div>

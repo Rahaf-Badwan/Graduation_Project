@@ -247,6 +247,93 @@ def _table_exists(cursor, table_name):
     return int(row.get("cnt") or 0) > 0
 
 
+def _faculty_supervised_group_counts(cursor, faculty_id):
+    counts = {
+        "project_groups": 0,
+        "section_groups": 0,
+        "total_groups": 0,
+    }
+
+    if not faculty_id:
+        return counts
+
+    if _table_exists(cursor, "projects"):
+        if _table_exists(cursor, "project_members"):
+            cursor.execute(
+                """
+                SELECT COUNT(DISTINCT p.project_id) AS cnt
+                FROM projects p
+                JOIN project_members pm ON pm.project_id = p.project_id
+                WHERE p.supervisor_id = %s
+                """,
+                (faculty_id,),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM projects
+                WHERE supervisor_id = %s
+                """,
+                (faculty_id,),
+            )
+        row = cursor.fetchone() or {}
+        counts["project_groups"] = int(row.get("cnt") or 0)
+
+    if _table_exists(cursor, "student_distribution_sections"):
+        if _table_exists(cursor, "section_students"):
+            cursor.execute(
+                """
+                SELECT COUNT(DISTINCT sec.section_id) AS cnt
+                FROM student_distribution_sections sec
+                JOIN section_students ss ON ss.section_id = sec.section_id
+                WHERE sec.supervisor_id = %s
+                """,
+                (faculty_id,),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM student_distribution_sections
+                WHERE supervisor_id = %s
+                """,
+                (faculty_id,),
+            )
+        row = cursor.fetchone() or {}
+        counts["section_groups"] = int(row.get("cnt") or 0)
+
+    counts["total_groups"] = counts["project_groups"] + counts["section_groups"]
+    return counts
+
+
+def _coordinator_supervisor_access(cursor, user_id):
+    cursor.execute(
+        """
+        SELECT f.faculty_id, u.full_name
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE f.user_id = %s
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    faculty = cursor.fetchone()
+    if not faculty:
+        return {
+            "faculty": None,
+            "counts": _faculty_supervised_group_counts(cursor, None),
+            "can_switch": False,
+        }
+
+    counts = _faculty_supervised_group_counts(cursor, faculty.get("faculty_id"))
+    return {
+        "faculty": faculty,
+        "counts": counts,
+        "can_switch": counts["total_groups"] > 0,
+    }
+
+
 def _ensure_faculty_load_submission_columns(cursor):
     if not _table_exists(cursor, "faculty_load_settings"):
         return
@@ -802,7 +889,7 @@ def fetch_supervisors():
     anchor_semester_id = anchor["semester_id"] if anchor else None
 
     cursor.execute("""
-        SELECT f.faculty_id, u.full_name
+        SELECT f.faculty_id, u.full_name, u.role
         FROM faculty f
         JOIN users u ON u.user_id = f.user_id
         WHERE u.role IN ('supervisor', 'coordinator', 'head_of_department')
@@ -834,6 +921,8 @@ def fetch_supervisors():
             {
                 "faculty_id": row["faculty_id"],
                 "full_name": row["full_name"],
+                "role": row.get("role") or "supervisor",
+                "is_load_exempt": row.get("role") in {"coordinator", "head_of_department"},
                 "assigned_projects": snapshot["supervised_groups"],
                 "wanted_hours": snapshot["wanted_hours"],
                 "hours_submitted": snapshot["hours_submitted"],
@@ -852,6 +941,28 @@ def fetch_supervisors():
 
 
 # ─── Coordinator Pages ───────────────────────────────────────────────────
+def _faculty_assignment_role(cursor, faculty_id):
+    cursor.execute(
+        """
+        SELECT u.role
+        FROM faculty f
+        JOIN users u ON u.user_id = f.user_id
+        WHERE f.faculty_id = %s
+        LIMIT 1
+        """,
+        (faculty_id,),
+    )
+    row = cursor.fetchone() or {}
+    return row.get("role") or "supervisor"
+
+
+def _faculty_load_exempt_for_assignment(cursor, faculty_id):
+    return _faculty_assignment_role(cursor, faculty_id) in {
+        "coordinator",
+        "head_of_department",
+    }
+
+
 COORDINATOR_PAGES = {
     "dashboard": "coordinator/index.html",
     "registration": "coordinator/registration.html",
@@ -4815,8 +4926,9 @@ def api_assign_group_supervisor():
             project.get("course_code") or "COMP4300",
         )
         required_hours = required_students * 0.5
+        load_exempt = _faculty_load_exempt_for_assignment(cursor, int(supervisor_id))
 
-        if snapshot["remaining_hours"] < required_hours:
+        if not load_exempt and snapshot["remaining_hours"] < required_hours:
             cursor.close()
             db.close()
             return (
@@ -5036,8 +5148,9 @@ def api_add_section():
             "COMP4200",
         )
         required_hours = len(student_ids) * 0.5
+        load_exempt = _faculty_load_exempt_for_assignment(cursor, int(supervisor_id))
 
-        if snapshot["remaining_hours"] < required_hours:
+        if not load_exempt and snapshot["remaining_hours"] < required_hours:
             cursor.close()
             db.close()
             return (
@@ -9643,15 +9756,18 @@ def api_coordinator_groups_with_space():
                    {group_name_expr} AS group_name,
                    p.title,
                    p.supervisor_id,
+                   u_sup.role AS supervisor_role,
                    GROUP_CONCAT(u.full_name ORDER BY pm.is_primary_contact DESC SEPARATOR ', ') AS team_members,
                    COUNT(pm.student_id) AS member_count
             FROM projects p
             JOIN project_members pm ON pm.project_id = p.project_id
             JOIN students st ON st.student_id = pm.student_id
             JOIN users u ON u.user_id = st.user_id
+            LEFT JOIN faculty f_sup ON f_sup.faculty_id = p.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f_sup.user_id
             WHERE p.semester_id = %s
               AND p.status = 'submitted'
-            GROUP BY p.project_id, p.title
+            GROUP BY p.project_id, p.title, p.supervisor_id, u_sup.role
             HAVING member_count < 3
             ORDER BY p.project_id DESC
         """, (semester["semester_id"],))
@@ -9671,8 +9787,13 @@ def api_coordinator_groups_with_space():
                 )
                 group["supervisor_wanted_hours"] = snapshot["wanted_hours"]
                 group["supervisor_remaining_hours"] = snapshot["remaining_hours"]
+                load_exempt = group.get("supervisor_role") in {
+                    "coordinator",
+                    "head_of_department",
+                }
                 group["supervisor_can_take_one_student"] = (
-                    snapshot["wanted_hours"] > 0 and snapshot["remaining_hours"] >= 0.5
+                    load_exempt
+                    or (snapshot["wanted_hours"] > 0 and snapshot["remaining_hours"] >= 0.5)
                 )
             else:
                 group["supervisor_wanted_hours"] = 0.0
@@ -9752,7 +9873,14 @@ def api_coordinator_add_student_to_group():
             "COMP4200",
         )
         required_hours = len(student_ids) * 0.5
-        if snapshot["wanted_hours"] <= 0 or snapshot["remaining_hours"] < required_hours:
+        load_exempt = _faculty_load_exempt_for_assignment(
+            cursor,
+            int(project["supervisor_id"]),
+        )
+        if (
+            not load_exempt
+            and (snapshot["wanted_hours"] <= 0 or snapshot["remaining_hours"] < required_hours)
+        ):
             cursor.close()
             db.close()
             return (
@@ -13315,7 +13443,13 @@ def coordinator_profile_api():
         if not profile:
             return jsonify({"ok": False, "error": "Profile not found"}), 404
 
+        supervisor_counts = _faculty_supervised_group_counts(cur, profile.get("faculty_id"))
+
         profile["course_label"] = "COMP4200 / COMP4300"
+        profile["can_switch_to_supervisor"] = supervisor_counts["total_groups"] > 0
+        profile["supervisor_group_count"] = supervisor_counts["total_groups"]
+        profile["supervisor_project_group_count"] = supervisor_counts["project_groups"]
+        profile["supervisor_section_group_count"] = supervisor_counts["section_groups"]
 
         return jsonify({
             "ok": True,
@@ -13369,6 +13503,83 @@ def _ensure_user_profile_extra_table(cursor):
             FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
+
+
+@coordinator_bp.route("/api/coordinator/profile/update-info", methods=["POST"])
+@login_required(role="coordinator")
+def api_coordinator_update_profile_info():
+    user_id = session.get("user_id")
+    data = request.get_json(silent=True) or {}
+    office_number = (data.get("office_number") or "").strip()
+    years_raw = str(data.get("years_experience") or "").strip()
+
+    if len(office_number) > 50:
+        return jsonify({"error": "Office number must be 50 characters or fewer."}), 400
+
+    if years_raw:
+        try:
+            years_experience = int(years_raw)
+        except ValueError:
+            return jsonify({"error": "Years of experience must be a whole number."}), 400
+        if years_experience < 0 or years_experience > 80:
+            return jsonify({"error": "Years of experience must be between 0 and 80."}), 400
+    else:
+        years_experience = None
+
+    conn = get_db()
+    cur = conn.cursor(dictionary=True)
+    try:
+        _ensure_user_profile_extra_table(cur)
+        has_office_number = _db_column_exists(cur, "faculty", "office_number")
+
+        cur.execute(
+            """
+            SELECT faculty_id
+            FROM faculty
+            WHERE user_id = %s
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        faculty = cur.fetchone()
+        if not faculty:
+            return jsonify({"error": "Faculty profile not found."}), 404
+
+        if has_office_number:
+            cur.execute(
+                """
+                UPDATE faculty
+                SET office_number = %s, years_experience = %s
+                WHERE faculty_id = %s
+                """,
+                (office_number or None, years_experience, faculty["faculty_id"]),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE faculty
+                SET years_experience = %s
+                WHERE faculty_id = %s
+                """,
+                (years_experience, faculty["faculty_id"]),
+            )
+            cur.execute(
+                """
+                INSERT INTO user_profile_extra (user_id, office_number)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE office_number = VALUES(office_number)
+                """,
+                (user_id, office_number or None),
+            )
+
+        conn.commit()
+        return jsonify({"message": "Profile information updated successfully."})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 
 @coordinator_bp.route("/api/coordinator/change-password", methods=["POST"])
@@ -13442,7 +13653,7 @@ def api_coordinator_change_password():
 @login_required(role="coordinator")
 def switch_to_supervisor():
     """
-    Allow a coordinator who also exists in faculty table to view the system as supervisor.
+    Allow a coordinator with supervised groups to view the system as supervisor.
     It keeps the original coordinator session so the user can switch back.
     """
     user_id = session.get("user_id")
@@ -13450,23 +13661,14 @@ def switch_to_supervisor():
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute(
-        """
-        SELECT f.faculty_id, u.full_name
-        FROM faculty f
-        JOIN users u ON u.user_id = f.user_id
-        WHERE f.user_id = %s
-        LIMIT 1
-        """,
-        (user_id,),
-    )
-
-    faculty = cursor.fetchone()
+    access = _coordinator_supervisor_access(cursor, user_id)
     cursor.close()
     db.close()
 
-    if not faculty:
+    if not access.get("can_switch"):
         return redirect(url_for("coordinator_bp.coordinator_page", page="profile"))
+
+    faculty = access["faculty"]
 
     session["original_role"] = session.get("role")
     session["original_user_id"] = session.get("user_id")

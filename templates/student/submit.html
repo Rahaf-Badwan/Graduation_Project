@@ -127,7 +127,7 @@
           <span class="material-symbols-outlined icon-inline">description</span>
         </div>
         <div class="upload-text">Final Report</div>
-        <div class="upload-hint">PDF · Max 50MB</div>
+        <div class="upload-hint">Required · PDF · Max 500MB</div>
         <div id="status-report" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
           ↑ Click to upload
         </div>
@@ -136,13 +136,13 @@
       <!-- Source Code -->
       <div class="upload-zone" id="zone-code" onclick="document.getElementById('file-code').click()"
         style="cursor:pointer">
-        <input type="file" id="file-code" accept=".zip,.rar" style="display:none"
+        <input type="file" id="file-code" accept=".zip,.rar,.tar,.gz,.7z" style="display:none"
           onchange="handleFileSelect(this, 'zone-code', 'status-code')">
         <div class="upload-icon">
           <span class="material-symbols-outlined icon-inline">code</span>
         </div>
-        <div class="upload-text">Source Code</div>
-        <div class="upload-hint">ZIP / RAR / 7Z · Max 50MB</div>
+        <div class="upload-text">Source Code <span style="font-size:11px;color:var(--text-secondary);font-weight:800">(Optional)</span></div>
+        <div class="upload-hint">Optional · ZIP / RAR / 7Z · Max 500MB</div>
         <div id="status-code" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
           ↑ Click to upload
         </div>
@@ -156,8 +156,8 @@
         <div class="upload-icon">
           <span class="material-symbols-outlined icon-inline">slideshow</span>
         </div>
-        <div class="upload-text">Presentation Slides</div>
-        <div class="upload-hint">PPTX / PDF · Max 50MB</div>
+        <div class="upload-text">Presentation Slides <span style="font-size:11px;color:var(--text-secondary);font-weight:800">(Optional)</span></div>
+        <div class="upload-hint">Optional · PPTX / PDF · Max 50MB</div>
         <div id="status-slides" style="margin-top:8px;font-size:11px;font-weight:600;color:var(--text-secondary)">
           ↑ Click to upload
         </div>
@@ -378,11 +378,10 @@
   }
 
   var TIMELINE_ITEM_ID = "{{ timeline_item_id or '' }}";
-  var MAX_UPLOAD_MB = 50;
   var FILE_RULES = {
-    final_report: { label: 'Final Report', extensions: ['pdf'] },
-    source_code: { label: 'Source Code', extensions: ['zip', 'rar', 'tar', 'gz', '7z'] },
-    presentation: { label: 'Presentation Slides', extensions: ['pdf', 'pptx', 'ppt'] }
+    final_report: { label: 'Final Report', extensions: ['pdf'], maxMb: 500 },
+    source_code: { label: 'Source Code', extensions: ['zip', 'rar', 'tar', 'gz', '7z'], maxMb: 500 },
+    presentation: { label: 'Presentation Slides', extensions: ['pdf', 'pptx', 'ppt'], maxMb: 50 }
   };
 
   // ── تحميل الملفات المرفوعة مسبقاً عند فتح الصفحة ─────────────
@@ -455,8 +454,8 @@
     if (!file.size) {
       return rule.label + ' cannot be empty.';
     }
-    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
-      return rule.label + ' exceeds the ' + MAX_UPLOAD_MB + ' MB upload limit.';
+    if (file.size > rule.maxMb * 1024 * 1024) {
+      return rule.label + ' exceeds the ' + rule.maxMb + ' MB upload limit.';
     }
     return '';
   }
