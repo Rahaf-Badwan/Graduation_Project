@@ -7,7 +7,10 @@
 {% block content %}
 
 <style>
-  html, body { scroll-behavior: auto !important; }
+  html,
+  body {
+    scroll-behavior: auto !important;
+  }
 
   #pg-lectures {
     display: block !important;
@@ -41,8 +44,13 @@
     color: #fff;
   }
 
-  #pg-lectures .lecture-section { display: none; }
-  #pg-lectures .lecture-section.active { display: block; }
+  #pg-lectures .lecture-section {
+    display: none;
+  }
+
+  #pg-lectures .lecture-section.active {
+    display: block;
+  }
 
   #pg-lectures .lecture-grid {
     display: grid;
@@ -105,7 +113,9 @@
     background: var(--color-background-tertiary);
   }
 
-  #pg-lectures .mini-form.on { display: block; }
+  #pg-lectures .mini-form.on {
+    display: block;
+  }
 
   #pg-lectures .form-grid {
     display: grid;
@@ -142,7 +152,9 @@
     box-shadow: 0 0 0 3px rgba(46, 125, 66, .12);
   }
 
-  #pg-lectures textarea { resize: vertical; }
+  #pg-lectures textarea {
+    resize: vertical;
+  }
 
   #pg-lectures #lectureList-introduction,
   #pg-lectures #lectureList-graduation_project {
@@ -254,7 +266,9 @@
     flex-wrap: wrap;
   }
 
-  #pg-lectures .attendance-summary:empty { display: none; }
+  #pg-lectures .attendance-summary:empty {
+    display: none;
+  }
 
   #pg-lectures .attendance-count {
     display: inline-flex;
@@ -336,7 +350,9 @@
     font-weight: 900;
   }
 
-  #pg-lectures .attendance-radio input { width: auto; }
+  #pg-lectures .attendance-radio input {
+    width: auto;
+  }
 
   .lecture-toast {
     display: none;
@@ -353,16 +369,36 @@
     text-align: center;
     font-size: 15px;
     font-weight: 800;
-    box-shadow: 0 18px 42px rgba(0,0,0,.24);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .24);
   }
 
   @media(max-width:900px) {
-    #pg-lectures .form-grid { grid-template-columns: 1fr; }
-    #pg-lectures .lecture-tab { width: 100%; text-align: center; }
-    #pg-lectures .lec-card { grid-template-columns: 1fr; }
-    #pg-lectures .lec-top { flex-direction: column; gap: 8px; }
-    #pg-lectures .attendance-summary-top { margin-left: 0; justify-content: flex-start; }
-    #pg-lectures .attendance-row { grid-template-columns: 1fr; }
+    #pg-lectures .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-lectures .lecture-tab {
+      width: 100%;
+      text-align: center;
+    }
+
+    #pg-lectures .lec-card {
+      grid-template-columns: 1fr;
+    }
+
+    #pg-lectures .lec-top {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #pg-lectures .attendance-summary-top {
+      margin-left: 0;
+      justify-content: flex-start;
+    }
+
+    #pg-lectures .attendance-row {
+      grid-template-columns: 1fr;
+    }
   }
 
 
@@ -408,7 +444,6 @@
     border-color: #b9d7c2 !important;
     color: #16743a !important;
   }
-
 </style>
 
 
@@ -431,13 +466,16 @@
         <div class="card-hd">
           <h3 class="card-title">COMP4200 Lectures</h3>
           <div class="card-actions">
-            <button class="btn btn-primary" type="button" onclick="toggleLectureForm('introduction')">+ Add Lecture</button>
-            <button class="btn btn-outline" type="button" onclick="restartScheduledLectures('introduction')">Restart Scheduled</button>
+            <button class="btn btn-primary" type="button" onclick="toggleLectureForm('introduction')">+ Add
+              Lecture</button>
+            <button class="btn btn-outline" type="button" onclick="restartScheduledLectures('introduction')">Restart
+              Scheduled</button>
           </div>
         </div>
 
         <div class="lecture-note">
-          This page is only for lectures. Restart Scheduled deletes scheduled lectures for COMP4200 only, without deleting completed or cancelled lectures.
+          This page is only for lectures. Restart Scheduled deletes scheduled lectures for COMP4200 only, without
+          deleting completed or cancelled lectures.
         </div>
 
         <div id="lectureForm-introduction" class="mini-form"></div>
@@ -452,13 +490,16 @@
         <div class="card-hd">
           <h3 class="card-title">COMP4300 Lectures</h3>
           <div class="card-actions">
-            <button class="btn btn-primary" type="button" onclick="toggleLectureForm('graduation_project')">+ Add Lecture</button>
-            <button class="btn btn-outline" type="button" onclick="restartScheduledLectures('graduation_project')">Restart Scheduled</button>
+            <button class="btn btn-primary" type="button" onclick="toggleLectureForm('graduation_project')">+ Add
+              Lecture</button>
+            <button class="btn btn-outline" type="button"
+              onclick="restartScheduledLectures('graduation_project')">Restart Scheduled</button>
           </div>
         </div>
 
         <div class="lecture-note">
-          This page is only for lectures. Restart Scheduled deletes scheduled lectures for COMP4300 only, without deleting completed or cancelled lectures.
+          This page is only for lectures. Restart Scheduled deletes scheduled lectures for COMP4300 only, without
+          deleting completed or cancelled lectures.
         </div>
 
         <div id="lectureForm-graduation_project" class="mini-form"></div>

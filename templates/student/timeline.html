@@ -394,7 +394,7 @@
     </label>
 
     <div style="font-size:11px;color:var(--color-text-secondary);margin-top:6px;margin-bottom:18px">
-      Accepted: PDF, Word, PowerPoint, ZIP, RAR · Max 50 MB
+      Accepted: PDF, Word, PowerPoint, ZIP, RAR · Max 500 MB
     </div>
 
     <!-- status message -->
@@ -614,7 +614,19 @@
         submitted_by_me: true,
       };
       const badge = document.getElementById('submitted-badge-' + _modalItemId);
-      if (badge) { badge.style.display = ''; badge.textContent = '✓ Submitted'; }
+      if (badge) {
+        badge.style.display = '';
+        badge.textContent = '✓ Submitted by you';
+      }
+
+      const actionBtn = document.querySelector(`.timeline-submit-link[data-item-id="${_modalItemId}"]`);
+      if (actionBtn) {
+        actionBtn.innerHTML =
+          '<span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">edit</span>Update Submission';
+        actionBtn.style.background = 'linear-gradient(135deg,#0369a1,#0284c7)';
+      }
+
+      loadMySubmissions().catch(() => {});
 
       setTimeout(closeUploadModal, 1400);
     } catch (err) {

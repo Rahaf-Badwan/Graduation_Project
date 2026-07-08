@@ -41,26 +41,57 @@ def _current_dashboard_semesters(cursor):
         ORDER BY semester_id DESC
     """)
     semesters = cursor.fetchall()
-    return _project_year_semesters(cursor, semesters) if semesters else []
+    if semesters:
+        return _project_year_semesters(cursor, semesters)
+
+    return _latest_project_year_semesters(cursor)
+
+
+def _latest_project_year_semesters(cursor):
+    cursor.execute("""
+        SELECT sem.semester_id, sem.academic_year, sem.semester_number, sem.course_code
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE sem.academic_year IS NOT NULL
+          AND sem.course_code IN ('COMP4200', 'COMP4300')
+          AND LOWER(COALESCE(p.status, '')) NOT IN (
+                'archived', 'archive', 'draft', 'cancelled', 'rejected',
+                'promoted', 'search', 'search_only', 'imported_archive',
+                'solo_pending'
+          )
+          AND COALESCE(p.title, '') NOT LIKE 'Committee Demo%%'
+          AND COALESCE(p.title, '') NOT LIKE 'COMP4300 Graduation Project%%'
+        ORDER BY sem.start_date DESC, sem.semester_id DESC
+        LIMIT 1
+    """)
+    latest = cursor.fetchone()
+    return _project_year_semesters(cursor, [latest]) if latest else []
 
 
 def _project_year_semesters(cursor, anchor_semesters):
-    academic_years = sorted({
-        row["academic_year"]
+    term_pairs = sorted({
+        (row["academic_year"], row["semester_number"])
         for row in anchor_semesters
-        if row.get("academic_year")
+        if row.get("academic_year") and row.get("semester_number") is not None
     })
-    if not academic_years:
+
+    if not term_pairs:
         return anchor_semesters
 
-    placeholders = ",".join(["%s"] * len(academic_years))
+    term_filters = " OR ".join(
+        ["(academic_year = %s AND semester_number = %s)"] * len(term_pairs)
+    )
+    params = []
+    for academic_year, semester_number in term_pairs:
+        params.extend([academic_year, semester_number])
+
     cursor.execute(f"""
         SELECT semester_id, academic_year, semester_number, course_code
         FROM semesters
-        WHERE academic_year IN ({placeholders})
+        WHERE ({term_filters})
           AND course_code IN ('COMP4200', 'COMP4300')
         ORDER BY academic_year DESC, semester_number DESC, semester_id DESC
-    """, tuple(academic_years))
+    """, tuple(params))
     scoped = cursor.fetchall()
     if not scoped:
         return anchor_semesters

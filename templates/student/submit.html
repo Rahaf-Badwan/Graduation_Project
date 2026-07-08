@@ -485,8 +485,8 @@
       } catch (err) {
         throw new Error('The server returned an unexpected response (' + response.status + ').');
       }
-      if (!response.ok || data.error) {
-        throw new Error(data.error || 'Request failed (' + response.status + ').');
+      if (!response.ok || data.error || data.needs_attention || data.ok === false) {
+        throw new Error(data.error || data.message || 'Request failed (' + response.status + ').');
       }
       return data;
     });
@@ -631,7 +631,9 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d.error) throw new Error(d.error);
+        if (d.error || d.needs_attention || d.ok === false) {
+          throw new Error(d.error || d.message || 'Failed to save draft.');
+        }
         showToast('Draft saved successfully.', false);
         btn.disabled = false;
         btn.textContent = 'Save as Draft';

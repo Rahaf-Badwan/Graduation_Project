@@ -40,6 +40,32 @@ def _ensure_student_course_results_score_schema(cursor):
         )
 
 
+def _normalize_student_result_row(row):
+    """Keep moved-section results consistent when a pending row already has a grade."""
+    if not row:
+        return row
+
+    final_score = row.get("final_score")
+    if final_score is not None:
+        final_score = float(final_score)
+        row["final_score"] = final_score
+
+    status = (row.get("course_status") or "pending").lower()
+    decision = (row.get("final_decision") or "").lower()
+    project_status = (row.get("project_status") or "").lower()
+
+    if decision == "accepted" or project_status in {"accepted", "archived"}:
+        row["course_status"] = "passed"
+    elif decision == "rejected" or project_status == "rejected":
+        row["course_status"] = "failed"
+    elif status == "pending" and final_score is not None:
+        row["course_status"] = "passed" if final_score >= 60 else "failed"
+    else:
+        row["course_status"] = status
+
+    return row
+
+
 @student_bp.route("/result")
 @login_required(role="student")
 def result():
@@ -72,6 +98,24 @@ def result():
                 history=[],
                 error="Student record was not found.",
             )
+
+        from routes.appCoordinator import _repair_evaluation_result_memberships
+
+        _repair_evaluation_result_memberships(
+            cursor,
+            student_id=student["student_id"],
+            updated_by=None,
+        )
+        db.commit()
+
+        course_context = _student_latest_comp4200_result(cursor, student["student_id"])
+        promoted_to = course_context.get("promoted_to_semester_id")
+        is_promoted = bool(promoted_to or course_context.get("promoted_at"))
+        preferred_course = (
+            "COMP4300"
+            if course_context.get("course_status") == "passed" and is_promoted
+            else "COMP4200"
+        )
 
         cursor.execute(
             """
@@ -158,18 +202,27 @@ def result():
             FROM student_course_results scr
             JOIN semesters s ON s.semester_id = scr.semester_id
             WHERE scr.student_id = %s
-            ORDER BY s.semester_id DESC
+            ORDER BY
+                (s.course_code = %s AND (%s IS NULL OR s.semester_id = %s)) DESC,
+                (s.course_code = %s) DESC,
+                s.semester_id DESC,
+                scr.result_id DESC
             LIMIT 1
             """,
-            (student["student_id"],),
+            (
+                student["student_id"],
+                preferred_course,
+                promoted_to,
+                promoted_to,
+                preferred_course,
+            ),
         )
         result_data = cursor.fetchone()
 
         if result_data:
             result_data["student_name"] = student["full_name"]
             result_data["university_id"] = student["university_id"]
-            if result_data.get("final_score") is not None:
-                result_data["final_score"] = float(result_data["final_score"])
+            _normalize_student_result_row(result_data)
 
             cursor.execute(
                 """
@@ -206,14 +259,23 @@ def result():
                 FROM student_course_results scr
                 JOIN semesters s ON s.semester_id = scr.semester_id
                 WHERE scr.student_id = %s
-                ORDER BY s.semester_id DESC
+                ORDER BY
+                    (s.course_code = %s AND (%s IS NULL OR s.semester_id = %s)) DESC,
+                    (s.course_code = %s) DESC,
+                    s.semester_id DESC,
+                    scr.result_id DESC
                 """,
-                (student["student_id"],),
+                (
+                    student["student_id"],
+                    preferred_course,
+                    promoted_to,
+                    promoted_to,
+                    preferred_course,
+                ),
             )
             history = cursor.fetchall()
             for item in history:
-                if item.get("final_score") is not None:
-                    item["final_score"] = float(item["final_score"])
+                _normalize_student_result_row(item)
 
             promoted_source = next(
                 (

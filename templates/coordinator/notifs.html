@@ -598,7 +598,7 @@
     background: var(--color-background-primary);
     border-radius: 22px;
     width: 100%;
-    max-width: 650px;
+    max-width: 760px;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 24px 60px rgba(0, 0, 0, .22);
@@ -655,6 +655,135 @@
     border: 1px solid #e6ece8
   }
 
+  .sn-structured-message {
+    display: grid;
+    gap: 12px;
+    white-space: normal
+  }
+
+  .sn-structured-intro,
+  .sn-structured-panel {
+    background: var(--color-background-primary);
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 12px;
+    box-shadow: 0 5px 16px rgba(16, 24, 40, .035)
+  }
+
+  .sn-structured-intro {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 760;
+    line-height: 1.65;
+    padding: 13px 14px;
+    border-left: 4px solid var(--sn-green)
+  }
+
+  .sn-structured-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px
+  }
+
+  .sn-structured-detail {
+    min-width: 0;
+    padding: 12px;
+    background: var(--color-background-primary);
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 12px
+  }
+
+  .sn-structured-label {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .06em;
+    margin-bottom: 4px;
+    text-transform: uppercase
+  }
+
+  .sn-structured-value {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 850;
+    overflow-wrap: anywhere
+  }
+
+  .sn-structured-panel {
+    padding: 13px 14px
+  }
+
+  .sn-structured-list {
+    display: grid;
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0
+  }
+
+  .sn-structured-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    line-height: 1.55;
+    padding: 8px 9px;
+    background: var(--color-background-tertiary);
+    border: 1px solid var(--color-border-tertiary);
+    border-radius: 10px
+  }
+
+  .sn-structured-list li::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--sn-green);
+    margin-top: 7px
+  }
+
+  .sn-structured-item-grid {
+    display: grid;
+    gap: 7px;
+    width: 100%
+  }
+
+  .sn-structured-time {
+    color: var(--sn-green);
+    font-weight: 950
+  }
+
+  .sn-structured-item-detail {
+    display: grid;
+    gap: 2px;
+    min-width: 0
+  }
+
+  .sn-structured-item-detail strong {
+    color: var(--color-text-secondary);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase
+  }
+
+  .sn-structured-item-detail span {
+    color: var(--color-text-primary);
+    font-weight: 760;
+    overflow-wrap: anywhere
+  }
+
+  .sn-structured-name {
+    font-weight: 900
+  }
+
+  .sn-structured-role {
+    color: var(--color-text-secondary);
+    font-weight: 650
+  }
+
   .sn-modal-att-link {
     display: inline-flex;
     align-items: center;
@@ -706,6 +835,16 @@
     display: none
   }
 
+  @media(min-width:680px) {
+    .sn-structured-item-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .sn-structured-time {
+      grid-column: 1 / -1
+    }
+  }
+
   @media(max-width:560px) {
     .sn-shell {
       padding: 8px 8px 96px
@@ -737,6 +876,10 @@
       right: 18px;
       bottom: 20px
     }
+
+    .sn-structured-grid {
+      grid-template-columns: 1fr
+    }
   }
 
   /* ── Dark mode overrides ── */
@@ -746,58 +889,288 @@
     --sn-muted: var(--color-text-secondary);
     --sn-text: var(--color-text-primary);
   }
-  html[data-theme="dark"] .sn-card { background: var(--color-background-primary); border-color: var(--color-border-tertiary); box-shadow: none; }
-  html[data-theme="dark"] .sn-card-hd { background: var(--color-background-secondary) !important; border-bottom-color: var(--color-border-tertiary); }
-  html[data-theme="dark"] .sn-card-sub { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-tabs { background: var(--color-background-primary); }
-  html[data-theme="dark"] .sn-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
-  html[data-theme="dark"] .sn-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
-  html[data-theme="dark"] .main-notif-tab { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
-  html[data-theme="dark"] .main-notif-tab.on { background: var(--green); border-color: var(--green); color: #fff; }
-  html[data-theme="dark"] .sn-msg { background: var(--color-background-primary); border-color: var(--color-border-tertiary); }
-  html[data-theme="dark"] .sn-msg:hover { border-color: var(--green); box-shadow: 0 4px 12px rgba(0,0,0,.35); }
-  html[data-theme="dark"] .sn-msg.unread { background: var(--color-background-tertiary) !important; border-color: var(--green) !important; }
-  html[data-theme="dark"] .sn-msg-title  { color: var(--color-text-primary) !important; }
-  html[data-theme="dark"] .sn-msg-meta   { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-msg-preview { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-pill.read       { background: var(--blue-light);  color: var(--blue); }
-  html[data-theme="dark"] .sn-pill.unread-pill { background: var(--amber-light); color: var(--amber); }
-  html[data-theme="dark"] .sn-pill.sent-pill   { background: var(--green-light); color: var(--green); }
-  html[data-theme="dark"] .course-pill { background: var(--green-light); color: var(--green); }
-  html[data-theme="dark"] .sn-att-badge { background: var(--color-background-tertiary); color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-btn { background: var(--green); }
-  html[data-theme="dark"] .sn-btn.secondary { background: var(--color-background-tertiary); color: var(--green); border-color: var(--color-border-tertiary); }
-  html[data-theme="dark"] .sn-field input, html[data-theme="dark"] .sn-field select, html[data-theme="dark"] .sn-field textarea { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
-  html[data-theme="dark"] .sn-file-zone { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); }
-  html[data-theme="dark"] .sn-file-zone-label { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-empty { background: var(--color-background-secondary); border-color: var(--color-border-tertiary); color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-modal { background: var(--color-background-primary); }
-  html[data-theme="dark"] .sn-modal-hd { background: var(--color-background-secondary); border-bottom-color: var(--color-border-tertiary); }
-  html[data-theme="dark"] .sn-modal-title { color: var(--color-text-primary); }
-  html[data-theme="dark"] .sn-modal-close { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-modal-msg-meta { color: var(--color-text-secondary); }
-  html[data-theme="dark"] .sn-modal-msg-body { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--color-text-primary); }
-  html[data-theme="dark"] .sn-modal-divider { background: var(--color-border-tertiary); }
-  html[data-theme="dark"] .sn-compose-drawer { background: var(--color-background-primary); }
-  html[data-theme="dark"] .sn-drawer-close { background: var(--color-background-tertiary); border-color: var(--color-border-tertiary); color: var(--green); }
+
+  html[data-theme="dark"] .sn-card {
+    background: var(--color-background-primary);
+    border-color: var(--color-border-tertiary);
+    box-shadow: none;
+  }
+
+  html[data-theme="dark"] .sn-card-hd {
+    background: var(--color-background-secondary) !important;
+    border-bottom-color: var(--color-border-tertiary);
+  }
+
+  html[data-theme="dark"] .sn-card-sub {
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-tabs {
+    background: var(--color-background-primary);
+  }
+
+  html[data-theme="dark"] .sn-tab {
+    background: var(--color-background-tertiary);
+    border-color: var(--color-border-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  html[data-theme="dark"] .sn-tab.on {
+    background: var(--green);
+    border-color: var(--green);
+    color: #fff;
+  }
+
+  html[data-theme="dark"] .main-notif-tab {
+    background: var(--color-background-tertiary);
+    border-color: var(--color-border-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  html[data-theme="dark"] .main-notif-tab.on {
+    background: var(--green);
+    border-color: var(--green);
+    color: #fff;
+  }
+
+  html[data-theme="dark"] .sn-msg {
+    background: var(--color-background-primary);
+    border-color: var(--color-border-tertiary);
+  }
+
+  html[data-theme="dark"] .sn-msg:hover {
+    border-color: var(--green);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+  }
+
+  html[data-theme="dark"] .sn-msg.unread {
+    background: var(--color-background-tertiary) !important;
+    border-color: var(--green) !important;
+  }
+
+  html[data-theme="dark"] .sn-msg-title {
+    color: var(--color-text-primary) !important;
+  }
+
+  html[data-theme="dark"] .sn-msg-meta {
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-msg-preview {
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-pill.read {
+    background: var(--blue-light);
+    color: var(--blue);
+  }
+
+  html[data-theme="dark"] .sn-pill.unread-pill {
+    background: var(--amber-light);
+    color: var(--amber);
+  }
+
+  html[data-theme="dark"] .sn-pill.sent-pill {
+    background: var(--green-light);
+    color: var(--green);
+  }
+
+  html[data-theme="dark"] .course-pill {
+    background: var(--green-light);
+    color: var(--green);
+  }
+
+  html[data-theme="dark"] .sn-att-badge {
+    background: var(--color-background-tertiary);
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-btn {
+    background: var(--green);
+  }
+
+  html[data-theme="dark"] .sn-btn.secondary {
+    background: var(--color-background-tertiary);
+    color: var(--green);
+    border-color: var(--color-border-tertiary);
+  }
+
+  html[data-theme="dark"] .sn-field input,
+  html[data-theme="dark"] .sn-field select,
+  html[data-theme="dark"] .sn-field textarea {
+    background: var(--color-background-secondary);
+    border-color: var(--color-border-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  html[data-theme="dark"] .sn-file-zone {
+    background: var(--color-background-secondary);
+    border-color: var(--color-border-tertiary);
+  }
+
+  html[data-theme="dark"] .sn-file-zone-label {
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-empty {
+    background: var(--color-background-secondary);
+    border-color: var(--color-border-tertiary);
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-modal {
+    background: var(--color-background-primary);
+  }
+
+  html[data-theme="dark"] .sn-modal-hd {
+    background: var(--color-background-secondary);
+    border-bottom-color: var(--color-border-tertiary);
+  }
+
+  html[data-theme="dark"] .sn-modal-title {
+    color: var(--color-text-primary);
+  }
+
+  html[data-theme="dark"] .sn-modal-close {
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-modal-msg-meta {
+    color: var(--color-text-secondary);
+  }
+
+  html[data-theme="dark"] .sn-modal-msg-body {
+    background: var(--color-background-tertiary);
+    border-color: var(--color-border-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  html[data-theme="dark"] .sn-modal-divider {
+    background: var(--color-border-tertiary);
+  }
+
+  html[data-theme="dark"] .sn-compose-drawer {
+    background: var(--color-background-primary);
+  }
+
+  html[data-theme="dark"] .sn-drawer-close {
+    background: var(--color-background-tertiary);
+    border-color: var(--color-border-tertiary);
+    color: var(--green);
+  }
 
 
-  .main-notif-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px; }
-  .main-notif-tab { border:1px solid #d7e3dc; background:var(--color-background-primary); color:var(--color-text-primary); padding:10px 14px; border-radius:999px; font-weight:900; cursor:pointer; transition:background .15s,color .15s,border-color .15s,box-shadow .15s; }
-  .main-notif-tab:hover { box-shadow:0 5px 14px rgba(16,24,40,.06); }
-  .main-notif-tab.on { background:var(--sn-green); color:#fff; border-color:var(--sn-green); }
-  .notif-tab-pane { display:none; }
-  .notif-tab-pane.active { display:block; }
-  .course-pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800; color:var(--green); background:var(--green-light); border-radius:999px; padding:4px 9px; margin-top:6px; margin-right:6px; }
-  .sn-reply-policy { display:flex; gap:8px; align-items:flex-start; padding:10px 12px; border:1px solid #d8e2dc; border-radius:14px; background:var(--color-background-tertiary); color:var(--color-text-primary); font-size:13px; line-height:1.45; margin-bottom:13px; }
-  .sn-reply-policy input { margin-top:2px; flex-shrink:0; }
-  .sn-no-reply-note { border:1px dashed #cddbd2; border-radius:14px; background:var(--color-background-tertiary); color:var(--color-text-secondary); font-size:13px; font-weight:700; padding:11px 12px; margin-top:12px; }
-  .notice-preview { border-left:5px solid var(--sn-green); background:var(--color-background-tertiary); border-radius:14px; padding:13px 14px; margin-top:8px; }
-  .notice-preview-title { font-weight:900; color:var(--color-text-primary); margin-bottom:8px; }
-  .notice-preview-body { font-size:13px; color:var(--color-text-primary); line-height:1.55; white-space:pre-wrap; }
-  .notice-preview-hl { color:#b42318; font-weight:900; margin-top:8px; }
-  html[data-theme="dark"] .sn-card-hd { background:var(--color-background-secondary) !important; border-bottom-color:var(--color-border-tertiary); }
+  .main-notif-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 16px;
+  }
 
+  .main-notif-tab {
+    border: 1px solid #d7e3dc;
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s, box-shadow .15s;
+  }
+
+  .main-notif-tab:hover {
+    box-shadow: 0 5px 14px rgba(16, 24, 40, .06);
+  }
+
+  .main-notif-tab.on {
+    background: var(--sn-green);
+    color: #fff;
+    border-color: var(--sn-green);
+  }
+
+  .notif-tab-pane {
+    display: none;
+  }
+
+  .notif-tab-pane.active {
+    display: block;
+  }
+
+  .course-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--green);
+    background: var(--green-light);
+    border-radius: 999px;
+    padding: 4px 9px;
+    margin-top: 6px;
+    margin-right: 6px;
+  }
+
+  .sn-reply-policy {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid #d8e2dc;
+    border-radius: 14px;
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 13px;
+  }
+
+  .sn-reply-policy input {
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .sn-no-reply-note {
+    border: 1px dashed #cddbd2;
+    border-radius: 14px;
+    background: var(--color-background-tertiary);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 11px 12px;
+    margin-top: 12px;
+  }
+
+  .notice-preview {
+    border-left: 5px solid var(--sn-green);
+    background: var(--color-background-tertiary);
+    border-radius: 14px;
+    padding: 13px 14px;
+    margin-top: 8px;
+  }
+
+  .notice-preview-title {
+    font-weight: 900;
+    color: var(--color-text-primary);
+    margin-bottom: 8px;
+  }
+
+  .notice-preview-body {
+    font-size: 13px;
+    color: var(--color-text-primary);
+    line-height: 1.55;
+    white-space: pre-wrap;
+  }
+
+  .notice-preview-hl {
+    color: #b42318;
+    font-weight: 900;
+    margin-top: 8px;
+  }
+
+  html[data-theme="dark"] .sn-card-hd {
+    background: var(--color-background-secondary) !important;
+    border-bottom-color: var(--color-border-tertiary);
+  }
 </style>
 
 <div class="page page-single on" id="pg-notifs">
@@ -928,7 +1301,8 @@
             <label for="snMessage">Message</label>
             <textarea id="snMessage" name="message" placeholder="Write your memo here..." required></textarea>
           </div>
-          <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--color-text-primary);margin-bottom:13px;">
+          <label
+            style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--color-text-primary);margin-bottom:13px;">
             <input type="checkbox" id="snUrgent" name="urgent" value="1"> Mark as urgent
           </label>
           <label class="sn-reply-policy" for="snAllowReply">
@@ -1081,6 +1455,180 @@
 
     function courseLabel(scope) {
       return ({ introduction: 'Project Introduction', graduation_project: 'Graduation Project', both: 'Both Courses' }[scope] || 'Both Courses');
+    }
+
+    function splitPeopleList(value) {
+      return String(value || '')
+        .split(/\s*,\s*/)
+        .map(item => item.trim())
+        .filter(Boolean);
+    }
+
+    function cleanMessageLabel(label) {
+      const key = String(label || '').trim().toLowerCase();
+      return ({
+        'date/time': 'Date and time',
+        date: 'Date',
+        time: 'Time',
+        room: 'Room',
+        course: 'Course',
+        section: 'Section',
+        project: 'Project',
+        'committee members': 'Committee members',
+        'committee members and roles': 'Committee members and roles',
+        'report readers': 'Report readers',
+        'items and reading assignments': 'Items and reading assignments',
+        'your schedule and duties': 'Your schedule and duties'
+      }[key] || String(label || '').trim());
+    }
+
+    function parseStructuredMessage(msgData) {
+      const raw = String(msgData.message || '').trim();
+      if (!raw) return null;
+
+      const title = String(msgData.title || '');
+      const looksStructured = /committee|discussion|scheduled|report reader|reading assignments|schedule and duties/i.test(title + '\n' + raw);
+      const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const intro = [];
+      const details = [];
+      const groups = [];
+      let activeGroup = null;
+      let recognized = 0;
+
+      function addGroup(title, items) {
+        const group = {
+          title: cleanMessageLabel(title),
+          items: (items || []).map(item => String(item || '').trim()).filter(Boolean)
+        };
+        groups.push(group);
+        recognized += 1;
+        return group;
+      }
+
+      lines.forEach(line => {
+        const bullet = line.match(/^[-*\u2022]\s*(.+)$/);
+        if (bullet) {
+          if (!activeGroup) activeGroup = addGroup('Details', []);
+          activeGroup.items.push(bullet[1].trim());
+          recognized += 1;
+          return;
+        }
+
+        const match = line.match(/^([^:]{2,70}):\s*(.*)$/);
+        if (!match) {
+          intro.push(line);
+          activeGroup = null;
+          return;
+        }
+
+        const key = match[1].trim();
+        const value = match[2].trim();
+        const lowerKey = key.toLowerCase();
+
+        if (lowerKey === 'date/time' && value) {
+          const timeMatch = value.match(/^(\d{4}-\d{2}-\d{2})\s+(?:from\s+)?(.+)$/i);
+          if (timeMatch) {
+            details.push({ label: 'Date', value: timeMatch[1] });
+            details.push({ label: 'Time', value: timeMatch[2].replace(/\s+to\s+/i, ' - ').replace(/\s*-\s*/g, ' - ') });
+          } else {
+            details.push({ label: cleanMessageLabel(key), value });
+          }
+          recognized += 1;
+          activeGroup = null;
+          return;
+        }
+
+        if (/committee members|report readers/i.test(lowerKey)) {
+          activeGroup = addGroup(key, value ? splitPeopleList(value) : []);
+          return;
+        }
+
+        if (/items and reading assignments|your schedule and duties/i.test(lowerKey)) {
+          activeGroup = addGroup(key, value ? [value] : []);
+          return;
+        }
+
+        if (value) {
+          details.push({ label: cleanMessageLabel(key), value });
+          recognized += 1;
+        } else {
+          activeGroup = addGroup(key, []);
+          return;
+        }
+        activeGroup = null;
+      });
+
+      groups.forEach(group => {
+        group.items = group.items.filter(Boolean);
+      });
+
+      if (!looksStructured && recognized < 2) return null;
+      return { intro, details, groups: groups.filter(group => group.items.length) };
+    }
+
+    function renderStructuredListItem(item) {
+      const itemText = String(item || '');
+      if (itemText.includes(' | ')) {
+        const parts = itemText.split(/\s*\|\s*/).map(part => part.trim()).filter(Boolean);
+        const lead = parts.shift() || '';
+        const details = parts.map(part => {
+          const detailParts = part.split(/\s*:\s*/);
+          if (detailParts.length > 1) {
+            return '<span class="sn-structured-item-detail"><strong>' + esc(detailParts.shift()) + '</strong><span>' + esc(detailParts.join(': ')) + '</span></span>';
+          }
+          return '<span class="sn-structured-item-detail"><span>' + esc(part) + '</span></span>';
+        }).join('');
+        return '<li><span class="sn-structured-item-grid"><span class="sn-structured-time">' + esc(lead) + '</span>' + details + '</span></li>';
+      }
+      const parts = itemText.split(/\s*:\s*/);
+      if (parts.length > 1) {
+        return '<li><span><span class="sn-structured-name">' + esc(parts.shift()) + '</span>' +
+          '<span class="sn-structured-role">: ' + esc(parts.join(': ')) + '</span></span></li>';
+      }
+      return '<li><span class="sn-structured-name">' + esc(itemText) + '</span></li>';
+    }
+
+    function renderStructuredMessage(msgData) {
+      const parsed = parseStructuredMessage(msgData);
+      if (!parsed) return '';
+
+      const introHtml = parsed.intro.length
+        ? '<div class="sn-structured-intro">' + parsed.intro.map(esc).join('<br>') + '</div>'
+        : '';
+      const detailsHtml = parsed.details.length
+        ? '<div class="sn-structured-grid">' + parsed.details.map(detail =>
+          '<div class="sn-structured-detail">' +
+          '<span class="sn-structured-label">' + esc(detail.label) + '</span>' +
+          '<div class="sn-structured-value">' + esc(detail.value) + '</div>' +
+          '</div>'
+        ).join('') + '</div>'
+        : '';
+      const groupHtml = parsed.groups.map(group =>
+        '<div class="sn-structured-panel">' +
+        '<span class="sn-structured-label">' + esc(group.title) + '</span>' +
+        '<ul class="sn-structured-list">' + group.items.map(renderStructuredListItem).join('') + '</ul>' +
+        '</div>'
+      ).join('');
+
+      return '<div class="sn-structured-message">' + introHtml + detailsHtml + groupHtml + '</div>';
+    }
+
+    function structuredPreview(msgData) {
+      const parsed = parseStructuredMessage(msgData);
+      if (!parsed) return '';
+      const values = [];
+      const course = parsed.details.find(d => /^course$/i.test(d.label));
+      const date = parsed.details.find(d => /^date$/i.test(d.label));
+      const time = parsed.details.find(d => /^time$/i.test(d.label));
+      const room = parsed.details.find(d => /^room$/i.test(d.label));
+      [course, date, time, room].forEach(item => {
+        if (item && item.value) values.push(item.value);
+      });
+      return values.length ? values.join(' - ') : (parsed.intro[0] || msgData.message || '');
+    }
+
+    function messagePreview(msgData) {
+      return structuredPreview(msgData) || msgData.message || '';
     }
 
     function repliesAllowed(message) {
@@ -1349,7 +1897,7 @@
         '</div>' +
         '<div class="sn-msg-meta">From: ' + esc(r.sender_name || 'System') + ' · ' + esc(roleLabel(r.sender_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
         '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + replyBadge(r) + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
-        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '<div class="sn-msg-preview">' + esc(messagePreview(r)) + '</div>' +
         '</div>' +
         '</article>'
       ).join('');
@@ -1367,7 +1915,7 @@
         '</div>' +
         '<div class="sn-msg-meta">To: ' + esc(r.recipient_name || '') + ' · ' + esc(roleLabel(r.recipient_role)) + ' · ' + esc(r.created_at || '') + '</div>' +
         '<div><span class="course-pill">' + esc(courseLabel(r.course_scope)) + '</span>' + replyBadge(r) + (r.has_attachment ? '<span class="sn-att-badge">📎 ' + esc(r.attachment_name) + '</span>' : '') + '</div>' +
-        '<div class="sn-msg-preview">' + esc(r.message) + '</div>' +
+        '<div class="sn-msg-preview">' + esc(messagePreview(r)) + '</div>' +
         '</div>' +
         '</article>'
       ).join('');
@@ -1455,7 +2003,12 @@
         ? 'From: ' + (msgData.sender_name || 'System') + ' · ' + roleLabel(msgData.sender_role) + ' · ' + (msgData.created_at || '')
         : 'To: ' + (msgData.recipient_name || '') + ' · ' + roleLabel(msgData.recipient_role) + ' · ' + (msgData.created_at || '');
       $('modalMeta').textContent = meta + ' · ' + courseLabel(msgData.course_scope);
-      $('modalBody').textContent = msgData.message;
+      const structuredHtml = renderStructuredMessage(msgData);
+      if (structuredHtml) {
+        $('modalBody').innerHTML = structuredHtml;
+      } else {
+        $('modalBody').textContent = msgData.message;
+      }
 
       const attLink = $('modalAttLink');
       if (msgData.has_attachment) {

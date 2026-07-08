@@ -22,6 +22,9 @@
             <div class="field-label">{{ t['head']['this_semester'] }} <span class="req">*</span></div>
             <div style="display:flex;gap:8px;align-items:center">
               <select id="semesterSelect" class="field-select" style="flex:1"><option></option></select>
+              <button id="activateAcademicYearBtn" class="btn btn-outline" type="button" onclick="activateAcademicYear()" style="white-space:nowrap">
+                Set Active
+              </button>
               <button class="btn btn-outline" type="button" onclick="openAcademicYearModal()" style="white-space:nowrap">
                 + Create
               </button>
@@ -77,6 +80,14 @@
         <input id="academicYearEnd" class="field-input" type="text" inputmode="numeric"
                maxlength="4" placeholder="2027" autocomplete="off">
       </div>
+    </div>
+    <div class="field-wrap">
+      <div class="field-label">Semester Number <span class="req">*</span></div>
+      <select id="semesterNumber" class="field-select">
+        <option value="1">Semester 1</option>
+        <option value="2">Semester 2</option>
+        <option value="3">Summer</option>
+      </select>
     </div>
     <div class="form-grid">
       <div class="field-wrap">

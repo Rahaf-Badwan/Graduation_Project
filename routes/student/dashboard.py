@@ -256,20 +256,8 @@ def api_dashboard_data():
         result["student_name"] = st.get("full_name") or ""
         result["student_university_id"] = st.get("university_id") or ""
 
-        # 2. الكورس الصح (COMP4200 أو COMP4300)
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM   student_course_results scr
-            JOIN   semesters s ON s.semester_id = scr.semester_id
-            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
-            ORDER  BY scr.semester_id DESC LIMIT 1
-            """,
-            (student_id,),
-        )
-        r = cursor.fetchone()
+        # 2. Pick the correct course even if a moved section created a newer pending row.
+        r = _student_latest_comp4200_result(cursor, student_id)
         promoted_to = (r or {}).get("promoted_to_semester_id")
         is_promoted = bool(
             promoted_to or (r or {}).get("promoted_at")
@@ -582,6 +570,7 @@ def api_dashboard_data():
                 section_id=(
                     intro_section.get("section_id") if is_section_workspace else None
                 ),
+                supervisor_faculty_id=result.get("supervisor_id"),
                 final_report_uploaded=final_report_uploaded,
             )
         result["progress"]["overall"] = result["milestone_progress"]["overall"]
@@ -619,7 +608,14 @@ def api_dashboard_data():
         try:
             if target_course == "COMP4300":
                 raise RuntimeError("Skip COMP4200 timeline deadlines after promotion.")
-            cursor.execute("""
+            timeline_ids = _student_published_intro_timeline_ids(
+                cursor,
+                supervisor_faculty_id=result.get("supervisor_id"),
+            )
+            if not timeline_ids:
+                raise RuntimeError("No relevant published timeline.")
+            placeholders = ",".join(["%s"] * len(timeline_ids))
+            cursor.execute(f"""
                 SELECT ti.title, ti.due_date,
                        (
                            (
@@ -639,13 +635,13 @@ def api_dashboard_data():
                        ) AS submission_open
                 FROM   comp4200_timeline_items ti
                 JOIN   comp4200_timelines t ON t.timeline_id = ti.timeline_id
-                WHERE  %s <> 'COMP4300'
+                WHERE  t.timeline_id IN ({placeholders})
                   AND  t.is_published = TRUE
                   AND  ti.is_deadline = TRUE
                   AND  COALESCE(ti.is_archived, FALSE) = FALSE
                   AND  ti.due_date   >= DATE_SUB(CURDATE(), INTERVAL 2 DAY)
                 ORDER  BY ti.due_date ASC
-                """, (target_course,))
+                """, tuple(timeline_ids))
             for ti in cursor.fetchall():
                 dd = ti["due_date"]
                 deadlines.append(
@@ -695,15 +691,23 @@ def api_dashboard_data():
             try:
                 if target_course == "COMP4300":
                     raise RuntimeError("Skip COMP4200 timeline nearest deadline after promotion.")
-                cursor.execute("""
+                timeline_ids = _student_published_intro_timeline_ids(
+                    cursor,
+                    supervisor_faculty_id=result.get("supervisor_id"),
+                )
+                if not timeline_ids:
+                    raise RuntimeError("No relevant published timeline.")
+                placeholders = ",".join(["%s"] * len(timeline_ids))
+                cursor.execute(f"""
                     SELECT MIN(ti.due_date) AS nearest
                     FROM   comp4200_timeline_items ti
                     JOIN   comp4200_timelines t ON t.timeline_id = ti.timeline_id
-                    WHERE  t.is_published = TRUE
+                    WHERE  t.timeline_id IN ({placeholders})
+                      AND  t.is_published = TRUE
                       AND  ti.is_deadline = TRUE
                       AND  COALESCE(ti.is_archived, FALSE) = FALSE
                       AND  ti.due_date   >= CURDATE()
-                    """)
+                    """, tuple(timeline_ids))
                 tnr = cursor.fetchone()
                 tnearest = _as_date((tnr or {}).get("nearest")) if tnr else None
                 if tnearest and (nearest_d is None or tnearest < nearest_d):

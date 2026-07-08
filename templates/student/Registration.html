@@ -520,7 +520,14 @@
         const data = await res.json();
 
         if (data.already_registered) {
-          showError("⚠️ " + data.error + "\n\nThis group appears to have already been registered. Please refresh the page.");
+          showError("Notice: " + (data.message || data.error) + "\n\nThis group appears to have already been registered. Please refresh the page.");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Register Group";
+          return;
+        }
+
+        if (data.needs_attention || data.ok === false) {
+          showError(data.message || data.error || "Submission could not be completed.");
           submitBtn.disabled = false;
           submitBtn.textContent = "Register Group";
           return;
@@ -582,7 +589,14 @@
         const data = await res.json();
 
         if (data.already_registered) {
-          showError("⚠️ " + data.error + "\n\nYou appear to be already registered. Please refresh the page.");
+          showError("Notice: " + (data.message || data.error) + "\n\nYou appear to be already registered. Please refresh the page.");
+          soloRegBtn.disabled = false;
+          soloRegBtn.innerHTML = '<span class="material-symbols-outlined icon-inline" style="font-size:16px">person</span> Register Solo (No Team)';
+          return;
+        }
+
+        if (data.needs_attention || data.ok === false) {
+          showError(data.message || data.error || "Submission could not be completed.");
           soloRegBtn.disabled = false;
           soloRegBtn.innerHTML = '<span class="material-symbols-outlined icon-inline" style="font-size:16px">person</span> Register Solo (No Team)';
           return;

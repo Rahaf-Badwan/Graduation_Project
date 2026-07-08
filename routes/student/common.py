@@ -152,35 +152,113 @@ def _table_exists_student(cursor, table_name):
     return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
 
 
+def _student_result_status_from_row(row):
+    if not row:
+        return "pending"
+
+    status = (row.get("course_status") or row.get("status") or "pending").lower()
+    project_status = (row.get("project_status") or "").lower()
+    if project_status in {"accepted", "archived"}:
+        return "passed"
+    if project_status == "rejected":
+        return "failed"
+
+    final_score = row.get("final_score")
+    if status == "pending" and final_score is not None:
+        try:
+            return "passed" if float(final_score) >= 60 else "failed"
+        except (TypeError, ValueError):
+            return status
+    return status
+
+
+def _student_latest_comp4200_result(cursor, student_id):
+    """Return the COMP4200 row that should decide the student's current course.
+
+    Moving sections can create a newer pending COMP4200 row. A previously
+    passed and promoted result must still win, otherwise the student is pulled
+    back from COMP4300 to COMP4200 in several pages.
+    """
+    if not student_id or not _table_exists_student(cursor, "student_course_results"):
+        return {}
+
+    has_final_score = _db_column_exists_student(
+        cursor, "student_course_results", "final_score"
+    )
+    score_expr = "scr.final_score" if has_final_score else "NULL"
+    project_score_expr = """
+        (
+            SELECT COALESCE(fd2.final_score, p2.final_score)
+            FROM project_members pm2
+            JOIN projects p2 ON p2.project_id = pm2.project_id
+            LEFT JOIN final_decisions fd2 ON fd2.project_id = p2.project_id
+            WHERE pm2.student_id = scr.student_id
+              AND p2.semester_id = scr.semester_id
+            ORDER BY p2.project_id DESC
+            LIMIT 1
+        )
+    """
+    final_score_expr = f"COALESCE({score_expr}, {project_score_expr})"
+    project_status_expr = """
+        (
+            SELECT p2.status
+            FROM project_members pm2
+            JOIN projects p2 ON p2.project_id = pm2.project_id
+            WHERE pm2.student_id = scr.student_id
+              AND p2.semester_id = scr.semester_id
+            ORDER BY p2.project_id DESC
+            LIMIT 1
+        )
+    """
+    passed_expr = (
+        "(scr.status = 'passed' OR "
+        f"({project_status_expr} IN ('accepted', 'archived')) OR "
+        f"(scr.status = 'pending' AND {final_score_expr} IS NOT NULL AND {final_score_expr} >= 60))"
+    )
+    cursor.execute(
+        f"""
+        SELECT scr.status AS course_status,
+               scr.promoted_to_semester_id,
+               scr.promoted_at,
+               {final_score_expr} AS final_score,
+               {project_status_expr} AS project_status,
+               scr.semester_id
+        FROM student_course_results scr
+        JOIN semesters s ON s.semester_id = scr.semester_id
+        WHERE scr.student_id = %s
+          AND s.course_code = 'COMP4200'
+        ORDER BY
+          ({passed_expr}
+           AND (scr.promoted_to_semester_id IS NOT NULL OR scr.promoted_at IS NOT NULL)) DESC,
+          scr.semester_id DESC,
+          scr.result_id DESC
+        LIMIT 1
+        """,
+        (student_id,),
+    )
+    row = cursor.fetchone() or {}
+    if row:
+        row["course_status"] = _student_result_status_from_row(row)
+    return row
+
+
 def _student_course_context_for_id(cursor, student_id):
     target_course = "COMP4200"
-    if student_id and _table_exists_student(cursor, "student_course_results"):
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM student_course_results scr
-            JOIN semesters s ON s.semester_id = scr.semester_id
-            WHERE scr.student_id = %s AND s.course_code = 'COMP4200'
-            ORDER BY scr.semester_id DESC
-            LIMIT 1
-            """,
-            (student_id,),
-        )
-        result_row = cursor.fetchone() or {}
-        is_promoted = bool(
-            result_row.get("promoted_to_semester_id")
-            or result_row.get("promoted_at")
-        )
-        if result_row.get("course_status") == "passed" and is_promoted:
-            target_course = "COMP4300"
+    result_row = _student_latest_comp4200_result(cursor, student_id)
+    is_promoted = bool(
+        result_row.get("promoted_to_semester_id")
+        or result_row.get("promoted_at")
+    )
+    course_status = result_row.get("course_status") or "pending"
+    if result_row.get("course_status") == "passed" and is_promoted:
+        target_course = "COMP4300"
 
     return {
         "student_id": student_id,
         "target_course": target_course,
         "can_use_comp4200_registration": bool(student_id)
-        and target_course == "COMP4200",
+        and target_course == "COMP4200"
+        and course_status != "passed",
     }
 
 
@@ -607,19 +685,7 @@ def _student_active_semester(cursor):
 
 
 def _target_semester_for_submission(cursor, student_id, timeline_item_id=None):
-    cursor.execute(
-        """
-        SELECT scr.status AS course_status,
-               scr.promoted_to_semester_id,
-               scr.promoted_at
-        FROM   student_course_results scr
-        JOIN   semesters s ON s.semester_id = scr.semester_id
-        WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
-        ORDER  BY scr.semester_id DESC LIMIT 1
-        """,
-        (student_id,),
-    )
-    result_row = cursor.fetchone()
+    result_row = _student_latest_comp4200_result(cursor, student_id)
     course_status = (result_row or {}).get("course_status", "pending")
     promoted_to = (result_row or {}).get("promoted_to_semester_id")
     promoted_at = (result_row or {}).get("promoted_at")
@@ -667,8 +733,58 @@ def _student_published_intro_timeline(cursor):
     return cursor.fetchone()
 
 
+def _student_published_intro_timeline_ids(cursor, supervisor_faculty_id=None):
+    if not _student_intro_timeline_tables_ready(cursor):
+        return []
+
+    semester = _student_active_semester(cursor)
+    if not semester:
+        return []
+
+    params = [semester["semester_id"]]
+    owner_filter = ""
+    if (
+        supervisor_faculty_id
+        and _db_column_exists_student(cursor, "comp4200_timelines", "owner_role")
+        and _db_column_exists_student(cursor, "comp4200_timelines", "created_by")
+    ):
+        owner_filter = """
+          AND (
+                COALESCE(owner_role, 'coordinator') = 'coordinator'
+             OR (
+                    owner_role = 'supervisor'
+                AND created_by = (
+                    SELECT user_id
+                    FROM faculty
+                    WHERE faculty_id = %s
+                    LIMIT 1
+                )
+             )
+          )
+        """
+        params.append(supervisor_faculty_id)
+
+    cursor.execute(
+        f"""
+        SELECT timeline_id
+        FROM comp4200_timelines
+        WHERE semester_id = %s
+          AND is_published = TRUE
+          {owner_filter}
+        ORDER BY COALESCE(published_at, updated_at) DESC, timeline_id DESC
+        """,
+        tuple(params),
+    )
+    return [
+        int(row["timeline_id"])
+        for row in cursor.fetchall()
+        if row.get("timeline_id") is not None
+    ]
+
+
 def _student_dashboard_milestone_progress(
-    cursor, student_id, project_id=None, section_id=None, final_report_uploaded=False
+    cursor, student_id, project_id=None, section_id=None, supervisor_faculty_id=None,
+    final_report_uploaded=False
 ):
     milestone_total = 0
     milestone_submitted = 0
@@ -676,19 +792,22 @@ def _student_dashboard_milestone_progress(
     last_milestone_title = ""
 
     try:
-        timeline = _student_published_intro_timeline(cursor)
-        if timeline:
+        timeline_ids = _student_published_intro_timeline_ids(
+            cursor, supervisor_faculty_id=supervisor_faculty_id
+        )
+        if timeline_ids:
+            placeholders = ",".join(["%s"] * len(timeline_ids))
             cursor.execute(
-                """
+                f"""
                 SELECT COUNT(DISTINCT ti.item_id) AS total
                 FROM comp4200_timeline_items ti
                 JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
-                WHERE tl.timeline_id = %s
+                WHERE tl.timeline_id IN ({placeholders})
                   AND tl.is_published = TRUE
                   AND ti.is_deadline = TRUE
                   AND COALESCE(ti.is_archived, FALSE) = FALSE
                 """,
-                (timeline["timeline_id"],),
+                tuple(timeline_ids),
             )
             milestone_total = int((cursor.fetchone() or {}).get("total") or 0)
 
@@ -734,13 +853,13 @@ def _student_dashboard_milestone_progress(
                     FROM milestone_submissions ms
                     JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
                     JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
-                    WHERE tl.timeline_id = %s
+                    WHERE tl.timeline_id IN ({placeholders})
                       AND tl.is_published = TRUE
                       AND ti.is_deadline = TRUE
                       AND COALESCE(ti.is_archived, FALSE) = FALSE
                     {submit_where}
                     """,
-                    (timeline["timeline_id"], *submit_params),
+                    (*timeline_ids, *submit_params),
                 )
                 milestone_submitted = int(
                     (cursor.fetchone() or {}).get("submitted") or 0
@@ -752,7 +871,7 @@ def _student_dashboard_milestone_progress(
                     FROM milestone_submissions ms
                     JOIN comp4200_timeline_items ti ON ti.item_id = ms.item_id
                     JOIN comp4200_timelines tl ON tl.timeline_id = ti.timeline_id
-                    WHERE tl.timeline_id = %s
+                    WHERE tl.timeline_id IN ({placeholders})
                       AND tl.is_published = TRUE
                       AND ti.is_deadline = TRUE
                       AND COALESCE(ti.is_archived, FALSE) = FALSE
@@ -760,7 +879,7 @@ def _student_dashboard_milestone_progress(
                     ORDER BY ms.submitted_at DESC
                     LIMIT 1
                     """,
-                    (timeline["timeline_id"], *submit_params),
+                    (*timeline_ids, *submit_params),
                 )
                 last_row = cursor.fetchone() or {}
                 last_milestone_submission = _fmt_date(last_row.get("submitted_at"))
@@ -1090,7 +1209,8 @@ def _ensure_milestone_submissions_table(cursor):
             student_id     INT          NOT NULL,
             project_id     INT          NULL,
             file_name      VARCHAR(255) NOT NULL,
-            file_data      LONGBLOB     NOT NULL,
+            file_path      VARCHAR(600) NULL,
+            file_data      LONGBLOB     NULL,
             file_mime      VARCHAR(120) NOT NULL,
             file_size_mb   DECIMAL(6,2) NULL,
             submitted_to   ENUM('supervisor','coordinator','both')
@@ -1123,8 +1243,16 @@ def _ensure_milestone_submissions_table(cursor):
     except Exception:
         pass
 
+    try:
+        cursor.execute(
+            "ALTER TABLE milestone_submissions MODIFY COLUMN file_data LONGBLOB NULL"
+        )
+    except Exception:
+        pass
+
     for col_name, col_def in [
         ("project_id", "INT NULL"),
+        ("file_path", "VARCHAR(600) NULL"),
         ("item_title", "VARCHAR(255) NULL"),
         ("item_label", "VARCHAR(180) NULL"),
     ]:
@@ -1154,12 +1282,13 @@ def _sync_final_report_timeline_submission(
     student_id,
     project_id,
     file_name,
-    file_bytes,
+    file_bytes=None,
+    file_path=None,
     mime_type,
     size_mb,
 ):
     item_id = _coerce_positive_int(timeline_item_id)
-    if not item_id or not project_id or not file_bytes:
+    if not item_id or not project_id or (not file_bytes and not file_path):
         return None
 
     _ensure_milestone_submissions_table(cursor)
@@ -1255,15 +1384,16 @@ def _sync_final_report_timeline_submission(
     cursor.execute(
         """
         INSERT INTO milestone_submissions
-            (item_id, student_id, project_id, file_name, file_data,
+            (item_id, student_id, project_id, file_name, file_path, file_data,
              file_mime, file_size_mb, submitted_to, item_title, item_label)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             item_id,
             student_id,
             project_id,
             file_name,
+            file_path,
             file_bytes,
             mime_type or "application/octet-stream",
             size_mb,
@@ -1643,6 +1773,8 @@ __all__ = [
     "_json_safe",
     "_db_column_exists_student",
     "_table_exists_student",
+    "_student_result_status_from_row",
+    "_student_latest_comp4200_result",
     "_student_course_context_for_id",
     "_student_course_context",
     "_student_visible_project_ids",
@@ -1656,6 +1788,7 @@ __all__ = [
     "_student_active_semester",
     "_target_semester_for_submission",
     "_student_published_intro_timeline",
+    "_student_published_intro_timeline_ids",
     "_student_dashboard_milestone_progress",
     "_student_intro_timeline_deadlines",
     "_comp4300_final_submission_window",

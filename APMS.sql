@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS semesters (
     start_date       DATE         NULL,
     end_date         DATE         NULL,
     is_active        BOOLEAN      NOT NULL DEFAULT FALSE,
-    UNIQUE KEY uq_semester (academic_year, semester_number)
+    UNIQUE KEY uq_semester_course (academic_year, semester_number, course_code)
 ) ENGINE=InnoDB;
 
 -- ============================================================

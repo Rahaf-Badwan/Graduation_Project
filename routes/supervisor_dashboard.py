@@ -67,26 +67,53 @@ def _current_project_year_semesters(cursor, faculty_id):
         anchors = cursor.fetchall()
 
     if not anchors:
+        cursor.execute(
+            """
+            SELECT DISTINCT s.semester_id, s.academic_year, s.semester_number, s.course_code, s.start_date
+            FROM projects p
+            JOIN semesters s ON s.semester_id = p.semester_id
+            WHERE p.supervisor_id = %s
+              AND COALESCE(p.status, '') NOT IN ('archived', 'archive', 'draft', 'cancelled', 'rejected')
+              AND EXISTS (
+                    SELECT 1
+                    FROM project_members pm
+                    WHERE pm.project_id = p.project_id
+              )
+            ORDER BY COALESCE(s.start_date, '1900-01-01') DESC, s.semester_id DESC
+            LIMIT 1
+            """,
+            (faculty_id,),
+        )
+        latest = cursor.fetchone()
+        anchors = [latest] if latest else []
+
+    if not anchors:
         return []
 
-    academic_years = sorted({
-        row["academic_year"]
+    term_pairs = sorted({
+        (row["academic_year"], row["semester_number"])
         for row in anchors
-        if row.get("academic_year")
+        if row.get("academic_year") and row.get("semester_number") is not None
     })
-    if not academic_years:
+    if not term_pairs:
         return anchors
 
-    placeholders = ",".join(["%s"] * len(academic_years))
+    term_filters = " OR ".join(
+        ["(academic_year = %s AND semester_number = %s)"] * len(term_pairs)
+    )
+    params = []
+    for academic_year, semester_number in term_pairs:
+        params.extend([academic_year, semester_number])
+
     cursor.execute(
         f"""
         SELECT semester_id, academic_year, semester_number, course_code
         FROM semesters
-        WHERE academic_year IN ({placeholders})
+        WHERE ({term_filters})
           AND course_code IN ('COMP4200', 'COMP4300')
         ORDER BY academic_year DESC, semester_number DESC, semester_id DESC
         """,
-        tuple(academic_years),
+        tuple(params),
     )
     semesters = cursor.fetchall()
     if not semesters:

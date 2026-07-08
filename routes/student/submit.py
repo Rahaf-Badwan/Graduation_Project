@@ -1,4 +1,5 @@
 from flask import (
+    current_app,
     Response,
     jsonify,
     redirect,
@@ -8,12 +9,118 @@ from flask import (
     url_for,
 )
 import bcrypt
+import os
+import secrets
+import time
 from werkzeug.utils import secure_filename
 
 from auth import login_required
 from db import get_db
 from .blueprint import student_bp
 from .common import *
+
+
+PROJECT_UPLOAD_REL_DIR = "static/uploads/project_files"
+MILESTONE_UPLOAD_REL_DIR = "static/uploads/milestone_submissions"
+
+
+def _milestone_upload_abs_dir():
+    return os.path.join(current_app.root_path, *MILESTONE_UPLOAD_REL_DIR.split("/"))
+
+
+def _project_upload_abs_dir():
+    return os.path.join(current_app.root_path, *PROJECT_UPLOAD_REL_DIR.split("/"))
+
+
+def _save_project_upload(file_storage, original_name, project_id, file_type):
+    safe_original = secure_filename(original_name or "") or "project_file"
+    safe_name = f"{file_type}_{safe_original}"[:255]
+    upload_dir = _project_upload_abs_dir()
+    os.makedirs(upload_dir, exist_ok=True)
+    stored_name = (
+        f"{int(project_id)}_{file_type}_{int(time.time())}_"
+        f"{secrets.token_hex(6)}_{safe_original}"
+    )
+    abs_path = os.path.join(upload_dir, stored_name)
+    file_storage.seek(0)
+    file_storage.save(abs_path)
+    return safe_name, f"{PROJECT_UPLOAD_REL_DIR}/{stored_name}"
+
+
+def _save_milestone_upload(file_storage, original_name, item_id, student_id):
+    safe_name = secure_filename(original_name or "") or "milestone_submission"
+    safe_name = safe_name[:255]
+    upload_dir = _milestone_upload_abs_dir()
+    os.makedirs(upload_dir, exist_ok=True)
+    stored_name = (
+        f"{int(item_id)}_{int(student_id)}_{int(time.time())}_"
+        f"{secrets.token_hex(6)}_{safe_name}"
+    )
+    abs_path = os.path.join(upload_dir, stored_name)
+    file_storage.seek(0)
+    file_storage.save(abs_path)
+    return safe_name, f"{MILESTONE_UPLOAD_REL_DIR}/{stored_name}"
+
+
+def _delete_milestone_upload(rel_path):
+    clean_path = (rel_path or "").replace("\\", "/").lstrip("/")
+    if not clean_path.startswith(f"{MILESTONE_UPLOAD_REL_DIR}/"):
+        return
+    root = os.path.abspath(_milestone_upload_abs_dir())
+    abs_path = os.path.abspath(os.path.join(current_app.root_path, clean_path))
+    try:
+        if os.path.commonpath([root, abs_path]) == root and os.path.isfile(abs_path):
+            os.remove(abs_path)
+    except Exception:
+        pass
+
+
+def _delete_project_upload(rel_path):
+    clean_path = (rel_path or "").replace("\\", "/").lstrip("/")
+    if not clean_path.startswith(f"{PROJECT_UPLOAD_REL_DIR}/"):
+        return
+    root = os.path.abspath(_project_upload_abs_dir())
+    abs_path = os.path.abspath(os.path.join(current_app.root_path, clean_path))
+    try:
+        if os.path.commonpath([root, abs_path]) == root and os.path.isfile(abs_path):
+            os.remove(abs_path)
+    except Exception:
+        pass
+
+
+def _project_file_column_exists(cursor, column_name):
+    cursor.execute(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'project_files'
+          AND COLUMN_NAME = %s
+        """,
+        (column_name,),
+    )
+    return int((cursor.fetchone() or {}).get("cnt") or 0) > 0
+
+
+def _ensure_project_file_storage_columns(cursor):
+    if not _project_file_column_exists(cursor, "file_path"):
+        cursor.execute("ALTER TABLE project_files ADD COLUMN file_path VARCHAR(600) NULL")
+    try:
+        cursor.execute("ALTER TABLE project_files MODIFY COLUMN file_data LONGBLOB NULL")
+    except Exception:
+        pass
+
+
+def _attention_response(message, status_key="blocked", **extra):
+    payload = {
+        "ok": False,
+        "success": False,
+        "needs_attention": True,
+        "status": status_key,
+        "message": message,
+    }
+    payload.update(extra)
+    return jsonify(payload), 200
 
 @student_bp.route("/submit")
 @login_required(role="student")
@@ -40,19 +147,7 @@ def submit():
         student_id = st_row["student_id"] if st_row else None
 
         # تحديد الكورس الصح بناءً على نتيجة الطالب
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM   student_course_results scr
-            JOIN   semesters s ON s.semester_id = scr.semester_id
-            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
-            ORDER  BY scr.semester_id DESC LIMIT 1
-            """,
-            (student_id,),
-        )
-        result_row = cursor.fetchone()
+        result_row = _student_latest_comp4200_result(cursor, student_id)
         course_status = (result_row or {}).get("course_status", "pending")
         promoted_to = (result_row or {}).get("promoted_to_semester_id")
         is_promoted = bool(
@@ -230,6 +325,7 @@ def api_submit_info():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_project_file_storage_columns(cursor)
 
         # Get student_id
         cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
@@ -241,21 +337,7 @@ def api_submit_info():
         student_id = st_row["student_id"]
 
         # Get the student's course result (COMP4200) to decide target semester
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM   student_course_results scr
-            JOIN   semesters s ON s.semester_id = scr.semester_id
-            WHERE  scr.student_id = %s
-              AND  s.course_code  = 'COMP4200'
-            ORDER  BY scr.semester_id DESC
-            LIMIT  1
-            """,
-            (student_id,),
-        )
-        result_row = cursor.fetchone()
+        result_row = _student_latest_comp4200_result(cursor, student_id)
 
         course_status = (result_row or {}).get("course_status", "pending")
         promoted_to = (result_row or {}).get("promoted_to_semester_id")
@@ -402,6 +484,7 @@ def api_submit_project():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_project_file_storage_columns(cursor)
 
         # Get student_id
         cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
@@ -413,19 +496,7 @@ def api_submit_project():
         student_id = st_row["student_id"]
 
         # ── Determine target semester based on course result ──
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM   student_course_results scr
-            JOIN   semesters s ON s.semester_id = scr.semester_id
-            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
-            ORDER  BY scr.semester_id DESC LIMIT 1
-            """,
-            (student_id,),
-        )
-        result_row = cursor.fetchone()
+        result_row = _student_latest_comp4200_result(cursor, student_id)
         course_status = (result_row or {}).get("course_status", "pending")
         promoted_to = (result_row or {}).get("promoted_to_semester_id")
         is_promoted = bool(promoted_to or (result_row or {}).get("promoted_at"))
@@ -475,14 +546,10 @@ def api_submit_project():
         ):
             cursor.close()
             db.close()
-            return (
-                jsonify(
-                    {
-                        "error": "The submission window has closed. You can no longer update your submission.",
-                        "project_id": (existing or {}).get("project_id"),
-                    }
-                ),
-                403,
+            return _attention_response(
+                "The submission window has closed. You can no longer update your submission.",
+                status_key="submission_closed",
+                project_id=(existing or {}).get("project_id"),
             )
 
         final_submission = None
@@ -550,19 +617,15 @@ def api_submit_project():
                 if team_submission:
                     cursor.close()
                     db.close()
-                    return (
-                        jsonify(
-                            {
-                                "error": (
-                                    f"Your teammate '{team_submission['submitted_by']}' "
-                                    f"has already submitted the project. "
-                                    f"Only one member per team can submit."
-                                ),
-                                "already_submitted_by_team": True,
-                                "project_id": team_submission["project_id"],
-                            }
+                    return _attention_response(
+                        (
+                            f"Your teammate '{team_submission['submitted_by']}' "
+                            f"has already submitted the project. "
+                            f"Only one member per team can submit."
                         ),
-                        409,
+                        status_key="already_submitted_by_team",
+                        already_submitted_by_team=True,
+                        project_id=team_submission["project_id"],
                     )
 
         if existing:
@@ -612,18 +675,14 @@ def api_submit_project():
                     )
                     cursor.close()
                     db.close()
-                    return (
-                        jsonify(
-                            {
-                                "error": (
-                                    f"This project has already been submitted by {name}. "
-                                    f"Only the student who created the submission can update it."
-                                ),
-                                "already_submitted_by_team": True,
-                                "project_id": existing["project_id"],
-                            }
+                    return _attention_response(
+                        (
+                            f"This project has already been submitted by {name}. "
+                            f"Only the student who created the submission can update it."
                         ),
-                        409,
+                        status_key="already_submitted_by_team",
+                        already_submitted_by_team=True,
+                        project_id=existing["project_id"],
                     )
 
                 cursor.execute(
@@ -720,7 +779,7 @@ def api_submit_project():
         if timeline_item_id:
             cursor.execute(
                 """
-                SELECT file_name, file_data, file_mime, file_size_mb
+                SELECT file_name, file_path, file_data, file_mime, file_size_mb
                 FROM project_files
                 WHERE project_id = %s
                   AND file_type = 'final_report'
@@ -731,7 +790,7 @@ def api_submit_project():
                 (project_id,),
             )
             final_file = cursor.fetchone()
-            if final_file and final_file.get("file_data"):
+            if final_file and (final_file.get("file_data") or final_file.get("file_path")):
                 _sync_final_report_timeline_submission(
                     cursor,
                     timeline_item_id=timeline_item_id,
@@ -739,6 +798,7 @@ def api_submit_project():
                     project_id=project_id,
                     file_name=final_file.get("file_name") or "final_report.pdf",
                     file_bytes=final_file.get("file_data"),
+                    file_path=final_file.get("file_path"),
                     mime_type=final_file.get("file_mime"),
                     size_mb=final_file.get("file_size_mb"),
                 )
@@ -773,7 +833,7 @@ def api_submit_project():
             }
         )
     except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+        return _attention_response(str(e), status_key="submission_closed")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -819,9 +879,12 @@ def api_upload_file():
     if size_bytes > max_file_mb * 1024 * 1024:
         return jsonify({"error": f"File exceeds the {max_file_mb} MB upload limit."}), 413
 
+    saved_project_file_path = None
+    old_project_file_path = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_project_file_storage_columns(cursor)
 
         # Get student_id
         cursor.execute("SELECT student_id FROM students WHERE user_id = %s", (user_id,))
@@ -833,19 +896,7 @@ def api_upload_file():
         student_id = st_row["student_id"]
 
         # تحديد الكورس الصح بناءً على نتيجة الطالب
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM   student_course_results scr
-            JOIN   semesters s ON s.semester_id = scr.semester_id
-            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
-            ORDER  BY scr.semester_id DESC LIMIT 1
-            """,
-            (student_id,),
-        )
-        result_row = cursor.fetchone()
+        result_row = _student_latest_comp4200_result(cursor, student_id)
         course_status = (result_row or {}).get("course_status", "pending")
         promoted_to = (result_row or {}).get("promoted_to_semester_id")
         is_promoted = bool(promoted_to or (result_row or {}).get("promoted_at"))
@@ -907,18 +958,14 @@ def api_upload_file():
         if not _is_submission_open(cursor, active_semester_id, project_id):
             cursor.close()
             db.close()
-            return (
-                jsonify(
-                    {
-                        "error": "The submission window has closed. No more uploads are allowed."
-                    }
-                ),
-                403,
+            return _attention_response(
+                "The submission window has closed. No more uploads are allowed.",
+                status_key="submission_closed",
             )
 
         cursor.execute(
             """
-            SELECT uploaded_by
+            SELECT uploaded_by, file_path
             FROM   project_files
             WHERE  project_id = %s
               AND  file_type = 'final_report'
@@ -932,18 +979,27 @@ def api_upload_file():
         if final_submission and final_submission.get("uploaded_by") != user_id:
             cursor.close()
             db.close()
-            return (
-                jsonify(
-                    {
-                        "error": "This project has already been submitted by another team member."
-                    }
-                ),
-                403,
+            return _attention_response(
+                "This project has already been submitted by another team member.",
+                status_key="already_submitted_by_team",
+                already_submitted_by_team=True,
             )
 
         # Read file bytes into memory (already size-checked above)
-        file_bytes = f.read()
-        safe_name = f"{file_type}_{secure_filename(f.filename)}"
+        cursor.execute(
+            """
+            SELECT file_path
+            FROM project_files
+            WHERE project_id = %s AND file_type = %s
+            LIMIT 1
+            """,
+            (project_id, file_type),
+        )
+        old_project_file_path = (cursor.fetchone() or {}).get("file_path")
+
+        safe_name, saved_project_file_path = _save_project_upload(
+            f, f.filename, project_id, file_type
+        )
         mime_type = f.mimetype or "application/octet-stream"
         size_mb = round(size_bytes / (1024 * 1024), 2)
 
@@ -951,19 +1007,28 @@ def api_upload_file():
         cursor.execute(
             """
             INSERT INTO project_files
-                (project_id, file_type, file_name, file_data, file_mime,
+                (project_id, file_type, file_name, file_path, file_data, file_mime,
                  file_size_mb, upload_status, uploaded_by, uploaded_at)
-            VALUES (%s, %s, %s, %s, %s, %s, 'uploaded', %s, NOW())
+            VALUES (%s, %s, %s, %s, NULL, %s, %s, 'uploaded', %s, NOW())
             ON DUPLICATE KEY UPDATE
                 file_name     = VALUES(file_name),
-                file_data     = VALUES(file_data),
+                file_path     = VALUES(file_path),
+                file_data     = NULL,
                 file_mime     = VALUES(file_mime),
                 file_size_mb  = VALUES(file_size_mb),
                 upload_status = 'uploaded',
                 uploaded_by   = VALUES(uploaded_by),
                 uploaded_at   = NOW()
             """,
-            (project_id, file_type, safe_name, file_bytes, mime_type, size_mb, user_id),
+            (
+                project_id,
+                file_type,
+                safe_name,
+                saved_project_file_path,
+                mime_type,
+                size_mb,
+                user_id,
+            ),
         )
 
         if file_type == "final_report" and timeline_item_id:
@@ -973,7 +1038,7 @@ def api_upload_file():
                 student_id=student_id,
                 project_id=project_id,
                 file_name=safe_name,
-                file_bytes=file_bytes,
+                file_path=saved_project_file_path,
                 mime_type=mime_type,
                 size_mb=size_mb,
             )
@@ -1018,6 +1083,8 @@ def api_upload_file():
         db.commit()
         cursor.close()
         db.close()
+        if old_project_file_path:
+            _delete_project_upload(old_project_file_path)
 
         return jsonify(
             {
@@ -1029,8 +1096,12 @@ def api_upload_file():
             }
         )
     except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+        if saved_project_file_path:
+            _delete_project_upload(saved_project_file_path)
+        return _attention_response(str(e), status_key="submission_closed")
     except Exception as e:
+        if saved_project_file_path:
+            _delete_project_upload(saved_project_file_path)
         return jsonify({"error": str(e)}), 500
 
 
@@ -1046,7 +1117,7 @@ def api_download_file(file_id):
         # Verify the file belongs to a project this user is a member of
         cursor.execute(
             """
-            SELECT pf.file_name, pf.file_data, pf.file_mime
+            SELECT pf.file_name, pf.file_path, pf.file_data, pf.file_mime
             FROM   project_files pf
             JOIN   project_members pm ON pm.project_id = pf.project_id
             JOIN   students st        ON st.student_id = pm.student_id
@@ -1058,17 +1129,26 @@ def api_download_file(file_id):
         cursor.close()
         db.close()
 
-        if not row or not row["file_data"]:
+        if not row:
             return jsonify({"error": "File not found."}), 404
 
-        mime = row["file_mime"] or "application/octet-stream"
-        return Response(
-            bytes(row["file_data"]),
-            mimetype=mime,
-            headers={
-                "Content-Disposition": f'attachment; filename="{row["file_name"]}"'
-            },
-        )
+        if row.get("file_data"):
+            mime = row["file_mime"] or "application/octet-stream"
+            return Response(
+                bytes(row["file_data"]),
+                mimetype=mime,
+                headers={
+                    "Content-Disposition": f'attachment; filename="{row["file_name"]}"'
+                },
+            )
+
+        if row.get("file_path"):
+            clean_path = (row.get("file_path") or "").replace("\\", "/").lstrip("/")
+            if clean_path.startswith("static/"):
+                clean_path = clean_path[len("static/") :]
+            return redirect(url_for("static", filename=clean_path))
+
+        return jsonify({"error": "File content not found."}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1197,14 +1277,16 @@ def api_milestone_submit():
     if not f or not f.filename:
         return jsonify({"error": "Empty file."}), 400
 
-    # Size check (max 50 MB)
+    # Size check (max 500 MB)
     f.seek(0, 2)
     size_bytes = f.tell()
     f.seek(0)
-    MAX_MB = 50
+    MAX_MB = 500
     if size_bytes > MAX_MB * 1024 * 1024:
         return jsonify({"error": f"File exceeds {MAX_MB} MB limit."}), 400
 
+    saved_file_rel_path = None
+    old_submission_file_path = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -1217,7 +1299,8 @@ def api_milestone_submit():
                 student_id     INT          NOT NULL,
                 project_id     INT          NULL,
                 file_name      VARCHAR(255) NOT NULL,
-                file_data      LONGBLOB     NOT NULL,
+                file_path      VARCHAR(600) NULL,
+                file_data      LONGBLOB     NULL,
                 file_mime      VARCHAR(120) NOT NULL,
                 file_size_mb   DECIMAL(6,2) NULL,
                 submitted_to   ENUM('supervisor','coordinator','both')
@@ -1250,8 +1333,16 @@ def api_milestone_submit():
         except Exception:
             pass
 
+        try:
+            cursor.execute(
+                "ALTER TABLE milestone_submissions MODIFY COLUMN file_data LONGBLOB NULL"
+            )
+        except Exception:
+            pass
+
         # Migration: add snapshot columns if not exist (use existing dictionary cursor)
         for _col, _col_def in [
+            ("file_path", "VARCHAR(600) NULL"),
             ("item_title", "VARCHAR(255) NULL"),
             ("item_label", "VARCHAR(180) NULL"),
         ]:
@@ -1423,7 +1514,8 @@ def api_milestone_submit():
         if section_id:
             cursor.execute(
                 """
-                SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
+                SELECT ms.submission_id, ms.student_id, ms.file_path,
+                       u.full_name AS submitted_by
                 FROM milestone_submissions ms
                 JOIN students st ON st.student_id = ms.student_id
                 JOIN users u ON u.user_id = st.user_id
@@ -1443,7 +1535,8 @@ def api_milestone_submit():
         elif project_id:
             cursor.execute(
                 """
-                SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
+                SELECT ms.submission_id, ms.student_id, ms.file_path,
+                       u.full_name AS submitted_by
                 FROM   milestone_submissions ms
                 JOIN   students st ON st.student_id = ms.student_id
                 JOIN   users    u  ON u.user_id     = st.user_id
@@ -1457,7 +1550,8 @@ def api_milestone_submit():
         else:
             cursor.execute(
                 """
-                SELECT ms.submission_id, ms.student_id, u.full_name AS submitted_by
+                SELECT ms.submission_id, ms.student_id, ms.file_path,
+                       u.full_name AS submitted_by
                 FROM   milestone_submissions ms
                 JOIN   students st ON st.student_id = ms.student_id
                 JOIN   users    u  ON u.user_id     = st.user_id
@@ -1504,6 +1598,7 @@ def api_milestone_submit():
                 )
 
             # مسموح بالتعديل → احذف القديم وارفع الجديد
+            old_submission_file_path = existing_submission.get("file_path")
             cursor.execute(
                 "DELETE FROM milestone_submissions WHERE submission_id = %s",
                 (existing_submission["submission_id"],),
@@ -1511,8 +1606,9 @@ def api_milestone_submit():
             is_resubmit = True
 
         # ── احفظ الملف ────────────────────────────────────────────
-        file_bytes = f.read()
-        safe_name = secure_filename(f.filename)
+        safe_name, saved_file_rel_path = _save_milestone_upload(
+            f, f.filename, int(item_id), student_id
+        )
         mime_type = f.mimetype or "application/octet-stream"
         size_mb = round(size_bytes / (1024 * 1024), 2)
 
@@ -1520,16 +1616,17 @@ def api_milestone_submit():
             """
             INSERT INTO milestone_submissions
                 (item_id, student_id, project_id, file_name,
-                 file_data, file_mime, file_size_mb, submitted_to,
+                 file_path, file_data, file_mime, file_size_mb, submitted_to,
                  item_title, item_label)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 int(item_id),
                 student_id,
                 project_id,
                 safe_name,
-                file_bytes,
+                saved_file_rel_path,
+                None,
                 mime_type,
                 size_mb,
                 submitted_to,
@@ -1567,6 +1664,8 @@ def api_milestone_submit():
         submission_id = cursor.lastrowid
         cursor.close()
         db.close()
+        if old_submission_file_path:
+            _delete_milestone_upload(old_submission_file_path)
 
         return jsonify(
             {
@@ -1581,6 +1680,8 @@ def api_milestone_submit():
         )
 
     except Exception as e:
+        if saved_file_rel_path:
+            _delete_milestone_upload(saved_file_rel_path)
         return jsonify({"error": str(e)}), 500
 
 

@@ -232,7 +232,7 @@ async function submitDistributionProject() {
     });
     const data = await res.json();
     messageBox.textContent = data.message || data.error || 'Done.';
-    messageBox.style.color = res.ok ? 'green' : 'crimson';
+    messageBox.style.color = res.ok && data.ok !== false && !data.needs_attention ? 'green' : 'crimson';
   } catch (err) {
     messageBox.textContent = 'Could not submit the project.';
     messageBox.style.color = 'crimson';

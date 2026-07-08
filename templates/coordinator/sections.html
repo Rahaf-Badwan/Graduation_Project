@@ -339,7 +339,8 @@
         <div class="sections-title">Sections Completion</div>
         <div class="sections-subtitle">
           Mark Project Introduction sections and Graduation Project groups as succeeded.
-          When a group is marked succeeded, it is sent to the Head of Department for approval and removed from this active coordinator list.
+          When a group is marked succeeded, it is sent to the Head of Department for approval and removed from this
+          active coordinator list.
         </div>
       </div>
 
@@ -355,7 +356,8 @@
 
     <div class="sections-info-box">
       Use this page to update the completion result for each section/group.
-      When you mark a section as <b>Succeeded</b>, it becomes visible to the Head of Department for approval and disappears from your active list.
+      When you mark a section as <b>Succeeded</b>, it becomes visible to the Head of Department for approval and
+      disappears from your active list.
     </div>
   </div>
 
@@ -485,11 +487,10 @@
           <div class="section-meta">Supervisor: <b>${escapeHtml(row.supervisor_name || '—')}</b></div>
           <div class="section-meta">Students (${escapeHtml(row.student_count || 0)}): ${escapeHtml(row.students || 'No students')}</div>
 
-          ${
-            row.marked_at
-              ? `<div class="section-meta">Last update: ${escapeHtml(row.marked_at)} by ${escapeHtml(row.marked_by_name || 'Coordinator')}</div>`
-              : ''
-          }
+          ${row.marked_at
+        ? `<div class="section-meta">Last update: ${escapeHtml(row.marked_at)} by ${escapeHtml(row.marked_by_name || 'Coordinator')}</div>`
+        : ''
+      }
         </div>
 
         <div class="section-actions">

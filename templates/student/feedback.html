@@ -118,6 +118,15 @@
       line-height: 1.5;
       padding: 9px 11px;
     }
+    #pg-feedback .fb-area-source {
+      color: var(--color-text-secondary);
+      display: block;
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    #pg-feedback .fb-area-text { display: block; }
     #pg-feedback .fb-item-point::before { color: var(--amber); content: "- "; font-weight: 900; }
     #pg-feedback .fb-item-point.resolved,
     #pg-feedback .fb-area.resolved { color: var(--green); text-decoration: line-through; }
@@ -249,11 +258,17 @@
     const box = document.getElementById('feedbackAreas');
     const areas = items.flatMap(item => (item.improvement_points || []).map(point => ({
       ...point,
-      priority: item.priority || 'normal'
+      priority: item.priority || 'normal',
+      reviewer_name: item.reviewer_name || 'Faculty Member',
+      feedback_type: item.feedback_type || '',
+      project_title: item.project_title || 'Project'
     })));
     box.innerHTML = areas.length
       ? areas.map(point => `
-          <div class="fb-area ${esc(point.priority)} ${point.is_resolved ? 'resolved' : ''}">${esc(point.point_text)}</div>
+          <div class="fb-area ${esc(point.priority)} ${point.is_resolved ? 'resolved' : ''}">
+            <span class="fb-area-source">${esc(point.reviewer_name)} &middot; ${esc(label(point.feedback_type))} &middot; ${esc(point.project_title)}</span>
+            <span class="fb-area-text">${esc(point.point_text)}</span>
+          </div>
         `).join('')
       : '<div class="fb-empty" style="padding:12px 0">No improvement points yet.</div>';
   }

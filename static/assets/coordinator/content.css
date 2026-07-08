@@ -148,20 +148,56 @@
 .p-temp { background: var(--amber-light); color: var(--amber); }
 
 .toast {
-  position: fixed; left: 24px; bottom: 24px;
+  position: fixed; left: 50%; top: 50%;
   max-width: min(360px, calc(100vw - 32px));
   background: rgba(17,24,39,.92); color: #fff;
   padding: 12px 14px; border-radius: 12px;
   box-shadow: 0 12px 30px rgba(15,23,42,.25);
   font-size: 12px; line-height: 1.6;
-  transform: translateY(18px); opacity: 0;
+  transform: translate(-50%, calc(-50% + 18px)); opacity: 0;
   pointer-events: none; transition: opacity .2s ease, transform .2s ease;
-  z-index: 999;
+  z-index: 1200;
+  text-align: left;
 }
-.toast.show { opacity: 1; transform: translateY(0); }
+.toast.show { opacity: 1; transform: translate(-50%, -50%); }
 .toast.success { background: rgba(13,110,86,.95); }
 .toast.warn { background: rgba(186,117,23,.96); }
 .toast.error { background: rgba(153,60,29,.96); }
+.coord-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1190;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(15,23,42,.36);
+}
+.coord-confirm {
+  width: min(440px, calc(100vw - 32px));
+  border-radius: 14px;
+  background: var(--color-background, #fff);
+  border: 1px solid var(--color-border-tertiary, #e5e7eb);
+  box-shadow: 0 24px 55px rgba(15,23,42,.28);
+  padding: 20px;
+}
+.coord-confirm-title {
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: var(--color-text-primary, #111827);
+}
+.coord-confirm-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-secondary, #4b5563);
+  margin-bottom: 18px;
+}
+.coord-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 .hidden { display: none !important; }
 
 /* ===== 7. RESPONSIVE QUERIES ===== */

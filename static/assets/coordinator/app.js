@@ -5,9 +5,73 @@ let professorsCache = [];
 let formsCache = [];
 let unassignedCache = [];
 let committeeDashboardCache = null;
+let coordToastTimer = null;
 
 function normalizeText(t) {
   return (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function showCoordinatorToast(message, type = 'error') {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message || '';
+  toast.className = `toast show ${type}`;
+  clearTimeout(coordToastTimer);
+  coordToastTimer = setTimeout(() => {
+    toast.className = 'toast';
+  }, 3600);
+}
+
+function showCoordinatorConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel' }) {
+  return new Promise(resolve => {
+    document.querySelector('.coord-confirm-backdrop')?.remove();
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'coord-confirm-backdrop';
+    backdrop.innerHTML = `
+      <div class="coord-confirm" role="dialog" aria-modal="true" aria-labelledby="coordConfirmTitle">
+        <div class="coord-confirm-title" id="coordConfirmTitle">${escapeHtml(title || 'Confirm action')}</div>
+        <div class="coord-confirm-text">${escapeHtml(message || '')}</div>
+        <div class="coord-confirm-actions">
+          <button class="btn btn-outline" type="button" data-confirm-cancel>${escapeHtml(cancelText)}</button>
+          <button class="btn btn-primary" type="button" data-confirm-ok>${escapeHtml(confirmText)}</button>
+        </div>
+      </div>
+    `;
+
+    const close = value => {
+      backdrop.remove();
+      resolve(value);
+    };
+
+    backdrop.addEventListener('click', event => {
+      if (event.target === backdrop) close(false);
+    });
+    backdrop.querySelector('[data-confirm-cancel]')?.addEventListener('click', () => close(false));
+    backdrop.querySelector('[data-confirm-ok]')?.addEventListener('click', () => close(true));
+
+    document.body.appendChild(backdrop);
+    backdrop.querySelector('[data-confirm-ok]')?.focus();
+  });
+}
+
+function showSectionMessage(message, type = 'error') {
+  const msg = document.getElementById('sectionMsg');
+  const colors = {
+    ok: 'green',
+    success: 'green',
+    warn: '#c67c00',
+    error: '#c62828',
+    loading: '#444',
+  };
+  if (msg) {
+    msg.style.color = colors[type] || colors.error;
+    msg.style.fontWeight = type === 'loading' ? '600' : '700';
+    msg.textContent = message || '';
+  }
+  if (message && type !== 'loading') {
+    showCoordinatorToast(message, type === 'ok' ? 'success' : type);
+  }
 }
 
 function getSidebar() {
@@ -178,7 +242,7 @@ function handleStudentCheckboxChange(changedBox) {
   const checked = Array.from(document.querySelectorAll('.unassigned-student-checkbox:checked'));
   if (checked.length > 3) {
     changedBox.checked = false;
-    alert('You can select at most 3 students.');
+    showCoordinatorToast('You can select at most 3 students.', 'warn');
   }
   updateSelectedStudentsCount();
 }
@@ -234,7 +298,7 @@ async function toggleDistributionWindow() {
       msg.style.color = '#c62828';
       msg.textContent = 'Please choose an automatic close date before opening registration.';
     }
-    alert('Please choose an automatic close date before opening registration.');
+    showCoordinatorToast('Please choose an automatic close date before opening registration.', 'warn');
     return;
   }
 
@@ -498,32 +562,32 @@ async function assignGroupSupervisor(projectId) {
   const supervisorId = select ? select.value : '';
 
   if (!supervisorId) {
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '600';
-      msg.textContent = 'Please choose a supervisor before saving.';
-    }
-    alert('Please choose a supervisor before saving.');
+    showSectionMessage('Please choose a supervisor before saving.', 'warn');
     return;
   }
 
   if (select && select.selectedOptions[0]?.disabled) {
     const message = 'This supervisor is not available for assignment.';
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '600';
-      msg.textContent = message;
-    }
-    alert(message);
+    showSectionMessage(message, 'warn');
     return;
   }
 
+  const selectedSupervisor = (select?.selectedOptions[0]?.textContent || 'this supervisor')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const groupName = (select?.closest('tr')?.querySelector('td')?.textContent || 'this group')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const confirmed = await showCoordinatorConfirm({
+    title: 'Confirm Supervisor Assignment',
+    message: `Assign ${selectedSupervisor} to ${groupName}?`,
+    confirmText: 'Save Assignment',
+    cancelText: 'Cancel'
+  });
+  if (!confirmed) return;
+
   try {
-    if (msg) {
-      msg.style.color = '#444';
-      msg.style.fontWeight = '600';
-      msg.textContent = 'Saving group supervisor...';
-    }
+    showSectionMessage('Saving group supervisor...', 'loading');
 
     const res = await fetch('/api/coordinator/assign-group-supervisor', {
       method: 'POST',
@@ -536,24 +600,20 @@ async function assignGroupSupervisor(projectId) {
 
     const data = await readApiJson(res);
 
+    if (data.needs_attention || data.ok === false) {
+      showSectionMessage(data.message || data.error || 'Supervisor could not be assigned.', 'warn');
+      return;
+    }
+
     if (!res.ok) {
       throw new Error(data.error || 'Failed to assign supervisor.');
     }
 
-    if (msg) {
-      msg.style.color = 'green';
-      msg.style.fontWeight = '600';
-      msg.textContent = data.message || 'Supervisor assigned successfully.';
-    }
+    showSectionMessage(data.message || 'Supervisor assigned successfully.', 'ok');
 
     await loadDistributionData();
   } catch (err) {
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '700';
-      msg.textContent = err.message || 'Something went wrong while assigning the supervisor.';
-    }
-    alert(err.message || 'Something went wrong while assigning the supervisor.');
+    showSectionMessage(err.message || 'Something went wrong while assigning the supervisor.', 'error');
   }
 }
 
@@ -564,9 +624,10 @@ async function deleteGroup(projectId, groupName) {
     const res  = await fetch(`/api/coordinator/delete-group/${projectId}`, { method: 'DELETE' });
     const data = await readApiJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to delete group.');
+    showCoordinatorToast(data.message || 'Group deleted successfully.', 'success');
     await loadDistributionData();
   } catch (err) {
-    alert(err.message || 'Something went wrong.');
+    showSectionMessage(err.message || 'Something went wrong.', 'error');
   }
 }
 
@@ -579,48 +640,28 @@ async function addSectionEntry() {
   const addBtn = document.querySelector('button[onclick="createSectionNoDuplicate()"]');
 
   if (!sectionName || !supervisorId) {
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '600';
-      msg.textContent = 'Please enter the group name and choose a supervisor.';
-    }
+    showSectionMessage('Please enter the group name and choose a supervisor.', 'warn');
     throw new Error('Please enter the group name and choose a supervisor.');
   }
 
   if (sectionSupervisor?.selectedOptions[0]?.disabled) {
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '600';
-      msg.textContent = 'This supervisor is not available for assignment.';
-    }
+    showSectionMessage('This supervisor is not available for assignment.', 'warn');
     throw new Error('This supervisor is not available for assignment.');
   }
 
   if (!selectedStudents.length) {
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '600';
-      msg.textContent = 'Please choose at least one unassigned student.';
-    }
+    showSectionMessage('Please choose at least one unassigned student.', 'warn');
     throw new Error('Please choose at least one unassigned student.');
   }
 
   if (selectedStudents.length > 3) {
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '600';
-      msg.textContent = 'You can choose at most 3 students.';
-    }
+    showSectionMessage('You can choose at most 3 students.', 'warn');
     throw new Error('You can choose at most 3 students.');
   }
 
   try {
     if (addBtn) addBtn.disabled = true;
-    if (msg) {
-      msg.style.color = '#444';
-      msg.style.fontWeight = '600';
-      msg.textContent = 'Saving...';
-    }
+    showSectionMessage('Saving...', 'loading');
 
     const res = await fetch('/api/coordinator/add-section', {
       method: 'POST',
@@ -638,11 +679,7 @@ async function addSectionEntry() {
       throw new Error(data.error || 'Failed to create group.');
     }
 
-    if (msg) {
-      msg.style.color = 'green';
-      msg.style.fontWeight = '600';
-      msg.textContent = data.message || 'Group created successfully.';
-    }
+    showSectionMessage(data.message || 'Group created successfully.', 'ok');
 
     const sectionNameInput = document.getElementById('sectionName');
     const sectionSupervisor = document.getElementById('sectionSupervisor');
@@ -652,11 +689,7 @@ async function addSectionEntry() {
     await loadDistributionData();
     return data;
   } catch (err) {
-    if (msg) {
-      msg.style.color = '#c62828';
-      msg.style.fontWeight = '700';
-      msg.textContent = err.message || 'Something went wrong while creating the group.';
-    }
+    showSectionMessage(err.message || 'Something went wrong while creating the group.', 'error');
     throw err;
   } finally {
     if (addBtn) addBtn.disabled = false;
@@ -1151,7 +1184,10 @@ function renderDashboardLatest(projects) {
 function renderDashboardProgress(stats) {
   const box = document.getElementById('dashWorkflowProgress');
   if (!box) return;
-  const total = Math.max(parseInt(stats.total_projects || 0, 10), 1);
+  const total = Math.max(
+    parseInt(stats.workflow_total || stats.visible_groups || stats.total_sections || stats.total_projects || 0, 10),
+    1
+  );
   const items = [
     ['Submitted / Review', stats.awaiting_review || 0],
     ['Committee Evaluation', stats.under_evaluation || 0],

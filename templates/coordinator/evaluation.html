@@ -7,6 +7,23 @@
 {% block content %}
 <div class="page page-single on" id="pg-evaluation">
   <div id="evalToast" class="eval-toast" role="status" aria-live="polite"></div>
+  <div class="eval-modal-backdrop" id="evalConfirmBackdrop" aria-hidden="true">
+    <div class="eval-modal" role="dialog" aria-modal="true" aria-labelledby="evalConfirmTitle">
+      <div class="eval-modal-head">
+        <div>
+          <div class="eval-modal-kicker" id="evalConfirmKicker">Confirm action</div>
+          <h3 id="evalConfirmTitle">Are you sure?</h3>
+        </div>
+        <button class="eval-modal-close" type="button" onclick="resolveEvalConfirm(false)" aria-label="Close">x</button>
+      </div>
+      <p id="evalConfirmMessage"></p>
+      <div class="eval-modal-meta" id="evalConfirmMeta"></div>
+      <div class="eval-modal-actions">
+        <button class="mini-btn gray" type="button" onclick="resolveEvalConfirm(false)" id="evalConfirmCancel">Cancel</button>
+        <button class="mini-btn blue" type="button" onclick="resolveEvalConfirm(true)" id="evalConfirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
   <style>
     #pg-evaluation {
       display: block !important;
@@ -437,6 +454,91 @@
       white-space: nowrap;
     }
 
+    .eval-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(16, 24, 40, .36);
+      z-index: 9999;
+    }
+
+    .eval-modal-backdrop.show {
+      display: flex;
+    }
+
+    .eval-modal {
+      width: min(470px, 100%);
+      border: 1px solid #dbe7e1;
+      border-radius: 16px;
+      background: var(--color-background-primary);
+      box-shadow: 0 24px 70px rgba(16, 24, 40, .24);
+      padding: 18px;
+    }
+
+    .eval-modal-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .eval-modal-kicker {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      background: var(--blue-light);
+      color: var(--blue);
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 850;
+      margin-bottom: 8px;
+    }
+
+    .eval-modal h3 {
+      margin: 0;
+      color: var(--color-text-primary);
+      font-size: 18px;
+    }
+
+    .eval-modal p {
+      margin: 0;
+      color: #475467;
+      line-height: 1.5;
+    }
+
+    .eval-modal-meta {
+      margin-top: 12px;
+      border: 1px solid #e7eee9;
+      border-radius: 12px;
+      background: var(--color-background-tertiary);
+      color: var(--color-text-primary);
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .eval-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .eval-modal-close {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #e7eee9;
+      border-radius: 10px;
+      background: var(--color-background-tertiary);
+      color: #667085;
+      cursor: pointer;
+      font-weight: 850;
+    }
+
     @media(max-width:800px) {
       .eval-grid {
         grid-template-columns: 1fr 1fr
@@ -467,6 +569,7 @@
       </select>
       <button class="mini-btn green" onclick="openAllWindows()">Open Grade for All + Notify</button>
       <button class="mini-btn red" onclick="closeAllEvaluations()">Close Evaluation for All</button>
+      <button class="mini-btn blue" onclick="sendAllToSupervisors()">Send All to Supervisor</button>
       <button class="mini-btn blue" onclick="downloadCommitteeSchedule()">Download Committee Schedule Excel</button>
       <button class="mini-btn gray" onclick="loadAll()">Refresh</button>
     </div>
@@ -495,6 +598,7 @@
   let currentScope = 'introduction';
   let allProjects = [];
   let loadSeq = 0;
+  let evalConfirmResolver = null;
 
   function toastMsg(msg, ok = true) {
     const t = document.getElementById('evalToast') || document.getElementById('toast');
@@ -509,6 +613,57 @@
       alert(msg);
     }
   }
+
+  function showEvalConfirm(options = {}) {
+    const backdrop = document.getElementById('evalConfirmBackdrop');
+    const title = document.getElementById('evalConfirmTitle');
+    const message = document.getElementById('evalConfirmMessage');
+    const meta = document.getElementById('evalConfirmMeta');
+    const kicker = document.getElementById('evalConfirmKicker');
+    const ok = document.getElementById('evalConfirmOk');
+    const cancel = document.getElementById('evalConfirmCancel');
+
+    if (!backdrop || !title || !message || !meta || !ok || !cancel) {
+      toastMsg('Confirmation dialog is not ready. Please refresh the page.', false);
+      return Promise.resolve(false);
+    }
+
+    title.textContent = options.title || 'Confirm action';
+    message.textContent = options.message || 'Are you sure you want to continue?';
+    meta.textContent = options.meta || '';
+    meta.style.display = options.meta ? 'block' : 'none';
+    kicker.textContent = options.kicker || 'Final Evaluation';
+    ok.textContent = options.confirmText || 'Confirm';
+    cancel.textContent = options.cancelText || 'Cancel';
+    ok.className = `mini-btn ${options.variant || 'blue'}`;
+
+    backdrop.classList.add('show');
+    backdrop.setAttribute('aria-hidden', 'false');
+    ok.focus();
+
+    return new Promise(resolve => {
+      evalConfirmResolver = resolve;
+    });
+  }
+
+  function resolveEvalConfirm(value) {
+    const backdrop = document.getElementById('evalConfirmBackdrop');
+    if (backdrop) {
+      backdrop.classList.remove('show');
+      backdrop.setAttribute('aria-hidden', 'true');
+    }
+    if (evalConfirmResolver) {
+      evalConfirmResolver(Boolean(value));
+      evalConfirmResolver = null;
+    }
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && evalConfirmResolver) {
+      resolveEvalConfirm(false);
+    }
+  });
+
   async function api(url, options = {}) {
     const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
     const data = await res.json().catch(() => ({ error: 'Invalid server response' }));
@@ -566,7 +721,15 @@
       return;
     }
 
-    if (!confirm(`Open grade entry for all ${list.length} item(s) in this tab?`)) {
+    const confirmed = await showEvalConfirm({
+      kicker: currentScope === 'introduction' ? 'COMP4200 bulk action' : 'COMP4300 bulk action',
+      title: 'Open grade entry for all?',
+      message: 'Doctors and readers will be notified for every visible item in this tab.',
+      meta: `${list.length} item(s) will be opened.`,
+      confirmText: 'Open All',
+      variant: 'green'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -607,7 +770,15 @@
   }
   async function closeAllEvaluations() {
     const label = currentScope === 'introduction' ? 'COMP4200 sections' : 'COMP4300 projects';
-    if (!confirm(`Close evaluation for all ${label} in this tab?`)) return;
+    const confirmed = await showEvalConfirm({
+      kicker: 'Close evaluation',
+      title: 'Close all ready evaluations?',
+      message: 'Only items with complete marks will be calculated. Items with missing marks will be skipped.',
+      meta: `Scope: ${label}`,
+      confirmText: 'Close Ready Items',
+      variant: 'red'
+    });
+    if (!confirmed) return;
     try {
       const data = await api('/api/coordinator/evaluation/close-all', {
         method: 'POST',
@@ -799,6 +970,134 @@
       </div>`;
   }
 
+  function currentUserEvaluatorTasks(p) {
+    const allowed = new Set([
+      'intro_report_reader',
+      'intro_discussion_member',
+      'grad_report_reader',
+      'grad_committee_member'
+    ]);
+    return (p.grades || []).filter(g =>
+      Number(g.is_current_user_task) &&
+      allowed.has(g.component)
+    );
+  }
+
+  function myEvaluatorTaskBox(p) {
+    const tasks = currentUserEvaluatorTasks(p);
+    if (!tasks.length) return '';
+
+    const rows = p.student_scores || [];
+    const disabled = Number(p.is_open) ? '' : 'disabled';
+
+    return tasks.map(task => {
+      const taskId = Number(task.task_id);
+      const title = componentName(task.component);
+      const submitted = Number(task.is_submitted)
+        ? '<span class="pill p-done">Submitted</span>'
+        : '<span class="pill p-pending">Waiting</span>';
+
+      if (Number(task.shared_mark)) {
+        const value = task.mark === null || task.mark === undefined ? '' : Number(task.mark).toFixed(2);
+        return `
+          <div class="student-score-box">
+            <div class="student-score-head">
+              <span>My assigned mark - ${escapeHtml(title)}</span>
+              <span>${submitted}</span>
+            </div>
+            <table class="student-score-table">
+              <thead><tr><th>Evaluator</th><th>Shared mark /${money(task.max_mark)}</th><th>Note</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <b>${escapeHtml(task.evaluator_name || 'Me')}</b>
+                    <div class="student-muted">This report-reader mark is shared by the whole group.</div>
+                  </td>
+                  <td>
+                    <input
+                      class="student-score-input"
+                      id="my-task-shared-${taskId}"
+                      type="number"
+                      min="0"
+                      max="${escapeHtml(task.max_mark || 0)}"
+                      step="0.01"
+                      value="${escapeHtml(value)}"
+                      placeholder="0 - ${escapeHtml(task.max_mark || 0)}"
+                      ${disabled}>
+                  </td>
+                  <td>
+                    <input
+                      class="student-score-note"
+                      id="my-task-note-${taskId}"
+                      placeholder="Optional note"
+                      value="${escapeHtml(task.notes || '')}"
+                      ${disabled}>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="btn-row" style="padding:12px">
+              <button class="mini-btn green" type="button" onclick="saveMyEvaluatorTask(${taskId})" ${disabled}>
+                Save My Mark
+              </button>
+            </div>
+          </div>`;
+      }
+
+      const savedByStudent = new Map((task.student_marks || []).map(m => [Number(m.student_id), m]));
+      const body = rows.map(student => {
+        const studentId = Number(student.student_id);
+        const saved = savedByStudent.get(studentId) || {};
+        const value = saved.mark === null || saved.mark === undefined ? '' : Number(saved.mark).toFixed(2);
+        return `
+          <tr>
+            <td>
+              <b>${escapeHtml(student.student_name || 'Student')}</b>
+              <div class="student-muted">${escapeHtml(student.university_id || student.email || '')}</div>
+            </td>
+            <td>${absenceCell(student.absence_count)}</td>
+            <td>
+              <input
+                class="student-score-input my-task-input"
+                id="my-task-${taskId}-${studentId}"
+                type="number"
+                min="0"
+                max="${escapeHtml(task.max_mark || 0)}"
+                step="0.01"
+                value="${escapeHtml(value)}"
+                placeholder="0 - ${escapeHtml(task.max_mark || 0)}"
+                ${disabled}>
+            </td>
+            <td>
+              <input
+                class="student-score-note"
+                id="my-task-note-${taskId}-${studentId}"
+                placeholder="Optional note"
+                value="${escapeHtml(saved.notes || '')}"
+                ${disabled}>
+            </td>
+          </tr>`;
+      }).join('');
+
+      return `
+        <div class="student-score-box">
+          <div class="student-score-head">
+            <span>My assigned marks - ${escapeHtml(title)}</span>
+            <span>${submitted}</span>
+          </div>
+          <table class="student-score-table">
+            <thead><tr><th>Student</th><th>Absences</th><th>Mark /${money(task.max_mark)}</th><th>Note</th></tr></thead>
+            <tbody>${body || '<tr><td colspan="4">No students found for this item.</td></tr>'}</tbody>
+          </table>
+          <div class="btn-row" style="padding:12px">
+            <button class="mini-btn green" type="button" onclick="saveMyEvaluatorTask(${taskId})" ${disabled}>
+              Save My Marks
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
   function studentScoreTable(p, ready) {
     const rows = p.student_scores || [];
     const disabled = ready ? '' : 'disabled';
@@ -934,10 +1233,37 @@
       : '<span class="pill p-pending">Waiting students</span>';
   }
 
+  function gradeCompleteForProject(grade, project) {
+    if (!Number(grade.is_submitted)) return false;
+    if (grade.mark !== null && grade.mark !== undefined) return true;
+    if (Number(grade.shared_mark)) return false;
+
+    const expectedIds = (project.student_scores || []).map(s => Number(s.student_id)).filter(Number.isFinite);
+    const submittedIds = new Set((grade.student_marks || [])
+      .filter(m => Number(m.is_submitted) && m.mark !== null && m.mark !== undefined)
+      .map(m => Number(m.student_id)));
+
+    return expectedIds.length
+      ? expectedIds.every(id => submittedIds.has(id))
+      : submittedIds.size > 0;
+  }
+
+  function missingGradesBox(project) {
+    const missing = (project.grades || []).filter(grade => !gradeCompleteForProject(grade, project));
+    if (!missing.length) return '';
+
+    return `
+      <div class="workflow-box" style="border-color:#fecdca;background:var(--coral-light);color:#912018">
+        <b>Cannot calculate yet:</b>
+        ${missing.map(grade => `${escapeHtml(grade.evaluator_name || 'Evaluator')} - ${escapeHtml(componentName(grade.component))}`).join(', ')}
+      </div>`;
+  }
+
 
   function projectCard(p) {
     const ready = isReadyToSend(p);
     const coordinatorMarkBox = currentScope === 'introduction' ? coordinatorStudentMarkBox(p) : '';
+    const myTaskBox = myEvaluatorTaskBox(p);
     return `<div class="eval-card" id="project-${p.project_id}">
     <div class="eval-card-head">
       <div>
@@ -951,7 +1277,9 @@
     </div>
     <div class="eval-grid">${scoreCards(p)}</div>
     ${coordinatorMarkBox}
+    ${myTaskBox}
     ${studentScoreTable(p, ready)}
+    ${missingGradesBox(p)}
     <textarea class="notes-input" id="notes-${p.project_id}" placeholder="Notes to supervisor..."></textarea>
     <div class="btn-row">
       <button class="mini-btn green" onclick="openWindow(${p.project_id})">Open Grade Entry + Notify Doctors</button>
@@ -1036,6 +1364,118 @@
         })
       });
       toastMsg(d.message || 'Coordinator marks saved successfully.');
+      await loadProjects();
+    } catch (e) {
+      toastMsg(e.message, false);
+    }
+  }
+
+  async function sendAllToSupervisors() {
+    const ready = allProjects.filter(isReadyToSend);
+    if (!ready.length) {
+      toastMsg('No calculated items are ready to send.', false);
+      return;
+    }
+
+    const supervisorCount = new Set(
+      ready.map(p => p.supervisor_name || 'Supervisor').filter(Boolean)
+    ).size;
+    const confirmed = await showEvalConfirm({
+      kicker: 'Supervisor delivery',
+      title: 'Send ready results?',
+      message: 'Each calculated group will be sent to its assigned supervisor for review.',
+      meta: `${ready.length} ready item(s) across ${supervisorCount} supervisor(s).`,
+      confirmText: 'Send All',
+      variant: 'blue'
+    });
+    if (!confirmed) return;
+
+    try {
+      const data = await api('/api/coordinator/evaluation/send-all-to-supervisors', {
+        method: 'POST',
+        body: JSON.stringify({ course_scope: currentScope })
+      });
+      toastMsg(data.message || 'Ready results were sent to supervisors.');
+      await loadProjects();
+    } catch (e) {
+      toastMsg(e.message, false);
+    }
+  }
+
+  function findMyEvaluatorTask(taskId) {
+    for (const project of allProjects) {
+      const task = (project.grades || []).find(g => Number(g.task_id) === Number(taskId));
+      if (task) return { project, task };
+    }
+    return null;
+  }
+
+  async function saveMyEvaluatorTask(taskId) {
+    const found = findMyEvaluatorTask(taskId);
+    if (!found) {
+      toastMsg('Evaluation task was not found. Refresh the page.', false);
+      return;
+    }
+
+    const { project, task } = found;
+    const maxMark = Number(task.max_mark || 0);
+    const payload = { task_id: taskId };
+
+    if (Number(task.shared_mark)) {
+      const input = document.getElementById(`my-task-shared-${taskId}`);
+      const noteInput = document.getElementById(`my-task-note-${taskId}`);
+      const rawValue = String(input ? input.value : '').trim();
+      if (rawValue === '') {
+        toastMsg('Please enter your shared report mark.', false);
+        if (input) input.focus();
+        return;
+      }
+      const mark = Number(rawValue);
+      if (Number.isNaN(mark) || mark < 0 || mark > maxMark) {
+        toastMsg(`Mark must be between 0 and ${maxMark}.`, false);
+        if (input) input.focus();
+        return;
+      }
+      payload.mark = mark;
+      payload.notes = noteInput ? noteInput.value.trim() : '';
+    } else {
+      const rows = project.student_scores || [];
+      if (!rows.length) {
+        toastMsg('No students found for this item.', false);
+        return;
+      }
+
+      payload.marks = [];
+      for (const student of rows) {
+        const studentId = Number(student.student_id);
+        const input = document.getElementById(`my-task-${taskId}-${studentId}`);
+        const noteInput = document.getElementById(`my-task-note-${taskId}-${studentId}`);
+        const rawValue = String(input ? input.value : '').trim();
+        if (rawValue === '') {
+          toastMsg('Please enter your mark for every student.', false);
+          if (input) input.focus();
+          return;
+        }
+        const mark = Number(rawValue);
+        if (Number.isNaN(mark) || mark < 0 || mark > maxMark) {
+          toastMsg(`Marks must be between 0 and ${maxMark}.`, false);
+          if (input) input.focus();
+          return;
+        }
+        payload.marks.push({
+          student_id: studentId,
+          mark,
+          notes: noteInput ? noteInput.value.trim() : ''
+        });
+      }
+    }
+
+    try {
+      const d = await api('/api/coordinator/evaluation/my-task-marks', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      toastMsg(d.message || 'Your marks were saved successfully.');
       await loadProjects();
     } catch (e) {
       toastMsg(e.message, false);

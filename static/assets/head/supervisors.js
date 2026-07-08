@@ -140,10 +140,15 @@ async function addSupervisor() {
   const btn   = document.getElementById('add-btn');
   const errEl = document.getElementById('add-error');
   errEl.textContent = '';
+  errEl.style.color = 'var(--red,#dc2626)';
 
   const name  = document.getElementById('add-name').value.trim();
   const uid   = document.getElementById('add-uid').value.trim();
-  const spec  = document.getElementById('add-spec').value.trim();
+  const spec  = (typeof getSpecValue === 'function'
+    ? getSpecValue()
+    : document.getElementById('add-spec').value
+  ).trim();
+  const specCustom = typeof getSpecCustom === 'function' ? getSpecCustom() : '';
 
   if (!name || !uid) {
     errEl.textContent = 'Full name and university ID are required.'; return;
@@ -159,15 +164,29 @@ async function addSupervisor() {
     const res  = await fetch('/head/supervisors-api/add', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ full_name: name, university_id: uid, specialization: spec })
+      body:    JSON.stringify({
+        full_name: name,
+        university_id: uid,
+        specialization: spec,
+        spec_custom: specCustom
+      })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed');
 
+    if (data.already_exists) {
+      errEl.style.color = 'var(--amber,#d97706)';
+      errEl.textContent = data.message || 'This supervisor already exists.';
+      showToast(data.message || 'This supervisor already exists.', 'info');
+      return;
+    }
+
     showToast('Supervisor added! They can activate at /activate', 'success');
-    ['add-name','add-uid','add-spec'].forEach(id =>
+    ['add-name','add-uid','add-spec','add-spec-other'].forEach(id =>
       document.getElementById(id).value = ''
     );
+    if (typeof toggleOtherSpec === 'function') toggleOtherSpec('');
+    if (typeof updateSpecSelectStyle === 'function') updateSpecSelectStyle();
     loadSupervisors();
 
   } catch (err) {

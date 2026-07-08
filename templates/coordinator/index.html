@@ -214,7 +214,7 @@ async function loadDashboard() {
     setEl('statEvaluation', s.under_evaluation ?? 0);
     setEl('statStudents', s.active_students ?? 0);
     setEl('miniAccepted', s.accepted ?? 0);
-    setEl('miniSections', s.total_sections ?? 0);
+    setEl('miniSections', s.visible_groups ?? s.total_sections ?? 0);
     setEl('miniRejected', s.rejected ?? 0);
     setEl('miniCommittees', s.committees ?? 0);
     const semTxt = sem.academic_year ? sem.academic_year + ' · S' + (sem.semester_number||'') : '—';
@@ -246,7 +246,7 @@ function renderTypeChart(abt) {
 function renderWorkflow(s) {
   const el = document.getElementById('workflowBars');
   if (!el) return;
-  const total = Math.max(s.total_projects||1, 1);
+  const total = Math.max(s.workflow_total || s.visible_groups || s.total_sections || s.total_projects || 1, 1);
   const dark = isDark();
   const items = [
     { label:'Under evaluation', val:s.under_evaluation||0, color: dark ? '#a78bfa' : '#7c3aed' },

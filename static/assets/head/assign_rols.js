@@ -44,13 +44,19 @@ function renderAcademicYears(preferredYear) {
 
   years.forEach(year => {
     const option = document.createElement('option');
-    option.value = year.academic_year;
-    option.textContent = year.academic_year + (year.is_new ? ' (new)' : '');
-    if (preferredYear ? year.academic_year === preferredYear : year.is_active) option.selected = true;
+    option.value = year.term_key || `${year.academic_year}|${year.semester_number || 1}`;
+    const labels = [];
+    if (year.is_active) labels.push('active');
+    if (year.is_new) labels.push('new');
+    option.textContent = `${year.academic_year} · S${year.semester_number || 1}` + (labels.length ? ` (${labels.join(', ')})` : '');
+    if (preferredYear ? option.value === preferredYear : year.is_active) option.selected = true;
     select.appendChild(option);
   });
 
-  if (!select.value) select.value = years[0].academic_year;
+  if (!select.value) {
+    const first = years[0];
+    select.value = first.term_key || `${first.academic_year}|${first.semester_number || 1}`;
+  }
   select.onchange = renderSelectedYear;
 }
 
@@ -67,10 +73,10 @@ function renderDoctorSelect() {
 }
 
 function renderSelectedYear() {
-  const year = document.getElementById('semesterSelect').value;
-  const coordinator = assignState.coordinatorsByYear[year] || null;
+  const term = selectedTerm();
+  const coordinator = assignState.coordinatorsByYear[term.key] || null;
   updateCoordinatorUI(coordinator);
-  renderDoctorList(year, coordinator);
+  renderDoctorList(term.key, coordinator);
 
   const select = document.getElementById('doctorSelect');
   select.value = coordinator && coordinator.faculty_id ? String(coordinator.faculty_id) : '';
@@ -143,9 +149,9 @@ function assignCoordinator(facultyId) {
     return;
   }
 
-  const academicYear = document.getElementById('semesterSelect').value;
-  if (!academicYear) {
-    showToast('Please select an academic year.', 'error');
+  const term = selectedTerm();
+  if (!term.academicYear || !term.semesterNumber) {
+    showToast('Please select an academic semester.', 'error');
     return;
   }
 
@@ -162,7 +168,8 @@ function assignCoordinator(facultyId) {
 
   const body = new URLSearchParams({
     faculty_id: facultyId,
-    academic_year: academicYear,
+    academic_year: term.academicYear,
+    semester_number: String(term.semesterNumber),
     notes,
   });
 
@@ -178,10 +185,58 @@ function assignCoordinator(facultyId) {
         return;
       }
       showToast('Coordinator assigned successfully.', 'success');
-      return loadAssignCoordinatorPage(academicYear);
+      return loadAssignCoordinatorPage(term.key);
     })
     .catch(() => showToast('Something went wrong.', 'error'))
     .finally(resetBtn);
+}
+
+async function activateAcademicYear() {
+  const term = selectedTerm();
+  const btn = document.getElementById('activateAcademicYearBtn');
+
+  if (!term.academicYear || !term.semesterNumber) {
+    showToast('Please select an academic semester.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Activating...';
+
+  try {
+    const res = await fetch(API_BASE + '/api/academic-years/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        academic_year: term.academicYear,
+        semester_number: term.semesterNumber,
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showToast(data.error || 'Could not activate academic year.', 'error');
+      return;
+    }
+
+    showToast(`${data.academic_year} · S${data.semester_number} is now active.`, 'success');
+    await loadAssignCoordinatorPage(data.term_key);
+  } catch (err) {
+    showToast('Something went wrong.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Set Active';
+  }
+}
+
+function selectedTerm() {
+  const raw = document.getElementById('semesterSelect').value || '';
+  const parts = raw.split('|');
+  return {
+    key: raw,
+    academicYear: parts[0] || '',
+    semesterNumber: Number(parts[1] || 1),
+  };
 }
 
 function updateCoordinatorUI(coordinator) {
@@ -241,6 +296,7 @@ function openAcademicYearModal() {
   modal.style.display = 'flex';
   document.getElementById('academicYearStart').value = '';
   document.getElementById('academicYearEnd').value = '';
+  document.getElementById('semesterNumber').value = '1';
   document.getElementById('semesterStart').value = '';
   document.getElementById('semesterEnd').value = '';
   document.getElementById('setActiveYear').checked = false;
@@ -264,6 +320,7 @@ async function createAcademicYear() {
 
   const payload = {
     academic_year: academicYear,
+    semester_number: Number(document.getElementById('semesterNumber').value || 1),
     semester_start: document.getElementById('semesterStart').value,
     semester_end: document.getElementById('semesterEnd').value,
     set_active: document.getElementById('setActiveYear').checked,
@@ -286,8 +343,8 @@ async function createAcademicYear() {
     }
 
     closeAcademicYearModal();
-    showToast(`Academic year ${data.academic_year} created successfully.`, 'success');
-    await loadAssignCoordinatorPage(data.academic_year);
+    showToast(`${data.academic_year} · S${data.semester_number} created successfully.`, 'success');
+    await loadAssignCoordinatorPage(data.term_key);
 
   } catch (err) {
     errorEl.textContent = 'Something went wrong.';

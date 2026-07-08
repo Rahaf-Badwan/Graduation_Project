@@ -6,6 +6,7 @@ from routes.appCoordinator import (
     _evaluation_fetch_grade_rows,
     _evaluation_grade_completion,
     _evaluation_ready_for_calculation,
+    _repair_evaluation_result_memberships,
     _evaluation_window_for_item,
 )
 
@@ -32,6 +33,7 @@ def api_supervisor_my_grades():
         db.close()
         return jsonify({"grades": []})
     faculty_id = faculty['faculty_id']
+    _repair_evaluation_result_memberships(cursor, updated_by=user_id)
 
     cursor.execute("""
         SELECT
@@ -87,6 +89,7 @@ def api_supervisor_my_grades():
     """, (faculty_id,))
     grades.extend(cursor.fetchall())
     grades.sort(key=lambda row: row.get("project_title") or "")
+    db.commit()
     cursor.close()
     db.close()
     return jsonify({"grades": grades})

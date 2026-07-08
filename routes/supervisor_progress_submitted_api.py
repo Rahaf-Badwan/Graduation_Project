@@ -44,6 +44,21 @@ def _column_exists(cursor, table_name, column_name):
     return int(row.get("cnt") or 0) > 0
 
 
+def _ensure_milestone_storage_columns(cursor):
+    if not _table_exists(cursor, "milestone_submissions"):
+        return
+    try:
+        cursor.execute(
+            "ALTER TABLE milestone_submissions MODIFY COLUMN file_data LONGBLOB NULL"
+        )
+    except Exception:
+        pass
+    if not _column_exists(cursor, "milestone_submissions", "file_path"):
+        cursor.execute(
+            "ALTER TABLE milestone_submissions ADD COLUMN file_path VARCHAR(600) NULL"
+        )
+
+
 def _ensure_progress_tables(cursor):
     cursor.execute(
         """
@@ -972,6 +987,7 @@ def api_supervisor_submitted_files():
             and _table_exists(cursor, "comp4200_timeline_items")
             and _table_exists(cursor, "comp4200_timelines")
         ):
+            _ensure_milestone_storage_columns(cursor)
             duplicate_project_report_filter = ""
             if _table_exists(cursor, "project_files"):
                 duplicate_project_report_filter = """
@@ -1001,6 +1017,7 @@ def api_supervisor_submitted_files():
                     ms.submission_id,
                     ms.project_id,
                     ms.file_name,
+                    ms.file_path,
                     ms.file_mime,
                     ms.file_size_mb,
                     ms.submitted_at,
@@ -1030,7 +1047,7 @@ def api_supervisor_submitted_files():
                   AND ms.submitted_to IN ('supervisor', 'both')
                   {duplicate_project_report_filter}
                 GROUP BY
-                    ms.submission_id, ms.project_id, ms.file_name, ms.file_mime,
+                    ms.submission_id, ms.project_id, ms.file_name, ms.file_path, ms.file_mime,
                     ms.file_size_mb, ms.submitted_at, ti.title, ti.milestone_label,
                     p.title, p.status, s.course_code, u_student.full_name, sup_user.full_name
                 ORDER BY ms.submitted_at DESC, ms.submission_id DESC
@@ -1056,6 +1073,7 @@ def api_supervisor_submitted_files():
                         "team_members": row.get("team_members") or "",
                         "submitted_by": row.get("submitted_by") or "Unknown student",
                         "file_name": row.get("file_name") or "Open file",
+                        "file_path": row.get("file_path") or "",
                         "file_size_mb": float(row.get("file_size_mb") or 0),
                         "uploaded_at": _format_submission_datetime(uploaded_at),
                         "sort_at": uploaded_at,
@@ -1115,12 +1133,13 @@ def api_supervisor_download_milestone_submission(submission_id):
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
+        _ensure_milestone_storage_columns(cursor)
         faculty_id = _current_supervisor_faculty_id(cursor)
         access_filter = _submission_access_filter(cursor)
         params = (submission_id,) + _project_access_params(cursor, faculty_id)
         cursor.execute(
             f"""
-            SELECT ms.file_name, ms.file_data, ms.file_mime
+            SELECT ms.file_name, ms.file_path, ms.file_data, ms.file_mime
             FROM milestone_submissions ms
             JOIN projects p ON p.project_id = ms.project_id
             LEFT JOIN semesters s ON s.semester_id = p.semester_id

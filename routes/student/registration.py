@@ -224,6 +224,16 @@ def api_student_distribution_window_status():
 @login_required(role="student")
 def api_student_distribution_submit():
     data = request.get_json(silent=True) or {}
+
+    def distribution_notice(message, **extra):
+        payload = {
+            "ok": False,
+            "message": message,
+            "needs_attention": True,
+        }
+        payload.update(extra)
+        return jsonify(payload), 200
+
     is_solo = bool(data.get("solo"))
     title = (data.get("title") or "").strip() or ("Solo Registration" if is_solo else "")
     group_name = (data.get("group_name") or "").strip()
@@ -240,9 +250,9 @@ def api_student_distribution_submit():
         member_ids.insert(0, user_uid)
 
     if not title:
-        return jsonify({"error": "Project title is required."}), 400
+        return distribution_notice("Project title is required.")
     if not member_ids:
-        return jsonify({"error": "At least one team member is required."}), 400
+        return distribution_notice("At least one team member is required.")
 
     try:
         db = get_db()
@@ -252,19 +262,14 @@ def api_student_distribution_submit():
         if not semester:
             cursor.close()
             db.close()
-            return jsonify({"error": "No active semester is configured."}), 400
+            return distribution_notice("No active semester is configured.")
 
         course_context = _student_course_context(cursor, user_id)
         if course_context.get("target_course") != "COMP4200":
             cursor.close()
             db.close()
-            return (
-                jsonify(
-                    {
-                        "error": "COMP4300 students are already registered through their COMP4200 team and cannot use this registration window."
-                    }
-                ),
-                403,
+            return distribution_notice(
+                "COMP4300 students are already registered through their COMP4200 team and cannot use this registration window."
             )
 
         is_open = int(semester.get("distribution_open") or 0) == 1
@@ -276,7 +281,7 @@ def api_student_distribution_submit():
         if not is_open:
             cursor.close()
             db.close()
-            return jsonify({"error": "Student distribution is currently closed."}), 403
+            return distribution_notice("Student distribution is currently closed.")
 
         for uid in member_ids:
             cursor.execute(
@@ -294,36 +299,19 @@ def api_student_distribution_submit():
             if not member_row:
                 cursor.close()
                 db.close()
-                return (
-                    jsonify(
-                        {
-                            "error": f"Student {uid} was not found."
-                        }
-                    ),
-                    400,
-                )
+                return distribution_notice(f"Student {uid} was not found.")
             if not member_row.get("is_active"):
                 cursor.close()
                 db.close()
-                return (
-                    jsonify(
-                        {
-                            "error": f"Student {uid} cannot be added because their account is inactive."
-                        }
-                    ),
-                    400,
+                return distribution_notice(
+                    f"Student {uid} cannot be added because their account is inactive."
                 )
             member_context = _student_course_context(cursor, member_row["user_id"])
             if member_context.get("target_course") != "COMP4200":
                 cursor.close()
                 db.close()
-                return (
-                    jsonify(
-                        {
-                            "error": f"Student {uid} is not eligible for COMP4200 registration."
-                        }
-                    ),
-                    400,
+                return distribution_notice(
+                    f"Student {uid} is not eligible for COMP4200 registration."
                 )
 
         # Duplicate check
@@ -346,14 +334,9 @@ def api_student_distribution_submit():
             if dup:
                 cursor.close()
                 db.close()
-                return (
-                    jsonify(
-                        {
-                            "already_registered": True,
-                            "error": f"Student {uid} is already registered (Project: \"{dup['title']}\").",
-                        }
-                    ),
-                    409,
+                return distribution_notice(
+                    f"Student {uid} is already registered (Project: \"{dup['title']}\").",
+                    already_registered=True,
                 )
 
         pref_ids = [int(x) for x in preferred[:3] if str(x).strip().isdigit()]
@@ -426,6 +409,13 @@ def api_student_distribution_submit():
                 )
 
         if registered_student_ids and _table_exists_student(cursor, "student_course_results"):
+            if not _db_column_exists_student(cursor, "student_course_results", "final_score"):
+                cursor.execute(
+                    """
+                    ALTER TABLE student_course_results
+                    ADD COLUMN final_score DECIMAL(6,2) NULL AFTER status
+                    """
+                )
             placeholders = ", ".join(["%s"] * len(registered_student_ids))
             cursor.execute(
                 f"""
@@ -435,9 +425,24 @@ def api_student_distribution_submit():
                 FROM students st
                 WHERE st.student_id IN ({placeholders})
                 ON DUPLICATE KEY UPDATE
-                    status = IF(student_course_results.promoted_at IS NULL, 'pending', student_course_results.status),
-                    updated_by = IF(student_course_results.promoted_at IS NULL, VALUES(updated_by), student_course_results.updated_by),
-                    notes = IF(student_course_results.promoted_at IS NULL, NULL, student_course_results.notes),
+                    status = IF(
+                        student_course_results.promoted_at IS NULL
+                        AND student_course_results.final_score IS NULL,
+                        'pending',
+                        student_course_results.status
+                    ),
+                    updated_by = IF(
+                        student_course_results.promoted_at IS NULL
+                        AND student_course_results.final_score IS NULL,
+                        VALUES(updated_by),
+                        student_course_results.updated_by
+                    ),
+                    notes = IF(
+                        student_course_results.promoted_at IS NULL
+                        AND student_course_results.final_score IS NULL,
+                        NULL,
+                        student_course_results.notes
+                    ),
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (semester["semester_id"], user_id, *registered_student_ids),
@@ -462,6 +467,7 @@ def api_student_distribution_submit():
         db.close()
         return jsonify(
             {
+                "ok": True,
                 "message": "Project proposal submitted successfully.",
                 "project_id": project_id,
             }

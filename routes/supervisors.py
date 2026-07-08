@@ -55,7 +55,31 @@ def _current_supervisor_semesters(cursor):
         ORDER BY semester_id DESC
     """)
     semesters = cursor.fetchall()
-    return _project_year_semesters(cursor, semesters) if semesters else []
+    if semesters:
+        return _project_year_semesters(cursor, semesters)
+
+    return _latest_project_year_semesters(cursor)
+
+
+def _latest_project_year_semesters(cursor):
+    cursor.execute("""
+        SELECT sem.semester_id, sem.academic_year, sem.semester_number, sem.course_code
+        FROM projects p
+        JOIN semesters sem ON sem.semester_id = p.semester_id
+        WHERE sem.academic_year IS NOT NULL
+          AND sem.course_code IN ('COMP4200', 'COMP4300')
+          AND LOWER(COALESCE(p.status, '')) NOT IN (
+                'archived', 'archive', 'draft', 'cancelled', 'rejected',
+                'promoted', 'search', 'search_only', 'imported_archive',
+                'solo_pending'
+          )
+          AND COALESCE(p.title, '') NOT LIKE 'Committee Demo%%'
+          AND COALESCE(p.title, '') NOT LIKE 'COMP4300 Graduation Project%%'
+        ORDER BY sem.start_date DESC, sem.semester_id DESC
+        LIMIT 1
+    """)
+    latest = cursor.fetchone()
+    return _project_year_semesters(cursor, [latest]) if latest else []
 
 
 def _project_year_semesters(cursor, anchor_semesters):
@@ -294,7 +318,10 @@ def api_add_supervisor():
         """, (university_id, email))
         if cursor.fetchone():
             cursor.close(); db.close()
-            return jsonify({'error': 'A user with this ID or email already exists.'}), 409
+            return jsonify({
+                'message': 'A user with this ID or email already exists.',
+                'already_exists': True,
+            }), 200
 
         cursor.execute("""
             INSERT INTO users

@@ -32,20 +32,9 @@ def api_student_topbar_info():
             return jsonify({"course_code": "COMP4200", "academic_year": ""})
         student_id = st["student_id"]
 
-        # Determine course (COMP4200 or COMP4300)
-        cursor.execute(
-            """
-            SELECT scr.status AS course_status,
-                   scr.promoted_to_semester_id,
-                   scr.promoted_at
-            FROM   student_course_results scr
-            JOIN   semesters s ON s.semester_id = scr.semester_id
-            WHERE  scr.student_id = %s AND s.course_code = 'COMP4200'
-            ORDER  BY scr.semester_id DESC LIMIT 1
-            """,
-            (student_id,),
-        )
-        r = cursor.fetchone()
+        # Determine course (COMP4200 or COMP4300) without letting a moved
+        # section's newer pending row override a passed promotion.
+        r = _student_latest_comp4200_result(cursor, student_id)
         is_promoted = bool(
             (r or {}).get("promoted_to_semester_id") or (r or {}).get("promoted_at")
         )
@@ -56,6 +45,18 @@ def api_student_topbar_info():
         )
 
         sem = _student_semester_for_course(cursor, course_code)
+        promoted_to = (r or {}).get("promoted_to_semester_id")
+        if course_code == "COMP4300" and promoted_to:
+            cursor.execute(
+                """
+                SELECT semester_id, academic_year, course_code
+                FROM semesters
+                WHERE semester_id = %s AND course_code = 'COMP4300'
+                LIMIT 1
+                """,
+                (promoted_to,),
+            )
+            sem = cursor.fetchone() or sem
         academic_year = (sem or {}).get("academic_year") or ""
 
         cursor.close()

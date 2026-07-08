@@ -63,9 +63,11 @@ def api_student_feedback():
             FROM feedback f
             JOIN projects p ON p.project_id = f.project_id
             JOIN semesters sem ON sem.semester_id = p.semester_id
+            JOIN faculty supervisor_faculty ON supervisor_faculty.faculty_id = p.supervisor_id
             JOIN users reviewer ON reviewer.user_id = f.reviewer_id
             WHERE f.project_id IN ({placeholders})
               AND COALESCE(f.is_draft, FALSE) = FALSE
+              AND reviewer.user_id = supervisor_faculty.user_id
             ORDER BY f.created_at DESC, f.feedback_id DESC
             """,
             tuple(project_ids),
