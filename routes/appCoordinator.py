@@ -1117,7 +1117,7 @@ def api_coordinator_dashboard_data():
             f"""
             SELECT p.project_id, p.title, p.status, p.submission_date,
                    sup.full_name AS supervisor_name,
-                   COALESCE(GROUP_CONCAT(DISTINCT stu.full_name ORDER BY pm.is_primary_contact DESC, stu.full_name SEPARATOR ', '), '') AS team_members
+                   COALESCE(GROUP_CONCAT(stu.full_name ORDER BY pm.is_primary_contact DESC, stu.full_name SEPARATOR ', '), '') AS team_members
             FROM projects p
             JOIN semesters s ON s.semester_id = p.semester_id
             LEFT JOIN faculty sf ON sf.faculty_id = p.supervisor_id
@@ -2682,7 +2682,7 @@ def api_coordinator_submission_files():
                        sup_u.full_name AS supervisor_name,
                        (
                            SELECT GROUP_CONCAT(
-                               DISTINCT tm_u.full_name
+                               tm_u.full_name
                                ORDER BY tm_pm.is_primary_contact DESC, tm_u.full_name
                                SEPARATOR ', '
                            )
@@ -2760,7 +2760,7 @@ def api_coordinator_submission_files():
                        sup_u.full_name AS supervisor_name,
                        (
                            SELECT GROUP_CONCAT(
-                               DISTINCT tm_u.full_name
+                               tm_u.full_name
                                ORDER BY tm_pm.is_primary_contact DESC, tm_u.full_name
                                SEPARATOR ', '
                            )
@@ -4744,7 +4744,7 @@ def api_coordinator_distribution_data():
                    pref3.full_name AS preferred_3,
                    u_sup.full_name AS final_supervisor,
                    COALESCE(
-                       GROUP_CONCAT(DISTINCT u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
+                       GROUP_CONCAT(u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
                        ''
                    ) AS team_members,
                    COUNT(DISTINCT pm.student_id) AS member_count
@@ -5489,7 +5489,7 @@ def _notify_heads_section_success_request(cursor, course_scope, project_id, coor
             {group_name_expr} AS group_name,
             COALESCE(NULLIF(p.title, ''), {group_name_expr}) AS project_title,
             COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
-            GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', ') AS students
+            GROUP_CONCAT(u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', ') AS students
         FROM projects p
         JOIN semesters sem ON sem.semester_id = p.semester_id
         JOIN project_members pm ON pm.project_id = p.project_id
@@ -6420,7 +6420,7 @@ def api_coordinator_section_results():
                    p.title AS project_title,
                    'introduction' AS course_scope,
                    COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
-                   COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
+                   COALESCE(GROUP_CONCAT(u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
                    COUNT(DISTINCT pm.student_id) AS student_count,
                    p.status AS project_status,
                    scs.status AS result_status,
@@ -6465,7 +6465,7 @@ def api_coordinator_section_results():
                    p.title AS project_title,
                    'graduation_project' AS course_scope,
                    COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name,
-                   COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
+                   COALESCE(GROUP_CONCAT(u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students,
                    COUNT(DISTINCT pm.student_id) AS student_count,
                    p.status AS project_status,
                    scs.status AS result_status,
@@ -7104,14 +7104,15 @@ def api_review_projects():
         # لو جدول الملفات مش موجود، خلي files_count = 0
         has_project_files = _table_exists(cursor, "project_files")
 
-        files_join = """
-            LEFT JOIN project_files pf
-              ON pf.project_id = p.project_id
-             AND COALESCE(CONVERT(pf.upload_status USING utf8mb4) COLLATE utf8mb4_unicode_ci, 'uploaded' COLLATE utf8mb4_unicode_ci) = 'uploaded' COLLATE utf8mb4_unicode_ci
-        """ if has_project_files else ""
-
         files_count_select = (
-            "COUNT(DISTINCT pf.file_id) AS files_count"
+            """
+            (
+                SELECT COUNT(DISTINCT pf.file_id)
+                FROM project_files pf
+                WHERE pf.project_id = p.project_id
+                  AND COALESCE(CONVERT(pf.upload_status USING utf8mb4) COLLATE utf8mb4_unicode_ci, 'uploaded' COLLATE utf8mb4_unicode_ci) = 'uploaded' COLLATE utf8mb4_unicode_ci
+            ) AS files_count
+            """
             if has_project_files
             else "0 AS files_count"
         )
@@ -7131,7 +7132,7 @@ def api_review_projects():
                 sup.full_name AS supervisor_name,
                 COALESCE(
                     GROUP_CONCAT(
-                        DISTINCT stu.full_name
+                        stu.full_name
                         ORDER BY pm.is_primary_contact DESC, stu.full_name
                         SEPARATOR ', '
                     ),
@@ -7144,7 +7145,6 @@ def api_review_projects():
             LEFT JOIN project_members pm ON pm.project_id = p.project_id
             LEFT JOIN students st ON st.student_id = pm.student_id
             LEFT JOIN users stu ON stu.user_id = st.user_id
-            {files_join}
             WHERE p.semester_id = %s
               AND p.status IN (
                   'submitted',
@@ -8428,7 +8428,7 @@ def _committee_fetch_eligible_projects(
             sup_f.specialization AS supervisor_specialization,
             'graduation_project' AS course_scope,
             COALESCE(
-                GROUP_CONCAT(DISTINCT u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
+                GROUP_CONCAT(u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
                 ''
             ) AS team_members
         FROM projects p
@@ -8562,6 +8562,7 @@ def _committee_fetch_plan_rows(cursor):
         LEFT JOIN committee_plan_sections cps ON cps.plan_id = cp.plan_id
         GROUP BY cp.plan_id, cp.committee_name, cp.course_scope, cp.discussion_date, cp.start_time, cp.end_time,
                  cp.status, cp.responsible_faculty_id, dr.room_name, ru.full_name
+        HAVING projects_count > 0
         ORDER BY cp.discussion_date DESC, cp.start_time ASC, cp.plan_id DESC
         """)
     return cursor.fetchall()
@@ -9187,7 +9188,7 @@ def _committee_fetch_projects_for_plan(cursor, plan_id):
             sup_u.full_name AS supervisor_name,
             'graduation_project' AS course_scope,
             COALESCE(
-                GROUP_CONCAT(DISTINCT u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
+                GROUP_CONCAT(u.full_name ORDER BY pm.is_primary_contact DESC, u.full_name SEPARATOR ', '),
                 ''
             ) AS team_members,
             r1.faculty_id AS reader1_id,
@@ -9292,7 +9293,18 @@ def _committee_dashboard_payload(cursor):
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS ongoing_count,
             SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_count,
             0 AS average_score
-        FROM committee_plans
+        FROM committee_plans cp
+        WHERE (
+            COALESCE(cp.course_scope, 'graduation_project') = 'introduction'
+            AND EXISTS (
+                SELECT 1 FROM committee_plan_sections cps WHERE cps.plan_id = cp.plan_id
+            )
+        ) OR (
+            COALESCE(cp.course_scope, 'graduation_project') = 'graduation_project'
+            AND EXISTS (
+                SELECT 1 FROM committee_plan_projects cpp WHERE cpp.plan_id = cp.plan_id
+            )
+        )
         """)
     stat_row = cursor.fetchone() or {}
 
@@ -10222,7 +10234,7 @@ def api_coordinator_add_student_to_group():
                    COALESCE(u_sup.full_name, 'Not assigned yet') AS supervisor_name,
                    COALESCE(
                        GROUP_CONCAT(
-                           DISTINCT u_student.full_name
+                           u_student.full_name
                            ORDER BY pm.is_primary_contact DESC, u_student.full_name
                            SEPARATOR ', '
                        ),
@@ -11660,7 +11672,7 @@ def _evaluation_item_students(cursor, course_scope, reference_id):
             return []
         cursor.execute(
             """
-            SELECT DISTINCT
+            SELECT
                 st.student_id,
                 u.user_id,
                 u.full_name AS student_name,
@@ -12662,7 +12674,7 @@ def api_coordinator_committee_schedule_export():
                     COALESCE(resp_u.full_name, '') AS responsible_name,
                     p.title AS item_title,
                     COALESCE(sup_u.full_name, '') AS supervisor_name,
-                    COALESCE(GROUP_CONCAT(DISTINCT stu_u.full_name ORDER BY pm.is_primary_contact DESC, stu_u.full_name SEPARATOR ', '), '') AS students,
+                    COALESCE(GROUP_CONCAT(stu_u.full_name ORDER BY pm.is_primary_contact DESC, stu_u.full_name SEPARATOR ', '), '') AS students,
                     COALESCE(r1_u.full_name, '') AS reader1_name,
                     COALESCE(r2_u.full_name, '') AS reader2_name,
                     COALESCE((
@@ -12821,7 +12833,7 @@ def api_coordinator_evaluation_projects():
                         cp.responsible_faculty_id,
                         resp_u.full_name AS responsible_name,
                         u_sup.full_name AS supervisor_name,
-                        COALESCE(GROUP_CONCAT(DISTINCT u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students
+                        COALESCE(GROUP_CONCAT(u_st.full_name ORDER BY pm.is_primary_contact DESC, u_st.full_name SEPARATOR ', '), '') AS students
                     FROM committee_plan_projects cpp
                     JOIN committee_plans cp ON cp.plan_id = cpp.plan_id
                     JOIN projects p ON p.project_id = cpp.project_id
@@ -14084,6 +14096,10 @@ def api_coordinator_evaluation_finalize():
         return jsonify({"error": "project_id/reference_id is required."}), 400
     if decision not in {"accepted", "rejected", "archived"}:
         return jsonify({"error": "decision must be accepted, rejected, or archived."}), 400
+    if course_scope == "graduation_project" and decision == "archived":
+        return jsonify({
+            "error": "Only the Head of Department can archive COMP4300 projects. Mark the project as accepted/succeeded for Head approval."
+        }), 403
 
     try:
         reference_id = int(reference_id)

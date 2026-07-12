@@ -59,11 +59,11 @@
   },
 
   "coordinator": {
-    "dashboard": "Coordinator Dashboard",
+    "dashboard": "Dashboard",
     "ai": "AI Assistant",
     "committee": "Committee",
     "evaluation": "Evaluation",
-    "exams": "Exams",
+    "exams": "Timelines & Submissions",
     "hours": "Hours",
     "lectures": "Lectures",
     "notifications": "Notifications",
@@ -71,7 +71,7 @@
     "registration": "Registration",
     "review": "Review",
     "search": "Search",
-    "sections": "Sections",
+    "sections": "Project Completion",
     "dashboard_role": "Coordinator",
     "stat_active_projects": "Active projects / groups",
     "stat_in_evaluation": "In committee evaluation",
@@ -94,7 +94,7 @@
   },
 
   "head": {
-    "dashboard": "Head Dashboard",
+    "dashboard": "Dashboard",
     "add_student": "Add Student",
     "ai": "AI Assistant",
     "assign": "Assign Coordinators",

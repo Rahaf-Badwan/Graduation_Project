@@ -790,8 +790,12 @@
       setAssignmentMessage(`readersMsg_${key}`, 'Saving readers...', false);
       const data = await postCommitteeJson(url, { reader1_id: reader1Id, reader2_id: reader2Id });
       setAssignmentMessage(`readersMsg_${key}`, data.message || 'Readers saved.', false);
-      await renderCommitteeDashboardPayload(data, { allowFallback: false });
-      openGeneratedCommitteeTab(courseScope);
+      const currentReaders = document.getElementById(`currentReaders_${key}`);
+      if (currentReaders) {
+        const reader1Name = r1.selectedOptions[0]?.textContent || '—';
+        const reader2Name = r2.selectedOptions[0]?.textContent || '—';
+        currentReaders.textContent = `${reader1Name} / ${reader2Name}`;
+      }
     } catch (err) {
       setAssignmentMessage(`readersMsg_${key}`, err.message || 'Could not save readers.', true);
     }
@@ -959,7 +963,7 @@
                     Time: ${safeText(project.slot_start || '')}${project.slot_end ? ` - ${safeText(project.slot_end)}` : ''}<br>
                     Students: ${safeText(project.team_members || project.students || '—')}<br>
                     Supervisor: ${safeText(project.supervisor_name || plan.supervisor_name || '—')}<br>
-                    Current Readers: ${safeText(project.reader1_name || '—')} / ${safeText(project.reader2_name || '—')}
+                    Current Readers: <span id="currentReaders_${safeText(key)}">${safeText(project.reader1_name || '—')} / ${safeText(project.reader2_name || '—')}</span>
                   </div>
                   <div class="assignment-box">
                     <b>Choose Report Readers</b>

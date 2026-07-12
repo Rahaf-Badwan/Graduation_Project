@@ -65,18 +65,6 @@
       <span class="sb-label">{{ t['general']['Grades'] }}</span>
     </a>
     
-    <a class="sb-item {% if request.path == '/head/search' %}on{% endif %}"
-      data-page="search"
-      data-tip="{{ t['general']['archived_projects'] }}"
-      href="/head/search">
-      <span class="sb-icon">
-        <span class="material-symbols-outlined icon-inline">search</span>
-      </span>
-      <span class="sb-label">{{ t['general']['archived_projects'] }}</span>
-    </a>
-
-   
-
     <a class="sb-item {% if request.path == '/head/notifs' %}on{% endif %}"
       data-page="notifs"
       data-tip="Notifications"
@@ -85,6 +73,16 @@
         <span class="material-symbols-outlined icon-inline">notifications</span>
       </span>
       <span class="sb-label">{{ t['head']['notifications'] }}</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/head/search' %}on{% endif %}"
+      data-page="search"
+      data-tip="{{ t['general']['archived_projects'] }}"
+      href="/head/search">
+      <span class="sb-icon">
+        <span class="material-symbols-outlined icon-inline">search</span>
+      </span>
+      <span class="sb-label">{{ t['general']['archived_projects'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/head/ai' %}on{% endif %}"

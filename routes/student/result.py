@@ -66,6 +66,27 @@ def _normalize_student_result_row(row):
     return row
 
 
+def _remove_orphaned_duplicate_passes(history):
+    """Hide stale passed rows superseded by a newer, project-backed pass."""
+    project_backed_passes = set()
+    cleaned = []
+
+    # The result query is ordered newest-first within each course.
+    for item in history:
+        course_code = item.get("course_code")
+        is_passed = item.get("course_status") == "passed"
+        has_project = bool(item.get("project_title"))
+
+        if is_passed and not has_project and course_code in project_backed_passes:
+            continue
+
+        cleaned.append(item)
+        if is_passed and has_project and course_code:
+            project_backed_passes.add(course_code)
+
+    return cleaned
+
+
 @student_bp.route("/result")
 @login_required(role="student")
 def result():
@@ -276,6 +297,7 @@ def result():
             history = cursor.fetchall()
             for item in history:
                 _normalize_student_result_row(item)
+            history = _remove_orphaned_duplicate_passes(history)
 
             promoted_source = next(
                 (

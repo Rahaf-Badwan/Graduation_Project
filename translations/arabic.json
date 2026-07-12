@@ -59,11 +59,11 @@
   },
 
   "coordinator": {
-    "dashboard": "لوحة تحكم المنسق",
+    "dashboard": "لوحة التحكم",
     "ai": "المساعد الذكي",
     "committee": "اللجنة",
     "evaluation": "التقييم",
-    "exams": "الامتحانات",
+    "exams": "الجداول والتسليمات",
     "hours": "الساعات",
     "lectures": "المحاضرات",
     "notifications": "الإشعارات",
@@ -71,7 +71,7 @@
     "registration": "التسجيل",
     "review": "المراجعة",
     "search": "البحث",
-    "sections": "الأقسام",
+    "sections": "إنجاز المشاريع",
     "dashboard_role": "المنسق",
      "stat_active_projects": "المشاريع / المجموعات النشطة",
     "stat_in_evaluation": "تقييم اللجنة",
@@ -94,7 +94,7 @@
   },
 
   "head": {
-    "dashboard": "لوحة تحكم الرئيس",
+    "dashboard": "لوحة التحكم",
     "add_student": "إضافة طالب",
     "ai": "المساعد الذكي",
     "assign": "تعيين المشرفين",

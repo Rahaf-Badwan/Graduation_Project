@@ -117,9 +117,9 @@ def api_add_student():
         return jsonify({"error": f"Database error: {e}"}), 500
 
 
-# Return active students based on their real course/project lifecycle.
-# A succeeded COMP4200 group moves to the COMP4300 tab immediately, while
-# students whose COMP4300 project is archived disappear from the active list.
+# Return active students based on Head-approved lifecycle transitions.
+# Coordinator success only makes a group/project ready for Head approval; it
+# must not move students between tabs or remove them from the active list.
 @add_student_bp.route("/api/students/active", methods=["GET"])
 @login_required(role="head_of_department")
 def api_active_students():
@@ -148,21 +148,17 @@ def api_active_students():
                 WHERE u.role = 'student'
                   AND u.is_active = TRUE
                   AND s.course_code = 'COMP4200'
-                  AND scr.promoted_at IS NULL
-                  AND scr.promoted_to_semester_id IS NULL
                   AND NOT EXISTS (
                       SELECT 1
-                      FROM project_members completed_pm
-                      JOIN projects completed_project
-                        ON completed_project.project_id = completed_pm.project_id
-                      JOIN semesters completed_semester
-                        ON completed_semester.semester_id = completed_project.semester_id
-                      JOIN section_completion_status completed_status
-                        ON completed_status.course_scope = 'introduction'
-                       AND completed_status.reference_id = completed_project.project_id
-                       AND completed_status.status = 'succeeded'
-                      WHERE completed_pm.student_id = st.student_id
-                        AND completed_semester.course_code = 'COMP4200'
+                      FROM student_course_results promoted_result
+                      JOIN users promoter
+                        ON promoter.user_id = promoted_result.promoted_by
+                       AND promoter.role = 'head_of_department'
+                      JOIN semesters promoted_target
+                        ON promoted_target.semester_id = promoted_result.promoted_to_semester_id
+                       AND promoted_target.course_code = 'COMP4300'
+                      WHERE promoted_result.student_id = st.student_id
+                        AND promoted_result.promoted_at IS NOT NULL
                   )
                 ORDER BY u.full_name
                 """
@@ -183,28 +179,15 @@ def api_active_students():
                   AND (
                       EXISTS (
                           SELECT 1
-                          FROM project_members passed_pm
-                          JOIN projects passed_project
-                            ON passed_project.project_id = passed_pm.project_id
-                          JOIN semesters passed_semester
-                            ON passed_semester.semester_id = passed_project.semester_id
-                          JOIN section_completion_status passed_status
-                            ON passed_status.course_scope = 'introduction'
-                           AND passed_status.reference_id = passed_project.project_id
-                           AND passed_status.status = 'succeeded'
-                          WHERE passed_pm.student_id = st.student_id
-                            AND passed_semester.course_code = 'COMP4200'
-                      )
-                      OR EXISTS (
-                          SELECT 1
-                          FROM project_members active_pm
-                          JOIN projects active_project
-                            ON active_project.project_id = active_pm.project_id
-                          JOIN semesters active_semester
-                            ON active_semester.semester_id = active_project.semester_id
-                          WHERE active_pm.student_id = st.student_id
-                            AND active_semester.course_code = 'COMP4300'
-                            AND LOWER(COALESCE(active_project.status, '')) NOT IN ('archived', 'archive')
+                          FROM student_course_results promoted_result
+                          JOIN users promoter
+                            ON promoter.user_id = promoted_result.promoted_by
+                           AND promoter.role = 'head_of_department'
+                          JOIN semesters promoted_target
+                            ON promoted_target.semester_id = promoted_result.promoted_to_semester_id
+                           AND promoted_target.course_code = 'COMP4300'
+                          WHERE promoted_result.student_id = st.student_id
+                            AND promoted_result.promoted_at IS NOT NULL
                       )
                   )
                   AND NOT EXISTS (

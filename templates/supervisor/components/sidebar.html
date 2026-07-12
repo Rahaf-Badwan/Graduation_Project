@@ -33,7 +33,7 @@
 
     <a class="sb-item {% if request.path in ['/supervisor/progress', '/supervisor/timeline'] %}on{% endif %}" href="/supervisor/timeline">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">assignment</span></span>
-      <span class="sb-label">Exam</span>
+      <span class="sb-label">Timelines &amp; Submissions</span>
     </a>
 
     <a class="sb-item {% if request.path == '/supervisor/lectures' %}on{% endif %}" href="/supervisor/lectures">
@@ -62,15 +62,14 @@
       <span class="sb-label">{{ t['general']['Grades'] }}</span>
     </a>
 
-    <a class="sb-item {% if request.path == '/supervisor/search' %}on{% endif %}" href="/supervisor/search">
-      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
-      <span class="sb-label">{{ t['general']['archived_projects'] }}</span>
-    </a>
-
-     
     <a class="sb-item {% if request.path == '/supervisor/notifs' %}on{% endif %}" href="/supervisor/notifs">
       <span class="sb-icon"><span class="material-symbols-outlined icon-inline">notifications</span></span>
       <span class="sb-label">Notifications</span>
+    </a>
+
+    <a class="sb-item {% if request.path == '/supervisor/search' %}on{% endif %}" href="/supervisor/search">
+      <span class="sb-icon"><span class="material-symbols-outlined icon-inline">search</span></span>
+      <span class="sb-label">{{ t['general']['archived_projects'] }}</span>
     </a>
 
     <a class="sb-item {% if request.path == '/supervisor/ai' %}on{% endif %}" href="/supervisor/ai">
