@@ -303,6 +303,23 @@ def _faculty_supervised_group_counts(cursor, faculty_id):
         row = cursor.fetchone() or {}
         counts["section_groups"] = int(row.get("cnt") or 0)
 
+    if _table_exists(cursor, "committee_plan_members") and _table_exists(cursor, "committee_plans"):
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT cpm.plan_id) AS cnt
+            FROM committee_plan_members cpm
+            JOIN committee_plans cp ON cp.plan_id = cpm.plan_id
+            WHERE cpm.faculty_id = %s
+              AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+            """,
+            (faculty_id,),
+        )
+        row = cursor.fetchone() or {}
+        committee_plans = int(row.get("cnt") or 0)
+        if committee_plans > 0:
+            counts["project_groups"] += committee_plans
+            counts["section_groups"] += committee_plans
+
     counts["total_groups"] = counts["project_groups"] + counts["section_groups"]
     return counts
 
@@ -11425,10 +11442,9 @@ def _evaluation_autocreate_tasks(cursor, course_scope, reference_id, created_by=
 
     if course_scope == "introduction":
         coordinator_faculty_id = _evaluation_current_coordinator_faculty_id(cursor)
-        if not coordinator_faculty_id:
-            raise ValueError("The logged-in coordinator is not linked to a faculty record, so the /10 coordinator mark cannot be created.")
-        _evaluation_insert_task(cursor, course_scope, reference_id, "intro_coordinator", coordinator_faculty_id, created_by)
-        created_faculty_ids.add(int(coordinator_faculty_id))
+        if coordinator_faculty_id:
+            _evaluation_insert_task(cursor, course_scope, reference_id, "intro_coordinator", coordinator_faculty_id, created_by)
+            created_faculty_ids.add(int(coordinator_faculty_id))
 
     # The discussion/committee supervisors are exactly the committee members saved
     # for the current plan. No random doctors, no old tasks, no fallback.

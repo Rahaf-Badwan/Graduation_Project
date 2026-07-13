@@ -257,6 +257,23 @@ def _head_faculty_supervised_group_counts(cursor, faculty_id):
         row = cursor.fetchone() or {}
         counts["section_groups"] = int(row.get("cnt") or 0)
 
+    if _head_table_exists(cursor, "committee_plan_members") and _head_table_exists(cursor, "committee_plans"):
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT cpm.plan_id) AS cnt
+            FROM committee_plan_members cpm
+            JOIN committee_plans cp ON cp.plan_id = cpm.plan_id
+            WHERE cpm.faculty_id = %s
+              AND COALESCE(cp.status, 'scheduled') <> 'cancelled'
+            """,
+            (faculty_id,),
+        )
+        row = cursor.fetchone() or {}
+        committee_plans = int(row.get("cnt") or 0)
+        if committee_plans > 0:
+            counts["project_groups"] += committee_plans
+            counts["section_groups"] += committee_plans
+
     counts["total_groups"] = counts["project_groups"] + counts["section_groups"]
     return counts
 
