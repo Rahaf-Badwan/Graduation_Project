@@ -441,80 +441,85 @@ def _insert_notification(
     related_project_id=None,
     course_scope="both",
 ):
-    notification_type = _safe_notification_type(cursor, notification_type)
-    has_course_scope = _db_column_exists(cursor, "notifications", "course_scope")
-    has_can_reply = _db_column_exists(cursor, "notifications", "can_reply")
+    try:
+        notification_type = _safe_notification_type(cursor, notification_type)
+        has_course_scope = _db_column_exists(cursor, "notifications", "course_scope")
+        has_can_reply = _db_column_exists(cursor, "notifications", "can_reply")
 
-    if has_course_scope and has_can_reply:
-        cursor.execute(
-            """
-            INSERT INTO notifications
-                (recipient_id, sender_id, notification_type, title, message,
-                 course_scope, related_project_id, is_read, can_reply)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, FALSE)
-            """,
-            (
-                recipient_id,
-                sender_id,
-                notification_type,
-                title,
-                message,
-                course_scope,
-                related_project_id,
-            ),
-        )
-    elif has_course_scope:
-        cursor.execute(
-            """
-            INSERT INTO notifications
-                (recipient_id, sender_id, notification_type, title, message,
-                 course_scope, related_project_id, is_read)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE)
-            """,
-            (
-                recipient_id,
-                sender_id,
-                notification_type,
-                title,
-                message,
-                course_scope,
-                related_project_id,
-            ),
-        )
-    elif has_can_reply:
-        cursor.execute(
-            """
-            INSERT INTO notifications
-                (recipient_id, sender_id, notification_type, title, message,
-                 related_project_id, is_read, can_reply)
-            VALUES (%s, %s, %s, %s, %s, %s, FALSE, FALSE)
-            """,
-            (
-                recipient_id,
-                sender_id,
-                notification_type,
-                title,
-                message,
-                related_project_id,
-            ),
-        )
-    else:
-        cursor.execute(
-            """
-            INSERT INTO notifications
-                (recipient_id, sender_id, notification_type, title, message,
-                 related_project_id, is_read)
-            VALUES (%s, %s, %s, %s, %s, %s, FALSE)
-            """,
-            (
-                recipient_id,
-                sender_id,
-                notification_type,
-                title,
-                message,
-                related_project_id,
-            ),
-        )
+        if has_course_scope and has_can_reply:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     course_scope, related_project_id, is_read, can_reply)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE, FALSE)
+                """,
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    course_scope,
+                    related_project_id,
+                ),
+            )
+        elif has_course_scope:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     course_scope, related_project_id, is_read)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, FALSE)
+                """,
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    course_scope,
+                    related_project_id,
+                ),
+            )
+        elif has_can_reply:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     related_project_id, is_read, can_reply)
+                VALUES (%s, %s, %s, %s, %s, %s, FALSE, FALSE)
+                """,
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    related_project_id,
+                ),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO notifications
+                    (recipient_id, sender_id, notification_type, title, message,
+                     related_project_id, is_read)
+                VALUES (%s, %s, %s, %s, %s, %s, FALSE)
+                """,
+                (
+                    recipient_id,
+                    sender_id,
+                    notification_type,
+                    title,
+                    message,
+                    related_project_id,
+                ),
+            )
+    except Exception:
+        return False
+
+    return True
 
 
 def _project_student_user_ids(cursor, project_id):
@@ -8704,66 +8709,69 @@ def _section_student_user_ids(cursor, section_id):
 
 def _notify_section_students(cursor, section_id, sender_id):
     """Notify COMP4200 students about their supervisor and group/section students."""
-    cursor.execute(
-        """
-        SELECT COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS section_name,
-               u_sup.full_name AS supervisor_name
-        FROM student_distribution_sections sec
-        LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
-        LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
-        JOIN faculty f ON f.faculty_id = sec.supervisor_id
-        JOIN users u_sup ON u_sup.user_id = f.user_id
-        WHERE sec.section_id = %s
-        """,
-        (section_id,),
-    )
-    section = cursor.fetchone()
-    if not section:
-        return 0
-
-    cursor.execute(
-        """
-        SELECT st.student_id, u.user_id, u.full_name
-        FROM section_students ss
-        JOIN students st ON st.student_id = ss.student_id
-        JOIN users u ON u.user_id = st.user_id
-        WHERE ss.section_id = %s
-          AND u.role = 'student'
-          AND u.is_active = TRUE
-        ORDER BY u.full_name
-        """,
-        (section_id,),
-    )
-    students = cursor.fetchall()
-    if not students:
-        return 0
-
-    all_names = [s["full_name"] for s in students]
-    sent = 0
-
-    for student in students:
-        partners = [name for name in all_names if name != student["full_name"]]
-        partners_line = ", ".join(partners) if partners else "No other students in your section yet"
-        message = (
-            f"You have been assigned to section: {section.get('section_name')}.\n"
-            f"Supervisor: {section.get('supervisor_name') or 'Not assigned'}.\n"
-            f"Section students: {', '.join(all_names)}.\n"
-            f"Your partners: {partners_line}."
+    try:
+        cursor.execute(
+            """
+            SELECT COALESCE(NULLIF(p_intro.title, ''), sec.section_name) AS section_name,
+                   COALESCE(u_sup.full_name, 'Not assigned') AS supervisor_name
+            FROM student_distribution_sections sec
+            LEFT JOIN comp4200_project_sections cps ON cps.section_id = sec.section_id
+            LEFT JOIN projects p_intro ON p_intro.project_id = cps.project_id
+            LEFT JOIN faculty f ON f.faculty_id = sec.supervisor_id
+            LEFT JOIN users u_sup ON u_sup.user_id = f.user_id
+            WHERE sec.section_id = %s
+            """,
+            (section_id,),
         )
+        section = cursor.fetchone()
+        if not section:
+            return 0
 
-        _insert_notification(
-            cursor,
-            student["user_id"],
-            sender_id,
-            "system",
-            "Supervisor and Section Assignment",
-            message,
-            None,
-            "introduction",
+        cursor.execute(
+            """
+            SELECT st.student_id, u.user_id, u.full_name
+            FROM section_students ss
+            JOIN students st ON st.student_id = ss.student_id
+            JOIN users u ON u.user_id = st.user_id
+            WHERE ss.section_id = %s
+              AND u.role = 'student'
+              AND u.is_active = TRUE
+            ORDER BY u.full_name
+            """,
+            (section_id,),
         )
-        sent += 1
+        students = cursor.fetchall()
+        if not students:
+            return 0
 
-    return sent
+        all_names = [s["full_name"] for s in students]
+        sent = 0
+
+        for student in students:
+            partners = [name for name in all_names if name != student["full_name"]]
+            partners_line = ", ".join(partners) if partners else "No other students in your section yet"
+            message = (
+                f"You have been assigned to section: {section.get('section_name')}\n"
+                f"Supervisor: {section.get('supervisor_name') or 'Not assigned'}\n"
+                f"Section students: {', '.join(all_names)}\n"
+                f"Your partners: {partners_line}."
+            )
+
+            _insert_notification(
+                cursor,
+                student["user_id"],
+                sender_id,
+                "system",
+                "Supervisor and Section Assignment",
+                message,
+                None,
+                "introduction",
+            )
+            sent += 1
+
+        return sent
+    except Exception:
+        return 0
 
 
 def _committee_auto_assign_readers(cursor, plan_id, items, members, course_scope="graduation_project"):
@@ -9967,41 +9975,47 @@ def api_add_students_to_existing_section():
                 VALUES (%s, %s)
             """, (section_id, student_id))
 
-        if _table_exists(cursor, "comp4200_project_sections"):
-            cursor.execute(
-                """
-                SELECT project_id
-                FROM comp4200_project_sections
-                WHERE section_id = %s
-                LIMIT 1
-                """,
-                (section_id,),
-            )
-            link = cursor.fetchone()
-            if link and link.get("project_id"):
-                project_id = int(link["project_id"])
-                for student_id in student_ids:
-                    cursor.execute(
-                        """
-                        DELETE p
-                        FROM projects p
-                        JOIN project_members pm ON pm.project_id = p.project_id
-                        WHERE pm.student_id = %s
-                          AND p.semester_id = %s
-                          AND p.status = 'solo_pending'
-                        """,
-                        (student_id, active_semester["semester_id"]),
-                    )
-                    cursor.execute(
-                        """
-                        INSERT IGNORE INTO project_members
-                            (project_id, student_id, is_primary_contact)
-                        VALUES (%s, %s, 0)
-                        """,
-                        (project_id, student_id),
-                    )
+        try:
+            if _table_exists(cursor, "comp4200_project_sections"):
+                cursor.execute(
+                    """
+                    SELECT project_id
+                    FROM comp4200_project_sections
+                    WHERE section_id = %s
+                    LIMIT 1
+                    """,
+                    (section_id,),
+                )
+                link = cursor.fetchone()
+                if link and link.get("project_id"):
+                    project_id = int(link["project_id"])
+                    for student_id in student_ids:
+                        cursor.execute(
+                            """
+                            DELETE p
+                            FROM projects p
+                            JOIN project_members pm ON pm.project_id = p.project_id
+                            WHERE pm.student_id = %s
+                              AND p.semester_id = %s
+                              AND p.status = 'solo_pending'
+                            """,
+                            (student_id, active_semester["semester_id"]),
+                        )
+                        cursor.execute(
+                            """
+                            INSERT IGNORE INTO project_members
+                                (project_id, student_id, is_primary_contact)
+                            VALUES (%s, %s, 0)
+                            """,
+                            (project_id, student_id),
+                        )
+        except Exception:
+            pass
 
-        _notify_section_students(cursor, section_id, session.get("user_id"))
+        try:
+            _notify_section_students(cursor, section_id, session.get("user_id"))
+        except Exception:
+            pass
 
         db.commit()
 
